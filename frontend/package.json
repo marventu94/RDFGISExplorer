@@ -1,0 +1,53 @@
+{
+  "name": "frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "private": true,
+  "packageManager": "pnpm@10.33.4",
+  "dependencies": {
+    "@angular/cdk": "^21.2.12",
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/material": "^21.2.12",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "@turf/boolean-point-in-polygon": "^7.3.5",
+    "ag-grid-angular": "^35.3.0",
+    "ag-grid-community": "^35.3.0",
+    "chart.js": "^4.5.1",
+    "codemirror": "^6.0.2",
+    "cytoscape": "^3.33.4",
+    "cytoscape-cola": "^2.5.1",
+    "cytoscape-dagre": "^3.0.0",
+    "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
+    "leaflet.markercluster": "^1.5.3",
+    "rxjs": "~7.8.0",
+    "sparqljs": "^3.7.4",
+    "tslib": "^2.3.0",
+    "vis-timeline": "^8.5.1"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.11",
+    "@angular/cli": "^21.2.11",
+    "@angular/compiler-cli": "^21.2.0",
+    "@types/cytoscape": "^3.31.0",
+    "@types/geojson": "^7946.0.16",
+    "@types/leaflet": "^1.9.21",
+    "@types/leaflet-draw": "^1.0.13",
+    "@types/leaflet.markercluster": "^1.5.6",
+    "@types/sparqljs": "^3.1.12",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}
