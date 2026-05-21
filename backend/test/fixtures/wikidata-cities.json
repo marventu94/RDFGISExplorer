@@ -1,0 +1,30 @@
+{
+  "head": {
+    "vars": ["city", "cityLabel", "coord", "population", "incep", "website"]
+  },
+  "results": {
+    "bindings": [
+      {
+        "city": { "type": "uri", "value": "http://www.wikidata.org/entity/Q1486" },
+        "cityLabel": { "xml:lang": "es", "type": "literal", "value": "Buenos Aires" },
+        "coord": { "datatype": "http://www.opengis.net/ont/geosparql#wktLiteral", "type": "literal", "value": "Point(-58.3816 -34.6037)" },
+        "population": { "datatype": "http://www.w3.org/2001/XMLSchema#decimal", "type": "literal", "value": "3075646" },
+        "incep": { "datatype": "http://www.w3.org/2001/XMLSchema#date", "type": "literal", "value": "1536-02-02" },
+        "website": { "type": "uri", "value": "https://buenosaires.gob.ar" }
+      },
+      {
+        "city": { "type": "uri", "value": "http://www.wikidata.org/entity/Q442" },
+        "cityLabel": { "xml:lang": "es", "type": "literal", "value": "Córdoba" },
+        "coord": { "datatype": "http://www.opengis.net/ont/geosparql#wktLiteral", "type": "literal", "value": "Point(-64.1810 -31.4200)" },
+        "population": { "datatype": "http://www.w3.org/2001/XMLSchema#decimal", "type": "literal", "value": "1391180" },
+        "incep": { "datatype": "http://www.w3.org/2001/XMLSchema#dateTime", "type": "literal", "value": "1573-07-06T00:00:00Z" },
+        "website": { "type": "uri", "value": "https://cordoba.gob.ar" }
+      },
+      {
+        "city": { "type": "uri", "value": "http://www.wikidata.org/entity/Q44244" },
+        "cityLabel": { "xml:lang": "en", "type": "literal", "value": "Rosario" },
+        "coord": { "datatype": "http://www.opengis.net/ont/geosparql#wktLiteral", "type": "literal", "value": "Point(-60.6393 -32.9468)" }
+      }
+    ]
+  }
+}
