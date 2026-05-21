@@ -1,0 +1,97 @@
+:host {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sparql-input {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--mat-sys-surface);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.editor-area :is(.cm-editor) {
+  height: 100%;
+}
+
+.editor-area :is(.cm-editor .cm-scroller) {
+  overflow: auto;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--mat-sys-surface-container-low);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  flex-shrink: 0;
+  min-height: 40px;
+  gap: 8px;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-right {
+  margin-left: auto;
+}
+
+.limit-btn {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.mat-spinner {
+  margin-right: 8px;
+}
+
+.snackbar-error {
+  min-width: 320px;
+}
+
+::ng-deep .library-menu .menu-section-label {
+  padding: 8px 16px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--mat-sys-on-surface-variant);
+  letter-spacing: 0.5px;
+}
+
+::ng-deep .library-menu .mat-mdc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+::ng-deep .library-menu .delete-btn {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  padding: 0;
+}
+
+::ng-deep .library-menu .delete-btn .mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.active-option {
+  font-weight: 600;
+  color: var(--mat-sys-primary);
+}
