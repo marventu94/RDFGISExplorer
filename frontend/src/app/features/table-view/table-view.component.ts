@@ -1,8 +1,392 @@
-import { Component } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  OnDestroy,
+} from '@angular/core';
+import { Subject, takeUntil, firstValueFrom } from 'rxjs';
+import { filter } from 'rxjs/operators';
+import { AgGridAngular } from 'ag-grid-angular';
+import type {
+  ColDef,
+  GridApi,
+  GridReadyEvent,
+  RowSelectedEvent,
+  CellValueChangedEvent,
+  ICellRendererParams,
+} from 'ag-grid-community';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSelectModule } from '@angular/material/select';
+import { FormsModule } from '@angular/forms';
+
+import { SelectionService } from '@core/services/selection.service';
+import { CurationService } from '@core/services/curation.service';
+import type {
+  QueryResult,
+  ResultBinding,
+  BindingValue,
+  NormalizedNode,
+  CurationRecord,
+  Selection,
+} from '@shared/models';
+import { UriCellRendererComponent } from './cell-renderers/uri-cell-renderer.component';
+import { CoordCellRendererComponent } from './cell-renderers/coord-cell-renderer.component';
+import { EditableCellRendererComponent } from './cell-renderers/editable-cell-renderer.component';
+import { InlineEditorComponent } from './cell-editors/inline-editor.component';
 
 @Component({
   selector: 'app-table-view',
   standalone: true,
-  template: '<div class="placeholder-m02">M02 Table View</div>',
+  imports: [
+    AgGridAngular,
+    MatIconModule,
+    MatButtonModule,
+    MatSnackBarModule,
+    MatSelectModule,
+    FormsModule,
+  ],
+  templateUrl: './table-view.component.html',
+  styleUrl: './table-view.component.scss',
 })
-export class TableViewComponent {}
+export class TableViewComponent implements OnDestroy {
+  private readonly selectionService = inject(SelectionService);
+  private readonly curationService = inject(CurationService);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly destroy$ = new Subject<void>();
+
+  private gridApi: GridApi | null = null;
+  private readonly curationCache = new Map<string, CurationRecord[]>();
+  private isInternalSelection = false;
+
+  readonly queryResult = signal<QueryResult | null>(null);
+  readonly pageSize = signal(50);
+  readonly pageSizeOptions = [50, 100, 200];
+
+  readonly columnDefs = signal<ColDef[]>([]);
+  readonly rowData = signal<ResultBinding[]>([]);
+  readonly defaultColDef: ColDef = {
+    sortable: true,
+    filter: true,
+    resizable: true,
+    minWidth: 100,
+  };
+
+  readonly isReady = computed(() => this.gridApi !== null);
+  readonly hasData = computed(() => this.rowData().length > 0);
+  readonly isTruncated = computed(
+    () => this.queryResult()?.meta?.truncated ?? false,
+  );
+  readonly truncatedMessage = computed(() => {
+    const qr = this.queryResult();
+    if (!qr?.meta?.truncated) return '';
+    return `Mostrando ${qr.bindings.length} de ${qr.meta.limitApplied} resultados (truncado)`;
+  });
+
+  constructor() {
+    this.selectionService.filteredQueryResult$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((result) => {
+        this.curationCache.clear();
+        this.queryResult.set(result);
+        if (result) {
+          this.buildColumnDefs(result);
+          this.rowData.set(result.bindings);
+        } else {
+          this.columnDefs.set([]);
+          this.rowData.set([]);
+        }
+      });
+
+    this.selectionService.selectedNode$
+      .pipe(
+        takeUntil(this.destroy$),
+        filter((sel: Selection) => sel.source !== 'table'),
+      )
+      .subscribe((sel: Selection) => {
+        if (sel.node && this.gridApi) {
+          this.scrollToNode(sel.node);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  onGridReady(event: GridReadyEvent): void {
+    this.gridApi = event.api;
+    this.gridApi.sizeColumnsToFit();
+  }
+
+  onFirstDataRendered(): void {
+    void this.loadVisibleCurations();
+  }
+
+  onPaginationChanged(): void {
+    void this.loadVisibleCurations();
+  }
+
+  onRowSelected(event: RowSelectedEvent): void {
+    if (!event.node.isSelected() || this.isInternalSelection) return;
+    const rowData = event.data as Record<string, BindingValue> | undefined;
+    if (!rowData) return;
+
+    const node = this.buildNodeFromRow(rowData);
+    if (node) {
+      this.selectionService.select(node, 'table');
+    }
+  }
+
+  onCellValueChanged(event: CellValueChangedEvent): void {
+    const field = event.colDef.field;
+    if (!field) return;
+
+    const rowData = event.data as Record<string, BindingValue>;
+    if (!rowData) return;
+
+    const node = this.buildNodeFromRow(rowData);
+    if (!node) return;
+
+    const rawValue = rowData[field];
+    const newValue = event.newValue as string;
+    const rawString = this.bindingToRawString(rawValue);
+
+    void this.saveCuration(node.uri, field, rawString, newValue);
+  }
+
+  exportCsv(): void {
+    if (this.gridApi) {
+      this.gridApi.exportDataAsCsv({
+        fileName: `query-results-${new Date().toISOString().slice(0, 10)}.csv`,
+      });
+    }
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize.set(size);
+  }
+
+  private buildColumnDefs(result: QueryResult): void {
+    const defs: ColDef[] = result.variables.map((variable, index) => {
+      const isPrimaryUriColumn = index === 0;
+
+      const colDef: ColDef = {
+        field: variable,
+        headerName: variable,
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 100,
+        editable: !isPrimaryUriColumn,
+        cellEditor: isPrimaryUriColumn ? undefined : InlineEditorComponent,
+        valueGetter: (params) => {
+          const val = params.data?.[variable] as BindingValue | undefined;
+          return this.bindingToRawString(val);
+        },
+        cellRendererSelector: (
+          params: ICellRendererParams,
+        ) => {
+          if (isPrimaryUriColumn) {
+            return { component: UriCellRendererComponent };
+          }
+          const v = params.value as BindingValue | undefined;
+          if (v?.type === 'coordinate') {
+            return { component: CoordCellRendererComponent };
+          }
+          return { component: EditableCellRendererComponent };
+        },
+      };
+      return colDef;
+    });
+
+    this.columnDefs.set(defs);
+  }
+
+  private bindingToRawString(value: BindingValue | undefined): string {
+    if (!value) return '';
+    switch (value.type) {
+      case 'literal':
+        return value.value;
+      case 'uri':
+        return value.value;
+      case 'coordinate':
+        return `${value.value.lat}, ${value.value.lng}`;
+      case 'date':
+        return value.value;
+      case 'bnode':
+        return value.value;
+      default:
+        return '';
+    }
+  }
+
+  private buildNodeFromRow(
+    rowData: Record<string, BindingValue>,
+  ): NormalizedNode | null {
+    let uri = '';
+    const attributes: Record<string, BindingValue> = {};
+    let label = '';
+
+    for (const [key, value] of Object.entries(rowData)) {
+      attributes[key] = value;
+
+      if (value.type === 'uri' && !uri) {
+        uri = value.value;
+      }
+      if (value.type === 'literal' && !label) {
+        label = value.value;
+      }
+    }
+
+    if (!uri) return null;
+
+    return {
+      uri,
+      label: label || this.shortenUri(uri),
+      attributes,
+      coordinate:
+        (Object.values(attributes).find((v) => v.type === 'coordinate')
+          ?.value as { lat: number; lng: number } | undefined) ??
+        undefined,
+    };
+  }
+
+  private shortenUri(uri: string): string {
+    if (!uri) return '';
+    const hashIndex = uri.lastIndexOf('#');
+    if (hashIndex > 0) {
+      const base = uri.substring(0, hashIndex);
+      const fragment = uri.substring(hashIndex + 1);
+      if (fragment.length < 30) {
+        const parts = base.split('/');
+        const ns = parts[parts.length - 1] || parts[parts.length - 2] || base;
+        return `${ns}:${fragment}`;
+      }
+    }
+    const parts = uri.split('/');
+    return parts[parts.length - 1] || parts[parts.length - 2] || uri;
+  }
+
+  private scrollToNode(node: NormalizedNode): void {
+    if (!this.gridApi) return;
+    this.isInternalSelection = true;
+
+    this.gridApi.forEachNode((gridNode) => {
+      const data = gridNode.data as Record<string, BindingValue> | undefined;
+      if (!data) return;
+      const nodeUri = this.extractUri(data);
+      if (nodeUri === node.uri) {
+        gridNode.setSelected(true, false);
+        this.gridApi?.ensureNodeVisible(gridNode, 'middle');
+      } else {
+        gridNode.setSelected(false, false);
+      }
+    });
+    this.isInternalSelection = false;
+  }
+
+  private extractUri(data: Record<string, BindingValue>): string | null {
+    for (const value of Object.values(data)) {
+      if (value?.type === 'uri') {
+        return value.value;
+      }
+    }
+    return null;
+  }
+
+  private async loadVisibleCurations(): Promise<void> {
+    if (!this.gridApi) return;
+    const nodesToLoad: string[] = [];
+
+    this.gridApi.forEachNodeAfterFilterAndSort((gridNode) => {
+      const data = gridNode.data as Record<string, BindingValue> | undefined;
+      if (!data) return;
+      const uri = this.extractUri(data);
+      if (uri && !this.curationCache.has(uri)) {
+        nodesToLoad.push(uri);
+        this.curationCache.set(uri, []);
+      }
+    });
+
+    for (const uri of nodesToLoad) {
+      try {
+        const { records } = await firstValueFrom(
+          this.curationService.getForNode(uri),
+        );
+        this.curationCache.set(uri, records);
+        this.attachCurationsToRows(uri, records);
+      } catch {
+        this.curationCache.set(uri, []);
+      }
+    }
+  }
+
+  private attachCurationsToRows(
+    nodeUri: string,
+    records: CurationRecord[],
+  ): void {
+    if (!this.gridApi) return;
+
+    const recordByField = new Map<string, CurationRecord>();
+    for (const record of records) {
+      recordByField.set(record.fieldName, record);
+    }
+
+    this.gridApi.forEachNode((gridNode) => {
+      const data = gridNode.data as Record<string, BindingValue> | undefined;
+      if (!data) return;
+      const uri = this.extractUri(data);
+      if (uri !== nodeUri) return;
+
+      for (const [field, record] of recordByField) {
+        (data as Record<string, unknown>)['__curation__' + field] = record;
+      }
+    });
+
+    this.gridApi.refreshCells();
+  }
+
+  private async saveCuration(
+    nodeUri: string,
+    fieldName: string,
+    rawValue: string | null,
+    newValue: string,
+  ): Promise<void> {
+    const existingRecords = this.curationCache.get(nodeUri) ?? [];
+    const existing = existingRecords.find((r) => r.fieldName === fieldName);
+
+    try {
+      if (existing) {
+        await firstValueFrom(
+          this.curationService.update(existing.id, {
+            manualValue: newValue,
+            status: 'corrected',
+          }),
+        );
+        existing.manualValue = newValue;
+        existing.status = 'corrected';
+      } else {
+        const record = await firstValueFrom(
+          this.curationService.create({
+            nodeUri,
+            fieldName,
+            rawValue: rawValue ?? undefined,
+            manualValue: newValue,
+            status: 'corrected',
+          }),
+        );
+        existingRecords.push(record);
+        this.curationCache.set(nodeUri, existingRecords);
+      }
+
+      this.attachCurationsToRows(nodeUri, existingRecords);
+      this.snackBar.open('Guardado', 'Cerrar', { duration: 2000 });
+    } catch {
+      this.snackBar.open('Error al guardar', 'Cerrar', { duration: 3000 });
+    }
+  }
+}
