@@ -1,0 +1,158 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.timeline-view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  height: 48px;
+  flex-shrink: 0;
+  background: var(--mat-sys-surface-container-low, #f5f5f5);
+  border-bottom: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
+}
+
+.zoom-group {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.toolbar-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid #b0bec5;
+  border-radius: 4px;
+  background: #fff;
+  color: #37474f;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: #eceff1;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &--apply {
+    background: #1565c0;
+    color: #fff;
+    border-color: #1565c0;
+
+    &:hover:not(:disabled) {
+      background: #1976d2;
+    }
+  }
+}
+
+.tl-container {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+
+  &--hidden {
+    visibility: hidden;
+    width: 0;
+    height: 0;
+    flex: 0;
+    min-height: unset;
+  }
+}
+
+.price-chart-area {
+  width: 100%;
+  flex-shrink: 0;
+  background: var(--mat-sys-surface, #fff);
+}
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #78909c;
+  font-size: 14px;
+  gap: 12px;
+  pointer-events: none;
+  background: var(--mat-sys-surface-container-lowest, #fafafa);
+
+  &__icon {
+    font-size: 48px;
+    line-height: 1;
+  }
+
+  &__text {
+    opacity: 0.8;
+  }
+
+  &__label {
+    font-size: 12px;
+    opacity: 0.6;
+    font-style: italic;
+  }
+}
+
+.chip {
+  display: inline-block;
+  padding: 6px 14px;
+  background: #eceff1;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #546e7a;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.banner {
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 90%;
+  text-align: center;
+  pointer-events: auto;
+
+  &--info {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #90caf9;
+  }
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #1565c0;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+
+  &:hover {
+    color: #0d47a1;
+  }
+}
+
+code {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
