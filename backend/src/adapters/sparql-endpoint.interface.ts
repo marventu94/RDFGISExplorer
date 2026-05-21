@@ -20,7 +20,10 @@ export class TimeoutError extends Error {
 }
 
 export class UpstreamError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message);
     this.name = 'UpstreamError';
   }
