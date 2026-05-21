@@ -5,6 +5,7 @@ import { createSparqlEndpoint } from './adapters/sparql-endpoint.factory';
 import { QueryModule } from './modules/query/query.module';
 import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 import { HealthModule } from './modules/health/health.module';
+import { CurationModule } from './modules/curation/curation.module';
 import { DatabaseModule } from './db/database.module';
 
 @Module({
@@ -14,7 +15,7 @@ import { DatabaseModule } from './db/database.module';
     QueryModule,
     SuggestionsModule,
     HealthModule,
-    // TODO (M06): import CurationModule (Wave 3)
+    CurationModule,
   ],
   providers: [
     {
