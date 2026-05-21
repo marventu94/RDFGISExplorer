@@ -1,0 +1,7 @@
+<nav class="navbar">
+  <span class="navbar-brand">RDF GIS Explorer</span>
+  <app-filter-badges />
+  <button type="button" class="navbar-toggle" (click)="toggleEditor.emit()">
+    {{ editorCollapsed() ? 'Expandir editor' : 'Colapsar editor' }}
+  </button>
+</nav>
