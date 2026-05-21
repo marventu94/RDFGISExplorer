@@ -140,6 +140,16 @@ N/A.
 - Al hacer drag de rango y click "Aplicar": addFilter.
 - Cleanup en OnDestroy: `timeline?.destroy()`, `chart?.destroy()`.
 
+### Empty states (3 niveles)
+
+| Caso | Detección | UI |
+|---|---|---|
+| `queryResult === null` | aún no se ejecutó query | Eje temporal vacío + texto centrado "Ejecutá una query con fechas para ver la línea de tiempo" |
+| `nodes.length > 0` pero `nodes.every(n => !n.temporalEvents?.length)` | query sin fechas | Banner persistente: "Esta query no devolvió fechas. Asegurate de incluir una variable con datatype `xsd:date`/`xsd:dateTime`, o ajustá el [Mapeo de Variables](M01-sparql-input.md#74-panel-de-mapeo-de-variables-field-mapping) para marcar una columna como fecha." |
+| `nodes` con fechas pero filtros activos dejan 0 visibles | filtros aplicados | Eje vacío + chip "0 eventos en el rango activo: [× Rango 2020-2023]" |
+
+El segundo caso (resultado sin fechas) es común con queries que no incluyen `?inception` o `?birthDate`. El link al Mapeo de Variables le da al usuario una salida sin reescribir la query.
+
 ## 8. Wireframe
 
 ```
@@ -169,7 +179,42 @@ N/A.
 - [ ] Gráfico aparece para nodos con ≥2 eventos con `numericValue`.
 - [ ] Cleanup en OnDestroy.
 
-## 10. Prompt para AI ejecutora
+## 10. Integración con App Shell (M00)
+
+Lee `docs/modules/M00-app-shell.md` §3 para ver el contexto completo.
+
+| Ítem | Valor |
+|---|---|
+| **Selector exacto** | `app-timeline-view` |
+| **Dónde lo monta M00** | Celda inferior-derecha del grid 2×2 |
+| **Tamaño** | M00 controla ancho y alto. **No pongas width/height fijos.** |
+| **CSS del host** | `:host { display: block; width: 100%; height: 100%; }` |
+
+**Crítico para vis-timeline:** el `div` que recibe la Timeline debe tener dimensiones reales. Si tiene `height: 0`, vis-timeline inicializa con tamaño cero y los ítems no se ven.
+
+```scss
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tl-container {
+  width: 100%;
+  height: calc(100% - 48px); // restar la barra de controles (botón "Aplicar rango")
+}
+```
+
+Si el grid de M00 cambia de tamaño, redraw la timeline:
+
+```ts
+@HostListener('window:resize')
+onResize(): void {
+  this.timeline?.redraw();
+}
+```
+
+## 11. Prompt para AI ejecutora
 
 ```
 Sos un experto en Angular 17 + vis-timeline + Chart.js.
@@ -179,7 +224,8 @@ Lee primero:
 - docs/01-tech-stack.md
 - docs/02-data-contracts.md (§2, §3)
 - docs/04-conventions-and-glossary.md
-- docs/modules/M05-timeline-view.md (este archivo)
+- docs/modules/M00-app-shell.md (§3 y §9 — selector y estructura de archivos)
+- docs/modules/M05-timeline-view.md (este archivo, especialmente §10 para el :host CSS y redraw)
 - docs/modules/M07-selection-service.md
 
 Pre-requisitos: M07 implementado.

@@ -47,6 +47,7 @@ Toda la documentación vive en `docs/`. Cada AI ejecutora debe leer **dos bloque
 
 | Módulo | Archivo | Responsabilidad |
 |---|---|---|
+| M00 | [`docs/modules/M00-app-shell.md`](docs/modules/M00-app-shell.md) | Layout principal: grid 2x2 resizable + navbar + sidenav |
 | M01 | [`docs/modules/M01-sparql-input.md`](docs/modules/M01-sparql-input.md) | Editor SPARQL + biblioteca de queries |
 | M02 | [`docs/modules/M02-table-view.md`](docs/modules/M02-table-view.md) | Vista de tabla con paginado/filtro/orden |
 | M03 | [`docs/modules/M03-graph-view.md`](docs/modules/M03-graph-view.md) | Vista de grafo Cytoscape.js + focus+context |
