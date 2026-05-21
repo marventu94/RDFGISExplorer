@@ -34,19 +34,29 @@ Estos tres módulos no tienen dependencias funcionales entre sí pero todos los 
 
 **Importante:** M08 depende del **interface** de M09 (`SparqlEndpoint`), no de la implementación. La AI-backend-2 puede arrancar tan pronto como AI-backend-1 commitee la interfaz (no necesita esperar al adapter completo).
 
-### Wave 2 — Vistas (paralelo completo)
+### Wave 2 — App Shell + Vistas (paralelo parcial)
 
 Una vez Wave 1 mergeada:
 
+**Paso 2a — M00 primero (solo):**
+
 | Módulo | Quién |
 |---|---|
-| **M01** SPARQL Input | AI-frontend-2 |
-| **M02** Table View | AI-frontend-3 |
-| **M03** Graph View | AI-frontend-4 |
-| **M04** Map View | AI-frontend-5 |
-| **M05** Timeline View | AI-frontend-6 |
+| **M00** App Shell | AI-frontend-2 |
 
-Todas dependen solo de M07 (estable) y M08 (estable). Pueden ir en paralelo sin coordinarse entre sí, **salvo M03 y M04 que comparten `ENTITY_TYPE_COLORS`** — el primero que llegue lo crea en `frontend/src/app/shared/entity-colors.ts`, el segundo lo importa.
+M00 arma el `AppComponent`, `DashboardComponent` (grid 2x2 redimensionable), navbar con filtros activos y sidenav de curado. Los módulos M01-M05 arrancan como placeholders `<div>`. **M00 debe mergearse antes de que los demás empiecen**, porque define los selectores `<app-table-view>`, `<app-graph-view>`, etc. que cada vista tiene que matchear.
+
+**Paso 2b — Vistas en paralelo (cuando M00 está mergeado):**
+
+| Módulo | Quién |
+|---|---|
+| **M01** SPARQL Input | AI-frontend-3 |
+| **M02** Table View | AI-frontend-4 |
+| **M03** Graph View | AI-frontend-5 |
+| **M04** Map View | AI-frontend-6 |
+| **M05** Timeline View | AI-frontend-7 |
+
+Todas dependen de M07 (estable), M08 (estable) y M00 (shell). Pueden ir en paralelo sin coordinarse entre sí, **salvo M03 y M04 que comparten `ENTITY_TYPE_COLORS`** — el primero que llegue lo crea en `frontend/src/app/shared/entity-colors.ts`, el segundo lo importa.
 
 ### Wave 3 — Curado
 
@@ -177,14 +187,15 @@ Definición de hecho: <criterios verificables>
 | Wave | Módulo | Estado | Branch / PR | AI |
 |---|---|---|---|---|
 | W0 | Documentación | ✅ | (en `main`) | planner |
-| W1 | M09 SPARQL Adapter | ⏳ | — | — |
-| W1 | M08 Backend (core) | ⏳ | — | — |
-| W1 | M07 SelectionService | ⏳ | — | — |
-| W2 | M01 SPARQL Input | ⏳ | — | — |
-| W2 | M02 Table | ⏳ | — | — |
-| W2 | M03 Graph | ⏳ | — | — |
-| W2 | M04 Map | ⏳ | — | — |
-| W2 | M05 Timeline | ⏳ | — | — |
+| W1 | M09 SPARQL Adapter | ✅ | (en `main`) | — |
+| W1 | M08 Backend (core) | ✅ | (en `main`) | — |
+| W1 | M07 SelectionService | ✅ | (en `main`) | — |
+| W2a | M00 App Shell | ⏳ | — | — |
+| W2b | M01 SPARQL Input | ⏳ | — | — |
+| W2b | M02 Table | ⏳ | — | — |
+| W2b | M03 Graph | ⏳ | — | — |
+| W2b | M04 Map | ⏳ | — | — |
+| W2b | M05 Timeline | ⏳ | — | — |
 | W3 | M08 Curation endpoints | ⏳ | — | — |
 | W3 | M06 Curation Panel | ⏳ | — | — |
 | W4 | E2E + polish | ⏳ | — | — |

@@ -13,9 +13,11 @@ Representación tabular por defecto al obtener resultados. Es la vista de refere
 - Detección de tipo de celda (URI, literal, coordenada, fecha) y formato apropiado.
 - Linking: click en fila propaga selección.
 - Exportación a CSV.
+- **Edición inline por celda** con botón ✏️ (ver §7.5). Persiste vía `CurationService` en M08 backend, sin abrir el panel de M06.
+- **Indicador visual de estado de curado** por celda: badge ✓ validado, color distinto si tiene corrección manual o de script.
 
 **NO implementa:**
-- Edición de celdas (eso es M06 curado, en un panel aparte).
+- Panel completo de detalle del nodo (validar todo, anotaciones, duplicados — eso es M06).
 - Lógica de filtros geo/temporales (filtros viven en mapa/timeline; la tabla solo reacciona a `filteredQueryResult$`).
 
 ## 3. Requerimientos funcionales
@@ -29,12 +31,17 @@ Representación tabular por defecto al obtener resultados. Es la vista de refere
 | TAB-05 | Alta | Icono pin en celdas con coordenadas | Click en pin emite evento para centrar mapa (vía `selectionService.select`) |
 | TAB-06 | Media | Exportar a CSV | Botón "Exportar CSV" descarga archivo con las filas visibles |
 | TAB-07 | Media | Columnas redimensionables y reordenables | ag-grid built-in con `enableSorting`, `resizable`, `lockPinned` off |
+| TAB-08 | Alta | Botón ✏️ en cada celda editable, click → edición inline | Editar valor → blur o Enter guarda contra `POST /api/curation` o `PATCH /api/curation/:id` |
+| TAB-09 | Alta | Celdas muestran el valor efectivo (manual > script > raw) | Si hay correcciones cargadas, la celda muestra `manualValue ?? scriptValue ?? rawValue` |
+| TAB-10 | Alta | Badge visual ✓ en celdas validadas, color en corregidas | Verificable por screenshot manual; tests de mapping `status → CSS class` |
+| TAB-11 | Media | Carga lazy de correcciones por nodo al renderizar la fila | `CurationService.getForNode(uri)` se llama on-demand, no en bulk |
 
 ## 4. Dependencias
 
-- **Lee de:** `selectionService.filteredQueryResult$`.
-- **Emite a:** `selectionService.select(node, 'table')`.
+- **Lee de:** `selectionService.filteredQueryResult$`, `selectionService.selectedNode$`, `CurationService.getForNode()` (lazy).
+- **Emite a:** `selectionService.select(node, 'table')`, `CurationService.create()` / `.update()`.
 - **Librerías:** `ag-grid-community ^31`, `ag-grid-angular ^31`.
+- **Crea `CurationService`** en `frontend/src/app/core/services/curation.service.ts`. M06 después lo consume sin duplicarlo.
 
 ## 5. Interfaces TypeScript
 
@@ -124,6 +131,52 @@ N/A (consume estado del SelectionService).
 ### Truncamiento
 Si `result.meta.truncated`, mostrar banner sobre la tabla: "Mostrando {bindings.length} de {limit} resultados (truncado)".
 
+### 7.5 Edición inline por celda (curado rápido)
+
+**Flujo:**
+1. Hover sobre una celda editable (cualquier celda excepto la columna URI primaria) → aparece icono ✏️ en la esquina derecha.
+2. Click en ✏️ → la celda se convierte en input editable con el valor actual pre-cargado.
+3. El usuario edita y:
+   - **Enter** o blur fuera de la celda → guarda.
+   - **Esc** → cancela sin guardar.
+4. Al guardar:
+   - Si **no hay** `CurationRecord` para `(nodeUri, fieldName)`: `CurationService.create({ nodeUri, fieldName, rawValue, manualValue: nuevoValor, status: 'corrected' })`.
+   - Si **ya existe**: `CurationService.update(id, { manualValue: nuevoValor, status: 'corrected' })`.
+5. Snackbar de confirmación. La celda se actualiza al nuevo valor con badge color "corregido".
+
+**Visualización por estado:**
+
+| Estado del campo | Visual de la celda |
+|---|---|
+| Sin record (valor raw del grafo) | Texto normal, sin badge |
+| `status: 'validated'` | Badge ✓ verde a la derecha del valor |
+| `status: 'corrected'` (tiene `manualValue`) | Texto en color azul con borde inferior punteado + badge ✏️ |
+| `status: 'pending'` | Badge ⏳ amarillo |
+| `scriptValue` presente sin override manual | Texto en color violeta + badge 🤖 |
+
+**Tooltip al hover en una celda con record:** muestra autor, timestamp y valores anteriores.
+
+**Carga lazy:**
+
+```ts
+// En la inicialización de cada fila visible
+async onRowFirstVisible(node: NormalizedNode): Promise<void> {
+  if (!this.curationCache.has(node.uri)) {
+    const { records } = await this.curationService.getForNode(node.uri).toPromise();
+    this.curationCache.set(node.uri, records);
+    this.gridApi.refreshCells({ rowNodes: [/* esta fila */] });
+  }
+}
+```
+
+**Botón "Ver detalle completo":** cada fila tiene también un botón 🔍 que abre el panel M06 (sidenav con tabs Datos/Anotaciones/Duplicados) para operaciones avanzadas. La tabla cubre el flujo rápido (corregir 1 campo); el panel cubre el flujo profundo (validar todo, gestionar duplicados, ver historial).
+
+**Columnas no editables:**
+
+- La columna URI primaria (la primera columna `?uri` del SELECT) no es editable porque cambia la identidad del nodo.
+- Columnas con tipo `coordinate` permiten editar mostrando dos inputs `lat` y `lng`.
+- Columnas con tipo `date` muestran un date picker en vez de input texto libre.
+
 ## 8. Wireframe ASCII
 
 ```
@@ -153,7 +206,25 @@ Si `result.meta.truncated`, mostrar banner sobre la tabla: "Mostrando {bindings.
 - [ ] Columnas resizable y reordenable por drag.
 - [ ] Empty state cuando no hay resultados.
 
-## 10. Prompt para AI ejecutora
+## 10. Integración con App Shell (M00)
+
+Lee `docs/modules/M00-app-shell.md` §3 para ver el contexto completo.
+
+| Ítem | Valor |
+|---|---|
+| **Selector exacto** | `app-table-view` |
+| **Dónde lo monta M00** | Celda superior-izquierda del grid 2×2 |
+| **Tamaño** | M00 controla ancho y alto vía CSS Grid. **No pongas width/height fijos.** |
+| **CSS del host** | `:host { display: block; width: 100%; height: 100%; overflow: hidden; }` |
+
+ag-grid necesita un contenedor con altura real para renderizar. Como M00 lo provee vía CSS Grid, el componente solo debe asegurarse de que su template raíz tenga `height: 100%`:
+
+```html
+<!-- table-view.component.html -->
+<ag-grid-angular style="width: 100%; height: 100%" ...></ag-grid-angular>
+```
+
+## 11. Prompt para AI ejecutora
 
 ```
 Sos un experto en Angular 17 + ag-grid-community.
@@ -161,23 +232,32 @@ Sos un experto en Angular 17 + ag-grid-community.
 Lee primero:
 - docs/00-architecture.md
 - docs/01-tech-stack.md
-- docs/02-data-contracts.md (§1, §2)
+- docs/02-data-contracts.md (§1, §2, §4)
 - docs/04-conventions-and-glossary.md
-- docs/modules/M02-table-view.md (este archivo)
+- docs/modules/M00-app-shell.md (§3 y §9 — selector y estructura de archivos)
+- docs/modules/M02-table-view.md (este archivo, especialmente §7.5 — edición inline)
 - docs/modules/M07-selection-service.md
+- docs/modules/M08-backend-api.md (endpoints /curation para edición inline)
 
-Pre-requisitos: M07 implementado.
+Pre-requisitos: M07 implementado. M08 con endpoints /curation/* implementado (o stub mockeado).
 
 Archivos a crear:
 - frontend/src/app/features/table-view/table-view.component.{ts,html,scss}
 - frontend/src/app/features/table-view/cell-renderers/coord-cell-renderer.component.ts
 - frontend/src/app/features/table-view/cell-renderers/uri-cell-renderer.component.ts
+- frontend/src/app/features/table-view/cell-renderers/editable-cell-renderer.component.ts  ← NEW (botón ✏️ + indicador estado curado)
+- frontend/src/app/features/table-view/cell-editors/inline-editor.component.ts  ← NEW (input editable cuando se activa)
+- frontend/src/app/core/services/curation.service.ts  ← NEW (lo usa también M06)
+- frontend/src/app/core/services/curation.service.spec.ts
 - frontend/src/app/features/table-view/table-view.component.spec.ts
 
 Restricciones:
-- NO modifiques M07 ni 02-data-contracts.md.
+- NO modifiques M07, M08 (ya implementados) ni 02-data-contracts.md.
 - Usar ag-grid-community (no enterprise).
 - Standalone components.
+- CurationService debe quedar en core/services (NO dentro de features/table-view) porque M06 lo va a consumir.
+- Edición inline: Enter o blur guarda, Esc cancela.
+- Author del curado: leer de localStorage con default 'martin@bago.com.ar'.
 
 Definición de hecho:
 - Criterios §9 verificados.

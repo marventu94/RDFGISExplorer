@@ -121,6 +121,16 @@ N/A.
 3. Inicializar `markerClusterGroup` y `drawnItems` (FeatureGroup).
 4. Setup de `L.Control.Draw` con rectangle + polygon.
 
+### Empty states (3 niveles)
+
+| Caso | Detección | UI |
+|---|---|---|
+| `queryResult === null` | aún no se ejecutó query | Mapa base visible centrado en Argentina + overlay "Ejecutá una query para ver datos georeferenciados" |
+| `nodes.length > 0` pero `nodes.every(n => !n.coordinate)` | query con resultados sin coordenadas | Mapa base visible + overlay no-bloqueante: "Esta query no devolvió coordenadas. Asegurate de incluir una variable con `wdt:P625` (Wikidata) o un literal `wktLiteral`, o ajustá el [Mapeo de Variables](#) en el panel SPARQL." |
+| `nodes.some(n => n.coordinate)` pero filtros activos dejan 0 visibles | filtros geo/temporal aplicados | Marcadores con `opacity: 0.3` ocultos + banner "0 de N nodos pasan los filtros activos: [chip × Área CABA] [chip × Rango 2020-2023]" |
+
+El overlay del segundo caso es importante: no es un error, es información. El usuario probablemente quiso ver el mapa y su query no devolvió coords. El link al panel de Mapeo de Variables ([M01](M01-sparql-input.md) §7.4) permite intentar reinterpretar un literal como coordenada sin reescribir la query.
+
 ### Reactivo
 - `filteredQueryResult$.subscribe(...)`: limpiar cluster, agregar marcadores nuevos.
 - `selectedNode$.subscribe(...)`: si `source !== 'map'` y `sel.node?.coordinate`, `flyTo` + animación de anillo pulsante.
@@ -171,7 +181,45 @@ Implementar con un `L.divIcon` temporal sobre el marcador seleccionado.
 - [ ] Color coherente con M03.
 - [ ] Cleanup en `OnDestroy` (`map.remove()`).
 
-## 10. Prompt para AI ejecutora
+## 10. Integración con App Shell (M00)
+
+Lee `docs/modules/M00-app-shell.md` §3 para ver el contexto completo.
+
+| Ítem | Valor |
+|---|---|
+| **Selector exacto** | `app-map-view` |
+| **Dónde lo monta M00** | Celda inferior-izquierda del grid 2×2 |
+| **Tamaño** | M00 controla ancho y alto. **No pongas width/height fijos.** |
+| **CSS del host** | `:host { display: block; width: 100%; height: 100%; }` |
+
+**Crítico para Leaflet:** Leaflet lanza el mapa con las dimensiones del contenedor en el momento de `L.map(container)`. Si el contenedor tiene `height: 0` o `height: auto`, el mapa **no se ve** (bug silencioso muy común).
+
+```scss
+// map-view.component.scss
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#map-container {
+  width: 100%;
+  height: 100%;
+}
+```
+
+Si el divisor de M00 es arrastrado y el panel cambia de tamaño, el mapa debe invalidar su tamaño:
+
+```ts
+@HostListener('window:resize')
+onResize(): void {
+  this.map?.invalidateSize();
+}
+```
+
+También llamar `invalidateSize()` después de que el editor SPARQL se colapsa (el grid gana altura), si M00 emite un evento para esto.
+
+## 11. Prompt para AI ejecutora
 
 ```
 Sos un experto en Angular 17 + Leaflet.
@@ -181,9 +229,10 @@ Lee primero:
 - docs/01-tech-stack.md
 - docs/02-data-contracts.md (§2, §3)
 - docs/04-conventions-and-glossary.md
-- docs/modules/M04-map-view.md (este archivo)
+- docs/modules/M00-app-shell.md (§3 y §9 — selector y estructura de archivos)
+- docs/modules/M04-map-view.md (este archivo, especialmente §10 para el :host CSS y invalidateSize)
 - docs/modules/M07-selection-service.md
-- docs/modules/M03-graph-view.md (para reusar ENTITY_TYPE_COLORS; refactorizar a frontend/src/app/shared/entity-colors.ts si es necesario)
+- docs/modules/M03-graph-view.md (para reusar ENTITY_TYPE_COLORS de shared/entity-colors.ts)
 
 Pre-requisitos: M07 implementado.
 

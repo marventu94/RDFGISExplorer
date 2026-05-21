@@ -13,6 +13,7 @@ Punto de entrada de la herramienta. Editor de SPARQL con resaltado de sintaxis, 
 - Botón "Ejecutar" + atajo `Ctrl+Enter`.
 - Persistencia de queries propias en `localStorage`.
 - Indicador de límite aplicado (500 por default, opción de subir a 2000).
+- **Panel de Mapeo de Variables**: después de ejecutar la query, mostrar las variables del SELECT con su tipo auto-detectado y permitir override manual (ver §7.4).
 
 **NO implementa:**
 - Ejecución contra el endpoint (eso es M08 vía un `ApiService`).
@@ -29,6 +30,9 @@ Punto de entrada de la herramienta. Editor de SPARQL con resaltado de sintaxis, 
 | SPARQL-04 | Alta | Límite 500 auto, ampliable a 2000 con confirmación | UI indica "LIMIT 500 aplicado"; opción "Aumentar a 2000" abre confirm dialog |
 | SPARQL-05 | Media | Autocompletado de prefijos | Al escribir `wd:` o `wdt:` sugiere entidades/propiedades comunes (lista hardcoded en fase 1) |
 | SPARQL-06 | Media | Guardar consultas propias en localStorage | Botón "Guardar"; queries propias aparecen en una sección "Mis queries" |
+| SPARQL-07 | Alta | Panel de Mapeo de Variables después de ejecutar | Cada variable del SELECT muestra su tipo detectado y un dropdown para override |
+| SPARQL-08 | Alta | Override de mapeo re-emite QueryResult con re-normalización | Cambiar `?year` de "literal" a "date" hace que M05 timeline aparezca con los items |
+| SPARQL-09 | Media | Overrides persisten en localStorage por hash de query | Re-ejecutar la misma query restaura los overrides anteriores |
 
 ## 4. Dependencias
 
@@ -88,6 +92,81 @@ Usa M08:
    - Si `result.meta.truncated === true`, mostrar warning "Resultado truncado a {limit}".
 4. Si responde error:
    - Mostrar mensaje legible (mapear `INVALID_SPARQL`, `TIMEOUT`, `UPSTREAM_ERROR`).
+
+### 7.4 Panel de Mapeo de Variables (Field Mapping)
+
+**Problema que resuelve:** M09 auto-detecta tipos (uri, literal, coordinate, date) por `datatype`, `xml:lang`, o pattern matching (`Point(...)`). Pero hay casos donde la detección falla:
+
+- Una variable `?año` de Wikidata viene como literal sin `xsd:date` → no se detecta como fecha.
+- Una columna `?ubicacion` con valor "POINT(-58.4 -34.6)" pero sin `datatype=wktLiteral`.
+- Un `?precio` que el usuario quiere graficar como `numericValue` en M05.
+
+**Cómo funciona:**
+
+1. Después de ejecutar la query, el componente recibe el `QueryResult` desde el backend.
+2. Antes de llamar `selectionService.setQueryResult(result)`, M01 muestra un panel "Mapeo de Variables" debajo del editor.
+3. Cada variable del `result.variables` aparece con su tipo detectado y un dropdown:
+   - URI (entidad)
+   - Literal (texto)
+   - Coordenada (lat,lng)
+   - Fecha (ISO 8601)
+   - Valor numérico (asociado a evento temporal)
+   - Ignorar (no usar)
+4. Al cambiar un mapeo, M01 **re-normaliza el `QueryResult` en cliente** y emite el resultado al SelectionService.
+
+**Re-normalización en cliente:**
+
+```ts
+function applyMappingOverrides(
+  raw: QueryResult,
+  overrides: Record<string, VariableRole>
+): QueryResult {
+  const newBindings = raw.bindings.map(row => {
+    const out: ResultBinding = {};
+    for (const v of raw.variables) {
+      const original = row[v];
+      const role = overrides[v];
+      out[v] = role ? coerceTo(role, original) : original;
+    }
+    return out;
+  });
+
+  // Reconstruir nodes y edges con los nuevos tipos
+  const { nodes, edges } = rebuildGraph(newBindings, raw.variables);
+
+  return { ...raw, bindings: newBindings, nodes, edges };
+}
+
+function coerceTo(role: VariableRole, value: BindingValue): BindingValue {
+  switch (role) {
+    case 'coordinate': return parseCoordinate(value);   // intenta WKT, lat/lng, etc.
+    case 'date':       return parseDate(value);          // intenta varios formatos ISO
+    case 'numeric':    return { ...value, type: 'literal', datatype: 'xsd:decimal' };
+    case 'uri':        return { type: 'uri', value: String(value.value) };
+    case 'literal':    return { type: 'literal', value: String(value.value) };
+    case 'ignore':     return value;  // queda pero no se usa para construir node attrs
+  }
+}
+```
+
+**Persistencia:**
+
+Los overrides se guardan en `localStorage` con clave `mapping-overrides:<hash(sparql)>`. Al volver a ejecutar la misma query, se aplican automáticamente sin preguntar.
+
+**Wireframe del panel:**
+
+```
+┌─ Mapeo de Variables (auto-detectado, podés ajustar) ────────────┐
+│  ?city       URI (entidad)        [URI ▼]                        │
+│  ?cityLabel  Literal (texto)      [Literal ▼]                    │
+│  ?coord      Coordenada           [Coordenada ▼]  ← auto detectó │
+│  ?population Literal (texto)      [Numérico ▼]    ← override     │
+│  ?inception  Fecha                [Fecha ▼]                      │
+│                                          [Restaurar auto] [Aplicar]│
+└──────────────────────────────────────────────────────────────────┘
+```
+
+El panel está colapsado por default (se expande con un botón ▼ "Mapeo de variables"). Cuando hay overrides activos, el botón muestra un badge "N overrides".
 
 ### Biblioteca de queries (fase 1, Wikidata)
 
@@ -223,7 +302,20 @@ SELECT ?writer ?writerLabel ?birth WHERE {
 - [ ] Guardar query propia → aparece en "Mis queries" → persiste tras reload.
 - [ ] Mapeo de errores: 400/408/413/502 a mensajes en español.
 
-## 10. Prompt para AI ejecutora
+## 10. Integración con App Shell (M00)
+
+Lee `docs/modules/M00-app-shell.md` §3 para ver el contexto completo.
+
+| Ítem | Valor |
+|---|---|
+| **Selector exacto** | `app-sparql-input` |
+| **Dónde lo monta M00** | Franja superior colapsable (`DashboardComponent`) |
+| **Tamaño** | M00 controla la altura (180px expandido / 0px colapsado). **No agregues altura fija** en el componente. |
+| **CSS del host** | `:host { display: block; width: 100%; overflow: hidden; }` |
+
+El componente recibe `@Input() collapsed: boolean` desde `DashboardComponent` para animar su colapso, o alternativamente emite un `EventEmitter` — coordiná con la implementación de M00.
+
+## 11. Prompt para AI ejecutora
 
 ```
 Sos un experto en Angular 17 standalone components + CodeMirror 6.
@@ -233,7 +325,8 @@ Lee primero (obligatorio):
 - docs/01-tech-stack.md
 - docs/02-data-contracts.md (§1)
 - docs/04-conventions-and-glossary.md
-- docs/modules/M01-sparql-input.md (este archivo)
+- docs/modules/M00-app-shell.md (§3 y §9 — selector exacto y cómo DashboardComponent controla el colapso)
+- docs/modules/M01-sparql-input.md (este archivo, especialmente §10 Integración con M00)
 - docs/modules/M07-selection-service.md (para llamar setQueryResult)
 - docs/modules/M08-backend-api.md (para entender el contrato del endpoint)
 
