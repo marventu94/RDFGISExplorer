@@ -1,0 +1,38 @@
+<div class="dashboard">
+  <div class="editor-area" [@editorCollapse]="editorState">
+    <app-sparql-input />
+  </div>
+  <div
+    class="views-container"
+    #container
+    [style.--col-left]="colLeft() + '%'"
+    [style.--row-top]="rowTop() + '%'"
+  >
+    <div class="views-grid">
+      <div class="cell top-left">
+        <app-table-view />
+      </div>
+      <div class="cell top-right">
+        <app-graph-view />
+      </div>
+      <div class="cell bottom-left">
+        <app-map-view />
+      </div>
+      <div class="cell bottom-right">
+        <app-timeline-view />
+      </div>
+    </div>
+    <div
+      class="divider divider-vertical"
+      cdkDrag
+      cdkDragLockAxis="x"
+      (cdkDragEnded)="onVerticalDragEnded($event)"
+    ></div>
+    <div
+      class="divider divider-horizontal"
+      cdkDrag
+      cdkDragLockAxis="y"
+      (cdkDragEnded)="onHorizontalDragEnded($event)"
+    ></div>
+  </div>
+</div>
