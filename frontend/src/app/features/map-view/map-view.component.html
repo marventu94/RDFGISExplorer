@@ -1,0 +1,42 @@
+<div class="map-view">
+  <div class="map-toolbar">
+    <span class="toolbar-label">Mapa:</span>
+    <select
+      class="baselayer-dropdown"
+      [ngModel]="baseLayer"
+      (ngModelChange)="changeBaseLayer($event)"
+    >
+      @for (opt of baseLayerOptions; track opt.value) {
+        <option [value]="opt.value">{{ opt.label }}</option>
+      }
+    </select>
+  </div>
+
+  @if (queryState === 'no-query') {
+    <div class="map-overlay">
+      <span class="overlay-icon">&#x1F5FA;</span>
+      <span class="overlay-text">Ejecutá una query para ver datos georeferenciados</span>
+    </div>
+  }
+
+  @if (queryState === 'no-coords') {
+    <div class="map-overlay map-overlay--info">
+      <span class="overlay-text">
+        Esta query no devolvió coordenadas. Asegurate de incluir una variable con
+        <code>wdt:P625</code> (Wikidata) o un literal <code>wktLiteral</code>, o ajustá el
+        <button type="button" class="overlay-link" (click)="scrollToEditor()">Mapeo de Variables</button>
+        en el panel SPARQL.
+      </span>
+    </div>
+  }
+
+  @if (queryState === 'filtered-zero') {
+    <div class="map-overlay map-overlay--warning">
+      <span class="overlay-text">
+        0 de {{ originalNodeCount }} nodos pasan los filtros activos
+      </span>
+    </div>
+  }
+
+  <div #mapContainer id="map-container"></div>
+</div>
