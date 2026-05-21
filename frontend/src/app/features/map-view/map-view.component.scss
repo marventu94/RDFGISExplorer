@@ -1,0 +1,137 @@
+@import 'leaflet/dist/leaflet.css';
+@import 'leaflet.markercluster/dist/MarkerCluster.css';
+@import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+@import 'leaflet-draw/dist/leaflet.draw.css';
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.map-view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#map-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.map-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 6px;
+  padding: 4px 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+}
+
+.toolbar-label {
+  color: #555;
+  font-weight: 500;
+}
+
+.baselayer-dropdown {
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+
+  &:focus {
+    outline: 2px solid #2196f3;
+    outline-offset: 1px;
+  }
+}
+
+.map-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  padding: 16px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  max-width: 90%;
+
+  &--info {
+    background: rgba(227, 242, 253, 0.95);
+    border: 1px solid #90caf9;
+  }
+
+  &--warning {
+    background: rgba(255, 243, 224, 0.95);
+    border: 1px solid #ffb74d;
+  }
+}
+
+.overlay-icon {
+  font-size: 32px;
+}
+
+.overlay-text {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.overlay-link {
+  background: none;
+  border: none;
+  color: #1565c0;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+
+  &:hover {
+    color: #0d47a1;
+  }
+}
+
+code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.tooltip-label {
+  color: #888;
+}
+
+.pulse-ring {
+  border: 3px solid #2196f3;
+  border-radius: 50%;
+  animation: pulse 1.2s ease-out 2;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
