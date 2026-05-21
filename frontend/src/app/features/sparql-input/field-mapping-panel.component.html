@@ -1,0 +1,41 @@
+<div class="mapping-panel">
+  <button
+    mat-button
+    class="toggle-btn"
+    [matBadge]="overridesCount() > 0 ? overridesCount() + ' overrides' : null"
+    [matBadgeHidden]="overridesCount() === 0"
+    (click)="toggle()"
+  >
+    <mat-icon>{{ expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
+    Mapeo vars
+  </button>
+
+  @if (expanded) {
+    <div class="mapping-content">
+      <div class="field-list">
+        @for (field of fields; track field.variable) {
+          <div class="field-row">
+            <span class="field-name">{{ field.variable }}</span>
+            <span class="field-detected">Auto-detect: {{ typeLabel(field.detectedType) }}</span>
+            <mat-select
+              class="field-select"
+              [value]="field.override"
+              (selectionChange)="onOverrideChange(field, $event.value)"
+            >
+              <mat-option value="uri">URI (entidad)</mat-option>
+              <mat-option value="literal">Literal (texto)</mat-option>
+              <mat-option value="coordinate">Coordenada</mat-option>
+              <mat-option value="date">Fecha</mat-option>
+              <mat-option value="numeric">Numérico</mat-option>
+              <mat-option value="ignore">Ignorar</mat-option>
+            </mat-select>
+          </div>
+        }
+      </div>
+      <div class="mapping-actions">
+        <button mat-button (click)="onRestore()">Restaurar auto</button>
+        <button mat-flat-button (click)="onApply()">Aplicar</button>
+      </div>
+    </div>
+  }
+</div>

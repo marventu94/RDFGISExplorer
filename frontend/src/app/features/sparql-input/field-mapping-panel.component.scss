@@ -1,0 +1,64 @@
+:host {
+  display: block;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface-container-low);
+  flex-shrink: 0;
+}
+
+.mapping-panel {
+  padding: 0;
+}
+
+.toggle-btn {
+  width: 100%;
+  justify-content: flex-start;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 12px;
+  height: 32px;
+  border-radius: 0;
+}
+
+.mapping-content {
+  padding: 8px 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.field-name {
+  font-family: monospace;
+  font-weight: 600;
+  min-width: 100px;
+  color: var(--mat-sys-on-surface);
+}
+
+.field-detected {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 11px;
+  min-width: 120px;
+}
+
+.field-select {
+  width: 150px;
+  --mat-select-trigger-text-size: 12px;
+}
+
+.mapping-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
