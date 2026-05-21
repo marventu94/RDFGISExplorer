@@ -8,31 +8,33 @@ Punto de entrada de la herramienta. Editor de SPARQL con resaltado de sintaxis, 
 
 **SÍ implementa:**
 - Componente Angular standalone `SparqlInputComponent`.
-- Editor CodeMirror 6 con highlighting SPARQL.
-- Panel lateral con biblioteca de queries predefinidas (Wikidata).
-- Botón "Ejecutar" + atajo `Ctrl+Enter`.
-- Persistencia de queries propias en `localStorage`.
-- Indicador de límite aplicado (500 por default, opción de subir a 2000).
-- **Panel de Mapeo de Variables**: después de ejecutar la query, mostrar las variables del SELECT con su tipo auto-detectado y permitir override manual (ver §7.4).
+- Editor CodeMirror 6 con highlighting SPARQL **vacío al iniciar**, con placeholder explicativo.
+- **Botón dropdown `[▼ Biblioteca]`** que abre menú con las queries guardadas. En el primer load se siembran **6 queries predefinidas** (seeds) en localStorage. Click carga la query al editor.
+- **Botón `[💾 Guardar query actual]`** que pide un nombre y persiste la query del editor en localStorage. Aparece habilitado solo si el editor tiene contenido.
+- Botón `[Ejecutar ▶]` + atajo `Ctrl+Enter`.
+- **Dropdown `[LIMIT 500 ▼]`** con opciones 500 / 1000 / 2000. Cambiar a 2000 pide confirmación.
+- **Panel colapsable `[▼ Mapeo de variables]`** debajo del editor, **colapsado por default** (§7.4). Se expande on demand. Cuando hay overrides activos, muestra un badge "N overrides".
 
 **NO implementa:**
 - Ejecución contra el endpoint (eso es M08 vía un `ApiService`).
 - Renderizado de resultados (eso son M02-M05).
 - Query builder visual (trabajo futuro).
+- **Restauración del editor entre sesiones**: el editor arranca vacío cada vez. La query actual no se persiste.
+- **Persistencia de overrides de mapeo**: los overrides se pierden al cerrar la app. (Sí persisten las queries de la biblioteca — ver SPARQL-06.)
 
 ## 3. Requerimientos funcionales
 
 | ID PDF | Prioridad | Descripción | Criterio de aceptación |
 |---|---|---|---|
-| SPARQL-01 | Alta | Editor con resaltado y `Ctrl+Enter` | Editor renderiza, palabras clave SPARQL coloreadas; atajo dispara `execute()` |
-| SPARQL-02 | Alta | Biblioteca de queries predefinidas seleccionables y editables | Panel muestra ≥6 queries; click carga al editor; usuario puede editar antes de ejecutar |
+| SPARQL-01 | Alta | Editor CodeMirror con resaltado SPARQL + `Ctrl+Enter` | Editor arranca **vacío** con placeholder `"-- Escribí tu query SPARQL acá, o usá [▼ Ejemplos] para cargar una predefinida"`. Palabras clave coloreadas. `Ctrl+Enter` dispara `execute()` |
+| SPARQL-02 | Alta | Botón dropdown `[▼ Biblioteca]` con queries persistidas en localStorage | En primer load, se siembran 6 queries predefinidas si no existen. Click en una opción carga al editor (reemplaza). Si el editor ya tiene contenido, abre confirm dialog "¿Reemplazar query actual?" |
 | SPARQL-03 | Alta | Validación de sintaxis con mensaje de error antes de ejecutar | Query inválida muestra error inline; el botón Ejecutar no envía request |
-| SPARQL-04 | Alta | Límite 500 auto, ampliable a 2000 con confirmación | UI indica "LIMIT 500 aplicado"; opción "Aumentar a 2000" abre confirm dialog |
-| SPARQL-05 | Media | Autocompletado de prefijos | Al escribir `wd:` o `wdt:` sugiere entidades/propiedades comunes (lista hardcoded en fase 1) |
-| SPARQL-06 | Media | Guardar consultas propias en localStorage | Botón "Guardar"; queries propias aparecen en una sección "Mis queries" |
-| SPARQL-07 | Alta | Panel de Mapeo de Variables después de ejecutar | Cada variable del SELECT muestra su tipo detectado y un dropdown para override |
+| SPARQL-04 | Alta | Dropdown `[LIMIT 500 ▼]` visible al lado de Ejecutar | Opciones: 500 / 1000 / 2000. Default 500. Cambio a 2000 abre confirm dialog "Queries más grandes pueden ser lentas o devolver más datos de los que las vistas manejan bien" |
+| SPARQL-05 | Media | Autocompletado de prefijos en CodeMirror | Al escribir `wd:` o `wdt:` sugiere entidades/propiedades comunes (lista hardcoded en fase 1) |
+| SPARQL-06 | Alta | Botón `[💾 Guardar query actual]` agrega entrada a la biblioteca | Pide nombre vía dialog. Persiste en localStorage. La nueva query aparece en el dropdown como "Mis queries" (separada de las seeds). Cada query custom tiene un botón × para eliminarla |
+| SPARQL-07 | Alta | Panel colapsable `[▼ Mapeo de variables]` debajo del editor | Colapsado por default. Click expande. Si hay overrides activos muestra badge "N overrides" |
 | SPARQL-08 | Alta | Override de mapeo re-emite QueryResult con re-normalización | Cambiar `?year` de "literal" a "date" hace que M05 timeline aparezca con los items |
-| SPARQL-09 | Media | Overrides persisten en localStorage por hash de query | Re-ejecutar la misma query restaura los overrides anteriores |
+| ~~SPARQL-09~~ | — | ~~Overrides persisten en localStorage~~ | **Out of scope** — los overrides se pierden al cerrar la app |
 
 ## 4. Dependencias
 
@@ -79,8 +81,78 @@ Usa M08:
 
 ## 7. Comportamiento esperado
 
+### 7.0 Inicialización (primer load)
+
+```ts
+const STORAGE_KEY = 'rdf-explorer:queries';
+
+ngOnInit(): void {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (!stored) {
+    // primera vez: sembrar las 6 queries predefinidas
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_QUERIES));
+  }
+  this.libraryQueries = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+}
+```
+
+**Modelo de datos en localStorage:**
+
+```ts
+interface StoredQuery {
+  id: string;             // 'seed-cities-argentina' | 'user-{uuid}'
+  name: string;
+  category: 'geo' | 'temporal' | 'exploration' | 'custom';
+  description?: string;
+  sparql: string;
+  isSeed: boolean;        // true = predefinida, false = guardada por el usuario
+  createdAt?: string;
+}
+```
+
+Las 6 queries seed tienen `isSeed: true` y `id: 'seed-*'`. Las que guarda el usuario tienen `isSeed: false`. En el dropdown se agrupan:
+
+```
+┌─ ▼ Biblioteca ───────────────────────┐
+│ Predefinidas                         │
+│   📍 Ciudades de Argentina           │
+│   📍 Universidades en La Plata       │
+│   🕐 Presidentes argentinos          │
+│   ...                                │
+│ ──────────────────────────           │
+│ Mis queries                          │
+│   ⭐ Mi query custom        [×]      │
+└──────────────────────────────────────┘
+```
+
+Las seeds no se pueden eliminar (×) — solo las custom. Si el usuario quiere "resetear" todo, hay un botón "Restaurar biblioteca por defecto" en el dropdown que borra `STORAGE_KEY` y vuelve a sembrar.
+
+### 7.1 Guardar query actual
+
+```ts
+saveCurrentQuery(): void {
+  const sparql = this.editor.getValue().trim();
+  if (!sparql) return;
+
+  const name = await this.dialog.open(NameDialog).afterClosed();
+  if (!name) return;
+
+  const entry: StoredQuery = {
+    id: `user-${crypto.randomUUID()}`,
+    name,
+    category: 'custom',
+    sparql,
+    isSeed: false,
+    createdAt: new Date().toISOString(),
+  };
+  this.libraryQueries = [...this.libraryQueries, entry];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(this.libraryQueries));
+  this.snackbar.open(`Query "${name}" guardada en la biblioteca`);
+}
+```
+
 ### Ciclo de ejecución
-1. Usuario escribe o carga una predefined query.
+1. Usuario escribe en el editor o selecciona una query de la biblioteca.
 2. Click en "Ejecutar" (o `Ctrl+Enter`):
    - Validación cliente opcional con `sparqljs`. Si falla, muestra error y aborta.
    - Aplica `limit` actual (default 500).
@@ -272,22 +344,57 @@ SELECT ?writer ?writerLabel ?birth WHERE {
 
 ## 8. Ejemplos / Wireframe ASCII
 
+**Estado inicial (al abrir la app):**
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ ▼ Biblioteca de queries        │ ┌─────────────────────────────┐│
-│ ─────────────────────────────  │ │ PREFIX wd: <http://...>     ││
-│ 📍 Geo (3)                     │ │ PREFIX wdt: <http://...>    ││
-│   Ciudades de Argentina        │ │ SELECT ?city ?cityLabel ... ││
-│   Universidades en La Plata    │ │ WHERE {                     ││
-│ 🕐 Temporal (2)                │ │   ?city wdt:P31 wd:Q515 ;   ││
-│   Presidentes argentinos       │ │         wdt:P17 wd:Q414 .   ││
-│   Museos por fundación         │ │ }                           ││
-│ 🔍 Exploración (1)             │ │ LIMIT 50                    ││
-│   Escritores argentinos        │ └─────────────────────────────┘│
-│ ─────────────────────────────  │                                │
-│ ⭐ Mis queries (localStorage)  │  [LIMIT 500 ▼]   [Ejecutar ▶]  │
-│   (sin guardadas)              │   Ctrl+Enter para ejecutar     │
-└─────────────────────────────────────────────────────────────────┘
+┌─ M01 — SPARQL Input (dentro de la franja superior de M00) ──────────┐
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ -- Escribí tu query SPARQL acá, o usá [▼ Biblioteca] para       │ │
+│ │    cargar una predefinida                                       │ │
+│ │                                                                 │ │
+│ │ (cursor parpadeando, sin contenido)                             │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│  [▼ Biblioteca] [💾 Guardar]  [▼ Mapeo vars]  [LIMIT 500▼] [Ejecutar▶]│
+│                                                Ctrl+Enter para ejecutar│
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+El botón `[💾 Guardar]` aparece deshabilitado (gris) cuando el editor está vacío. Se habilita en cuanto el usuario escribe.
+
+**Dropdown `[▼ Biblioteca]` abierto:**
+
+```
+┌─ ▼ Biblioteca ───────────────────────────┐
+│ Predefinidas                             │
+│   📍 Ciudades de Argentina               │
+│   📍 Universidades en La Plata           │
+│   🕐 Presidentes argentinos              │
+│   🕐 Museos por año de fundación         │
+│   🔍 Escritores argentinos               │
+│   🔍 Ríos de Argentina                   │
+│ ──────────────────────────────────────── │
+│ Mis queries                              │
+│   ⭐ (vacío en primer uso)              │
+│ ──────────────────────────────────────── │
+│ [↺ Restaurar biblioteca por defecto]    │
+└──────────────────────────────────────────┘
+```
+
+Click en una opción → si el editor tiene contenido, confirm dialog → carga al editor.
+Las queries de "Mis queries" tienen un botón × a la derecha para eliminarlas.
+"Restaurar biblioteca por defecto" borra todas las custom y restaura las 6 seeds.
+
+**Panel `[▼ Mapeo de variables]` expandido (después de ejecutar):**
+
+```
+┌─ ▲ Mapeo de variables ──────────────────────────────────────────────┐
+│  ?city       Auto-detect: URI         [URI       ▼]                 │
+│  ?cityLabel  Auto-detect: Literal     [Literal   ▼]                 │
+│  ?coord      Auto-detect: Coordenada  [Coordenada▼]                 │
+│  ?population Auto-detect: Literal     [Numérico  ▼] ← override      │
+│  ?inception  Auto-detect: Fecha       [Fecha     ▼]                 │
+│                                       [Restaurar auto] [Aplicar]    │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 9. Criterios de aceptación
