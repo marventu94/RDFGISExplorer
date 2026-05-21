@@ -1,0 +1,94 @@
+<div class="sparql-input" (keydown)="$event.stopPropagation()">
+  <div class="editor-area" #editorContainer></div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button mat-button [matMenuTriggerFor]="libraryMenu">
+        <mat-icon>arrow_drop_down</mat-icon>
+        Biblioteca
+      </button>
+      <mat-menu #libraryMenu="matMenu" class="library-menu">
+        <div class="menu-section-label">Predefinidas</div>
+        @for (q of seedQueries(); track q.id) {
+          <button mat-menu-item (click)="loadFromLibrary(q)">
+            <mat-icon>{{ getCategoryIcon(q.category) }}</mat-icon>
+            <span>{{ q.name }}</span>
+          </button>
+        }
+        @if (userQueries().length > 0) {
+          <mat-divider />
+          <div class="menu-section-label">Mis queries</div>
+          @for (q of userQueries(); track q.id) {
+            <button mat-menu-item (click)="loadFromLibrary(q)">
+              <mat-icon>star</mat-icon>
+              <span>{{ q.name }}</span>
+              <button
+                mat-icon-button
+                class="delete-btn"
+                (click)="deleteCustomQuery(q, $event)"
+                aria-label="Eliminar query"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            </button>
+          }
+        }
+        <mat-divider />
+        <button mat-menu-item (click)="restoreDefaults()">
+          <mat-icon>restore</mat-icon>
+          <span>Restaurar biblioteca por defecto</span>
+        </button>
+      </mat-menu>
+
+      <button
+        mat-button
+        [disabled]="!hasContent()"
+        (click)="saveCurrentQuery()"
+      >
+        <mat-icon>save</mat-icon>
+        Guardar
+      </button>
+    </div>
+
+    <div class="toolbar-right">
+      @if (executing()) {
+        <mat-spinner diameter="24"></mat-spinner>
+      }
+
+      <button
+        mat-button
+        [matMenuTriggerFor]="limitMenu"
+        [matBadge]="null"
+        class="limit-btn"
+      >
+        {{ limitLabel(limit()) }}
+        <mat-icon>arrow_drop_down</mat-icon>
+      </button>
+      <mat-menu #limitMenu="matMenu">
+        @for (opt of limitOptions; track opt) {
+          <button mat-menu-item (click)="onLimitChange(opt)">
+            <span [class.active-option]="limit() === opt">LIMIT {{ opt }}</span>
+          </button>
+        }
+      </mat-menu>
+
+      <button
+        mat-flat-button
+        color="primary"
+        [disabled]="!hasContent() || executing()"
+        (click)="execute()"
+      >
+        <mat-icon>play_arrow</mat-icon>
+        Ejecutar
+      </button>
+    </div>
+  </div>
+
+  <app-field-mapping-panel
+    [variables]="lastResult()?.variables ?? []"
+    [bindings]="lastResult()?.bindings ?? []"
+    [overridesCount]="overridesCount()"
+    (applyMapping)="onApplyMapping($event)"
+    (restoreAuto)="onRestoreAuto()"
+  />
+</div>
