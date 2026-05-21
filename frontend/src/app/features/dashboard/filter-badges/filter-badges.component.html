@@ -1,0 +1,8 @@
+<div class="filter-badges">
+  @for (filter of filters$ | async; track filter.id) {
+    <span class="badge">
+      {{ filter.label }}
+      <button type="button" class="badge-remove" (click)="removeFilter(filter.id)">&times;</button>
+    </span>
+  }
+</div>
