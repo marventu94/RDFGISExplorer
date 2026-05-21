@@ -139,6 +139,16 @@ N/A.
 ### Reactivo a selección externa
 - `selectedNode$.subscribe(sel => { if (sel.source !== 'graph' && sel.node) { panTo(sel.node.uri); applyFocusContext(sel.node.uri); } })`.
 
+### Empty states (3 niveles)
+
+| Caso | Detección | UI |
+|---|---|---|
+| `queryResult === null` | aún no se ejecutó query | Canvas vacío + texto centrado "Ejecutá una query para ver el grafo" |
+| `nodes.length > 0` pero `edges.length === 0` | query sin relaciones (sin URIs joined) | Nodos visibles en layout grid (no force-directed, sin aristas) + banner: "Esta query no expresó relaciones entre entidades. El grafo muestra nodos aislados. Para ver conexiones, agregá variables URI adicionales al SELECT que vinculen tu entidad principal con otras (ej: `?city wdt:P36 ?capital`)." |
+| `nodes.length > 0` pero filtros activos dejan 0 visibles | filtros aplicados | Canvas vacío + chip "0 de N nodos pasan los filtros activos" |
+
+Para el segundo caso, el `forceLayout` produce un blob amontonado de nodos sin aristas — visualmente malo. Cambiar a `grid` layout cuando `edges.length === 0` da una grilla limpia que el usuario puede inspeccionar.
+
 ## 8. Ejemplos
 
 ### Style sheet base
@@ -186,7 +196,43 @@ const style: cytoscape.Stylesheet[] = [
 - [ ] Botón fit recentra.
 - [ ] Cleanup en `OnDestroy` (`cy?.destroy()`).
 
-## 10. Prompt para AI ejecutora
+## 10. Integración con App Shell (M00)
+
+Lee `docs/modules/M00-app-shell.md` §3 para ver el contexto completo.
+
+| Ítem | Valor |
+|---|---|
+| **Selector exacto** | `app-graph-view` |
+| **Dónde lo monta M00** | Celda superior-derecha del grid 2×2 |
+| **Tamaño** | M00 controla ancho y alto. **No pongas width/height fijos.** |
+| **CSS del host** | `:host { display: block; width: 100%; height: 100%; }` |
+
+**Crítico para Cytoscape:** el `div#cyContainer` al que se pasa `cy = cytoscape({ container })` debe tener dimensiones reales en el momento del `ngAfterViewInit`. Si el host tiene `height: 0` o `height: auto`, Cytoscape renderiza con tamaño 0 y el grafo no aparece.
+
+```scss
+// graph-view.component.scss
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cy-container {
+  width: 100%;
+  height: 100%;  // hereda del host que ya tiene altura real de M00
+}
+```
+
+Si el grid de M00 cambia de tamaño (divisor arrastrado), llamar `this.cy?.resize()` para que Cytoscape se adapte:
+
+```ts
+@HostListener('window:resize')
+onResize(): void {
+  this.cy?.resize();
+}
+```
+
+## 11. Prompt para AI ejecutora
 
 ```
 Sos un experto en Angular 17 + Cytoscape.js.
@@ -196,7 +242,8 @@ Lee primero:
 - docs/01-tech-stack.md
 - docs/02-data-contracts.md (§2)
 - docs/04-conventions-and-glossary.md
-- docs/modules/M03-graph-view.md (este archivo)
+- docs/modules/M00-app-shell.md (§3 y §9 — selector y estructura de archivos)
+- docs/modules/M03-graph-view.md (este archivo, especialmente §10 para el :host CSS)
 - docs/modules/M07-selection-service.md
 
 Pre-requisitos: M07 implementado.

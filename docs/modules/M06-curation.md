@@ -2,7 +2,21 @@
 
 ## 1. Contexto
 
-Panel lateral que se abre al seleccionar cualquier nodo. Permite a analistas técnicos (LINTA) revisar, corregir y validar datos del nodo directamente desde la UI. Las correcciones se guardan en SQLite (overlay) **sin tocar el grafo original**.
+Panel lateral (sidenav derecho) para operaciones **avanzadas** de curado sobre un nodo: validación masiva, historial de anotaciones, gestión de duplicados, vista comparativa (raw / script / manual).
+
+**Importante: la edición rápida campo-a-campo NO es exclusiva de este panel.** M02 (tabla) implementa edición inline en cada celda usando el mismo `CurationService` que vive en `frontend/src/app/core/services/curation.service.ts` (creado por M02). M06 reutiliza ese servicio, no lo duplica.
+
+División de responsabilidades:
+
+| Operación | Lugar |
+|---|---|
+| Corregir un campo puntual de una fila | M02 (✏️ inline) |
+| Ver historial / anotaciones de un nodo | M06 (tab Anotaciones) |
+| Validar TODOS los campos del nodo en un click | M06 (botón Validar todo) |
+| Confirmar / descartar duplicados | M06 (tab Duplicados) |
+| Ver lado a lado raw / script / manual | M06 (tab Datos) |
+
+Las correcciones se guardan en SQLite (overlay) **sin tocar el grafo original**.
 
 ## 2. Alcance
 
@@ -33,9 +47,11 @@ Panel lateral que se abre al seleccionar cualquier nodo. Permite a analistas té
 
 ## 4. Dependencias
 
-- **Lee de:** `selectedNode$`, backend `/curation/:nodeUri`.
-- **Emite a:** backend (POST/PATCH `/curation`, `/curation/duplicates/:id/decision`).
+- **Lee de:** `selectedNode$`, `CurationService` (ya existe en `core/services/`, creado por M02 en Wave 2).
+- **Emite a:** mismo `CurationService` (POST/PATCH `/curation`, `/curation/duplicates/:id/decision`).
 - **Librerías:** `@angular/cdk` (Sidenav), `@angular/material` (Tabs, Form Fields, Snackbar).
+
+**No duplicar** `CurationService`. Si M02 ya está implementado (Wave 2), el servicio existe. Si M06 se implementa antes de M02 (raro), entonces M06 lo crea y M02 lo reutiliza.
 
 ## 5. Interfaces TypeScript
 
