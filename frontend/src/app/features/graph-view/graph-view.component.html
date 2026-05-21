@@ -1,0 +1,60 @@
+<div class="graph-container">
+  @if (queryState === 'no-query') {
+    <div class="empty-state">
+      <span class="empty-state__icon">&#x1F578;</span>
+      <span class="empty-state__text">Ejecutá una query para ver el grafo</span>
+    </div>
+  }
+
+  @if (queryState === 'filtered-zero') {
+    <div class="empty-state">
+      <span class="chip">0 de {{ originalNodeCount }} nodos pasan los filtros activos</span>
+    </div>
+  }
+
+  @if (queryState === 'no-edges') {
+    <div class="banner banner--info">
+      Esta query no expresó relaciones entre entidades. El grafo muestra nodos aislados.
+      Para ver conexiones, agregá variables URI adicionales al SELECT que vinculen tu entidad
+      principal con otras.
+    </div>
+  }
+
+  @if (queryState === 'truncated' && truncatedCount > 0) {
+    <div class="banner banner--warning">
+      Mostrando {{ MAX_NODES }} de {{ originalNodeCount }} nodos (top por conexiones)
+    </div>
+  }
+
+  @if (cy) {
+    <div class="graph-toolbar">
+      <select
+        class="layout-dropdown"
+        [ngModel]="currentLayout"
+        (ngModelChange)="setLayout($event)"
+      >
+        @for (opt of layoutOptions; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+      <button class="toolbar-btn" (click)="fit()">fit</button>
+      <button class="toolbar-btn" (click)="resetZoom()">reset zoom</button>
+    </div>
+  }
+
+  <div
+    #cyContainer
+    class="cy-container"
+    [class.cy-container--hidden]="!cy"
+  ></div>
+
+  @if (tooltipVisible) {
+    <div
+      class="edge-tooltip"
+      [style.left.px]="tooltipX"
+      [style.top.px]="tooltipY"
+    >
+      {{ tooltipText }}
+    </div>
+  }
+</div>
