@@ -1,8 +1,364 @@
-import { Component } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ElementRef,
+  ViewChild,
+  HostListener,
+  NgZone,
+  ChangeDetectorRef,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { SelectionService } from '@core/services/selection.service';
+import { combineLatest, Subject, takeUntil } from 'rxjs';
+import { filter } from 'rxjs/operators';
+import cytoscape from 'cytoscape';
+import cola from 'cytoscape-cola';
+import dagre from 'cytoscape-dagre';
+import type { QueryResult, NormalizedNode, NormalizedEdge, Selection } from '@shared/models';
+import { GRAPH_STYLE } from './graph-style';
+import { LAYOUT_CONFIGS } from './graph-layouts';
+
+cytoscape.use(cola);
+cytoscape.use(dagre);
+
+type GraphLayout = 'cola' | 'dagre' | 'circle' | 'grid';
+type QueryState = 'no-query' | 'no-edges' | 'filtered-zero' | 'truncated' | 'normal';
 
 @Component({
   selector: 'app-graph-view',
   standalone: true,
-  template: '<div class="placeholder-m03">M03 Graph View</div>',
+  imports: [FormsModule],
+  templateUrl: './graph-view.component.html',
+  styleUrls: ['./graph-view.component.scss'],
 })
-export class GraphViewComponent {}
+export class GraphViewComponent implements OnInit, OnDestroy {
+  @ViewChild('cyContainer', { static: true }) container!: ElementRef<HTMLDivElement>;
+
+  cy?: cytoscape.Core;
+  currentLayout: GraphLayout = 'cola';
+  readonly layoutOptions = [
+    { value: 'cola' as const, label: 'cola' },
+    { value: 'dagre' as const, label: 'dagre' },
+    { value: 'circle' as const, label: 'circle' },
+    { value: 'grid' as const, label: 'grid' },
+  ];
+
+  queryState: QueryState = 'no-query';
+  truncatedCount = 0;
+  originalNodeCount = 0;
+  filteredNodeCount = 0;
+  activeFilterCount = 0;
+
+  tooltipText = '';
+  tooltipVisible = false;
+  tooltipX = 0;
+  tooltipY = 0;
+
+  private destroy$ = new Subject<void>();
+  private originalResult: QueryResult | null = null;
+  private resizeObserver?: ResizeObserver;
+
+  readonly MAX_NODES = 300;
+  private readonly COLLAPSE_DEGREE = 20;
+
+  constructor(
+    private selectionService: SelectionService,
+    private ngZone: NgZone,
+    private cdr: ChangeDetectorRef,
+  ) {}
+
+  ngOnInit(): void {
+    this.initResizeObserver();
+
+    combineLatest([
+      this.selectionService.queryResult$,
+      this.selectionService.filteredQueryResult$,
+      this.selectionService.activeFilters$,
+    ])
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(([original, filtered, filters]) => {
+        this.originalResult = original;
+        this.activeFilterCount = filters.length;
+
+        if (!filtered || filtered.nodes.length === 0) {
+          if (!original || original.nodes.length === 0) {
+            this.queryState = 'no-query';
+          } else if (filters.length > 0) {
+            this.queryState = 'filtered-zero';
+            this.originalNodeCount = original.nodes.length;
+          } else {
+            this.queryState = 'no-query';
+          }
+          this.cy?.destroy();
+          this.cy = undefined;
+          this.cdr.markForCheck();
+          return;
+        }
+
+        this.filteredNodeCount = filtered.nodes.length;
+        this.originalNodeCount = original?.nodes.length ?? filtered.nodes.length;
+
+        if (filtered.edges.length === 0) {
+          this.queryState = 'no-edges';
+        } else if (this.originalNodeCount > this.MAX_NODES || filtered.nodes.length > this.MAX_NODES) {
+          this.queryState = 'truncated';
+          this.truncatedCount = this.originalNodeCount > this.MAX_NODES
+            ? this.originalNodeCount - this.MAX_NODES
+            : 0;
+        } else {
+          this.queryState = 'normal';
+        }
+
+        this.renderGraph(filtered);
+        this.cdr.markForCheck();
+      });
+
+    this.selectionService.selectedNode$
+      .pipe(
+        takeUntil(this.destroy$),
+        filter((sel: Selection) => sel.source !== 'graph'),
+      )
+      .subscribe((sel: Selection) => {
+        if (sel.node && this.cy) {
+          this.panToNode(sel.node.uri);
+          this.applyFocusContext(sel.node.uri);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.resizeObserver?.disconnect();
+    this.cy?.destroy();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.cy?.resize();
+  }
+
+  setLayout(layout: GraphLayout): void {
+    this.currentLayout = layout;
+    const config = LAYOUT_CONFIGS[layout];
+    if (this.cy && config) {
+      this.cy.layout(config.options).run();
+      setTimeout(() => {
+        this.cy?.fit(undefined, 50);
+      }, config.animationDuration + 50);
+    }
+  }
+
+  fit(): void {
+    this.cy?.fit(undefined, 50);
+  }
+
+  resetZoom(): void {
+    if (!this.cy) return;
+    this.cy.zoom(1);
+    this.cy.center();
+  }
+
+  private initResizeObserver(): void {
+    if (typeof ResizeObserver === 'undefined') return;
+    this.resizeObserver = new ResizeObserver(() => {
+      this.cy?.resize();
+    });
+    const containerEl = this.container?.nativeElement;
+    if (containerEl) {
+      this.resizeObserver.observe(containerEl);
+    }
+  }
+
+  private renderGraph(result: QueryResult): void {
+    if (this.cy) {
+      this.cy.destroy();
+    }
+
+    const elements = this.buildElements(result);
+    const defaultLayout = result.edges.length === 0 ? 'grid' : 'cola';
+    this.currentLayout = defaultLayout;
+
+    this.cy = cytoscape({
+      container: this.container.nativeElement,
+      elements,
+      style: GRAPH_STYLE,
+      layout: this.getLayoutOptions(defaultLayout),
+      wheelSensitivity: 0.3,
+      minZoom: 0.05,
+      maxZoom: 5,
+    });
+
+    this.bindGraphEvents();
+
+    if (result.edges.length > 0) {
+      this.cy.ready(() => {
+        setTimeout(() => {
+          this.collapseHighDegreeNodes();
+        }, 0);
+      });
+    }
+
+    this.cy.on('layoutstop', () => {
+      this.cy?.fit(undefined, 50);
+    });
+  }
+
+  private buildElements(result: QueryResult): cytoscape.ElementDefinition[] {
+    const elements: cytoscape.ElementDefinition[] = [];
+
+    const degreeMap = new Map<string, number>();
+    for (const edge of result.edges) {
+      degreeMap.set(edge.source, (degreeMap.get(edge.source) ?? 0) + 1);
+      degreeMap.set(edge.target, (degreeMap.get(edge.target) ?? 0) + 1);
+    }
+
+    let visibleNodes = result.nodes;
+    if (result.nodes.length > this.MAX_NODES) {
+      visibleNodes = [...result.nodes]
+        .sort((a, b) => (degreeMap.get(b.uri) ?? 0) - (degreeMap.get(a.uri) ?? 0))
+        .slice(0, this.MAX_NODES);
+    }
+
+    const visibleUris = new Set(visibleNodes.map((n) => n.uri));
+
+    for (const node of visibleNodes) {
+      const classes: string[] = [];
+      if (node.flags?.hasAnomaly) classes.push('anomaly');
+      if (node.flags?.isConfirmedDuplicate) classes.push('confirmed-duplicate');
+
+      elements.push({
+        data: {
+          id: node.uri,
+          label: node.label,
+          type: node.type ?? '',
+          degree: degreeMap.get(node.uri) ?? 0,
+          flagAnomaly: node.flags?.hasAnomaly ?? false,
+          flagConfirmedDuplicate: node.flags?.isConfirmedDuplicate ?? false,
+        },
+        classes: classes.join(' '),
+      });
+    }
+
+    for (const edge of result.edges) {
+      if (visibleUris.has(edge.source) && visibleUris.has(edge.target)) {
+        elements.push({
+          data: {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            predicate: edge.predicate,
+            predicateLabel: edge.predicateLabel ?? '',
+          },
+        });
+      }
+    }
+
+    return elements;
+  }
+
+  private bindGraphEvents(): void {
+    if (!this.cy) return;
+
+    this.cy.on('tap', 'node', (evt) => {
+      const node = evt.target;
+      const collapsed = node.data('collapsed') as boolean;
+
+      if (collapsed) {
+        this.expandNode(node.id());
+        return;
+      }
+
+      const nodeUri = node.id();
+      const nodeData = this.originalResult?.nodes.find((n) => n.uri === nodeUri);
+      if (nodeData) {
+        this.ngZone.run(() => {
+          this.selectionService.select(nodeData, 'graph');
+        });
+      }
+      this.applyFocusContext(nodeUri);
+    });
+
+    this.cy.on('tap', (evt) => {
+      if (evt.target === this.cy && (evt.originalEvent?.target as HTMLElement)?.tagName === 'CANVAS') {
+        this.ngZone.run(() => {
+          this.selectionService.clearSelection();
+        });
+        this.applyFocusContext(null);
+      }
+    });
+
+    this.cy.on('mouseover', 'edge', (evt) => {
+      const edge = evt.target;
+      this.tooltipText = (edge.data('predicateLabel') as string) || (edge.data('predicate') as string) || '';
+      this.tooltipVisible = !!this.tooltipText;
+    });
+
+    this.cy.on('mousemove', 'edge', (evt) => {
+      if (!this.tooltipVisible) return;
+      const originalEvent = evt.originalEvent as MouseEvent | undefined;
+      if (originalEvent) {
+        this.tooltipX = originalEvent.clientX + 12;
+        this.tooltipY = originalEvent.clientY + 12;
+      }
+    });
+
+    this.cy.on('mouseout', 'edge', () => {
+      this.tooltipVisible = false;
+    });
+  }
+
+  private applyFocusContext(focusUri: string | null): void {
+    if (!this.cy) return;
+    if (!focusUri) {
+      this.cy.elements().style('opacity', 1.0);
+      return;
+    }
+    const focus = this.cy.getElementById(focusUri);
+    if (focus.empty()) return;
+    const neighbors = focus.closedNeighborhood();
+    this.cy.elements().difference(neighbors).style('opacity', 0.2);
+    neighbors.style('opacity', 1.0);
+  }
+
+  private panToNode(uri: string): void {
+    if (!this.cy) return;
+    const node = this.cy.getElementById(uri);
+    if (node.empty()) return;
+    this.cy.animate({
+      fit: { eles: node, padding: 100 },
+      duration: 600,
+    });
+  }
+
+  private collapseHighDegreeNodes(): void {
+    this.cy?.nodes().forEach((node) => {
+      const deg = node.degree(false);
+      if (deg > this.COLLAPSE_DEGREE) {
+        node.data('collapsed', true);
+        node.data('originalLabel', node.data('label'));
+        node.data('label', `${node.data('label') as string} [+${deg} ocultos]`);
+        node.connectedEdges().style('display', 'none');
+        node.connectedEdges().connectedNodes().filter((n) => n.id() !== node.id()).style('display', 'none');
+      }
+    });
+  }
+
+  private expandNode(nodeId: string): void {
+    const node = this.cy?.getElementById(nodeId);
+    if (!node || !node.data('collapsed')) return;
+
+    node.data('collapsed', false);
+    const originalLabel = node.data('originalLabel') as string;
+    if (originalLabel) {
+      node.data('label', originalLabel);
+    }
+    node.connectedEdges().style('display', 'element');
+    node.connectedEdges().connectedNodes().style('display', 'element');
+  }
+
+  private getLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {
+    return LAYOUT_CONFIGS[layout]?.options ?? LAYOUT_CONFIGS['cola'].options;
+  }
+}
