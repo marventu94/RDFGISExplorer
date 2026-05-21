@@ -1,0 +1,62 @@
+<div class="timeline-view">
+  @if (queryState === 'no-query') {
+    <div class="empty-state">
+      <span class="empty-state__icon">&#x1F559;</span>
+      <span class="empty-state__text">Ejecutá una query con fechas para ver la línea de tiempo</span>
+    </div>
+  }
+
+  @if (queryState === 'no-dates') {
+    <div class="empty-state">
+      <div class="banner banner--info">
+        Esta query no devolvió fechas. Asegurate de incluir una variable con datatype
+        <code>xsd:date</code>/<code>xsd:dateTime</code>, o ajustá el
+        <button class="link-btn" type="button" (click)="openVariableMapping()">Mapeo de Variables</button>
+        para marcar una columna como fecha.
+      </div>
+    </div>
+  }
+
+  @if (queryState === 'filtered-zero') {
+    <div class="empty-state">
+      <div class="chip">
+        {{ activeFilterCount }} filtro{{ activeFilterCount !== 1 ? 's' : '' }} activo{{ activeFilterCount !== 1 ? 's' : '' }}
+      </div>
+      <span class="empty-state__text">0 de {{ originalNodeCount }} eventos en el rango activo</span>
+      @if (activeFilterLabel) {
+        <span class="empty-state__label">{{ activeFilterLabel }}</span>
+      }
+    </div>
+  }
+
+  @if (queryState === 'normal') {
+    <div class="toolbar">
+      <button
+        class="toolbar-btn toolbar-btn--apply"
+        type="button"
+        [disabled]="!canApplyRange"
+        (click)="applyRange()"
+      >
+        Aplicar rango
+      </button>
+      <div class="zoom-group">
+        <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Year)">Año</button>
+        <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Month)">Mes</button>
+        <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Week)">Semana</button>
+        <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Day)">Día</button>
+      </div>
+    </div>
+  }
+
+  <div
+    #tlContainer
+    class="tl-container"
+    [class.tl-container--hidden]="queryState !== 'normal'"
+  ></div>
+
+  @if (queryState === 'normal') {
+    <div class="price-chart-area">
+      <app-price-chart [node]="selectedNode" />
+    </div>
+  }
+</div>

@@ -38,6 +38,7 @@
     "rxjs": "~7.8.0",
     "sparqljs": "^3.7.4",
     "tslib": "^2.3.0",
+    "vis-data": "^8.0.4",
     "vis-timeline": "^8.5.1"
   },
   "devDependencies": {
