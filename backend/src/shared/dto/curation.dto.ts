@@ -6,7 +6,10 @@ export class CreateCurationDto {
   @IsOptional() @IsString() rawValue?: string;
   @IsOptional() @IsString() scriptValue?: string;
   @IsOptional() @IsString() manualValue?: string;
-  @IsIn(['validated', 'corrected', 'pending']) status!: 'validated' | 'corrected' | 'pending';
+  @IsIn(['validated', 'corrected', 'pending']) status!:
+    | 'validated'
+    | 'corrected'
+    | 'pending';
 }
 
 export class UpdateCurationDto {
@@ -15,7 +18,10 @@ export class UpdateCurationDto {
 }
 
 export class DuplicateDecisionDto {
-  @IsIn(['confirmed', 'rejected', 'pending']) decision!: 'confirmed' | 'rejected' | 'pending';
+  @IsIn(['confirmed', 'rejected', 'pending']) decision!:
+    | 'confirmed'
+    | 'rejected'
+    | 'pending';
 }
 
 export interface CurationRecord {
