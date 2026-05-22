@@ -22,14 +22,8 @@ import { TimelineViewComponent } from '@features/timeline-view/timeline-view.com
   styleUrl: './dashboard.component.scss',
   animations: [
     trigger('editorCollapse', [
-      state(
-        'expanded',
-        style({ height: '180px', opacity: 1, marginBottom: '0' }),
-      ),
-      state(
-        'collapsed',
-        style({ height: '0px', opacity: 0, marginBottom: '0' }),
-      ),
+      state('expanded', style({ height: '240px', opacity: 1, marginBottom: '0' })),
+      state('collapsed', style({ height: '0px', opacity: 0, marginBottom: '0' })),
       transition('expanded <=> collapsed', animate('300ms ease-in-out')),
     ]),
   ],
