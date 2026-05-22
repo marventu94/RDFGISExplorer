@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { SPARQL_ENDPOINT } from './adapters/sparql-endpoint.interface';
-import { createSparqlEndpoint } from './adapters/sparql-endpoint.factory';
+import { SparqlModule } from './modules/sparql/sparql.module';
 import { QueryModule } from './modules/query/query.module';
 import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 import { HealthModule } from './modules/health/health.module';
@@ -12,17 +11,11 @@ import { DatabaseModule } from './db/database.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
+    SparqlModule,
     QueryModule,
     SuggestionsModule,
     HealthModule,
     CurationModule,
   ],
-  providers: [
-    {
-      provide: SPARQL_ENDPOINT,
-      useFactory: () => createSparqlEndpoint(),
-    },
-  ],
-  exports: [SPARQL_ENDPOINT],
 })
 export class AppModule {}
