@@ -1,23 +1,22 @@
-import { Component, ElementRef, ViewChild, signal, input } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  computed,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { SparqlInputComponent } from '@features/sparql-input/sparql-input.component';
-import { TableViewComponent } from '@features/table-view/table-view.component';
-import { GraphViewComponent } from '@features/graph-view/graph-view.component';
-import { MapViewComponent } from '@features/map-view/map-view.component';
-import { TimelineViewComponent } from '@features/timeline-view/timeline-view.component';
+import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
+import { ViewSlotComponent } from './view-slot.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [
-    CdkDrag,
-    SparqlInputComponent,
-    TableViewComponent,
-    GraphViewComponent,
-    MapViewComponent,
-    TimelineViewComponent,
-  ],
+  imports: [CdkDrag, SparqlInputComponent, ViewSlotComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   animations: [
@@ -34,8 +33,22 @@ export class DashboardComponent {
   @ViewChild('container', { static: true }) containerRef!: ElementRef<HTMLElement>;
 
   protected readonly colLeft = signal(50);
-
   protected readonly rowTop = signal(50);
+
+  protected readonly layout = inject(DashboardLayoutService);
+  protected readonly preset = this.layout.preset;
+  protected readonly slotIndices = computed(() =>
+    Array.from({ length: this.layout.slotCount() }, (_, i) => i),
+  );
+
+  protected readonly showVerticalDivider = computed(() => {
+    const p = this.preset();
+    return p === 'quad' || p === 'split-h';
+  });
+  protected readonly showHorizontalDivider = computed(() => {
+    const p = this.preset();
+    return p === 'quad' || p === 'triple';
+  });
 
   protected get editorState(): string {
     return this.editorCollapsed() ? 'collapsed' : 'expanded';

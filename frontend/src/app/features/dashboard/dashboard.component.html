@@ -8,31 +8,28 @@
     [style.--col-left]="colLeft() + '%'"
     [style.--row-top]="rowTop() + '%'"
   >
-    <div class="views-grid">
-      <div class="cell top-left">
-        <app-table-view />
-      </div>
-      <div class="cell top-right">
-        <app-graph-view />
-      </div>
-      <div class="cell bottom-left">
-        <app-map-view />
-      </div>
-      <div class="cell bottom-right">
-        <app-timeline-view />
-      </div>
+    <div class="views-grid" [class]="'views-grid views-grid--' + preset()">
+      @for (i of slotIndices(); track i) {
+        <div class="cell">
+          <app-view-slot [index]="i" />
+        </div>
+      }
     </div>
-    <div
-      class="divider divider-vertical"
-      cdkDrag
-      cdkDragLockAxis="x"
-      (cdkDragEnded)="onVerticalDragEnded($event)"
-    ></div>
-    <div
-      class="divider divider-horizontal"
-      cdkDrag
-      cdkDragLockAxis="y"
-      (cdkDragEnded)="onHorizontalDragEnded($event)"
-    ></div>
+    @if (showVerticalDivider()) {
+      <div
+        class="divider divider-vertical"
+        cdkDrag
+        cdkDragLockAxis="x"
+        (cdkDragEnded)="onVerticalDragEnded($event)"
+      ></div>
+    }
+    @if (showHorizontalDivider()) {
+      <div
+        class="divider divider-horizontal"
+        cdkDrag
+        cdkDragLockAxis="y"
+        (cdkDragEnded)="onHorizontalDragEnded($event)"
+      ></div>
+    }
   </div>
 </div>
