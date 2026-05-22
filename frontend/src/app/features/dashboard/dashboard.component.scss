@@ -5,6 +5,8 @@
 }
 
 .editor-area {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--mat-sys-surface-container-low);
   border-bottom: 1px solid var(--mat-sys-outline-variant);
