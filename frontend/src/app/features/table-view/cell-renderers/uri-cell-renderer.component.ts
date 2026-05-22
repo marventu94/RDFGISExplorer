@@ -9,9 +9,7 @@ import type { BindingValue } from '@shared/models';
   selector: 'app-uri-cell-renderer',
   standalone: true,
   imports: [MatIconModule, MatButtonModule],
-  template: `
-    <span class="uri-cell" [title]="fullUri">{{ displayValue }}</span>
-  `,
+  template: ` <span class="uri-cell" [title]="fullUri">{{ displayValue }}</span> `,
   styles: [
     `
       :host {
@@ -34,8 +32,11 @@ export class UriCellRendererComponent implements ICellRendererAngularComp {
 
   agInit(params: ICellRendererParams): void {
     this.params = params;
-    const value = params.value as BindingValue | undefined;
-    this.fullUri = (value?.type === 'uri' || value?.type === 'literal' ? String(value.value) : '');
+    const field = params.colDef?.field;
+    const value = field
+      ? (params.data as Record<string, BindingValue> | undefined)?.[field]
+      : undefined;
+    this.fullUri = value?.type === 'uri' || value?.type === 'literal' ? String(value.value) : '';
     this.displayValue = this.shortenUri(this.fullUri);
   }
 

@@ -10,8 +10,16 @@ import type { BindingValue, CurationRecord } from '@shared/models';
   standalone: true,
   imports: [MatIconModule, MatButtonModule],
   template: `
-    <div class="editable-cell" (mouseenter)="showEditBtn.set(true)" (mouseleave)="showEditBtn.set(false)">
-      <span class="cell-value" [class.corrected]="status === 'corrected'" [class.scripted]="status === 'script'">
+    <div
+      class="editable-cell"
+      (mouseenter)="showEditBtn.set(true)"
+      (mouseleave)="showEditBtn.set(false)"
+    >
+      <span
+        class="cell-value"
+        [class.corrected]="status === 'corrected'"
+        [class.scripted]="status === 'script'"
+      >
         {{ effectiveValue }}
       </span>
       @if (status === 'validated') {
@@ -126,18 +134,21 @@ export class EditableCellRendererComponent implements ICellRendererAngularComp {
   }
 
   private refreshDisplay(params: ICellRendererParams): void {
-    const rawValue = params.value as BindingValue | undefined;
+    const field = params.colDef?.field;
+    const rawValue = field
+      ? (params.data as Record<string, BindingValue> | undefined)?.[field]
+      : undefined;
     const rawString = this.bindingToString(rawValue);
-    this.curationRecord = ((params.data as Record<string, unknown>)?.[
-      '__curation__' + params.colDef?.field
-    ] as CurationRecord) ?? null;
+    this.curationRecord =
+      ((params.data as Record<string, unknown>)?.[
+        '__curation__' + params.colDef?.field
+      ] as CurationRecord) ?? null;
 
     const record = this.curationRecord;
     if (record) {
       if (record.status === 'validated') {
         this.status = 'validated';
-        this.effectiveValue =
-          record.manualValue ?? record.scriptValue ?? rawString;
+        this.effectiveValue = record.manualValue ?? record.scriptValue ?? rawString;
       } else if (record.manualValue) {
         this.status = 'corrected';
         this.effectiveValue = record.manualValue;

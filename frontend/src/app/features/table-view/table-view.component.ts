@@ -1,10 +1,4 @@
-import {
-  Component,
-  inject,
-  signal,
-  computed,
-  OnDestroy,
-} from '@angular/core';
+import { Component, inject, signal, computed, OnDestroy } from '@angular/core';
 import { Subject, takeUntil, firstValueFrom } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -76,9 +70,7 @@ export class TableViewComponent implements OnDestroy {
 
   readonly isReady = computed(() => this.gridApi !== null);
   readonly hasData = computed(() => this.rowData().length > 0);
-  readonly isTruncated = computed(
-    () => this.queryResult()?.meta?.truncated ?? false,
-  );
+  readonly isTruncated = computed(() => this.queryResult()?.meta?.truncated ?? false);
   readonly truncatedMessage = computed(() => {
     const qr = this.queryResult();
     if (!qr?.meta?.truncated) return '';
@@ -187,14 +179,12 @@ export class TableViewComponent implements OnDestroy {
           const val = params.data?.[variable] as BindingValue | undefined;
           return this.bindingToRawString(val);
         },
-        cellRendererSelector: (
-          params: ICellRendererParams,
-        ) => {
+        cellRendererSelector: (params: ICellRendererParams) => {
           if (isPrimaryUriColumn) {
             return { component: UriCellRendererComponent };
           }
-          const v = params.value as BindingValue | undefined;
-          if (v?.type === 'coordinate') {
+          const rawBinding = (params.data as Record<string, BindingValue> | undefined)?.[variable];
+          if (rawBinding?.type === 'coordinate') {
             return { component: CoordCellRendererComponent };
           }
           return { component: EditableCellRendererComponent };
@@ -224,9 +214,7 @@ export class TableViewComponent implements OnDestroy {
     }
   }
 
-  private buildNodeFromRow(
-    rowData: Record<string, BindingValue>,
-  ): NormalizedNode | null {
+  private buildNodeFromRow(rowData: Record<string, BindingValue>): NormalizedNode | null {
     let uri = '';
     const attributes: Record<string, BindingValue> = {};
     let label = '';
@@ -249,9 +237,9 @@ export class TableViewComponent implements OnDestroy {
       label: label || this.shortenUri(uri),
       attributes,
       coordinate:
-        (Object.values(attributes).find((v) => v.type === 'coordinate')
-          ?.value as { lat: number; lng: number } | undefined) ??
-        undefined,
+        (Object.values(attributes).find((v) => v.type === 'coordinate')?.value as
+          | { lat: number; lng: number }
+          | undefined) ?? undefined,
     };
   }
 
@@ -314,9 +302,7 @@ export class TableViewComponent implements OnDestroy {
 
     for (const uri of nodesToLoad) {
       try {
-        const { records } = await firstValueFrom(
-          this.curationService.getForNode(uri),
-        );
+        const { records } = await firstValueFrom(this.curationService.getForNode(uri));
         this.curationCache.set(uri, records);
         this.attachCurationsToRows(uri, records);
       } catch {
@@ -325,10 +311,7 @@ export class TableViewComponent implements OnDestroy {
     }
   }
 
-  private attachCurationsToRows(
-    nodeUri: string,
-    records: CurationRecord[],
-  ): void {
+  private attachCurationsToRows(nodeUri: string, records: CurationRecord[]): void {
     if (!this.gridApi) return;
 
     const recordByField = new Map<string, CurationRecord>();
