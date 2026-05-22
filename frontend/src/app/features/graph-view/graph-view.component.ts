@@ -5,13 +5,14 @@ import {
   ElementRef,
   ViewChild,
   HostListener,
+  HostBinding,
   NgZone,
   ChangeDetectorRef,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectionService } from '@core/services/selection.service';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
-import { filter } from 'rxjs/operators';
+import { debounceTime, filter } from 'rxjs/operators';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
@@ -50,6 +51,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   filteredNodeCount = 0;
   activeFilterCount = 0;
 
+  @HostBinding('class.is-active-view') isActiveView = false;
+
   tooltipText = '';
   tooltipVisible = false;
   tooltipX = 0;
@@ -58,6 +61,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private originalResult: QueryResult | null = null;
   private resizeObserver?: ResizeObserver;
+  private suppressViewportEmit = false;
+  private readonly viewportChange$ = new Subject<void>();
 
   readonly MAX_NODES = 300;
   private readonly COLLAPSE_DEGREE = 20;
@@ -101,11 +106,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
         if (filtered.edges.length === 0) {
           this.queryState = 'no-edges';
-        } else if (this.originalNodeCount > this.MAX_NODES || filtered.nodes.length > this.MAX_NODES) {
+        } else if (
+          this.originalNodeCount > this.MAX_NODES ||
+          filtered.nodes.length > this.MAX_NODES
+        ) {
           this.queryState = 'truncated';
-          this.truncatedCount = this.originalNodeCount > this.MAX_NODES
-            ? this.originalNodeCount - this.MAX_NODES
-            : 0;
+          this.truncatedCount =
+            this.originalNodeCount > this.MAX_NODES ? this.originalNodeCount - this.MAX_NODES : 0;
         } else {
           this.queryState = 'normal';
         }
@@ -125,6 +132,69 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           this.applyFocusContext(sel.node.uri);
         }
       });
+
+    this.viewportChange$
+      .pipe(takeUntil(this.destroy$), debounceTime(500))
+      .subscribe(() => this.emitFocusFromViewport());
+
+    this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
+      this.isActiveView = v === 'graph';
+      this.cdr.markForCheck();
+    });
+
+    this.selectionService.focus$
+      .pipe(
+        takeUntil(this.destroy$),
+        filter(
+          (f) =>
+            f.source !== null &&
+            f.source !== 'graph' &&
+            f.uris.size > 0 &&
+            this.selectionService.getActiveView() !== 'graph',
+        ),
+      )
+      .subscribe((f) => this.applyExternalFocus(f.uris));
+  }
+
+  private emitFocusFromViewport(): void {
+    if (!this.cy) return;
+    const extent = this.cy.extent();
+    const uris: string[] = [];
+    this.cy.nodes().forEach((n) => {
+      const pos = n.position();
+      if (
+        pos.x >= extent.x1 &&
+        pos.x <= extent.x2 &&
+        pos.y >= extent.y1 &&
+        pos.y <= extent.y2 &&
+        n.style('display') !== 'none'
+      ) {
+        uris.push(n.id());
+      }
+    });
+    if (uris.length === 0) return;
+    this.selectionService.markActiveView('graph');
+    this.selectionService.setFocus(uris, 'graph');
+  }
+
+  private applyExternalFocus(uris: ReadonlySet<string>): void {
+    if (!this.cy) return;
+    const matched = this.cy.nodes().filter((n) => uris.has(n.id()));
+    if (matched.empty()) {
+      this.cy.elements().style('opacity', 1.0);
+      return;
+    }
+    this.cy.elements().style('opacity', 0.2);
+    matched.style('opacity', 1.0);
+    matched.connectedEdges().style('opacity', 0.6);
+    this.suppressViewportEmit = true;
+    this.cy.animate({
+      fit: { eles: matched, padding: 60 },
+      duration: 600,
+    });
+    setTimeout(() => {
+      this.suppressViewportEmit = false;
+    }, 800);
   }
 
   ngOnDestroy(): void {
@@ -190,6 +260,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       maxZoom: 5,
     });
 
+    this.cy.on('layoutstop', () => {
+      this.arrangeIsolatedNodes();
+      this.cy?.fit(undefined, 50);
+    });
+
     this.bindGraphEvents();
 
     if (result.edges.length > 0) {
@@ -200,8 +275,43 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       });
     }
 
-    this.cy.on('layoutstop', () => {
+    const layoutDuration = LAYOUT_CONFIGS[this.currentLayout]?.animationDuration ?? 500;
+    setTimeout(() => {
+      this.arrangeIsolatedNodes();
       this.cy?.fit(undefined, 50);
+    }, layoutDuration + 100);
+  }
+
+  private arrangeIsolatedNodes(): void {
+    if (!this.cy) return;
+    const components = this.cy.elements().components();
+    if (components.length <= 1) return;
+
+    const sorted = [...components].sort((a, b) => b.nodes().length - a.nodes().length);
+
+    const boxes = sorted.map((c) => ({ comp: c, bb: c.boundingBox({}) }));
+    const maxW = Math.max(...boxes.map((b) => b.bb.w));
+    const maxH = Math.max(...boxes.map((b) => b.bb.h));
+    const paddingX = Math.max(80, maxW * 0.2);
+    const paddingY = Math.max(80, maxH * 0.2);
+    const cellW = maxW + paddingX;
+    const cellH = maxH + paddingY;
+
+    const cols = Math.max(1, Math.ceil(Math.sqrt(boxes.length)));
+
+    boxes.forEach((b, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const targetCx = col * cellW + cellW / 2;
+      const targetCy = row * cellH + cellH / 2;
+      const currentCx = (b.bb.x1 + b.bb.x2) / 2;
+      const currentCy = (b.bb.y1 + b.bb.y2) / 2;
+      const dx = targetCx - currentCx;
+      const dy = targetCy - currentCy;
+      b.comp.nodes().forEach((n) => {
+        const p = n.position();
+        n.position({ x: p.x + dx, y: p.y + dy });
+      });
     });
   }
 
@@ -281,7 +391,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     });
 
     this.cy.on('tap', (evt) => {
-      if (evt.target === this.cy && (evt.originalEvent?.target as HTMLElement)?.tagName === 'CANVAS') {
+      if (
+        evt.target === this.cy &&
+        (evt.originalEvent?.target as HTMLElement)?.tagName === 'CANVAS'
+      ) {
         this.ngZone.run(() => {
           this.selectionService.clearSelection();
         });
@@ -291,7 +404,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     this.cy.on('mouseover', 'edge', (evt) => {
       const edge = evt.target;
-      this.tooltipText = (edge.data('predicateLabel') as string) || (edge.data('predicate') as string) || '';
+      this.tooltipText =
+        (edge.data('predicateLabel') as string) || (edge.data('predicate') as string) || '';
       this.tooltipVisible = !!this.tooltipText;
     });
 
@@ -307,6 +421,19 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy.on('mouseout', 'edge', () => {
       this.tooltipVisible = false;
     });
+
+    this.cy.on('viewport', () => {
+      if (this.suppressViewportEmit) return;
+      this.ngZone.run(() => {
+        this.selectionService.markActiveView('graph');
+        this.viewportChange$.next();
+      });
+    });
+
+    const container = this.container.nativeElement;
+    const markActive = () => this.selectionService.markActiveView('graph');
+    container.addEventListener('pointerdown', markActive);
+    container.addEventListener('wheel', markActive, { passive: true });
   }
 
   private applyFocusContext(focusUri: string | null): void {
@@ -340,7 +467,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         node.data('originalLabel', node.data('label'));
         node.data('label', `${node.data('label') as string} [+${deg} ocultos]`);
         node.connectedEdges().style('display', 'none');
-        node.connectedEdges().connectedNodes().filter((n) => n.id() !== node.id()).style('display', 'none');
+        node
+          .connectedEdges()
+          .connectedNodes()
+          .filter((n) => n.id() !== node.id())
+          .style('display', 'none');
       }
     });
   }
