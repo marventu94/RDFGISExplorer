@@ -255,7 +255,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       elements,
       style: GRAPH_STYLE,
       layout: this.getLayoutOptions(defaultLayout),
-      wheelSensitivity: 0.3,
+      wheelSensitivity: 1.0,
       minZoom: 0.05,
       maxZoom: 5,
     });
@@ -424,10 +424,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     this.cy.on('viewport', () => {
       if (this.suppressViewportEmit) return;
-      this.ngZone.run(() => {
-        this.selectionService.markActiveView('graph');
-        this.viewportChange$.next();
-      });
+      // No ngZone.run ni markActiveView aquí: el listener wheel/pointerdown del
+      // container ya marca activo. Mantener este handler liviano para no
+      // disparar change detection en cada tick de scroll.
+      this.ngZone.runOutsideAngular(() => this.viewportChange$.next());
     });
 
     const container = this.container.nativeElement;
