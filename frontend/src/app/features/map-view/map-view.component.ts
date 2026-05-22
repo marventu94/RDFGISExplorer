@@ -15,13 +15,7 @@ import { combineLatest, filter, Subject, takeUntil } from 'rxjs';
 import * as L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet-draw';
-import type {
-  QueryResult,
-  NormalizedNode,
-  Selection,
-  Filter,
-  GeoFilter,
-} from '@shared/models';
+import type { QueryResult, NormalizedNode, Selection, Filter, GeoFilter } from '@shared/models';
 import { colorForType } from '../../shared/entity-colors';
 import { TILE_LAYERS, BaseLayer } from './tile-layers';
 
@@ -61,7 +55,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
-    setTimeout(() => this.initMap(), 0);
+    requestAnimationFrame(() => requestAnimationFrame(() => this.initMap()));
   }
 
   private initMap(): void {
@@ -90,6 +84,10 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.setupDrawControl();
     this.setupSubscriptions();
     this.initResizeObserver();
+
+    this.map.whenReady(() => {
+      setTimeout(() => this.map?.invalidateSize(), 50);
+    });
   }
 
   changeBaseLayer(layer: BaseLayer): void {
@@ -192,8 +190,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
         }
 
         if (!filtered || filtered.nodes.length === 0) {
-          this.queryState =
-            activeFilters.length > 0 ? 'filtered-zero' : 'no-query';
+          this.queryState = activeFilters.length > 0 ? 'filtered-zero' : 'no-query';
           this.clearMarkers();
           this.syncDrawnItems(activeFilters);
           this.cdr.markForCheck();
@@ -285,9 +282,9 @@ export class MapViewComponent implements OnInit, OnDestroy {
     );
 
     this.drawnItems.eachLayer((layer) => {
-      const layerFilterId = (layer as unknown as Record<string, unknown>)[
-        '_filterId'
-      ] as string | undefined;
+      const layerFilterId = (layer as unknown as Record<string, unknown>)['_filterId'] as
+        | string
+        | undefined;
       if (layerFilterId && !geoFilterIds.has(layerFilterId)) {
         this.drawnItems!.removeLayer(layer);
       }
