@@ -60,18 +60,17 @@ export class CoordCellRendererComponent implements ICellRendererAngularComp {
 
   agInit(params: ICellRendererParams): void {
     this.params = params;
-    const value = params.value as BindingValue | undefined;
+    const field = params.colDef?.field;
+    const value = field
+      ? (params.data as Record<string, BindingValue> | undefined)?.[field]
+      : undefined;
     if (value?.type === 'coordinate') {
       this.hasCoord = true;
       const coord: Coordinate = value.value;
       this.displayText = `${coord.lat.toFixed(4)}, ${coord.lng.toFixed(4)}`;
     } else {
       this.hasCoord = false;
-      this.displayText = value?.value
-        ? typeof value.value === 'string'
-          ? value.value
-          : ''
-        : '';
+      this.displayText = value?.value ? (typeof value.value === 'string' ? value.value : '') : '';
     }
   }
 
@@ -92,9 +91,7 @@ export class CoordCellRendererComponent implements ICellRendererAngularComp {
     const rowNode = this.params.node;
     if (!rowNode?.data) return null;
     const rowData = rowNode.data as Record<string, BindingValue>;
-    const uriEntry = Object.entries(rowData).find(
-      ([, v]) => v?.type === 'uri',
-    );
+    const uriEntry = Object.entries(rowData).find(([, v]) => v?.type === 'uri');
     if (!uriEntry) return null;
     return {
       uri: String(uriEntry[1].value),
