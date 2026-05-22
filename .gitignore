@@ -5,3 +5,4 @@ dist/
 data/
 .angular/cache/
 coverage/
+package-lock.json
