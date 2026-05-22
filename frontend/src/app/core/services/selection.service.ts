@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest, map } from 'rxjs';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import type {
-  NormalizedNode,
-  QueryResult,
-  Selection,
-  Filter,
-} from '@shared/models';
+import type { NormalizedNode, QueryResult, Selection, Filter } from '@shared/models';
+
+export type FocusSource = 'map' | 'graph' | 'timeline' | null;
+
+export interface FocusState {
+  uris: ReadonlySet<string>;
+  source: FocusSource;
+}
 
 @Injectable({ providedIn: 'root' })
 export class SelectionService {
@@ -16,10 +18,19 @@ export class SelectionService {
   });
   private readonly _activeFilters$ = new BehaviorSubject<Filter[]>([]);
   private readonly _queryResult$ = new BehaviorSubject<QueryResult | null>(null);
+  private readonly _focus$ = new BehaviorSubject<FocusState>({
+    uris: new Set<string>(),
+    source: null,
+  });
+  private readonly _activeView$ = new BehaviorSubject<FocusSource>(null);
+  private activeViewTimer?: ReturnType<typeof setTimeout>;
+  private readonly ACTIVE_VIEW_TTL_MS = 2000;
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
   readonly activeFilters$: Observable<Filter[]> = this._activeFilters$.asObservable();
   readonly queryResult$: Observable<QueryResult | null> = this._queryResult$.asObservable();
+  readonly focus$: Observable<FocusState> = this._focus$.asObservable();
+  readonly activeView$: Observable<FocusSource> = this._activeView$.asObservable();
 
   readonly filteredQueryResult$: Observable<QueryResult | null> = combineLatest([
     this._queryResult$,
@@ -59,6 +70,30 @@ export class SelectionService {
     this._queryResult$.next(result);
     this._selectedNode$.next({ node: null, source: 'external' });
     this._activeFilters$.next([]);
+    this._focus$.next({ uris: new Set<string>(), source: null });
+  }
+
+  setFocus(uris: Iterable<string>, source: Exclude<FocusSource, null>): void {
+    this._focus$.next({ uris: new Set(uris), source });
+  }
+
+  clearFocus(): void {
+    this._focus$.next({ uris: new Set<string>(), source: null });
+  }
+
+  markActiveView(source: Exclude<FocusSource, null>): void {
+    if (this._activeView$.getValue() !== source) {
+      this._activeView$.next(source);
+    }
+    if (this.activeViewTimer) clearTimeout(this.activeViewTimer);
+    this.activeViewTimer = setTimeout(() => {
+      this._activeView$.next(null);
+      this.activeViewTimer = undefined;
+    }, this.ACTIVE_VIEW_TTL_MS);
+  }
+
+  getActiveView(): FocusSource {
+    return this._activeView$.getValue();
   }
 
   private applyFilters(result: QueryResult | null, filters: Filter[]): QueryResult | null {
@@ -83,9 +118,7 @@ export class SelectionService {
     }
     if (filter.kind === 'temporal') {
       if (!node.temporalEvents?.length) return false;
-      return node.temporalEvents.some(
-        (ev) => ev.isoDate >= filter.from && ev.isoDate <= filter.to,
-      );
+      return node.temporalEvents.some((ev) => ev.isoDate >= filter.from && ev.isoDate <= filter.to);
     }
     return true;
   }
