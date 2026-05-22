@@ -308,9 +308,15 @@ export class WikidataAdapter implements SparqlEndpoint {
         const targetUri = row[targetVar].value as string;
 
         if (!nodeMap.has(targetUri)) {
+          const targetLabelVar = `${targetVar}Label`;
+          const targetLabel =
+            row[targetLabelVar]?.type === 'literal'
+              ? String(row[targetLabelVar].value)
+              : this.uriFragment(targetUri);
           nodeMap.set(targetUri, {
             uri: targetUri,
-            label: this.uriFragment(targetUri),
+            label: targetLabel,
+            type: targetVar,
             attributes: {},
           });
         }
