@@ -1,12 +1,4 @@
-import {
-  Component,
-  OnInit,
-  OnDestroy,
-  inject,
-  signal,
-  ElementRef,
-  ViewChild,
-} from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -27,10 +19,7 @@ import { Parser } from 'sparqljs';
 
 import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
-import {
-  DashboardLayoutService,
-  LayoutPreset,
-} from '@core/services/dashboard-layout.service';
+import { DashboardLayoutService, LayoutPreset } from '@core/services/dashboard-layout.service';
 import { LibraryService } from './library.service';
 import { StoredQuery } from './seed-queries';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
@@ -146,7 +135,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         extensions: [
           basicSetup,
           sparqlLang,
-          cmPlaceholder("-- Escribí tu query SPARQL acá, o usá [▼ Biblioteca] para cargar una predefinida"),
+          cmPlaceholder(
+            '-- Escribí tu query SPARQL acá, o usá [▼ Biblioteca] para cargar una predefinida',
+          ),
           updateHasContent,
           ctrlEnterKeymap,
           EditorView.lineWrapping,
@@ -264,11 +255,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         this.snackBar.open(msg, 'OK', { duration: 4000 });
 
         if (result.meta.truncated) {
-          this.snackBar.open(
-            `Resultado truncado a ${result.meta.limitApplied} filas`,
-            'OK',
-            { duration: 6000 },
-          );
+          this.snackBar.open(`Resultado truncado a ${result.meta.limitApplied} filas`, 'OK', {
+            duration: 6000,
+          });
         }
       },
       error: (err: HttpErrorResponse) => {
@@ -290,9 +279,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const body = err.error;
 
     if (err.status === 400) {
-      return body?.message
-        ? `SPARQL inválido: ${body.message}`
-        : 'Error: query SPARQL inválida.';
+      return body?.message ? `SPARQL inválido: ${body.message}` : 'Error: query SPARQL inválida.';
     }
 
     if (err.status === 408) {
