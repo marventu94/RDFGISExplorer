@@ -1,12 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  ViewChild,
-  computed,
-  inject,
-  input,
-  signal,
-} from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, input, signal } from '@angular/core';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { SparqlInputComponent } from '@features/sparql-input/sparql-input.component';
