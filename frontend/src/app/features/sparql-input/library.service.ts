@@ -59,13 +59,14 @@ export class LibraryService {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
       this.persist([...SEED_QUERIES]);
-    } else {
-      try {
-        const parsed: StoredQuery[] = JSON.parse(stored);
-        this._queries$.next(parsed);
-      } catch {
-        this.persist([...SEED_QUERIES]);
-      }
+      return;
+    }
+    try {
+      const parsed: StoredQuery[] = JSON.parse(stored);
+      const custom = parsed.filter((q) => !q.isSeed);
+      this.persist([...SEED_QUERIES, ...custom]);
+    } catch {
+      this.persist([...SEED_QUERIES]);
     }
   }
 

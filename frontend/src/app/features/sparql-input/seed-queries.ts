@@ -63,7 +63,6 @@ SELECT ?river ?riverLabel ?length WHERE {
     category: 'temporal',
     description: 'Presidentes de Argentina con fecha de inicio y fin.',
     sparql: `PREFIX wd: <http://www.wikidata.org/entity/>
-PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 PREFIX p: <http://www.wikidata.org/prop/>
 PREFIX ps: <http://www.wikidata.org/prop/statement/>
 PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
@@ -71,7 +70,8 @@ PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX bd: <http://www.bigdata.com/rdf#>
 SELECT ?president ?presidentLabel ?start ?end WHERE {
   ?president p:P39 ?stmt .
-  ?stmt ps:P39 wd:Q207313 ; pq:P580 ?start .
+  ?stmt ps:P39 wd:Q12969145 ;
+        pq:P580 ?start .
   OPTIONAL { ?stmt pq:P582 ?end . }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "es,en" . }
 } ORDER BY ?start`,
