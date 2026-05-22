@@ -12,6 +12,7 @@ import {
   NormalizedNode,
   QueryResult,
   ResultBinding,
+  TemporalEvent,
 } from '../shared/dto/query-result.dto';
 
 const WIKIDATA_SPARQL_URL = 'https://query.wikidata.org/sparql';
@@ -263,10 +264,13 @@ export class WikidataAdapter implements SparqlEndpoint {
         const node: NormalizedNode = {
           uri: primaryUri,
           label,
+          type: primaryVar,
           attributes: this.collectAttributes(row, variables),
         };
         const coord = this.findCoordinate(row, variables);
         if (coord) node.coordinate = coord;
+        const events = this.findTemporalEvents(row, variables);
+        if (events.length > 0) node.temporalEvents = events;
         nodeMap.set(primaryUri, node);
       } else {
         const existing = nodeMap.get(primaryUri)!;
@@ -287,6 +291,15 @@ export class WikidataAdapter implements SparqlEndpoint {
         const coord = this.findCoordinate(row, variables);
         if (coord && !existing.coordinate) {
           existing.coordinate = coord;
+        }
+        const events = this.findTemporalEvents(row, variables);
+        for (const ev of events) {
+          const alreadyExists = existing.temporalEvents?.some(
+            (e) => e.field === ev.field && e.isoDate === ev.isoDate,
+          );
+          if (!alreadyExists) {
+            existing.temporalEvents = [...(existing.temporalEvents ?? []), ev];
+          }
         }
       }
 
@@ -334,6 +347,25 @@ export class WikidataAdapter implements SparqlEndpoint {
       }
     }
     return undefined;
+  }
+
+  private findTemporalEvents(
+    row: ResultBinding,
+    variables: string[],
+  ): TemporalEvent[] {
+    const events: TemporalEvent[] = [];
+    for (const v of variables) {
+      const val = row[v];
+      if (val?.type === 'date') {
+        const d = new Date(val.value);
+        events.push({
+          field: v,
+          isoDate: val.value,
+          numericValue: isNaN(d.getTime()) ? undefined : d.getFullYear(),
+        });
+      }
+    }
+    return events;
   }
 
   private collectAttributes(
