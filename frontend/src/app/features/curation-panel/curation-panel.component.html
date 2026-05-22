@@ -1,0 +1,50 @@
+<div class="panel-header">
+  <h2 class="panel-title">
+    @if (node(); as n) {
+      Detalle de {{ n.label }}
+    } @else {
+      Sin selección
+    }
+  </h2>
+  <button mat-icon-button (click)="closePanel()" aria-label="Cerrar panel">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+@if (loading()) {
+  <div class="panel-loading">
+    <mat-spinner diameter="32" />
+  </div>
+}
+
+<mat-tab-group [hidden]="loading()">
+  <mat-tab label="Datos">
+    <app-data-tab
+      [node]="node()"
+      [records]="records()"
+      (recordChanged)="onRecordChanged()"
+    />
+  </mat-tab>
+
+  <mat-tab label="Anotaciones">
+    <app-annotations-tab
+      [records]="records()"
+    />
+  </mat-tab>
+
+  <mat-tab>
+    <ng-template mat-tab-label>
+      Duplicados
+      @if (pendingDuplicateCount(); as count) {
+        @if (count > 0) {
+          <span class="duplicate-badge" [matBadge]="count" matBadgeColor="warn" matBadgeSize="small"></span>
+        }
+      }
+    </ng-template>
+    <app-duplicates-tab
+      [node]="node()"
+      [duplicates]="duplicates()"
+      (decisionMade)="onDuplicateDecision()"
+    />
+  </mat-tab>
+</mat-tab-group>
