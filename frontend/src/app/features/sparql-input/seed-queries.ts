@@ -42,6 +42,24 @@ SELECT ?univ ?univLabel ?coord ?inception WHERE {
     isSeed: true,
   },
   {
+    id: 'seed-provinces-capitals',
+    name: 'Provincias argentinas y sus capitales (grafo)',
+    category: 'exploration',
+    description: 'Grafo bipartito: provincias conectadas a sus capitales con coordenadas.',
+    sparql: `PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+SELECT ?province ?provinceLabel ?capital ?capitalLabel ?coord ?inception WHERE {
+  ?province wdt:P31 wd:Q44753 ;
+            wdt:P36 ?capital .
+  OPTIONAL { ?capital wdt:P625 ?coord . }
+  OPTIONAL { ?province wdt:P571 ?inception . }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "es,en" . }
+}`,
+    isSeed: true,
+  },
+  {
     id: 'seed-rivers-argentina',
     name: 'Ríos de Argentina',
     category: 'exploration',
