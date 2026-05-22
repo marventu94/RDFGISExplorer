@@ -1,13 +1,17 @@
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
 .sparql-input {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .editor-area {
@@ -18,11 +22,13 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
-.editor-area :is(.cm-editor) {
+::ng-deep .editor-area .cm-editor {
   height: 100%;
 }
 
-.editor-area :is(.cm-editor .cm-scroller) {
+::ng-deep .editor-area .cm-editor .cm-scroller {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
