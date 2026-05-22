@@ -5,21 +5,17 @@ import {
   ElementRef,
   ViewChild,
   HostListener,
+  HostBinding,
   NgZone,
   ChangeDetectorRef,
 } from '@angular/core';
 import { SelectionService } from '@core/services/selection.service';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
-import { filter } from 'rxjs/operators';
+import { debounceTime, filter } from 'rxjs/operators';
 import { Timeline } from 'vis-timeline/standalone';
 import type { DataItem, DataGroup, TimelineOptions } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
-import type {
-  QueryResult,
-  NormalizedNode,
-  Selection,
-  TemporalFilter,
-} from '@shared/models';
+import type { QueryResult, NormalizedNode, Selection, TemporalFilter } from '@shared/models';
 import { colorForType } from '@shared/entity-colors';
 import { PriceChartComponent } from './price-chart.component';
 
@@ -52,6 +48,8 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   activeFilterCount = 0;
   selectedNode: NormalizedNode | null = null;
 
+  @HostBinding('class.is-active-view') isActiveView = false;
+
   private timeline?: Timeline;
   private readonly items = new DataSet<DataItem>();
   private readonly groups = new DataSet<DataGroup>();
@@ -59,6 +57,8 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private pendingRange?: { start: Date; end: Date };
   private allNodes: NormalizedNode[] = [];
+  private suppressViewportEmit = false;
+  private readonly viewportChange$ = new Subject<{ start: Date; end: Date }>();
 
   constructor(
     private readonly selectionService: SelectionService,
@@ -78,9 +78,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       .subscribe(([original, filtered, filters]) => {
         this.activeFilterCount = filters.length;
 
-        const temporalFilter = filters.find(
-          (f): f is TemporalFilter => f.kind === 'temporal',
-        );
+        const temporalFilter = filters.find((f): f is TemporalFilter => f.kind === 'temporal');
         this.activeFilterLabel = temporalFilter?.label ?? '';
 
         if (!filtered || filtered.nodes.length === 0) {
@@ -106,9 +104,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         this.filteredNodeCount = filtered.nodes.length;
         this.allNodes = filtered.nodes;
 
-        const nodesWithDates = filtered.nodes.filter(
-          (n) => (n.temporalEvents?.length ?? 0) > 0,
-        );
+        const nodesWithDates = filtered.nodes.filter((n) => (n.temporalEvents?.length ?? 0) > 0);
 
         if (nodesWithDates.length === 0) {
           this.queryState = 'no-dates';
@@ -145,7 +141,99 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         }
       });
 
+    this.viewportChange$
+      .pipe(takeUntil(this.destroy$), debounceTime(500))
+      .subscribe((range) => this.emitFocusFromViewport(range));
+
+    this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
+      this.isActiveView = v === 'timeline';
+      this.cdr.markForCheck();
+    });
+
+    this.selectionService.focus$
+      .pipe(
+        takeUntil(this.destroy$),
+        filter(
+          (f) =>
+            f.source !== null &&
+            f.source !== 'timeline' &&
+            f.uris.size > 0 &&
+            this.selectionService.getActiveView() !== 'timeline',
+        ),
+      )
+      .subscribe((f) => this.applyExternalFocus(f.uris));
+
     this.initTimeline();
+  }
+
+  private emitFocusFromViewport(range: { start: Date; end: Date }): void {
+    if (this.allNodes.length === 0) return;
+    const fromMs = range.start.getTime();
+    const toMs = range.end.getTime();
+    const uris: string[] = [];
+    for (const node of this.allNodes) {
+      if (!node.temporalEvents?.length) continue;
+      const inRange = node.temporalEvents.some((ev) => {
+        const t = new Date(ev.isoDate).getTime();
+        return t >= fromMs && t <= toMs;
+      });
+      if (inRange) uris.push(node.uri);
+    }
+    if (uris.length === 0) return;
+    this.selectionService.markActiveView('timeline');
+    this.selectionService.setFocus(uris, 'timeline');
+  }
+
+  private applyExternalFocus(uris: ReadonlySet<string>): void {
+    if (!this.timeline || this.allNodes.length === 0) return;
+
+    let focusMin = Infinity;
+    let focusMax = -Infinity;
+    let totalMin = Infinity;
+    let totalMax = -Infinity;
+    let focusedCount = 0;
+    let totalWithDates = 0;
+
+    for (const node of this.allNodes) {
+      if (!node.temporalEvents?.length) continue;
+      totalWithDates++;
+      const inFocus = uris.has(node.uri);
+      if (inFocus) focusedCount++;
+      for (const ev of node.temporalEvents) {
+        const t = new Date(ev.isoDate).getTime();
+        if (t < totalMin) totalMin = t;
+        if (t > totalMax) totalMax = t;
+        if (inFocus) {
+          if (t < focusMin) focusMin = t;
+          if (t > focusMax) focusMax = t;
+        }
+      }
+    }
+
+    if (!isFinite(totalMin) || !isFinite(totalMax)) return;
+
+    let winMin: number;
+    let winMax: number;
+
+    const coverage = totalWithDates > 0 ? focusedCount / totalWithDates : 0;
+    if (!isFinite(focusMin) || coverage >= 0.7) {
+      winMin = totalMin;
+      winMax = totalMax;
+    } else {
+      winMin = focusMin;
+      winMax = focusMax;
+    }
+
+    const span = winMax - winMin;
+    const pad = Math.max(span * 0.2, 1000 * 60 * 60 * 24 * 30);
+
+    this.suppressViewportEmit = true;
+    this.timeline.setWindow(new Date(winMin - pad), new Date(winMax + pad), {
+      animation: { duration: 600, easingFunction: 'easeInOutQuad' },
+    });
+    setTimeout(() => {
+      this.suppressViewportEmit = false;
+    }, 800);
   }
 
   ngOnDestroy(): void {
@@ -180,9 +268,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     if (!this.timeline) return;
 
     const visible = this.timeline.getWindow();
-    const center = new Date(
-      (visible.start.getTime() + visible.end.getTime()) / 2,
-    );
+    const center = new Date((visible.start.getTime() + visible.end.getTime()) / 2);
 
     let start: Date;
     let end: Date;
@@ -236,12 +322,12 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       orientation: { axis: 'bottom', item: 'top' },
     };
 
-    this.timeline = new Timeline(
-      this.tlContainer.nativeElement,
-      this.items,
-      this.groups,
-      options,
-    );
+    this.timeline = new Timeline(this.tlContainer.nativeElement, this.items, this.groups, options);
+
+    const container = this.tlContainer.nativeElement;
+    const markActive = () => this.selectionService.markActiveView('timeline');
+    container.addEventListener('pointerdown', markActive, { capture: true });
+    container.addEventListener('wheel', markActive, { passive: true, capture: true });
 
     this.timeline.on('select', (props: { items: string[] }) => {
       if (!props.items || props.items.length === 0) return;
@@ -255,16 +341,23 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.timeline.on(
-      'rangechanged',
-      (props: { start: Date; end: Date; byUser: boolean }) => {
-        if (props.byUser) {
-          this.pendingRange = { start: props.start, end: props.end };
-          this.canApplyRange = true;
-          this.cdr.markForCheck();
-        }
-      },
-    );
+    this.timeline.on('rangechange', (props: { byUser: boolean }) => {
+      if (props.byUser) {
+        this.selectionService.markActiveView('timeline');
+      }
+    });
+
+    this.timeline.on('rangechanged', (props: { start: Date; end: Date; byUser: boolean }) => {
+      if (!props.byUser) return;
+      this.pendingRange = { start: props.start, end: props.end };
+      this.canApplyRange = true;
+      this.cdr.markForCheck();
+      if (!this.suppressViewportEmit) {
+        this.ngZone.run(() => {
+          this.viewportChange$.next({ start: props.start, end: props.end });
+        });
+      }
+    });
   }
 
   private initResizeObserver(): void {
@@ -295,9 +388,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         });
       }
 
-      const mostRecent = node.temporalEvents.reduce((a, b) =>
-        a.isoDate > b.isoDate ? a : b,
-      );
+      const mostRecent = node.temporalEvents.reduce((a, b) => (a.isoDate > b.isoDate ? a : b));
 
       const color = colorForType(node.type);
 

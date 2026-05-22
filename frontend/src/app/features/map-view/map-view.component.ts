@@ -5,13 +5,14 @@ import {
   ElementRef,
   ViewChild,
   HostListener,
+  HostBinding,
   NgZone,
   ChangeDetectorRef,
   inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectionService } from '@core/services/selection.service';
-import { combineLatest, filter, Subject, takeUntil } from 'rxjs';
+import { combineLatest, debounceTime, filter, Subject, takeUntil } from 'rxjs';
 import * as L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet-draw';
@@ -43,6 +44,12 @@ export class MapViewComponent implements OnInit, OnDestroy {
   originalNodeCount = 0;
   filteredNodeCount = 0;
   activeFilterCount = 0;
+
+  @HostBinding('class.is-active-view') isActiveView = false;
+
+  private currentNodes: NormalizedNode[] = [];
+  private suppressViewportEmit = false;
+  private readonly viewportChange$ = new Subject<void>();
 
   readonly baseLayerOptions = [
     { value: 'osm' as const, label: 'OSM' },
@@ -84,6 +91,16 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.setupDrawControl();
     this.setupSubscriptions();
     this.initResizeObserver();
+
+    this.map.on('moveend zoomend', () => {
+      if (this.suppressViewportEmit) return;
+      this.ngZone.run(() => this.viewportChange$.next());
+    });
+
+    this.map.on('mousedown wheel touchstart movestart zoomstart drag move zoom', () => {
+      if (this.suppressViewportEmit) return;
+      this.selectionService.markActiveView('map');
+    });
 
     this.map.whenReady(() => {
       setTimeout(() => this.map?.invalidateSize(), 50);
@@ -198,10 +215,33 @@ export class MapViewComponent implements OnInit, OnDestroy {
         }
 
         this.queryState = 'normal';
+        this.currentNodes = filtered.nodes;
         this.renderMarkers(filtered);
         this.syncDrawnItems(activeFilters);
         this.cdr.markForCheck();
       });
+
+    this.viewportChange$
+      .pipe(takeUntil(this.destroy$), debounceTime(500))
+      .subscribe(() => this.emitFocusFromViewport());
+
+    this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
+      this.isActiveView = v === 'map';
+      this.cdr.markForCheck();
+    });
+
+    this.selectionService.focus$
+      .pipe(
+        takeUntil(this.destroy$),
+        filter(
+          (f) =>
+            f.source !== null &&
+            f.source !== 'map' &&
+            f.uris.size > 0 &&
+            this.selectionService.getActiveView() !== 'map',
+        ),
+      )
+      .subscribe((f) => this.applyExternalFocus(f.uris));
 
     this.selectionService.selectedNode$
       .pipe(
@@ -289,6 +329,39 @@ export class MapViewComponent implements OnInit, OnDestroy {
         this.drawnItems!.removeLayer(layer);
       }
     });
+  }
+
+  private emitFocusFromViewport(): void {
+    if (!this.map || this.currentNodes.length === 0) return;
+    const bounds = this.map.getBounds();
+    const uris: string[] = [];
+    for (const node of this.currentNodes) {
+      if (!node.coordinate) continue;
+      if (bounds.contains([node.coordinate.lat, node.coordinate.lng])) {
+        uris.push(node.uri);
+      }
+    }
+    if (uris.length === 0) return;
+    this.selectionService.markActiveView('map');
+    this.selectionService.setFocus(uris, 'map');
+  }
+
+  private applyExternalFocus(uris: ReadonlySet<string>): void {
+    if (!this.map) return;
+    const points: L.LatLngTuple[] = [];
+    for (const node of this.currentNodes) {
+      if (!node.coordinate) continue;
+      if (uris.has(node.uri)) {
+        points.push([node.coordinate.lat, node.coordinate.lng]);
+      }
+    }
+    if (points.length === 0) return;
+    const bounds = L.latLngBounds(points);
+    this.suppressViewportEmit = true;
+    this.map.flyToBounds(bounds, { padding: [40, 40], duration: 0.8, maxZoom: 14 });
+    setTimeout(() => {
+      this.suppressViewportEmit = false;
+    }, 1000);
   }
 
   private flyToNode(node: NormalizedNode): void {
