@@ -22,6 +22,8 @@ import { PriceChartComponent } from './price-chart.component';
 type QueryState = 'no-query' | 'no-dates' | 'filtered-zero' | 'normal';
 
 enum ZoomLevel {
+  TenYears = 'ten-years',
+  FiveYears = 'five-years',
   Year = 'year',
   Month = 'month',
   Week = 'week',
@@ -274,6 +276,14 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     let end: Date;
 
     switch (level) {
+      case ZoomLevel.TenYears:
+        start = new Date(center.getFullYear() - 5, 0, 1);
+        end = new Date(center.getFullYear() + 5, 0, 1);
+        break;
+      case ZoomLevel.FiveYears:
+        start = new Date(center.getFullYear() - 2, 0, 1);
+        end = new Date(center.getFullYear() + 3, 0, 1);
+        break;
       case ZoomLevel.Day:
         start = new Date(center);
         start.setHours(0, 0, 0, 0);
