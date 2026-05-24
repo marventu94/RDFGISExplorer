@@ -1,6 +1,4 @@
-import { Component, signal } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
+import { Component } from '@angular/core';
 import type { ICellRendererAngularComp } from 'ag-grid-angular';
 import type { ICellRendererParams } from 'ag-grid-community';
 import type { BindingValue, CurationRecord } from '@shared/models';
@@ -8,13 +6,9 @@ import type { BindingValue, CurationRecord } from '@shared/models';
 @Component({
   selector: 'app-editable-cell-renderer',
   standalone: true,
-  imports: [MatIconModule, MatButtonModule],
+  imports: [],
   template: `
-    <div
-      class="editable-cell"
-      (mouseenter)="showEditBtn.set(true)"
-      (mouseleave)="showEditBtn.set(false)"
-    >
+    <div class="editable-cell">
       <span
         class="cell-value"
         [class.corrected]="status === 'corrected'"
@@ -30,17 +24,6 @@ import type { BindingValue, CurationRecord } from '@shared/models';
         <span class="badge badge-pending" title="Pendiente">&#x23F3;</span>
       } @else if (status === 'script') {
         <span class="badge badge-script" title="Script">&#x1F916;</span>
-      }
-      @if (showEditBtn()) {
-        <button
-          class="edit-btn"
-          mat-icon-button
-          (click)="onEditClick($event)"
-          aria-label="Editar celda"
-          title="Editar celda"
-        >
-          <mat-icon>edit</mat-icon>
-        </button>
       }
     </div>
   `,
@@ -97,22 +80,6 @@ import type { BindingValue, CurationRecord } from '@shared/models';
         background-color: #f3e5f5;
         color: #7b1fa2;
       }
-      .edit-btn {
-        width: 28px;
-        height: 28px;
-        line-height: 28px;
-        flex-shrink: 0;
-        opacity: 0.6;
-        transition: opacity 150ms;
-      }
-      .edit-btn:hover {
-        opacity: 1;
-      }
-      .edit-btn mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-      }
     `,
   ],
 })
@@ -121,7 +88,6 @@ export class EditableCellRendererComponent implements ICellRendererAngularComp {
   effectiveValue = '';
   status: 'validated' | 'corrected' | 'pending' | 'script' | null = null;
   curationRecord: CurationRecord | null = null;
-  showEditBtn = signal(false);
 
   agInit(params: ICellRendererParams): void {
     this.params = params;
@@ -210,14 +176,4 @@ export class EditableCellRendererComponent implements ICellRendererAngularComp {
     return last;
   }
 
-  onEditClick(event: MouseEvent): void {
-    event.stopPropagation();
-    const rowIndex = this.params.node?.rowIndex;
-    if (rowIndex !== null && rowIndex !== undefined) {
-      this.params.api.startEditingCell({
-        rowIndex,
-        colKey: this.params.column?.getColId() ?? this.params.colDef?.field ?? '',
-      });
-    }
-  }
 }

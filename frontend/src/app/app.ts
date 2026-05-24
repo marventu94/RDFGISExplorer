@@ -4,6 +4,7 @@ import { DashboardComponent } from '@features/dashboard/dashboard.component';
 import { NavbarComponent } from '@features/dashboard/navbar/navbar.component';
 import { CurationPanelComponent } from '@features/curation-panel/curation-panel.component';
 import { SelectionService } from '@core/services/selection.service';
+import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 
 @Component({
   selector: 'app-root',
@@ -14,8 +15,9 @@ import { SelectionService } from '@core/services/selection.service';
 })
 export class App {
   private readonly selectionService = inject(SelectionService);
+  private readonly dashboardLayout = inject(DashboardLayoutService);
   protected readonly sidenavOpen = signal(false);
-  protected readonly editorCollapsed = signal(false);
+  protected readonly editorCollapsed = this.dashboardLayout.editorCollapsed;
 
   @ViewChild('sidenav') sidenav!: MatSidenav;
 
@@ -25,10 +27,6 @@ export class App {
         this.sidenavOpen.set(true);
       }
     });
-  }
-
-  protected toggleEditor(): void {
-    this.editorCollapsed.update((v) => !v);
   }
 
   protected onSidenavClosed(): void {
