@@ -29,6 +29,7 @@ import type {
 import { UriCellRendererComponent } from './cell-renderers/uri-cell-renderer.component';
 import { CoordCellRendererComponent } from './cell-renderers/coord-cell-renderer.component';
 import { EditableCellRendererComponent } from './cell-renderers/editable-cell-renderer.component';
+import { PluginCellRendererComponent } from './cell-renderers/plugin-cell-renderer.component';
 import { InlineEditorComponent } from './cell-editors/inline-editor.component';
 
 @Component({
@@ -58,6 +59,7 @@ export class TableViewComponent implements OnDestroy {
   readonly queryResult = signal<QueryResult | null>(null);
   readonly pageSize = signal(50);
   readonly pageSizeOptions = [50, 100, 200];
+  readonly quickFilter = signal('');
 
   readonly columnDefs = signal<ColDef[]>([]);
   readonly rowData = signal<ResultBinding[]>([]);
@@ -191,6 +193,17 @@ export class TableViewComponent implements OnDestroy {
         },
       };
       return colDef;
+    });
+
+    defs.push({
+      colId: 'plugin',
+      headerName: 'Plugin',
+      sortable: false,
+      filter: false,
+      resizable: false,
+      suppressMovable: true,
+      width: 80,
+      cellRenderer: PluginCellRendererComponent,
     });
 
     this.columnDefs.set(defs);

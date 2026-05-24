@@ -81,17 +81,16 @@ interface ViewOption {
       }
       .slot-toolbar {
         position: absolute;
-        top: 4px;
-        right: 4px;
+        bottom: 4px;
+        left: 4px;
         z-index: 1100;
       }
       .slot-picker {
+        --mdc-icon-button-state-layer-size: 28px;
         background: rgba(255, 255, 255, 0.85);
         backdrop-filter: blur(4px);
-        width: 28px;
-        height: 28px;
-        line-height: 28px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        padding: 0;
       }
       .slot-picker .mat-icon {
         font-size: 18px;
