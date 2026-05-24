@@ -33,39 +33,6 @@
   z-index: 1;
 }
 
-.map-toolbar {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 6px;
-  padding: 4px 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-  font-size: 12px;
-}
-
-.toolbar-label {
-  color: #555;
-  font-weight: 500;
-}
-
-.baselayer-dropdown {
-  border: 1px solid #bdbdbd;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-  background: #fff;
-  cursor: pointer;
-
-  &:focus {
-    outline: 2px solid #2196f3;
-    outline-offset: 1px;
-  }
-}
 
 .map-overlay {
   position: absolute;

@@ -10,22 +10,22 @@ import {
   ChangeDetectorRef,
   inject,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { SelectionService } from '@core/services/selection.service';
 import { combineLatest, debounceTime, filter, Subject, takeUntil } from 'rxjs';
 import * as L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet-draw';
+import * as GeocoderControl from 'leaflet-control-geocoder';
 import type { QueryResult, NormalizedNode, Selection, Filter, GeoFilter } from '@shared/models';
 import { colorForType } from '../../shared/entity-colors';
-import { TILE_LAYERS, BaseLayer } from './tile-layers';
+import { TILE_LAYERS } from './tile-layers';
 
 type QueryState = 'no-query' | 'no-coords' | 'filtered-zero' | 'normal';
 
 @Component({
   selector: 'app-map-view',
   standalone: true,
-  imports: [FormsModule],
+  imports: [],
   templateUrl: './map-view.component.html',
   styleUrl: './map-view.component.scss',
 })
@@ -36,7 +36,6 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private clusterGroup?: L.MarkerClusterGroup;
   private drawnItems?: L.FeatureGroup;
   private tileLayer?: L.TileLayer;
-  protected baseLayer: BaseLayer = 'osm';
   private destroy$ = new Subject<void>();
   private resizeObserver?: ResizeObserver;
 
@@ -50,12 +49,6 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private currentNodes: NormalizedNode[] = [];
   private suppressViewportEmit = false;
   private readonly viewportChange$ = new Subject<void>();
-
-  readonly baseLayerOptions = [
-    { value: 'osm' as const, label: 'OSM' },
-    { value: 'positron' as const, label: 'Positron' },
-    { value: 'dark' as const, label: 'Dark' },
-  ];
 
   private readonly selectionService = inject(SelectionService);
   private readonly ngZone = inject(NgZone);
@@ -78,8 +71,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
       zoom: 5,
     });
 
-    this.tileLayer = L.tileLayer(TILE_LAYERS[this.baseLayer].url, {
-      attribution: TILE_LAYERS[this.baseLayer].attribution,
+    this.tileLayer = L.tileLayer(TILE_LAYERS['osm'].url, {
+      attribution: TILE_LAYERS['osm'].attribution,
     }).addTo(this.map);
 
     this.clusterGroup = L.markerClusterGroup();
@@ -89,6 +82,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.map!.addLayer(this.drawnItems);
 
     this.setupDrawControl();
+    this.setupGeocoder();
     this.setupSubscriptions();
     this.initResizeObserver();
 
@@ -105,16 +99,6 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.map.whenReady(() => {
       setTimeout(() => this.map?.invalidateSize(), 50);
     });
-  }
-
-  changeBaseLayer(layer: BaseLayer): void {
-    if (this.baseLayer === layer || !this.map || !this.tileLayer) return;
-
-    this.map.removeLayer(this.tileLayer);
-    this.baseLayer = layer;
-    this.tileLayer = L.tileLayer(TILE_LAYERS[layer].url, {
-      attribution: TILE_LAYERS[layer].attribution,
-    }).addTo(this.map);
   }
 
   scrollToEditor(): void {
@@ -138,13 +122,27 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.map?.remove();
   }
 
+  private setupGeocoder(): void {
+    if (!this.map) return;
+    GeocoderControl.geocoder({
+      defaultMarkGeocode: false,
+      placeholder: 'Buscar ciudad, calle…',
+      errorMessage: 'No se encontraron resultados',
+      geocoder: GeocoderControl.geocoders.nominatim(),
+    })
+      .on('markgeocode', (e: { geocode: { center: L.LatLng; bbox: L.LatLngBounds } }) => {
+        this.map!.fitBounds(e.geocode.bbox, { maxZoom: 14 });
+      })
+      .addTo(this.map);
+  }
+
   private setupDrawControl(): void {
     if (!this.map || !this.drawnItems) return;
 
     const drawControl = new L.Control.Draw({
       position: 'topright',
       draw: {
-        rectangle: { shapeOptions: {} },
+        rectangle: false,
         polygon: { shapeOptions: {} },
         marker: false,
         circle: false,
