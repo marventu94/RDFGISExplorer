@@ -19,7 +19,7 @@ import { Parser } from 'sparqljs';
 
 import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
-import { DashboardLayoutService, LayoutPreset } from '@core/services/dashboard-layout.service';
+import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { LibraryService } from './library.service';
 import { StoredQuery } from './seed-queries';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
@@ -60,22 +60,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
-
-  protected readonly layoutOptions: { preset: LayoutPreset; label: string; icon: string }[] = [
-    { preset: 'single', label: '1 vista', icon: 'crop_square' },
-    { preset: 'split-h', label: '2 vistas', icon: 'view_column' },
-    { preset: 'triple', label: '3 vistas', icon: 'view_quilt' },
-    { preset: 'quad', label: '4 vistas', icon: 'grid_view' },
-  ];
-
-  protected setLayoutPreset(preset: LayoutPreset): void {
-    this.dashboardLayout.setLayout(preset);
-  }
-
-  protected currentLayoutIcon(): string {
-    const p = this.dashboardLayout.preset();
-    return this.layoutOptions.find((o) => o.preset === p)?.icon ?? 'grid_view';
-  }
 
   private editorView: EditorView | null = null;
   private fallbackContent = '';
@@ -239,6 +223,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.apiService.executeQuery({ sparql, limit: currentLimit }).subscribe({
       next: (result) => {
         this.executing.set(false);
+        this.dashboardLayout.collapseEditor();
         this.lastResult.set(result);
 
         this.mappingOverrides.set({});

@@ -21,6 +21,15 @@ const SLOT_COUNT: Record<LayoutPreset, number> = {
 export class DashboardLayoutService {
   readonly preset = signal<LayoutPreset>('quad');
   readonly slots = signal<ViewType[]>([...DEFAULT_SLOTS]);
+  readonly editorCollapsed = signal(false);
+
+  collapseEditor(): void {
+    this.editorCollapsed.set(true);
+  }
+
+  toggleEditor(): void {
+    this.editorCollapsed.update((v) => !v);
+  }
 
   readonly slotCount = computed(() => SLOT_COUNT[this.preset()]);
   readonly visibleSlots = computed(() => this.slots().slice(0, this.slotCount()));

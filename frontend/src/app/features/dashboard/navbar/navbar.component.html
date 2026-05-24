@@ -1,7 +1,35 @@
 <nav class="navbar">
   <span class="navbar-brand">RDF GIS Explorer</span>
   <app-filter-badges />
-  <button type="button" class="navbar-toggle" (click)="toggleEditor.emit()">
-    {{ editorCollapsed() ? 'Expandir editor' : 'Colapsar editor' }}
-  </button>
+
+  <div class="navbar-actions">
+    <button type="button" class="navbar-btn" (click)="toggleEditor()">
+      <mat-icon>{{ layout.editorCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+      <span>Editor</span>
+    </button>
+
+    <button type="button" class="navbar-btn" [matMenuTriggerFor]="layoutMenu">
+      <mat-icon>{{ currentLayoutIcon() }}</mat-icon>
+      <span>Layout</span>
+    </button>
+    <mat-menu #layoutMenu="matMenu">
+      @for (opt of layoutOptions; track opt.preset) {
+        <button mat-menu-item (click)="setLayoutPreset(opt.preset)">
+          <mat-icon>{{ opt.icon }}</mat-icon>
+          <span>{{ opt.label }}</span>
+        </button>
+      }
+    </mat-menu>
+
+    <button
+      type="button"
+      class="navbar-btn"
+      [class.navbar-btn--active]="coordinatedViewEnabled()"
+      [class.navbar-btn--inactive]="!coordinatedViewEnabled()"
+      (click)="toggleCoordinatedView()"
+    >
+      <mat-icon>hub</mat-icon>
+      <span>Coordinada</span>
+    </button>
+  </div>
 </nav>
