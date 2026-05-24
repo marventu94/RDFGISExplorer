@@ -11,10 +11,21 @@
       </div>
     }
     <div class="table-toolbar">
-      <button class="export-btn" mat-stroked-button (click)="exportCsv()">
-        <mat-icon>download</mat-icon>
-        Exportar CSV
-      </button>
+      <div class="toolbar-search">
+        <mat-icon class="search-icon">search</mat-icon>
+        <input
+          class="search-input"
+          placeholder="Buscar en todas las columnas…"
+          [ngModel]="quickFilter()"
+          (ngModelChange)="quickFilter.set($event)"
+        />
+        @if (quickFilter()) {
+          <button class="search-clear" mat-icon-button (click)="quickFilter.set('')" aria-label="Limpiar">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </div>
+
       <div class="page-size-selector">
         <span>Filas:</span>
         <select [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
@@ -23,6 +34,10 @@
           }
         </select>
       </div>
+
+      <button mat-icon-button (click)="exportCsv()" title="Exportar CSV" aria-label="Exportar CSV">
+        <mat-icon>download</mat-icon>
+      </button>
     </div>
     <div class="grid-wrapper">
       <ag-grid-angular
@@ -37,6 +52,7 @@
         [paginationPageSizeSelector]="false"
         [suppressPaginationPanel]="false"
         [domLayout]="'normal'"
+        [quickFilterText]="quickFilter()"
         (gridReady)="onGridReady($event)"
         (firstDataRendered)="onFirstDataRendered()"
         (paginationChanged)="onPaginationChanged()"
