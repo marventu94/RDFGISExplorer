@@ -23,7 +23,7 @@ export class App {
 
   constructor() {
     this.selectionService.selectedNode$.subscribe((sel) => {
-      if (sel.node) {
+      if (sel.node && !this.dashboardLayout.visibleSlots().includes('table')) {
         this.sidenavOpen.set(true);
       }
     });
