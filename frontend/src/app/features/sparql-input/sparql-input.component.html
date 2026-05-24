@@ -49,18 +49,6 @@
         Guardar
       </button>
 
-      <button mat-button [matMenuTriggerFor]="layoutMenu" aria-label="Layout">
-        <mat-icon>{{ currentLayoutIcon() }}</mat-icon>
-        Layout
-      </button>
-      <mat-menu #layoutMenu="matMenu">
-        @for (opt of layoutOptions; track opt.preset) {
-          <button mat-menu-item (click)="setLayoutPreset(opt.preset)">
-            <mat-icon>{{ opt.icon }}</mat-icon>
-            <span>{{ opt.label }}</span>
-          </button>
-        }
-      </mat-menu>
     </div>
 
     <div class="toolbar-right">

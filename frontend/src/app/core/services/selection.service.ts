@@ -25,12 +25,15 @@ export class SelectionService {
   private readonly _activeView$ = new BehaviorSubject<FocusSource>(null);
   private activeViewTimer?: ReturnType<typeof setTimeout>;
   private readonly ACTIVE_VIEW_TTL_MS = 2000;
+  private readonly _coordinatedViewEnabled$ = new BehaviorSubject<boolean>(true);
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
   readonly activeFilters$: Observable<Filter[]> = this._activeFilters$.asObservable();
   readonly queryResult$: Observable<QueryResult | null> = this._queryResult$.asObservable();
   readonly focus$: Observable<FocusState> = this._focus$.asObservable();
   readonly activeView$: Observable<FocusSource> = this._activeView$.asObservable();
+  readonly coordinatedViewEnabled$: Observable<boolean> =
+    this._coordinatedViewEnabled$.asObservable();
 
   readonly filteredQueryResult$: Observable<QueryResult | null> = combineLatest([
     this._queryResult$,
@@ -74,6 +77,7 @@ export class SelectionService {
   }
 
   setFocus(uris: Iterable<string>, source: Exclude<FocusSource, null>): void {
+    if (!this._coordinatedViewEnabled$.getValue()) return;
     this._focus$.next({ uris: new Set(uris), source });
   }
 
@@ -82,6 +86,7 @@ export class SelectionService {
   }
 
   markActiveView(source: Exclude<FocusSource, null>): void {
+    if (!this._coordinatedViewEnabled$.getValue()) return;
     if (this._activeView$.getValue() !== source) {
       this._activeView$.next(source);
     }
@@ -94,6 +99,20 @@ export class SelectionService {
 
   getActiveView(): FocusSource {
     return this._activeView$.getValue();
+  }
+
+  toggleCoordinatedView(): void {
+    const next = !this._coordinatedViewEnabled$.getValue();
+    this._coordinatedViewEnabled$.next(next);
+    if (!next) {
+      if (this.activeViewTimer) clearTimeout(this.activeViewTimer);
+      this._activeView$.next(null);
+      this._focus$.next({ uris: new Set<string>(), source: null });
+    }
+  }
+
+  isCoordinatedViewEnabled(): boolean {
+    return this._coordinatedViewEnabled$.getValue();
   }
 
   private applyFilters(result: QueryResult | null, filters: Filter[]): QueryResult | null {
