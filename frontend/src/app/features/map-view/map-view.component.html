@@ -1,17 +1,4 @@
 <div class="map-view">
-  <div class="map-toolbar">
-    <span class="toolbar-label">Mapa:</span>
-    <select
-      class="baselayer-dropdown"
-      [ngModel]="baseLayer"
-      (ngModelChange)="changeBaseLayer($event)"
-    >
-      @for (opt of baseLayerOptions; track opt.value) {
-        <option [value]="opt.value">{{ opt.label }}</option>
-      }
-    </select>
-  </div>
-
   @if (queryState === 'no-query') {
     <div class="map-overlay">
       <span class="overlay-icon">&#x1F5FA;</span>

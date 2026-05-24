@@ -74,6 +74,9 @@ importers:
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
+      leaflet-control-geocoder:
+        specifier: ^3.3.1
+        version: 3.3.1(leaflet@1.9.4)
       leaflet-draw:
         specifier: ^1.0.4
         version: 1.0.4
@@ -2244,6 +2247,11 @@ packages:
   keycharm@0.4.0:
     resolution: {integrity: sha512-TyQTtsabOVv3MeOpR92sIKk/br9wxS+zGj4BG7CR8YbK4jM3tyIBaF0zhzeBUMx36/Q/iQLOKKOT+3jOQtemRQ==}
 
+  leaflet-control-geocoder@3.3.1:
+    resolution: {integrity: sha512-DOLZLAbTq5mKzbvXt6O4HOWeJ03QofwYBbEjcp4Upg1JyWcrVSkfOKWIwbB4bOSPb40cdFoe59DOxGa1Sj10yQ==}
+    peerDependencies:
+      leaflet: ^1.6.0 || ^2.0.0
+
   leaflet-draw@1.0.4:
     resolution: {integrity: sha512-rsQ6saQO5ST5Aj6XRFylr5zvarWgzWnrg46zQ1MEOEIHsppdC/8hnN8qMoFvACsPvTioAuysya/TVtog15tyAQ==}
 
@@ -2461,6 +2469,9 @@ packages:
   onetime@7.0.0:
     resolution: {integrity: sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==}
     engines: {node: '>=18'}
+
+  open-location-code@1.0.3:
+    resolution: {integrity: sha512-DBm14BSn40Ee241n80zIFXIT6+y8Tb0I+jTdosLJ8Sidvr2qONvymwqymVbHV2nS+1gkDZ5eTNpnOIVV0Kn2fw==}
 
   ora@9.3.0:
     resolution: {integrity: sha512-lBX72MWFduWEf7v7uWf5DHp9Jn5BI8bNPGuFgtXMmr2uDz2Gz2749y3am3agSDdkhHPHYmmxEGSKH85ZLGzgXw==}
@@ -5138,6 +5149,12 @@ snapshots:
 
   keycharm@0.4.0: {}
 
+  leaflet-control-geocoder@3.3.1(leaflet@1.9.4):
+    dependencies:
+      leaflet: 1.9.4
+    optionalDependencies:
+      open-location-code: 1.0.3
+
   leaflet-draw@1.0.4: {}
 
   leaflet.markercluster@1.5.3(leaflet@1.9.4):
@@ -5399,6 +5416,9 @@ snapshots:
   onetime@7.0.0:
     dependencies:
       mimic-function: 5.0.1
+
+  open-location-code@1.0.3:
+    optional: true
 
   ora@9.3.0:
     dependencies:

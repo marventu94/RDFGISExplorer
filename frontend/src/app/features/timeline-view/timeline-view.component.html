@@ -31,14 +31,6 @@
 
   @if (queryState === 'normal') {
     <div class="toolbar">
-      <button
-        class="toolbar-btn toolbar-btn--apply"
-        type="button"
-        [disabled]="!canApplyRange"
-        (click)="applyRange()"
-      >
-        Aplicar rango
-      </button>
       <div class="zoom-group">
         <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.TenYears)">10 años</button>
         <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.FiveYears)">5 años</button>
@@ -47,6 +39,14 @@
         <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Week)">Semana</button>
         <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Day)">Día</button>
       </div>
+      <button
+        class="toolbar-btn toolbar-btn--apply"
+        type="button"
+        [disabled]="!canApplyRange"
+        (click)="applyRange()"
+      >
+        Aplicar rango
+      </button>
     </div>
   }
 
