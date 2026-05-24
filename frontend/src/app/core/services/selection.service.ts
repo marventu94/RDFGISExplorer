@@ -126,8 +126,11 @@ export class SelectionService {
     const edges = result.edges.filter(
       (e) => filteredUris.has(e.source) && filteredUris.has(e.target),
     );
+    const bindings = result.bindings.filter((row) =>
+      Object.values(row).some((v) => v?.type === 'uri' && filteredUris.has(v.value)),
+    );
 
-    return { ...result, nodes: filtered, edges };
+    return { ...result, nodes: filtered, edges, bindings };
   }
 
   private nodePassesFilter(node: NormalizedNode, filter: Filter): boolean {
