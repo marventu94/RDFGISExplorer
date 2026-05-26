@@ -16,6 +16,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     label: { type: 'literal', value: 'person', 'xml:lang': 'en' },
   },
   resultLimit: 20,
+  backendMode: 'app-backend',
 };
 
 const DEFAULT_PREFIXES: readonly Prefix[] = [
