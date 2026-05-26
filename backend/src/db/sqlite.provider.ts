@@ -47,6 +47,25 @@ export function createSqliteConnection(dbPath?: string): Database.Database {
   return db;
 }
 
+const DASHBOARDS_MIGRATIONS_SQL = `
+CREATE TABLE IF NOT EXISTS dashboards (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('gis','explorer')),
+  name TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dashboards_updated ON dashboards(updated_at DESC);
+`;
+
 export function runMigrations(db: Database.Database): void {
   db.exec(MIGRATIONS_SQL);
+}
+
+export function createDashboardsConnection(): Database.Database {
+  const dbPath = process.env['DASHBOARDS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
+  const db = createSqliteConnection(dbPath);
+  db.exec(DASHBOARDS_MIGRATIONS_SQL);
+  return db;
 }

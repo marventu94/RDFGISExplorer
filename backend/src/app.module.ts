@@ -5,6 +5,7 @@ import { QueryModule } from './modules/query/query.module';
 import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 import { HealthModule } from './modules/health/health.module';
 import { CurationModule } from './modules/curation/curation.module';
+import { DashboardsModule } from './modules/dashboards/dashboards.module';
 import { DatabaseModule } from './db/database.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { DatabaseModule } from './db/database.module';
     SuggestionsModule,
     HealthModule,
     CurationModule,
+    DashboardsModule,
   ],
 })
 export class AppModule {}
