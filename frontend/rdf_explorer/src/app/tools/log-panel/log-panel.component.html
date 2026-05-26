@@ -1,0 +1,12 @@
+<h3 class="ta-center">
+  Log
+  <span class="ml-3 clickable" (click)="download()" style="cursor:pointer;">&#128229;</span>
+</h3>
+<hr class="desc-hr" />
+
+@for (entry of entries(); track entry.date.getTime() + '_' + entry.info) {
+  <div class="row log-row">
+    <div class="col-md-2 log-time">{{ formatTime(entry.date) }}</div>
+    <div class="col-md-10">{{ entry.info }}</div>
+  </div>
+}

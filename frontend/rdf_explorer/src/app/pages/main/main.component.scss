@@ -1,0 +1,66 @@
+.main-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 400px;
+  grid-template-rows: 1fr;
+  grid-template-areas: "search canvas tools";
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pane {
+  overflow: hidden;
+}
+
+.pane-search {
+  grid-area: search;
+  padding: 10px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.pane-search > * {
+  pointer-events: auto;
+}
+
+.pane-canvas {
+  grid-area: canvas;
+  position: relative;
+}
+
+.pane-tools {
+  grid-area: tools;
+  padding: 10px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.pane-tools > * {
+  pointer-events: auto;
+}
+
+.overlay {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 3rem;
+  color: #b3b3b3;
+  text-align: center;
+  z-index: 5;
+  pointer-events: all;
+  line-height: 1.5;
+}
+
+.overlay-link {
+  font-size: 1.2rem;
+  color: #007bff;
+  cursor: pointer;
+  pointer-events: auto;
+  margin: 0 8px;
+  text-decoration: none;
+}
+
+.overlay-link:hover {
+  text-decoration: underline;
+}

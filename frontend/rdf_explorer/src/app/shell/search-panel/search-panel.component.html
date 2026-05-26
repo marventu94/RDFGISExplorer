@@ -1,0 +1,51 @@
+<!-- SPDX-FileCopyrightText: 2024 RDFExplorer Contributors -->
+<div class="search-container" id="search-container">
+  <div class="search-input-container" id="search-input-container">
+    <form id="step1" (submit)="doSearch(); $event.preventDefault()">
+      <input
+        type="text"
+        class="search-input"
+        id="search-input"
+        placeholder="Search..."
+        autocomplete="off"
+        name="searchInput"
+        [(ngModel)]="searchInput"
+        (ngModelChange)="onSearchChange()"
+        (focus)="onInputFocus()"
+        [class.active]="searchActive"
+        [class.loading]="searchWait"
+        [class.error]="searchError"
+      />
+      <span class="search-icon" id="search-icon">&#128269;</span>
+    </form>
+  </div>
+  @if (searchActive) {
+    <div class="search-results-panel" id="search-results-panel">
+      @if (noResults && searchResults().length === 0) {
+        <div class="alert alert-warning" role="alert">
+          <strong>No results found!</strong>
+        </div>
+      }
+      @if (searchWait) {
+        <div class="search-wait">Searching...</div>
+      }
+      @for (result of searchResults(); track result.uri; let idx = $index) {
+        <div
+          class="fake-rect"
+          [id]="'result' + idx"
+          style="border-color: #1f77b4;"
+          draggable="true"
+          (dragstart)="onDragStart($event, result)"
+          [title]="result.uri"
+        >
+          <div>{{ result.label }}</div>
+          <div class="classes">
+            @if (result.description) {
+              <span>{{ result.description }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

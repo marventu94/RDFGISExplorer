@@ -1,0 +1,71 @@
+<div class="tools" id="tools">
+  <div class="right-buttons" id="right-buttons">
+    <button
+      class="tool-btn"
+      id="help-button"
+      [class.active]="toolService.active() === 'help'"
+      (click)="toolService.toggle('help')"
+      type="button"
+    >&#9432;</button>
+    <button
+      class="tool-btn"
+      [class.active]="toolService.active() === 'describe'"
+      (click)="toolService.toggle('describe')"
+      type="button"
+    >&#9776;</button>
+    <button
+      class="tool-btn"
+      [class.active]="toolService.active() === 'edit'"
+      (click)="toolService.toggle('edit')"
+      type="button"
+    >&#9998;</button>
+    <button
+      class="tool-btn"
+      [class.active]="toolService.active() === 'sparql'"
+      (click)="toolService.toggle('sparql')"
+      type="button"
+    >&lt;/&gt;</button>
+    <button
+      class="tool-btn"
+      [class.active]="toolService.active() === 'settings'"
+      (click)="toolService.toggle('settings')"
+      type="button"
+    >&#9881;</button>
+    <button
+      class="tool-btn"
+      [class.active]="toolService.active() === 'log'"
+      (click)="toolService.toggle('log')"
+      type="button"
+    >&#128196;</button>
+  </div>
+
+  @if (toolService.active() !== 'none') {
+    <div class="right-panel" id="right-panel">
+      @switch (toolService.active()) {
+        @case ('describe') {
+          <app-describe-panel />
+        }
+        @case ('edit') {
+          <app-edit-panel />
+        }
+        @case ('sparql') {
+          <app-sparql-panel />
+        }
+        @case ('settings') {
+          <app-settings-panel />
+        }
+        @case ('help') {
+          <app-help-panel />
+        }
+        @case ('log') {
+          <app-log-panel />
+        }
+        @default {
+          <div class="tool-placeholder">
+            Tool: <strong>{{ toolService.active() }}</strong>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>

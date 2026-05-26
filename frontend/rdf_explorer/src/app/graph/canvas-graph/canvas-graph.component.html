@@ -1,0 +1,8 @@
+<div class="cy-wrapper" [class.draw-mode]="drawMode">
+  <div class="cy-container" tabindex="0"></div>
+  @if (drawMode) {
+    <div class="draw-mode-badge">
+      Connect mode — drag from node to node &nbsp;|&nbsp; release <kbd>Ctrl</kbd> to exit
+    </div>
+  }
+</div>

@@ -1,0 +1,8 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+SELECT DISTINCT ?mosquito WHERE {
+  ?mosquito wdt:P31 wd:Q16521 .
+  ?mosquito wdt:P105 wd:Q7432 .
+  ?mosquito wdt:P171* wd:Q7367 .
+  ?mosquito wdt:P225 ?taxon_name .
+}
