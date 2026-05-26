@@ -68,4 +68,33 @@ describe('PropertyGraphService', () => {
   it('getNodeByUri returns null for unknown URI', () => {
     expect(service.getNodeByUri('http://nonexistent/')).toBeNull();
   });
+
+  it('serializeGraph returns empty snapshot for empty graph', () => {
+    const snapshot = service.serializeGraph();
+    expect(snapshot.nodes).toEqual([]);
+    expect(snapshot.edges).toEqual([]);
+  });
+
+  it('restoreGraph reconstructs nodes and edges', () => {
+    const a = service.addNode();
+    const b = service.addNode();
+    service.addEdge(a, b);
+
+    const snapshot = service.serializeGraph();
+    service.reset();
+    expect(service.nodes().length).toBe(0);
+
+    service.restoreGraph(snapshot);
+    expect(service.nodes().length).toBe(2);
+    expect(service.edges().length).toBe(1);
+  });
+
+  it('restoreGraph bumps revision', () => {
+    const n = service.addNode();
+    const snapshot = service.serializeGraph();
+    service.reset();
+    const before = service.revision();
+    service.restoreGraph(snapshot);
+    expect(service.revision()).toBe(before + 1);
+  });
 });

@@ -1,0 +1,26 @@
+<div class="dialog-container">
+  <h3>Guardar workspace</h3>
+
+  <label class="field">
+    <span>Nombre</span>
+    <input type="text" [(ngModel)]="name" placeholder="Mi consulta" />
+  </label>
+
+  @if (canOverwrite) {
+    <div class="mode-selector">
+      <label>
+        <input type="radio" name="saveMode" value="overwrite" [(ngModel)]="mode" />
+        Sobrescribir "{{ data.currentName }}"
+      </label>
+      <label>
+        <input type="radio" name="saveMode" value="copy" [(ngModel)]="mode" />
+        Guardar como copia
+      </label>
+    </div>
+  }
+
+  <div class="actions">
+    <button class="btn-secondary" (click)="cancel()" type="button">Cancelar</button>
+    <button class="btn-primary" (click)="save()" [disabled]="!name.trim()" type="button">Guardar</button>
+  </div>
+</div>
