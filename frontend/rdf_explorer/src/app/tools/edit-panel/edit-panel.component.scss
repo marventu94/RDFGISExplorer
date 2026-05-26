@@ -1,0 +1,61 @@
+.edit-tabs .nav-link {
+  cursor: pointer;
+  padding: 6px 12px;
+}
+.edit-tabs .nav-link.active {
+  font-weight: bold;
+}
+.tab-hl {
+  animation: pulse 0.5s ease-in-out 3;
+}
+@keyframes pulse {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: #fff3cd; }
+}
+.variable-section .edit-var-name-prefix {
+  padding: 6px 4px 6px 8px;
+  font-weight: bold;
+}
+.result-status {
+  width: 42px;
+  text-align: center;
+}
+.result-status.loading {
+  background-color: #fff3cd;
+}
+.uri-row, .result-row {
+  margin: 0;
+  padding: 2px 0;
+}
+.uri-value, .result-value {
+  display: inline-block;
+  max-width: calc(100% - 30px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.custom-container-title {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  background: #f8f9fa;
+  margin-bottom: 0;
+}
+.custom-container-title.active {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.custom-container-content {
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+  padding: 6px 10px;
+  display: none;
+}
+.custom-container-content.active {
+  display: block;
+}
+.alert-sm {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}

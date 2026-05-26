@@ -1,0 +1,44 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cy-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.cy-container {
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.cy-wrapper.draw-mode .cy-container {
+  cursor: crosshair;
+  outline: 2px solid #ff7f0e;
+  outline-offset: -2px;
+}
+
+.draw-mode-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 127, 14, 0.92);
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+
+  kbd {
+    background: rgba(255,255,255,0.25);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: monospace;
+  }
+}
