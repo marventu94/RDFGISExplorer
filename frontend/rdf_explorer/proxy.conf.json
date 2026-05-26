@@ -11,5 +11,10 @@
       "^/api/sparql/predicates": "/suggestions/predicates"
     },
     "changeOrigin": true
+  },
+  "/api/dashboards": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
   }
 }

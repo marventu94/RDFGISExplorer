@@ -3,7 +3,28 @@
     <app-search-panel />
   </div>
   <div class="pane pane-canvas">
+    <div class="panel-tabs">
+      @for (panel of workspace.panels(); track panel.id) {
+        <div
+          class="panel-tab"
+          [class.active]="workspace.activePanelId() === panel.id"
+          (click)="switchPanel(panel.id)"
+        >
+          <span class="tab-name">{{ panel.name }}</span>
+          @if (workspace.panels().length > 1) {
+            <button class="tab-close" (click)="removePanel(panel.id, $event)" type="button">&times;</button>
+          }
+        </div>
+      }
+      <button class="tab-add" (click)="addPanel()" type="button" title="Nuevo panel">+</button>
+      <div class="tab-spacer"></div>
+      <button class="save-btn" (click)="openSaveDialog()" type="button" title="Guardar workspace">
+        &#128190; Guardar
+      </button>
+    </div>
+
     <app-canvas-panel />
+
     @if (graph.nodes().length === 0 && !tutorialService.isActive()) {
       <div id="mid-help" class="overlay no-select">
         Need help?
@@ -17,3 +38,7 @@
     <app-tools-panel />
   </div>
 </div>
+
+@if (snackbarMessage) {
+  <div class="snackbar">{{ snackbarMessage }}</div>
+}
