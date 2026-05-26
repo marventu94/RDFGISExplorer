@@ -13,6 +13,7 @@ import {
 } from './domain';
 import type { DropPayload } from './domain';
 import type { QueryRetriever } from './domain';
+import { serializeGraph, deserializeGraph, type ExplorerSerializedGraph } from './domain/graph-serializer';
 
 /**
  * Angular wrapper around the pure-TypeScript PropertyGraph domain model.
@@ -139,5 +140,14 @@ export class PropertyGraphService {
 
   getNodeByUri(uri: string): Node | null {
     return this.graphRef.getNodeByUri(uri);
+  }
+
+  serializeGraph(): ExplorerSerializedGraph {
+    return serializeGraph(this.graphRef);
+  }
+
+  restoreGraph(snapshot: ExplorerSerializedGraph): void {
+    deserializeGraph(this.graphRef, snapshot);
+    this.bump();
   }
 }
