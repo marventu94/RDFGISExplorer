@@ -11,6 +11,7 @@ import {
   inject,
 } from '@angular/core';
 import { SelectionService } from '@core/services/selection.service';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { combineLatest, debounceTime, filter, Subject, takeUntil } from 'rxjs';
 import * as L from 'leaflet';
 import 'leaflet.markercluster';
@@ -51,6 +52,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private readonly viewportChange$ = new Subject<void>();
 
   private readonly selectionService = inject(SelectionService);
+  private readonly viewState = inject(DashboardViewStateService);
   private readonly ngZone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -88,6 +90,11 @@ export class MapViewComponent implements OnInit, OnDestroy {
 
     this.map.on('moveend zoomend', () => {
       if (this.suppressViewportEmit) return;
+      const center = this.map!.getCenter();
+      this.viewState.mapState.set({
+        center: [center.lat, center.lng],
+        zoom: this.map!.getZoom(),
+      });
       this.ngZone.run(() => this.viewportChange$.next());
     });
 
@@ -95,6 +102,12 @@ export class MapViewComponent implements OnInit, OnDestroy {
       if (this.suppressViewportEmit) return;
       this.selectionService.markActiveView('map');
     });
+
+    // Restore stored view state
+    const storedMapState = this.viewState.mapState();
+    if (storedMapState) {
+      this.map.setView(storedMapState.center, storedMapState.zoom);
+    }
 
     this.map.whenReady(() => {
       setTimeout(() => this.map?.invalidateSize(), 50);

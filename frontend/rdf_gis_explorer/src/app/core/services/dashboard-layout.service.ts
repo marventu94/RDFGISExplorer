@@ -80,6 +80,18 @@ export class DashboardLayoutService {
     this.slots.set(next);
   }
 
+  getPresetSnapshot(): LayoutPreset {
+    return this.preset();
+  }
+
+  getSlotsSnapshot(): ViewType[] {
+    return this.slots();
+  }
+
+  getEditorCollapsedSnapshot(): boolean {
+    return this.editorCollapsed();
+  }
+
   private hydrate(): void {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);

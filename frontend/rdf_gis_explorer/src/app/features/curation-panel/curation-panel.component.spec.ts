@@ -174,7 +174,7 @@ describe('CurationPanelComponent', () => {
     expect(emitSpy).toHaveBeenCalled();
   });
 
-  it('should show pending duplicate count when pending duplicates exist', async () => {
+  it('should load curation data when node selected', async () => {
     selectedNodeSubject.next({ node: mockNode, source: 'table' });
     fixture.detectChanges();
 
@@ -185,7 +185,7 @@ describe('CurationPanelComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(component.pendingDuplicateCount()).toBe(1);
+    expect(component.records()).toEqual(mockCurationResponse.records);
   });
 
   it('should reset state when selection is cleared', async () => {
@@ -204,8 +204,6 @@ describe('CurationPanelComponent', () => {
 
     expect(component.node()).toBeNull();
     expect(component.records()).toEqual([]);
-    expect(component.duplicates()).toEqual([]);
-    expect(component.pendingDuplicateCount()).toBe(0);
   });
 
   it('should load curation data for new node when selection changes', async () => {

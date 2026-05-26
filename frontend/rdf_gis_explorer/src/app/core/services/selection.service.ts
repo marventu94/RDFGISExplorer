@@ -115,6 +115,22 @@ export class SelectionService {
     return this._coordinatedViewEnabled$.getValue();
   }
 
+  getSelectedNodeSnapshot(): Selection {
+    return this._selectedNode$.getValue();
+  }
+
+  getActiveFiltersSnapshot(): Filter[] {
+    return this._activeFilters$.getValue();
+  }
+
+  getQueryResultSnapshot(): QueryResult | null {
+    return this._queryResult$.getValue();
+  }
+
+  getFocusSnapshot(): FocusState {
+    return this._focus$.getValue();
+  }
+
   private applyFilters(result: QueryResult | null, filters: Filter[]): QueryResult | null {
     if (!result) return null;
     if (filters.length === 0) return result;
