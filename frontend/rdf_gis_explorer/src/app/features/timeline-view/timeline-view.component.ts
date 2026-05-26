@@ -8,6 +8,7 @@ import {
   HostBinding,
   NgZone,
   ChangeDetectorRef,
+  inject,
 } from '@angular/core';
 import { SelectionService } from '@core/services/selection.service';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
@@ -17,6 +18,7 @@ import type { DataItem, DataGroup, TimelineOptions } from 'vis-timeline/standalo
 import { DataSet } from 'vis-data';
 import type { QueryResult, NormalizedNode, Selection, TemporalFilter } from '@shared/models';
 import { colorForType } from '@shared/entity-colors';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { PriceChartComponent } from './price-chart.component';
 
 type QueryState = 'no-query' | 'no-dates' | 'filtered-zero' | 'normal';
@@ -61,6 +63,8 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private allNodes: NormalizedNode[] = [];
   private suppressViewportEmit = false;
   private readonly viewportChange$ = new Subject<{ start: Date; end: Date }>();
+
+  private readonly viewState = inject(DashboardViewStateService);
 
   constructor(
     private readonly selectionService: SelectionService,
@@ -362,12 +366,22 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       this.pendingRange = { start: props.start, end: props.end };
       this.canApplyRange = true;
       this.cdr.markForCheck();
+      this.viewState.timelineState.set({
+        rangeStart: props.start.toISOString(),
+        rangeEnd: props.end.toISOString(),
+      });
       if (!this.suppressViewportEmit) {
         this.ngZone.run(() => {
           this.viewportChange$.next({ start: props.start, end: props.end });
         });
       }
     });
+
+    // Restore stored view state
+    const storedTimeline = this.viewState.timelineState();
+    if (storedTimeline?.rangeStart && storedTimeline?.rangeEnd) {
+      this.timeline.setWindow(new Date(storedTimeline.rangeStart), new Date(storedTimeline.rangeEnd));
+    }
   }
 
   private initResizeObserver(): void {

@@ -72,3 +72,21 @@ mat-sidenav-content {
   color: var(--mat-sys-on-surface-variant);
   opacity: 0.6;
 }
+
+.hydration-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+}
+
+.hydration-loader span {
+  font-size: 16px;
+  color: var(--mat-sys-on-surface);
+}
