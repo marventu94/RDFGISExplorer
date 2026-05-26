@@ -1,24 +1,16 @@
 import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { SettingsService } from './settings.service';
 import { WIKIDATA_SEED } from './wikidata-seed';
+import type { QueryResult, BindingValue } from './endpoint-adapter';
+import { createRdfBackendAdapter, type SparqlJsonResult, type SparqlBinding } from './endpoint-adapter';
 
-export interface SparqlBinding {
-  type: string;
-  value: string;
-  'xml:lang'?: string;
-  datatype?: string;
-}
-
-export interface SparqlJsonResult {
-  head: { vars: string[] };
-  results: {
-    bindings: Array<Record<string, SparqlBinding>>;
-  };
-}
+export type { SparqlBinding, SparqlJsonResult } from './endpoint-adapter';
 
 @Injectable({ providedIn: 'root' })
 export class RequestService {
   private readonly settings = inject(SettingsService);
+  private readonly http = inject(HttpClient);
 
   readonly labelCache = signal<ReadonlyMap<string, string>>(
     new Map(WIKIDATA_SEED),
@@ -40,25 +32,16 @@ export class RequestService {
     query: string,
     opts?: { signal?: AbortSignal },
   ): Promise<T> {
-    const endpointUrl = this.settings.app().endpoint.url;
-    const params = new URLSearchParams({
-      format: 'json',
-      query: query,
-    });
-    const url = `${endpointUrl}?origin=*&${params.toString()}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      signal: opts?.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`SPARQL query failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json() as SparqlJsonResult;
+    const adapter = createRdfBackendAdapter(this.settings.app(), this.http);
+    const result = await adapter.executeQuery(query, { signal: opts?.signal });
+    const data = toSparqlJsonResult(result);
     this.correlateLabels(data);
     return data as unknown as T;
+  }
+
+  async getPredicates(): Promise<string[]> {
+    const adapter = createRdfBackendAdapter(this.settings.app(), this.http);
+    return adapter.getPredicates();
   }
 
   private correlateLabels(result: SparqlJsonResult): void {
@@ -98,4 +81,38 @@ export class RequestService {
       }
     }
   }
+}
+
+function toSparqlJsonResult(result: QueryResult): SparqlJsonResult {
+  return {
+    head: { vars: result.variables },
+    results: {
+      bindings: result.bindings.map(row => {
+        const binding: Record<string, SparqlBinding> = {};
+        for (const [key, val] of Object.entries(row)) {
+          binding[key] = toSparqlBinding(val);
+        }
+        return binding;
+      }),
+    },
+  };
+}
+
+function toSparqlBinding(val: BindingValue): SparqlBinding {
+  if (val.type === 'uri') {
+    return { type: 'uri', value: val.value };
+  }
+  if (val.type === 'bnode') {
+    return { type: 'bnode', value: val.value };
+  }
+  if (val.type === 'literal') {
+    return {
+      type: 'literal',
+      value: val.value,
+      ...(val.lang ? { 'xml:lang': val.lang } : {}),
+      ...(val.datatype ? { datatype: val.datatype } : {}),
+    };
+  }
+  const raw = (val as any).raw ?? String(val.value);
+  return { type: 'literal', value: raw };
 }
