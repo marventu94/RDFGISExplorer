@@ -2,12 +2,11 @@
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
   "cli": {
-    "packageManager": "npm",
-    "analytics": "1d3b4c43-dde9-4810-8f65-3827cfb3bfd2"
+    "packageManager": "npm"
   },
   "newProjectRoot": "projects",
   "projects": {
-    "app": {
+    "app_shell": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -23,10 +22,10 @@
           "options": {},
           "configurations": {
             "production": {
-              "target": "app:esbuild:production"
+              "target": "app_shell:esbuild:production"
             },
             "development": {
-              "target": "app:esbuild:development",
+              "target": "app_shell:esbuild:development",
               "dev": true
             }
           },
@@ -35,7 +34,7 @@
         "serve": {
           "builder": "@angular-architects/native-federation:build",
           "options": {
-            "target": "app:serve-original:development",
+            "target": "app_shell:serve-original:development",
             "rebuildDelay": 500,
             "dev": true,
             "cacheExternalArtifacts": false,
@@ -57,7 +56,7 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss", "node_modules/shepherd.js/dist/css/shepherd.css"],
+            "styles": ["src/styles.scss"],
             "polyfills": ["es-module-shims"]
           },
           "configurations": {
@@ -65,13 +64,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "2MB",
-                  "maximumError": "3MB"
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "10kB",
-                  "maximumError": "20kB"
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
                 }
               ],
               "outputHashing": "all"
@@ -86,19 +85,18 @@
         },
         "serve-original": {
           "builder": "@angular/build:dev-server",
-          "options": {
-            "proxyConfig": "proxy.conf.json",
-            "port": 4201
-          },
           "configurations": {
             "production": {
-              "buildTarget": "app:esbuild:production"
+              "buildTarget": "app_shell:esbuild:production"
             },
             "development": {
-              "buildTarget": "app:esbuild:development"
+              "buildTarget": "app_shell:esbuild:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "port": 4200
+          }
         }
       }
     }

@@ -1,0 +1,15 @@
+{
+  "name": "rdf-gis-explorer",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --raw --names backend,shell,explorer,gis \"npm run dev:backend\" \"npm run dev:shell\" \"npm run dev:explorer\" \"npm run dev:gis\"",
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev:shell": "cd frontend/app_shell && npm run start",
+    "dev:explorer": "cd frontend/rdf_explorer && npm run start",
+    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -24,6 +24,7 @@
     "@codemirror/legacy-modes": "^6.5.3",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.0",
+    "@softarc/native-federation-node": "^3.3.4",
     "@turf/boolean-point-in-polygon": "^7.3.5",
     "ag-grid-angular": "^35.3.0",
     "ag-grid-community": "^35.3.0",
@@ -32,6 +33,7 @@
     "cytoscape": "^3.33.4",
     "cytoscape-cola": "^2.5.1",
     "cytoscape-dagre": "^3.0.0",
+    "es-module-shims": "^1.5.12",
     "leaflet": "^1.9.4",
     "leaflet-control-geocoder": "^3.3.1",
     "leaflet-draw": "^1.0.4",
@@ -43,6 +45,8 @@
     "vis-timeline": "^8.5.1"
   },
   "devDependencies": {
+    "@angular-architects/native-federation": "^21.2.3",
+    "@angular-devkit/build-angular": "^21.2.11",
     "@angular/build": "^21.2.11",
     "@angular/cli": "^21.2.11",
     "@angular/compiler-cli": "^21.2.0",
