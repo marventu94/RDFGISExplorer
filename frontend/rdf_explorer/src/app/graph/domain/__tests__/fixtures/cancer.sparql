@@ -1,0 +1,10 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+SELECT DISTINCT ?drug WHERE {
+  ?drug wdt:P129 ?gene_product .
+  ?gene wdt:P688 ?gene_product .
+  ?gene_product wdt:P682 ?biological_process .
+  ?biological_process (wdt:P361|wdt:P279)* wd:Q14818032 .
+  ?disease wdt:P2293 ?gene .
+  ?disease wdt:P279* wd:Q12078 .
+}

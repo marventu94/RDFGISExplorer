@@ -1,0 +1,157 @@
+@if (selected(); as sel) {
+  <h3 class="ta-center ell">Editing {{ sel.variable.toString() }} {{ isVariable ? '' : '(const)' }}</h3>
+
+  <ul class="nav nav-tabs nav-justified edit-tabs">
+    <li class="nav-item clickable">
+      <div class="nav-link" [class.active]="isVariable" (click)="mkVariable()">
+        <input type="checkbox" [checked]="isVariable" />
+        <span class="ml-1">Variable</span>
+      </div>
+    </li>
+    <li class="nav-item clickable">
+      <div class="nav-link" [class.active]="!isVariable" [class.tab-hl]="added > 0" (click)="mkConst()">
+        <input type="checkbox" [checked]="isConst" />
+        <span class="ml-1">Constraint</span>
+        @if (added > 0) {
+          <b class="ml-2">[+{{ added }}]</b>
+        }
+      </div>
+    </li>
+  </ul>
+
+  @if (!isVariable) {
+    <div class="constraint-section">
+      <div class="custom-container-title no-select mt-2 active">Constraints</div>
+      <div class="custom-container-content active">
+        <div class="input-group input-group-sm mt-1 mb-1">
+          <input class="form-control" [type]="newValueType" [placeholder]="newValuePlaceholder" [(ngModel)]="newValue" />
+          <button id="edit-button-add" class="btn btn-outline-secondary btn-sm" type="button" (click)="addValue()">add</button>
+        </div>
+        @if (!sel.hasUris()) {
+          <div class="alert alert-danger alert-sm mb-1">To use this resource as constraint you need to add at least one value</div>
+        }
+        @for (value of sel.uris; track value) {
+          <div class="row uri-row">
+            <div class="col-md-12">
+              <span class="ell uri-value">
+                @if (!isLiteral) {
+                  <a [title]="value" (click)="$event.preventDefault()">{{ getLabel(value) }}</a>
+                }
+                @if (isLiteral) {
+                  <span>{{ value }}</span>
+                }
+              </span>
+              <span class="clickable pull-right" (click)="rmValue(value)">&#128465;</span>
+            </div>
+          </div>
+        }
+      </div>
+      @if (selIsProperty()) {
+        <div class="form-check form-check-inline mt-1">
+          <input class="form-check-input" id="prop-star" type="checkbox" [checked]="sel.star" (change)="onStarChange($event)" />
+          <label class="form-check-label" for="prop-star">Wildcard property</label>
+        </div>
+      }
+    </div>
+  }
+
+  @if (isVariable) {
+    <div class="variable-section mt-3">
+      <div class="form-row">
+        <div class="input-group col-md-12">
+          <span class="input-group-text">Variable name</span>
+          <span class="edit-var-name-prefix">?</span>
+          <input id="edit-var-name" class="form-control" type="text" autocomplete="off"
+            [ngModel]="sel.variable.alias"
+            (ngModelChange)="onAliasChange($event)"
+            [placeholder]="sel.variable.id" />
+        </div>
+      </div>
+
+      <div class="form-row mt-2">
+        <div class="input-group" id="edit-filter-group">
+          <span class="input-group-text">Possible results</span>
+          <input id="edit-filter-results" class="form-control" type="text" autocomplete="off"
+            [ngModel]="resultFilterValue" (ngModelChange)="resultFilterValue = $event; onFilterValueChange()" />
+          <span class="input-group-text" id="edit-filter-results-icon">&#128269;</span>
+          <span class="input-group-text result-status" [class.loading]="resultFilterLoading">
+            @if (!resultFilterLoading) {
+              @if (sel.variable.results.length === 0) {
+                &#9888;
+              } @else {
+                &#10003;
+              }
+            } @else {
+              ...
+            }
+          </span>
+        </div>
+      </div>
+
+      <div class="custom-container-content active">
+        @if (sel.variable.results.length === 0) {
+          <div class="alert alert-warning alert-sm mt-2 mb-1">Currently this variable has no partial results!</div>
+        }
+        @for (elem of sel.variable.results; track elem.value) {
+          <div class="row result-row" [title]="elem.value">
+            <div class="col-md-12" [class.mt-1]="$first">
+              <span class="ell result-value">
+                <a (click)="$event.preventDefault()">{{ getLabel(elem.value) }}</a>
+              </span>
+              <span class="pull-right clickable" (click)="addValue(elem.value)">&#10133;</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="custom-container-title no-select mt-2 clickable" [class.active]="showFilters" (click)="showFilters = !showFilters">
+        Filters
+        @if (sel.variable.filters.length > 0) {
+          <span class="ml-1">[{{ sel.variable.filters.length }}]</span>
+        }
+        <span class="pull-right">{{ showFilters ? '&#9650;' : '&#9660;' }}</span>
+      </div>
+
+      @if (showFilters) {
+        <div class="custom-container-content active">
+          <div class="form-row mt-1">
+            <div class="input-group input-group-sm">
+              <select class="custom-select" [ngModel]="newFilterType" (ngModelChange)="onNewFilterTypeChange($event)">
+                <option value="">-- Select a new filter --</option>
+                @for (item of getFilterTypeOptions(); track item.key) {
+                  <option [value]="item.key">{{ item.metadata.name }}</option>
+                }
+              </select>
+              @for (field of newFilterFields; track field.key) {
+                <input class="form-control" [type]="field.meta.type" autocomplete="off"
+                  [placeholder]="field.key"
+                  [ngModel]="field.value"
+                  (ngModelChange)="updateNewFilterData(field.key, $event)" />
+              }
+              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="newFilter()">Add</button>
+            </div>
+          </div>
+
+          @for (ef of existingFilters; track ef) {
+            <div class="form-row mt-1">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">{{ ef.typeName }}</span>
+                @for (field of ef.fields; track field.key) {
+                  <input class="form-control"
+                    [type]="field.meta.type"
+                    autocomplete="off"
+                    [placeholder]="field.key"
+                    [ngModel]="field.value"
+                    (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
+                }
+                <div class="input-group-append clickable" (click)="rmFilter(ef.filter)">
+                  <span class="input-group-text">&#128465;</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+}
