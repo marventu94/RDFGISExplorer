@@ -10,14 +10,49 @@ El usuario ingresa una consulta SPARQL y obtiene cuatro vistas coordinadas (tabl
 
 ## Stack
 
-- **Frontend:** Angular 17+
-- **Backend:** NestJS sobre Node.js 20 LTS
+- **Frontend:** Angular 21 (Module Federation vía `@angular-architects/native-federation`)
+  - `frontend/app_shell/` — Host en `:4200`
+  - `frontend/rdf_explorer/` — Remote en `:4201`
+  - `frontend/rdf_gis_explorer/` — Remote en `:4202`
+- **Backend:** NestJS sobre Node.js 20 LTS (`:3000`)
 - **Endpoint SPARQL:** Wikidata (fase 1, default) / MillenniumDB (fase futura) — patrón Adapter
 - **Overlay de curado:** SQLite
 
 ---
 
 ## Cómo levantar el proyecto
+
+### Desarrollo local (con `npm run dev`)
+
+Desde la raíz del repo se pueden levantar los 4 servicios simultáneamente:
+
+```bash
+# Instalar dependencias del backend
+npm install
+
+# Instalar dependencias del app_shell
+cd frontend/app_shell && npm install && cd ../..
+
+# Instalar dependencias de rdf_explorer
+cd frontend/rdf_explorer && npm install && cd ../..
+
+# Instalar dependencias de rdf_gis_explorer
+cd frontend/rdf_gis_explorer && pnpm install && cd ../..
+
+# Levantar backend (:3000), shell (:4200), explorer (:4201) y gis (:4202)
+npm run dev
+```
+
+| Servicio | URL |
+|----------|-----|
+| App Shell (host) | http://localhost:4200 |
+| RDF Explorer (remote) | http://localhost:4200/explorer |
+| RDF GIS Explorer (remote) | http://localhost:4200/gis |
+| Backend API | http://localhost:3000 |
+
+> **Nota:** Si `npm run dev` muestra errores de `ENOSPC` (límite de file watchers), aumentá el límite del sistema: `sudo sysctl fs.inotify.max_user_watches=524288`.
+
+### Docker
 
 Ver [`docs/03-setup-and-docker.md`](docs/03-setup-and-docker.md).
 

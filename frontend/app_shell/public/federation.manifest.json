@@ -1,0 +1,4 @@
+{
+  "rdf_explorer": "http://localhost:4201/remoteEntry.json",
+  "rdf_gis_explorer": "http://localhost:4202/remoteEntry.json"
+}
