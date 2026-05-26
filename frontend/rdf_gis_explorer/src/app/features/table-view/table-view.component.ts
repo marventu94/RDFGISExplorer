@@ -18,6 +18,7 @@ import { FormsModule } from '@angular/forms';
 
 import { SelectionService } from '@core/services/selection.service';
 import { CurationService } from '@core/services/curation.service';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import type {
   QueryResult,
   ResultBinding,
@@ -50,6 +51,7 @@ export class TableViewComponent implements OnDestroy {
   private readonly selectionService = inject(SelectionService);
   private readonly curationService = inject(CurationService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly viewState = inject(DashboardViewStateService);
   private readonly destroy$ = new Subject<void>();
 
   private gridApi: GridApi | null = null;
@@ -80,6 +82,15 @@ export class TableViewComponent implements OnDestroy {
   });
 
   constructor() {
+    // Restore stored view state
+    const storedTable = this.viewState.tableState();
+    if (storedTable?.pageSize) {
+      this.pageSize.set(storedTable.pageSize);
+    }
+    if (storedTable?.quickFilter !== undefined) {
+      this.quickFilter.set(storedTable.quickFilter);
+    }
+
     this.selectionService.filteredQueryResult$
       .pipe(takeUntil(this.destroy$))
       .subscribe((result) => {
@@ -162,6 +173,18 @@ export class TableViewComponent implements OnDestroy {
 
   onPageSizeChange(size: number): void {
     this.pageSize.set(size);
+    this.viewState.tableState.set({
+      ...this.viewState.tableState(),
+      pageSize: size,
+    });
+  }
+
+  onQuickFilterChange(value: string): void {
+    this.quickFilter.set(value);
+    this.viewState.tableState.set({
+      ...this.viewState.tableState(),
+      quickFilter: value,
+    });
   }
 
   private buildColumnDefs(result: QueryResult): void {
