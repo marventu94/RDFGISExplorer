@@ -1,0 +1,138 @@
+@if (selected(); as sel) {
+  @if (sel.source) {
+    <div class="ta-center">
+      <span class="desc-nav-left" (click)="getPrev()">&#9664;</span>
+      <a class="ell" [href]="sel.uri" target="_blank" class="desc-uri-link">{{ sel.uri }}</a>
+      <span class="desc-nav-right" (click)="getNext()">&#9654;</span>
+      <hr class="desc-hr" />
+    </div>
+  }
+
+  <h3 class="ta-center mb-0 wrap">{{ getLabel(sel.uri) }}</h3>
+  <hr class="desc-hr" />
+
+  @if (sel.image.length > 0) {
+    @if (getResultsForProp(sel.results, sel.image[0].uri); as imgResults) {
+      @if (imgResults.length > 0) {
+        <img class="c-img" [src]="imgResults[0]" />
+      }
+    }
+  }
+
+  @for (prop of sel.text; track prop.uri) {
+    <div class="desc-text-block">
+      @for (value of getResultsForProp(sel.results, prop.uri); track $index; let i = $index) {
+        <div [class.active]="isTextExpanded(prop.uri + '_' + i)">
+          <span class="draggable-literal" draggable="true" (dragstart)="onDragLiteral($event, prop.uri)" [title]="prop.uri">
+            {{ getLabel(prop.uri) }}:&nbsp;
+          </span>
+          <a class="more-less" (click)="toggleText(prop.uri + '_' + i); $event.preventDefault()">
+            [{{ isTextExpanded(prop.uri + '_' + i) ? 'less' : 'more' }}]
+          </a>
+          <span>{{ isTextExpanded(prop.uri + '_' + i) ? value : (('' + value).slice(0, 80) + '...') }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  @if (sel.datatype.length > 0) {
+    <h5 class="mb-2 mt-3 clickable no-select" (click)="show.datatype = !show.datatype">
+      {{ show.datatype ? '&#9660;' : '&#9650;' }} Datatype properties
+      <span class="pull-right">[{{ sel.datatype.length }}]</span>
+    </h5>
+    @if (show.datatype) {
+      <div class="dt-table">
+        @for (prop of sel.datatype; track prop.uri) {
+          <div class="dt-row">
+            <div class="dt-col-label">
+              <span class="draggable-literal" draggable="true" (dragstart)="onDragLiteral($event, prop.uri)" [title]="prop.uri">
+                {{ getLabel(prop.uri) }}
+              </span>
+              <span> :</span>
+            </div>
+            <div class="dt-col-values">
+              @for (value of getResultsForProp(sel.results, prop.uri); track $index; let i = $index) {
+                <div [class.active]="isDtExpanded(prop.uri + '_' + i)">
+                  @if (('' + value).length < 80) {
+                    <span>{{ value }}</span>
+                  } @else {
+                    <span>{{ isDtExpanded(prop.uri + '_' + i) ? value : (('' + value).slice(0, 80) + '...') }}</span>
+                    <a class="pull-right" (click)="toggleDt(prop.uri + '_' + i); $event.preventDefault()">
+                      [{{ isDtExpanded(prop.uri + '_' + i) ? 'less' : 'more' }}]
+                    </a>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  @if (sel.objects.length > 0) {
+    <h5 id="objptitle" class="mb-2 mt-3 clickable no-select" (click)="show.objects = !show.objects">
+      {{ show.objects ? '&#9660;' : '&#9650;' }} Object properties
+      <span class="pull-right">[{{ sel.objects.length }}]</span>
+    </h5>
+    @if (show.objects) {
+      <input
+        class="form-control form-control-sm mb-2"
+        type="text"
+        placeholder="Search properties..."
+        [(ngModel)]="objectSearch"
+        (click)="$event.stopPropagation()"
+      />
+      @for (prop of getFilteredObjects(sel.objects); track prop.uri; let idx = $index) {
+        <div class="prop-rect" [class.active]="isObjActive(prop.uri)">
+          <div class="prop-head" (click)="toggleObj(prop.uri)">
+            <span class="prop-title" [id]="'propId' + idx" draggable="true" (dragstart)="onDragProperty($event, prop.uri)" [title]="prop.uri">
+              {{ getLabel(prop.uri) }}
+            </span>
+            <div class="prop-info">
+              <span class="prop-chevron" (click)="toggleObj(prop.uri); $event.stopPropagation();">
+                {{ isObjActive(prop.uri) ? '&#9660;' : '&#9650;' }}
+              </span>
+              <input class="prop-filter-input" type="text"
+                [ngModel]="getPropFilter(prop.uri)"
+                (ngModelChange)="setPropFilter(prop.uri, $event)"
+                placeholder="Filter..."
+                (click)="toggleObjWithTrue(prop.uri); $event.stopPropagation();" />
+            </div>
+          </div>
+          @if (isObjActive(prop.uri)) {
+            <hr class="desc-hr" />
+            <div class="fake-rect-container">
+              @for (obj of getFilteredResults(sel.results, prop.uri); track isObjectItem(obj) ? obj.uri : obj) {
+                <div class="obj-rect" draggable="true" (dragstart)="onDragObject($event, isObjectItem(obj) ? obj.uri : '', prop.uri)" [title]="isObjectItem(obj) ? obj.uri : obj">
+                  {{ isObjectItem(obj) ? (obj.label || getLabel(obj.uri)) : obj }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+
+  @if (sel.external.length > 0) {
+    <h5 class="mb-2 mt-3 clickable no-select" (click)="show.external = !show.external">
+      {{ show.external ? '&#9660;' : '&#9650;' }} External links
+      <span class="pull-right">[{{ sel.external.length }}]</span>
+    </h5>
+    @if (show.external) {
+      @for (prop of sel.external; track prop.uri) {
+        <div class="ext-row">
+          <span class="draggable-literal" draggable="true" (dragstart)="onDragLiteral($event, prop.uri)" [title]="prop.uri">
+            {{ getLabel(prop.uri) }}:
+          </span>
+          @for (value of getResultsForProp(sel.results, prop.uri); track value) {
+            <a class="ell ext-link" [href]="value" target="_blank">{{ value }}</a>
+          }
+        </div>
+      }
+    }
+  }
+} @else {
+  <h3 class="ta-center mb-0">No URIs to describe</h3>
+}

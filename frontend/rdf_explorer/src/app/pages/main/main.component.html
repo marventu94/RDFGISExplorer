@@ -1,0 +1,19 @@
+<div class="main-layout">
+  <div class="pane pane-search">
+    <app-search-panel />
+  </div>
+  <div class="pane pane-canvas">
+    <app-canvas-panel />
+    @if (graph.nodes().length === 0 && !tutorialService.isActive()) {
+      <div id="mid-help" class="overlay no-select">
+        Need help?
+        <span class="overlay-link" (click)="openGettingStarted()">getting started</span>
+        |
+        <span class="overlay-link" (click)="startTutorial()">interactive tutorial</span>
+      </div>
+    }
+  </div>
+  <div class="pane pane-tools">
+    <app-tools-panel />
+  </div>
+</div>
