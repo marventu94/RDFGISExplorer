@@ -1,0 +1,22 @@
+<h2 mat-dialog-title>Guardar tablero</h2>
+<mat-dialog-content>
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Nombre del tablero</mat-label>
+    <input matInput [ngModel]="name()" (ngModelChange)="name.set($event)" placeholder="Ej: Mis ciudades argentinas" />
+  </mat-form-field>
+
+  @if (showModeOptions) {
+    <div class="mode-options">
+      <mat-radio-group [ngModel]="mode()" (ngModelChange)="mode.set($event)">
+        <mat-radio-button value="overwrite">Sobreescribir existente</mat-radio-button>
+        <mat-radio-button value="copy">Guardar como copia</mat-radio-button>
+      </mat-radio-group>
+    </div>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Cancelar</button>
+  <button mat-flat-button [disabled]="!isValid" (click)="onSave()">
+    Guardar
+  </button>
+</mat-dialog-actions>

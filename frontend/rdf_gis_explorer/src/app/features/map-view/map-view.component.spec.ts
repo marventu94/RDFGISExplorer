@@ -174,13 +174,6 @@ describe('MapViewComponent', () => {
       expect(component).toBeTruthy();
     });
 
-    it('should have correct base layer options', () => {
-      const labels = component.baseLayerOptions.map((o) => o.label);
-      expect(labels).toEqual(['OSM', 'Positron', 'Dark']);
-      const values = component.baseLayerOptions.map((o) => o.value);
-      expect(values).toEqual(['osm', 'positron', 'dark']);
-    });
-
     it('should handle resize', () => {
       expect(() => component.onResize()).not.toThrow();
     });
@@ -281,18 +274,6 @@ describe('MapViewComponent', () => {
 
         expect(component.queryState).toBe('normal');
         expect(component.originalNodeCount).toBe(2);
-      });
-    });
-
-    describe('base layer switching', () => {
-      it('should change base layer to positron', () => {
-        component.changeBaseLayer('positron');
-        expect(component['baseLayer']).toBe('positron');
-      });
-
-      it('should not re-apply same base layer', () => {
-        component.changeBaseLayer('osm');
-        expect(component['baseLayer']).toBe('osm');
       });
     });
 

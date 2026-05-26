@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,6 +20,7 @@ import { Parser } from 'sparqljs';
 import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
+import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { LibraryService } from './library.service';
 import { StoredQuery } from './seed-queries';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
@@ -60,6 +61,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
+  private readonly queryState = inject(SparqlQueryStateService);
 
   private editorView: EditorView | null = null;
   private fallbackContent = '';
@@ -74,12 +76,31 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   protected readonly libraryQueries = signal<StoredQuery[]>([]);
 
+  constructor() {
+    effect(() => {
+      const query = this.queryState.query();
+      if (query && this.editorView && this.editorView.state.doc.toString() !== query) {
+        this.setEditorContent(query);
+      }
+    });
+    effect(() => {
+      this.limit.set(this.queryState.limit());
+    });
+  }
+
   ngOnInit(): void {
     this.libraryService.queries$.subscribe((queries) => {
       this.libraryQueries.set(queries);
     });
     this.createEditor();
     this.setupKeyboardShortcut();
+
+    // Sync initial state from service
+    const serviceQuery = this.queryState.query();
+    if (serviceQuery) {
+      this.setEditorContent(serviceQuery);
+    }
+    this.limit.set(this.queryState.limit());
   }
 
   ngOnDestroy(): void {
@@ -218,6 +239,8 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
 
     const currentLimit = this.limit();
+    this.queryState.query.set(sparql);
+    this.queryState.limit.set(currentLimit);
     this.executing.set(true);
 
     this.apiService.executeQuery({ sparql, limit: currentLimit }).subscribe({
@@ -294,6 +317,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       if (!confirmed) return;
     }
     this.limit.set(newLimit);
+    this.queryState.limit.set(newLimit);
   }
 
   protected limitLabel(value: number): string {

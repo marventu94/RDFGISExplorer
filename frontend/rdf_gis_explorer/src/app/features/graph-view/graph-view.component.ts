@@ -8,6 +8,7 @@ import {
   HostBinding,
   NgZone,
   ChangeDetectorRef,
+  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectionService } from '@core/services/selection.service';
@@ -17,6 +18,7 @@ import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection } from '@shared/models';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { GRAPH_STYLE } from './graph-style';
 import { LAYOUT_CONFIGS } from './graph-layouts';
 
@@ -66,6 +68,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   readonly MAX_NODES = 300;
   private readonly COLLAPSE_DEGREE = 20;
+
+  private readonly viewState = inject(DashboardViewStateService);
 
   constructor(
     private selectionService: SelectionService,
@@ -211,6 +215,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   setLayout(layout: GraphLayout): void {
     this.currentLayout = layout;
+    this.viewState.graphState.set({ layout });
     const config = LAYOUT_CONFIGS[layout];
     if (this.cy && config) {
       this.cy.layout(config.options).run();
@@ -247,8 +252,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     }
 
     const elements = this.buildElements(result);
+    const storedLayout = this.viewState.graphState();
     const defaultLayout = result.edges.length === 0 ? 'grid' : 'cola';
-    this.currentLayout = defaultLayout;
+    this.currentLayout = storedLayout ? (storedLayout.layout as GraphLayout) : defaultLayout;
 
     this.cy = cytoscape({
       container: this.container.nativeElement,
