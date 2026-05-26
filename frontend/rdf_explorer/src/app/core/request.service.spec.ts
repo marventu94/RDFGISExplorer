@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 import { RequestService, SparqlJsonResult } from './request.service';
 import { SettingsService } from './settings.service';
 import { signal } from '@angular/core';
@@ -18,11 +19,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     label: { type: 'literal', value: 'person', 'xml:lang': 'en' },
   },
   resultLimit: 20,
+  backendMode: 'direct',
 };
 
-function createMockSettings() {
+function createMockSettings(overrides: Partial<AppSettings> = {}) {
   return {
-    app: signal(DEFAULT_SETTINGS),
+    app: signal({ ...DEFAULT_SETTINGS, ...overrides }),
     prefixes: signal([] as any),
     describe: signal({} as any),
     update: vi.fn(),
@@ -38,6 +40,7 @@ describe('RequestService', () => {
     mockSettings = createMockSettings();
     TestBed.configureTestingModule({
       providers: [
+        provideHttpClient(),
         { provide: SettingsService, useValue: mockSettings },
       ],
     });
@@ -69,7 +72,7 @@ describe('RequestService', () => {
     });
   });
 
-  describe('execQuery', () => {
+  describe('execQuery in direct mode', () => {
     it('POSTs to the configured endpoint with format=json', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({

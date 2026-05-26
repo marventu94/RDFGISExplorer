@@ -2,5 +2,14 @@
   "/upload-survey": {
     "target": "http://localhost:8081",
     "secure": false
+  },
+  "/api/sparql": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "pathRewrite": {
+      "^/api/sparql/execute": "/query/execute",
+      "^/api/sparql/predicates": "/suggestions/predicates"
+    },
+    "changeOrigin": true
   }
 }

@@ -31,4 +31,5 @@ export interface AppSettings {
   endpoint: EndpointConfig;
   searchClass: SearchClass;
   resultLimit: number;
+  backendMode: 'app-backend' | 'direct';
 }
