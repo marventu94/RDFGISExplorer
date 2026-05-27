@@ -3,7 +3,7 @@ import { loadRemoteModule } from '@angular-architects/native-federation';
 import { Component } from '@angular/core';
 import { dashboardRedirectGuard } from './core/dashboard-redirect.guard';
 
-@Component({ template: '', standalone: true })
+@Component({ selector: 'app-dashboard-stub', template: '', standalone: true })
 class DashboardStubComponent {}
 
 export const routes: Routes = [
