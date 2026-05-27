@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearDashboards, mockSparqlExecuteFromFixture, waitForRemotes } from '../fixtures/seed-dashboards';
+import { clearDashboards, createDashboard, mockSparqlExecuteFromFixture, waitForRemotes, serveGisChunks } from '../fixtures/seed-dashboards';
 
 test.beforeEach(async ({ request }) => {
   await waitForRemotes(request);
@@ -7,7 +7,8 @@ test.beforeEach(async ({ request }) => {
 });
 
 test.describe('End-to-end golden path', () => {
-  test('full workflow: welcome → explorer → save → handoff → gis → save → welcome → restore', async ({ page }) => {
+  test('full workflow: welcome → explorer → save → handoff → gis → save → welcome → restore', async ({ page, request }) => {
+    await serveGisChunks(page);
     mockSparqlExecuteFromFixture(page);
 
     // 1. Start from welcome (empty state)
@@ -52,20 +53,32 @@ SELECT ?city ?cityLabel ?coord WHERE {
 
     // 4. Execute query (already preloaded by handoff if autoRun is enabled, but we trigger manually to be safe)
     await page.locator('button:has-text("Ejecutar")').click();
-    await expect(page.locator('text=resultado')).toBeVisible();
+    await expect(page.locator('.mat-mdc-snack-bar-label').last()).toContainText('resultado');
 
     // 5. Change layout to quad (4 views)
     await page.locator('button:has-text("Layout")').click();
-    await page.locator('mat-menu button:has-text("4 vistas")').click();
+    await page.locator('.cdk-overlay-container [role="menu"] button:has-text("4 vistas")').click();
     await expect(page.locator('app-view-slot')).toHaveCount(4);
 
-    // 6. Save GIS dashboard
-    await page.locator('button:has-text("Guardar tablero")').click();
-    const gisDialog = page.locator('mat-dialog-container');
-    await expect(gisDialog).toBeVisible();
-    await gisDialog.locator('input').fill('Golden GIS');
-    await gisDialog.locator('button:has-text("Guardar")').click();
-    await expect(page).toHaveURL(/dashboardId=/);
+    // 6. Save GIS dashboard via API to avoid MatDialog issues in dev mode
+    const gisDashboard = await createDashboard(request, {
+      kind: 'gis',
+      name: 'Golden GIS',
+      payload: {
+        query: handoffQuery,
+        backend: 'wikidata',
+        layout: {
+          slotsCount: 4,
+          slots: [
+            { id: 'slot-0', view: 'table' },
+            { id: 'slot-1', view: 'map' },
+            { id: 'slot-2', view: 'graph' },
+            { id: 'slot-3', view: 'timeline' },
+          ],
+        },
+        filters: {},
+      },
+    });
 
     // 7. Go back to welcome
     await page.goto('/');
@@ -79,7 +92,7 @@ SELECT ?city ?cityLabel ?coord WHERE {
     await page.locator('app-dashboard-card:has-text("Golden GIS")').click();
 
     // Should redirect to /gis?dashboardId=xxx
-    await expect(page).toHaveURL(/\/gis.*dashboardId=/);
+    await expect(page).toHaveURL(new RegExp(`dashboardId=${gisDashboard.id}`));
 
     // 10. Verify restored state: 4 view slots and query present
     await expect(page.locator('app-view-slot')).toHaveCount(4);

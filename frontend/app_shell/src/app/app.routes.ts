@@ -20,7 +20,7 @@ export const routes: Routes = [
   {
     path: 'explorer',
     loadComponent: () =>
-      loadRemoteModule('rdf_explorer', './Component').then((m) => m.AppComponent),
+      loadRemoteModule('rdf_explorer', './Component').then((m) => m.MainComponent),
   },
   {
     path: 'gis',

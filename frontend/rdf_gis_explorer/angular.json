@@ -55,6 +55,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/.cache/native-federation/rdf_gis_explorer",
+                "output": "/"
               }
             ],
             "styles": ["src/styles.scss"],

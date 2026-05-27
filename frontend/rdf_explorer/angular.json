@@ -55,6 +55,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/.cache/native-federation/app",
+                "output": "/"
               }
             ],
             "styles": ["src/styles.scss", "node_modules/shepherd.js/dist/css/shepherd.css"],

@@ -7,3 +7,5 @@ data/
 .angular/cache/
 coverage/
 package-lock.json
+test-results/
+frontend/e2e/test-results/

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearDashboards, createDashboard, waitForRemotes } from '../fixtures/seed-dashboards';
+import { clearDashboards, createDashboard, waitForRemotes, serveGisChunks } from '../fixtures/seed-dashboards';
 
 test.beforeEach(async ({ request }) => {
   await waitForRemotes(request);
@@ -58,14 +58,9 @@ test.describe('Welcome page', () => {
   });
 
   test('navigates to explorer and gis from CTAs', async ({ page }) => {
-    page.on('console', (msg) => console.log(`[console ${msg.type()}] ${msg.text()}`));
+    await serveGisChunks(page);
     page.on('pageerror', (err) => console.log('PAGEERROR:', err.message));
-
-    // Quick check: can GIS load directly?
-    await page.goto('http://localhost:4202');
-    await page.waitForTimeout(3000);
-    console.log('Direct GIS URL:', page.url());
-    console.log('Direct GIS title:', await page.title());
+    page.on('console', (msg) => console.log(`[console ${msg.type()}] ${msg.text()}`));
 
     await page.goto('/');
 
