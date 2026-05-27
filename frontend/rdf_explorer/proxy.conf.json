@@ -7,8 +7,8 @@
     "target": "http://localhost:3000",
     "secure": false,
     "pathRewrite": {
-      "^/api/sparql/execute": "/query/execute",
-      "^/api/sparql/predicates": "/suggestions/predicates"
+      "^/api/sparql/execute": "/api/query/execute",
+      "^/api/sparql/predicates": "/api/suggestions/predicates"
     },
     "changeOrigin": true
   },

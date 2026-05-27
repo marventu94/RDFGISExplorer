@@ -7,9 +7,12 @@
     "dev:backend": "cd backend && npm run start:dev",
     "dev:shell": "cd frontend/app_shell && npm run start",
     "dev:explorer": "cd frontend/rdf_explorer && npm run start",
-    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start"
+    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start",
+    "e2e:build-remotes": "cd frontend/rdf_explorer && npx ng build && cd ../rdf_gis_explorer && npx ng build",
+    "e2e:dev": "concurrently --raw --names backend,shell,explorer,gis \"npm run dev:backend\" \"npm run dev:shell\" \"npx http-server -p 4201 -c-1 --cors --proxy http://localhost:4201? frontend/rdf_explorer/dist/app/browser\" \"npx http-server -p 4202 -c-1 --cors --proxy http://localhost:4202? frontend/rdf_gis_explorer/dist/frontend/browser\""
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "http-server": "^14.1.1"
   }
 }
