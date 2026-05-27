@@ -131,6 +131,26 @@
   flex: 1;
 }
 
+.handoff-btn {
+  padding: 4px 10px;
+  background: #2ca02c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  margin-right: 4px;
+
+  &:hover:not(:disabled) {
+    background: #1f7a1f;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
 .save-btn {
   padding: 4px 10px;
   background: #1f77b4;
