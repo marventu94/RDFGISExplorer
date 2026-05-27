@@ -16,7 +16,12 @@ module.exports = withNativeFederation({
     'rxjs/fetch',
     'rxjs/testing',
     'rxjs/webSocket',
-    // Add further packages you don't need at runtime
+    // CJS/UMD packages that don't work as federation shared chunks
+    'sparqljs',
+    'leaflet',
+    'leaflet-control-geocoder',
+    'leaflet-draw',
+    'leaflet.markercluster',
   ],
 
   // Please read our FAQ about sharing libs:
