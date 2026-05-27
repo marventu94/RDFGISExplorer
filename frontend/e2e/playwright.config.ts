@@ -30,13 +30,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run e2e:dev',
+    command: 'npm run dev',
     cwd: path.resolve(__dirname, '../..'),
     url: 'http://localhost:4200',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: 'ignore',
+    stderr: 'ignore',
   },
   globalSetup: require.resolve('./global-setup'),
 });

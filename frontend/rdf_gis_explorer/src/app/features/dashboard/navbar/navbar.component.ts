@@ -1,9 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FilterBadgesComponent } from '../filter-badges/filter-badges.component';
 import { DashboardLayoutService, LayoutPreset } from '@core/services/dashboard-layout.service';
 import { SelectionService } from '@core/services/selection.service';
@@ -17,7 +17,7 @@ import {
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule],
+  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule, SaveDashboardDialogComponent],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
 })
@@ -27,10 +27,14 @@ export class NavbarComponent {
   protected readonly persistence = inject(DashboardPersistenceService);
   private readonly dialog = inject(MatDialog);
 
-  protected readonly coordinatedViewEnabled = toSignal(
-    this.selectionService.coordinatedViewEnabled$,
-    { initialValue: true },
-  );
+  private readonly _coordinatedViewEnabled = signal(true);
+  protected readonly coordinatedViewEnabled = this._coordinatedViewEnabled.asReadonly();
+
+  constructor() {
+    this.selectionService.coordinatedViewEnabled$
+      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .subscribe((v) => this._coordinatedViewEnabled.set(v));
+  }
 
   protected readonly layoutOptions: { preset: LayoutPreset; label: string; icon: string }[] = [
     { preset: 'single', label: '1 vista', icon: 'crop_square' },
