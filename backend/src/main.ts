@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -7,6 +7,7 @@ async function bootstrap() {
   const app = NestFactory.create(AppModule);
   const nestApp = await app;
 
+  nestApp.setGlobalPrefix('api');
   nestApp.useGlobalPipes(
     new ValidationPipe({ transform: true, whitelist: true }),
   );
@@ -19,6 +20,6 @@ async function bootstrap() {
 
   const port = process.env['BACKEND_PORT'] ?? 3000;
   await nestApp.listen(port);
-  console.log(`Backend running on http://localhost:${port}`);
+  Logger.log(`Backend running on http://localhost:${port}`);
 }
 void bootstrap();

@@ -8,16 +8,29 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
   selector: 'app-dashboard-card',
   standalone: true,
   template: `
-    <div class="card" (click)="navigate()">
+    <div
+      class="card"
+      role="listitem"
+      [attr.aria-label]="'Abrir ' + dashboard().name + ' (' + (dashboard().kind === 'gis' ? 'GIS' : 'Explorer') + ')'"
+      tabindex="0"
+      (click)="navigate()"
+      (keydown.enter)="navigate()"
+      (keydown.space)="navigate(); $event.preventDefault()"
+    >
       <div class="card__header">
         <span class="card__name">{{ dashboard().name }}</span>
         <div class="card__menu" (click)="$event.stopPropagation()">
-          <button class="card__menu-trigger" (click)="toggleMenu()">⋯</button>
+          <button
+            class="card__menu-trigger"
+            [attr.aria-label]="'Más opciones para ' + dashboard().name"
+            [attr.aria-expanded]="isMenuOpen()"
+            (click)="toggleMenu()"
+          >⋯</button>
           @if (isMenuOpen()) {
-            <div class="card__dropdown">
-              <button class="card__dropdown-item" (click)="rename()">Renombrar</button>
-              <button class="card__dropdown-item" (click)="duplicate()">Duplicar</button>
-              <button class="card__dropdown-item card__dropdown-item--danger" (click)="deleteDashboard()">Eliminar</button>
+            <div class="card__dropdown" role="menu">
+              <button class="card__dropdown-item" role="menuitem" (click)="rename()">Renombrar</button>
+              <button class="card__dropdown-item" role="menuitem" (click)="duplicate()">Duplicar</button>
+              <button class="card__dropdown-item card__dropdown-item--danger" role="menuitem" (click)="deleteDashboard()">Eliminar</button>
             </div>
           }
         </div>
@@ -27,6 +40,7 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
           class="card__chip"
           [class.card__chip--gis]="dashboard().kind === 'gis'"
           [class.card__chip--explorer]="dashboard().kind === 'explorer'"
+          aria-hidden="true"
         >
           {{ dashboard().kind === 'gis' ? 'GIS' : 'Explorer' }}
         </span>
@@ -43,9 +57,12 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
       cursor: pointer;
       transition: box-shadow 0.2s, border-color 0.2s;
     }
-    .card:hover {
+    .card:hover,
+    .card:focus-visible {
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       border-color: #ccc;
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
     }
     .card__header {
       display: flex;

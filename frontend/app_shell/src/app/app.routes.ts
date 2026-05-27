@@ -13,6 +13,11 @@ export const routes: Routes = [
       import('./pages/welcome/welcome.component').then((m) => m.WelcomePageComponent),
   },
   {
+    path: 'settings',
+    loadComponent: () =>
+      import('./pages/settings/settings.component').then((m) => m.SettingsPageComponent),
+  },
+  {
     path: 'explorer',
     loadComponent: () =>
       loadRemoteModule('rdf_explorer', './Component').then((m) => m.AppComponent),
