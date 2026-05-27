@@ -1,10 +1,8 @@
 # RDF GIS Explorer
 
-Herramienta web para exploración visual de grafos de conocimiento (KG) con dimensiones geo-espaciales y temporales. Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFIA / UNLP, 2025.
+Plataforma unificada para exploración visual de grafos de conocimiento (KG) con dimensiones geo-espaciales y temporales. Combina dos herramientas — **RDF Explorer** (construcción visual de queries SPARQL) y **RDF GIS Explorer** (dashboard de vistas coordinadas: tabla, grafo, mapa, línea de tiempo) — bajo un único *AppShell* con Module Federation.
 
-El usuario ingresa una consulta SPARQL y obtiene cuatro vistas coordinadas (tabla, grafo, mapa, línea de tiempo). La selección en una vista se propaga al resto vía linking & brushing.
-
-> **Estado actual:** documentación de diseño. La implementación se reparte entre múltiples AIs siguiendo los MDs de `docs/modules/`.
+Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFIA / UNLP, 2025.
 
 ---
 
@@ -15,22 +13,21 @@ El usuario ingresa una consulta SPARQL y obtiene cuatro vistas coordinadas (tabl
   - `frontend/rdf_explorer/` — Remote en `:4201`
   - `frontend/rdf_gis_explorer/` — Remote en `:4202`
 - **Backend:** NestJS sobre Node.js 20 LTS (`:3000`)
-- **Endpoint SPARQL:** Wikidata (fase 1, default) / MillenniumDB (fase futura) — patrón Adapter
-- **Overlay de curado:** SQLite
+- **DB:** SQLite (single-user, `backend/data/`)
+- **Endpoint SPARQL:** Wikidata (default) / MillenniumDB (futuro) — patrón Adapter en backend
+- **E2E:** Playwright (`frontend/e2e/`)
 
 ---
 
 ## Cómo levantar el proyecto
 
-### Desarrollo local (con `npm run dev`)
-
-Desde la raíz del repo se pueden levantar los 4 servicios simultáneamente:
+### Desarrollo local
 
 ```bash
 # Instalar dependencias del backend
-npm install
+cd backend && npm install && cd ..
 
-# Instalar dependencias del app_shell
+# Instalar dependencias del app shell
 cd frontend/app_shell && npm install && cd ../..
 
 # Instalar dependencias de rdf_explorer
@@ -50,52 +47,58 @@ npm run dev
 | RDF GIS Explorer (remote) | http://localhost:4200/gis |
 | Backend API | http://localhost:3000 |
 
-> **Nota:** Si `npm run dev` muestra errores de `ENOSPC` (límite de file watchers), aumentá el límite del sistema: `sudo sysctl fs.inotify.max_user_watches=524288`.
+### Tests E2E
+
+```bash
+cd frontend/e2e
+npm install
+npx playwright install --with-deps chromium
+npm run test
+```
 
 ### Docker
 
-Ver [`docs/03-setup-and-docker.md`](docs/03-setup-and-docker.md).
-
 ```bash
-# Resumen (lee el MD para detalles)
 cp .env.example .env
 docker compose up
 ```
 
 ---
 
-## Organización de la documentación
+## Flujo principal de la plataforma
 
-Toda la documentación vive en `docs/`. Cada AI ejecutora debe leer **dos bloques** antes de implementar su módulo:
+1. **Welcome** (`/`) — Tableros recientes guardados (mix de Explorer y GIS) con filtros y CTAs.
+2. **RDF Explorer** (`/explorer`) — Construcción visual de queries SPARQL; guardar workspace.
+3. **Handoff** — Botón "Explorar en GIS" migra la query generada al dashboard GIS.
+4. **RDF GIS Explorer** (`/gis`) — Ejecutar query, explorar resultados en 1-4 vistas coordinadas, guardar dashboard.
+5. **Persistencia** — Todo se guarda en el backend NestJS; recargar y abrir desde Welcome restaura el estado idéntico.
 
-### Docs base (TODA AI los lee primero)
+---
 
-| Archivo | Para qué sirve |
-|---|---|
-| [`docs/00-architecture.md`](docs/00-architecture.md) | Visión global, capas, flujo de datos, patrones |
-| [`docs/01-tech-stack.md`](docs/01-tech-stack.md) | Versiones exactas de librerías, justificación |
-| [`docs/02-data-contracts.md`](docs/02-data-contracts.md) | **Fuente única de tipos** compartidos front↔back |
-| [`docs/03-setup-and-docker.md`](docs/03-setup-and-docker.md) | Cómo levantar local + docker-compose + env vars |
-| [`docs/04-conventions-and-glossary.md`](docs/04-conventions-and-glossary.md) | Naming, testing, glosario del dominio (KG, SPARQL, etc.) |
+## Estructura del repo
 
-### Docs de módulo (UNA AI por módulo)
+```
+backend/                # NestJS + SQLite
+frontend/
+  app_shell/            # Host Angular + WelcomePage + routing
+  rdf_explorer/         # Remote: editor visual SPARQL
+  rdf_gis_explorer/     # Remote: dashboard 4 vistas
+  e2e/                  # Suite Playwright (5 specs)
+docs/
+  specs/                # Especificaciones por etapa
+  modules/              # Documentación de módulos
+```
 
-| Módulo | Archivo | Responsabilidad |
-|---|---|---|
-| M00 | [`docs/modules/M00-app-shell.md`](docs/modules/M00-app-shell.md) | Layout principal: grid 2x2 resizable + navbar + sidenav |
-| M01 | [`docs/modules/M01-sparql-input.md`](docs/modules/M01-sparql-input.md) | Editor SPARQL + biblioteca de queries |
-| M02 | [`docs/modules/M02-table-view.md`](docs/modules/M02-table-view.md) | Vista de tabla con paginado/filtro/orden |
-| M03 | [`docs/modules/M03-graph-view.md`](docs/modules/M03-graph-view.md) | Vista de grafo Cytoscape.js + focus+context |
-| M04 | [`docs/modules/M04-map-view.md`](docs/modules/M04-map-view.md) | Vista de mapa Leaflet + filtro por área |
-| M05 | [`docs/modules/M05-timeline-view.md`](docs/modules/M05-timeline-view.md) | Vista de línea de tiempo vis-timeline |
-| M06 | [`docs/modules/M06-curation.md`](docs/modules/M06-curation.md) | Panel de detalle + curado de datos |
-| M07 | [`docs/modules/M07-selection-service.md`](docs/modules/M07-selection-service.md) | SelectionService central (linking & brushing) |
-| M08 | [`docs/modules/M08-backend-api.md`](docs/modules/M08-backend-api.md) | API REST NestJS |
-| M09 | [`docs/modules/M09-sparql-adapter.md`](docs/modules/M09-sparql-adapter.md) | Adapter SPARQL: Wikidata + (stub) MillenniumDB |
+---
 
-### Coordinación entre AIs
+## Documentación
 
-Ver [`docs/ai-workflow.md`](docs/ai-workflow.md) — orden de implementación, branches, handoff, regla de oro: **nadie modifica `02-data-contracts.md` sin acuerdo explícito**.
+- [`docs/00-architecture.md`](docs/00-architecture.md) — Visión global, capas, flujo de datos
+- [`docs/01-tech-stack.md`](docs/01-tech-stack.md) — Versiones exactas de librerías
+- [`docs/02-data-contracts.md`](docs/02-data-contracts.md) — Tipos compartidos front↔back
+- [`docs/03-setup-and-docker.md`](docs/03-setup-and-docker.md) — Setup local + Docker
+- [`docs/04-conventions-and-glossary.md`](docs/04-conventions-and-glossary.md) — Naming, testing, glosario
+- [`docs/modules/`](docs/modules/) — Documentación por módulo
 
 ---
 
