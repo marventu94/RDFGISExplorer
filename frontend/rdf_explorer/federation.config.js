@@ -4,7 +4,7 @@ module.exports = withNativeFederation({
   name: 'rdf_explorer',
 
   exposes: {
-    './Component': './src/app/app.component.ts',
+    './Component': './src/app/pages/main/main.component.ts',
   },
 
   shared: {

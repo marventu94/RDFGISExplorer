@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearDashboards, mockSparqlExecuteFromFixture, waitForRemotes } from '../fixtures/seed-dashboards';
+import { clearDashboards, mockSparqlExecuteFromFixture, waitForRemotes, serveGisChunks } from '../fixtures/seed-dashboards';
 
 test.beforeEach(async ({ request }) => {
   await waitForRemotes(request);
@@ -8,6 +8,8 @@ test.beforeEach(async ({ request }) => {
 
 test.describe('Handoff Explorer → GIS', () => {
   test('transfers query from explorer to GIS', async ({ page }) => {
+    await serveGisChunks(page);
+
     const query = `PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 SELECT ?city ?cityLabel WHERE {
@@ -43,6 +45,7 @@ SELECT ?city ?cityLabel WHERE {
   });
 
   test('shows snackbar when no handoff payload exists', async ({ page }) => {
+    await serveGisChunks(page);
     await page.goto('/gis?handoff=1');
     // Should show snackbar about missing query
     await expect(page.locator('text=No se encontró la query a importar')).toBeVisible();
