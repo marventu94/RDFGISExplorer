@@ -16,8 +16,6 @@ module.exports = withNativeFederation({
     'rxjs/fetch',
     'rxjs/testing',
     'rxjs/webSocket',
-    'sparqljs',
-    'codemirror',
     // Add further packages you don't need at runtime
   ],
 

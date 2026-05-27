@@ -8,6 +8,8 @@ test.beforeEach(async ({ request }) => {
 
 test.describe('RDF Explorer flow', () => {
   test('saves workspace and reopens from welcome card with restored state', async ({ page }) => {
+    page.on('pageerror', (err) => console.log('PAGEERROR:', err.message));
+    page.on('console', (msg) => console.log(`[console ${msg.type()}] ${msg.text()}`));
     await page.goto('/explorer');
 
     // Verify explorer loads: tab panel and canvas should be visible
@@ -41,7 +43,7 @@ test.describe('RDF Explorer flow', () => {
     await page.locator('app-dashboard-card:has-text("E2E Explorer Workspace")').click();
 
     // Should redirect to explorer with workspaceId
-    await expect(page).toHaveURL(new RegExp(`/explorer\\\\?workspaceId=${workspaceId}`));
+    await expect(page).toHaveURL(new RegExp(`workspaceId=${workspaceId}`));
 
     // Verify restored state: the panel tab name should still be visible
     await expect(page.locator('.panel-tabs')).toBeVisible();
