@@ -44,6 +44,14 @@
     "vis-data": "^8.0.4",
     "vis-timeline": "^8.5.1"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "lmdb",
+      "msgpackr-extract"
+    ]
+  },
   "devDependencies": {
     "@angular-architects/native-federation": "^21.2.3",
     "@angular-devkit/build-angular": "^21.2.11",
