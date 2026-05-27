@@ -1,7 +1,17 @@
 import { Routes } from '@angular/router';
 import { loadRemoteModule } from '@angular-architects/native-federation';
+import { Component } from '@angular/core';
+import { dashboardRedirectGuard } from './core/dashboard-redirect.guard';
+
+@Component({ template: '', standalone: true })
+class DashboardStubComponent {}
 
 export const routes: Routes = [
+  {
+    path: '',
+    loadComponent: () =>
+      import('./pages/welcome/welcome.component').then((m) => m.WelcomePageComponent),
+  },
   {
     path: 'explorer',
     loadComponent: () =>
@@ -13,8 +23,12 @@ export const routes: Routes = [
       loadRemoteModule('rdf_gis_explorer', './Component').then((m) => m.App),
   },
   {
-    path: '',
-    redirectTo: 'explorer',
-    pathMatch: 'full',
+    path: 'dashboards/:id',
+    canActivate: [dashboardRedirectGuard],
+    component: DashboardStubComponent,
+  },
+  {
+    path: '**',
+    redirectTo: '',
   },
 ];

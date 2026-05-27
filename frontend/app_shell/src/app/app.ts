@@ -1,10 +1,15 @@
-import { Component } from '@angular/core';
-import { RouterOutlet, RouterLink } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { AsyncPipe } from '@angular/common';
+import { TopBarComponent } from './shell/top-bar.component';
+import { SnackbarService } from './core/snackbar.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, AsyncPipe, TopBarComponent],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
-export class App {}
+export class App {
+  protected readonly snackbar = inject(SnackbarService);
+}
