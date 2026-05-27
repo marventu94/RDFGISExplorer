@@ -5,6 +5,9 @@ module.exports = withNativeFederation({
 
   shared: {
     ...shareAll({ singleton: true, strictVersion: true, requiredVersion: 'auto' }),
+    // QueryHandoffService uses Plan B (sessionStorage + CustomEvent)
+    // as the shared communication channel between shell and remotes,
+    // since custom app services can't be shared via npm package sharing.
   },
 
   skip: [

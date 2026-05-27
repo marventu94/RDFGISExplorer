@@ -18,6 +18,13 @@
       }
       <button class="tab-add" (click)="addPanel()" type="button" title="Nuevo panel">+</button>
       <div class="tab-spacer"></div>
+      <button
+        class="handoff-btn"
+        [disabled]="!canHandoff()"
+        (click)="handoffToGis()"
+        type="button"
+        title="Explorar en GIS"
+      >Explorar en GIS</button>
       <button class="save-btn" (click)="openSaveDialog()" type="button" title="Guardar workspace">
         &#128190; Guardar
       </button>
