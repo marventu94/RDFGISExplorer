@@ -1,8 +1,11 @@
-import { Component, ElementRef, ViewChild, computed, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, input, signal, AfterViewInit } from '@angular/core';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { trigger, state, style, transition, animate } from '@angular/animations';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { SparqlInputComponent } from '@features/sparql-input/sparql-input.component';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
+import { QueryHandoffService } from '@core/services/query-handoff.service';
+import { getAutoRunHandoff } from '@core/services/query-handoff.service';
 import { ViewSlotComponent } from './view-slot.component';
 
 @Component({
@@ -19,10 +22,14 @@ import { ViewSlotComponent } from './view-slot.component';
     ]),
   ],
 })
-export class DashboardComponent {
+export class DashboardComponent implements AfterViewInit {
   readonly editorCollapsed = input(false);
 
   @ViewChild('container', { static: true }) containerRef!: ElementRef<HTMLElement>;
+  @ViewChild(SparqlInputComponent) sparqlInput!: SparqlInputComponent;
+
+  private readonly queryHandoff = inject(QueryHandoffService);
+  private readonly snackBar = inject(MatSnackBar);
 
   protected readonly colLeft = signal(50);
   protected readonly rowTop = signal(50);
@@ -44,6 +51,26 @@ export class DashboardComponent {
 
   protected get editorState(): string {
     return this.editorCollapsed() ? 'collapsed' : 'expanded';
+  }
+
+  ngAfterViewInit(): void {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('handoff') === '1') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('handoff');
+      window.history.replaceState({}, '', url.toString());
+
+      const payload = this.queryHandoff.consume();
+      if (payload) {
+        this.sparqlInput.setQuery(payload.query);
+        this.sparqlInput.setBackend(payload.backend);
+        if (getAutoRunHandoff()) {
+          setTimeout(() => this.sparqlInput.execute(), 300);
+        }
+      } else {
+        this.snackBar.open('No se encontró la query a importar', 'Cerrar', { duration: 4000 });
+      }
+    }
   }
 
   protected onVerticalDragEnded(event: CdkDragEnd): void {

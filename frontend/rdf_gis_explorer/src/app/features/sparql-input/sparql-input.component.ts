@@ -163,6 +163,14 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
   };
 
+  public setQuery(query: string): void {
+    this.setEditorContent(query);
+  }
+
+  public setBackend(backend: 'wikidata' | 'millenniumdb'): void {
+    this.queryState.backend.set(backend);
+  }
+
   protected get sparqlText(): string {
     if (this.editorView) {
       return this.editorView.state.doc.toString().trim();
@@ -223,7 +231,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected execute(): void {
+  public execute(): void {
     const sparql = this.sparqlText;
     if (!sparql) return;
 
