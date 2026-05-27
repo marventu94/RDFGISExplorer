@@ -95,13 +95,14 @@ export class MainComponent implements OnInit {
       },
     });
 
-    const result = await lastValueFrom(dialogRef.afterClosed());
+    const result = await lastValueFrom(dialogRef.closed);
     if (!result) return;
 
     try {
-      const dashboard = await this.workspace.saveWorkspace(result.name, result.overwriteId);
+      const typedResult = result as SaveWorkspaceDialogResult;
+      const dashboard = await this.workspace.saveWorkspace(typedResult.name, typedResult.overwriteId);
       this.showSnackbar(`Workspace guardado: ${dashboard.name}`);
-      if (!result.overwriteId) {
+      if (!typedResult.overwriteId) {
         await this.router.navigate([], {
           relativeTo: this.route,
           queryParams: { workspaceId: dashboard.id },
@@ -137,9 +138,8 @@ export class MainComponent implements OnInit {
     const sparql = this.generatedSparql();
     if (!sparql.trim()) return;
 
-    const endpointType = this.settings.app().endpoint.type;
     const backend: 'wikidata' | 'millenniumdb' =
-      endpointType === 'wikidata' || this.settings.app().endpoint.url.includes('wikidata')
+      this.settings.app().endpoint.url.includes('wikidata')
         ? 'wikidata'
         : 'millenniumdb';
 

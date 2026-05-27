@@ -13,9 +13,9 @@ type FilterKind = 'all' | 'gis' | 'explorer';
   imports: [RouterLink, AsyncPipe, DashboardCardComponent],
   template: `
     <div class="welcome">
-      <section class="welcome__ctas">
-        <a routerLink="/explorer" class="welcome__cta welcome__cta--explorer">
-          <div class="welcome__cta-icon">
+      <section class="welcome__ctas" aria-label="Acciones principales">
+        <a routerLink="/explorer" class="welcome__cta welcome__cta--explorer" aria-label="Abrir RDF Explorer para construir una query">
+          <div class="welcome__cta-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 6v6l4 2"/>
@@ -27,8 +27,8 @@ type FilterKind = 'all' | 'gis' | 'explorer';
           </div>
         </a>
 
-        <a routerLink="/gis" class="welcome__cta welcome__cta--gis">
-          <div class="welcome__cta-icon">
+        <a routerLink="/gis" class="welcome__cta welcome__cta--gis" aria-label="Abrir RDF GIS Explorer">
+          <div class="welcome__cta-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
               <circle cx="12" cy="10" r="3"/>
@@ -41,14 +41,15 @@ type FilterKind = 'all' | 'gis' | 'explorer';
         </a>
       </section>
 
-      <section class="welcome__recent">
+      <section class="welcome__recent" aria-label="Tableros recientes">
         <div class="welcome__recent-header">
           <h2 class="welcome__recent-title">Recientes</h2>
-          <div class="welcome__filters">
+          <div class="welcome__filters" role="group" aria-label="Filtrar por tipo">
             @for (f of filters; track f.value) {
               <button
                 class="welcome__filter"
                 [class.welcome__filter--active]="activeFilter === f.value"
+                [attr.aria-pressed]="activeFilter === f.value"
                 (click)="setFilter(f.value)"
               >
                 {{ f.label }}
@@ -59,14 +60,14 @@ type FilterKind = 'all' | 'gis' | 'explorer';
 
         @if (filteredDashboards$ | async; as dashboards) {
           @if (dashboards.length > 0) {
-            <div class="welcome__grid">
+            <div class="welcome__grid" role="list" aria-label="Lista de tableros recientes">
               @for (d of dashboards; track d.id) {
                 <app-dashboard-card [dashboard]="d" />
               }
             </div>
           } @else {
-            <div class="welcome__empty">
-              <svg viewBox="0 0 80 80" width="80" height="80" fill="none" stroke="#ccc" stroke-width="1.5">
+            <div class="welcome__empty" role="status" aria-live="polite">
+              <svg viewBox="0 0 80 80" width="80" height="80" fill="none" stroke="#ccc" stroke-width="1.5" aria-hidden="true">
                 <rect x="10" y="10" width="60" height="60" rx="8"/>
                 <path d="M30 35h20M30 45h14"/>
                 <circle cx="58" cy="50" r="6"/>
@@ -75,6 +76,10 @@ type FilterKind = 'all' | 'gis' | 'explorer';
               <a routerLink="/explorer" class="welcome__empty-cta">Ir a RDF Explorer</a>
             </div>
           }
+        } @else {
+          <div class="welcome__loading" role="status" aria-live="polite">
+            <span class="welcome__loading-text">Cargando recientes…</span>
+          </div>
         }
       </section>
     </div>
@@ -197,6 +202,16 @@ type FilterKind = 'all' | 'gis' | 'explorer';
     }
     .welcome__empty-cta:hover {
       background: #1557b0;
+    }
+    .welcome__loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1rem;
+      color: #888;
+    }
+    .welcome__loading-text {
+      font-size: 0.95rem;
     }
   `,
 })
