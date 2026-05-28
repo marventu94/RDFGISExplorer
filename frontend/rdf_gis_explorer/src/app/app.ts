@@ -28,10 +28,14 @@ export class App implements OnInit {
       this.persistence.load(dashboardId).subscribe({
         error: () => {
           this.persistence.isHydrating.set(false);
-          this.snackBar.open('Error al cargar el dashboard. Se muestra un tablero vacío.', 'Cerrar', {
-            duration: 6000,
-            panelClass: 'snackbar-error',
-          });
+          this.snackBar.open(
+            'Error al cargar el dashboard. Se muestra un tablero vacío.',
+            'Cerrar',
+            {
+              duration: 6000,
+              panelClass: 'snackbar-error',
+            },
+          );
           const url = new URL(window.location.href);
           url.searchParams.delete('dashboardId');
           window.history.replaceState({}, '', url.toString());
