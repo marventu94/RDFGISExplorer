@@ -6,10 +6,9 @@ import type { QueryResult } from '@shared/models';
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:3000';
 
   executeQuery(params: { sparql: string; limit?: number }): Observable<QueryResult> {
-    return this.http.post<QueryResult>(`${this.baseUrl}/query/execute`, {
+    return this.http.post<QueryResult>('/api/query/execute', {
       sparql: params.sparql,
       limit: params.limit ?? 500,
     });
