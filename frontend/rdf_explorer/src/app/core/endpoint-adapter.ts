@@ -145,14 +145,14 @@ export class GisBackendAdapter implements RdfBackendAdapter {
   async executeQuery(query: string, opts: ExecuteOpts = {}): Promise<QueryResult> {
     const body = { sparql: query, limit: opts.limit ?? 500 };
     const result = await firstValueFrom(
-      this.http.post<QueryResult>(`${this.baseUrl}/api/sparql/execute`, body),
+      this.http.post<QueryResult>(`${this.baseUrl}/api/query/execute`, body),
     );
     return result;
   }
 
   async getPredicates(): Promise<string[]> {
     const result = await firstValueFrom(
-      this.http.get<{ predicates: string[] }>(`${this.baseUrl}/api/sparql/predicates`),
+      this.http.get<{ predicates: string[] }>(`${this.baseUrl}/api/suggestions/predicates`),
     );
     return result.predicates;
   }

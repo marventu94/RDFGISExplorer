@@ -44,25 +44,24 @@ export interface UpdateDashboardInput {
 @Injectable({ providedIn: 'root' })
 export class DashboardApiClient {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:3000';
 
   list(): Observable<Dashboard[]> {
-    return this.http.get<Dashboard[]>(`${this.baseUrl}/api/dashboards`);
+    return this.http.get<Dashboard[]>('/api/dashboards');
   }
 
   get(id: string): Observable<Dashboard> {
-    return this.http.get<Dashboard>(`${this.baseUrl}/api/dashboards/${id}`);
+    return this.http.get<Dashboard>(`/api/dashboards/${id}`);
   }
 
   create(input: CreateDashboardInput): Observable<Dashboard> {
-    return this.http.post<Dashboard>(`${this.baseUrl}/api/dashboards`, input);
+    return this.http.post<Dashboard>('/api/dashboards', input);
   }
 
   update(id: string, input: UpdateDashboardInput): Observable<Dashboard> {
-    return this.http.put<Dashboard>(`${this.baseUrl}/api/dashboards/${id}`, input);
+    return this.http.put<Dashboard>(`/api/dashboards/${id}`, input);
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/api/dashboards/${id}`);
+    return this.http.delete<void>(`/api/dashboards/${id}`);
   }
 }
