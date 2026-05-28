@@ -1,23 +1,8 @@
-<mat-sidenav-container class="app-shell">
-  <mat-sidenav
-    #sidenav
-    mode="over"
-    position="end"
-    [opened]="sidenavOpen()"
-    (closed)="onSidenavClosed()"
-    class="curation-sidenav"
-  >
-    <app-curation-panel (close)="sidenav.close()" />
-  </mat-sidenav>
-
-  <mat-sidenav-content>
-    @if (persistence.isHydrating()) {
-      <div class="hydration-loader">
-        <mat-spinner diameter="48" />
-        <span>Cargando tablero…</span>
-      </div>
-    }
-    <app-navbar />
-    <app-dashboard [editorCollapsed]="editorCollapsed()" />
-  </mat-sidenav-content>
-</mat-sidenav-container>
+@if (persistence.isHydrating()) {
+  <div class="hydration-loader">
+    <mat-spinner diameter="48" />
+    <span>Cargando tablero…</span>
+  </div>
+}
+<app-navbar />
+<app-dashboard [editorCollapsed]="editorCollapsed()" />

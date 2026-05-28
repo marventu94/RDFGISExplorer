@@ -340,20 +340,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const visibleUris = new Set(visibleNodes.map((n) => n.uri));
 
     for (const node of visibleNodes) {
-      const classes: string[] = [];
-      if (node.flags?.hasAnomaly) classes.push('anomaly');
-      if (node.flags?.isConfirmedDuplicate) classes.push('confirmed-duplicate');
-
       elements.push({
         data: {
           id: node.uri,
           label: node.label,
           type: node.type ?? '',
           degree: degreeMap.get(node.uri) ?? 0,
-          flagAnomaly: node.flags?.hasAnomaly ?? false,
-          flagConfirmedDuplicate: node.flags?.isConfirmedDuplicate ?? false,
         },
-        classes: classes.join(' '),
       });
     }
 
