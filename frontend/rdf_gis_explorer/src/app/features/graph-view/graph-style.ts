@@ -24,21 +24,6 @@ export const GRAPH_STYLE: cytoscape.StylesheetStyle[] = [
     } as cytoscape.Css.Node,
   },
   {
-    selector: '.anomaly',
-    style: {
-      'border-color': '#FF9800',
-      'border-width': 3,
-    },
-  },
-  {
-    selector: '.confirmed-duplicate',
-    style: {
-      'border-style': 'dashed',
-      'border-color': '#9C27B0',
-      'border-width': 2,
-    },
-  },
-  {
     selector: 'edge',
     style: {
       'curve-style': 'bezier',

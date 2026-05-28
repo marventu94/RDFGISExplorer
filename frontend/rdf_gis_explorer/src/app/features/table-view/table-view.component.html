@@ -54,10 +54,7 @@
         [domLayout]="'normal'"
         [quickFilterText]="quickFilter()"
         (gridReady)="onGridReady($event)"
-        (firstDataRendered)="onFirstDataRendered()"
-        (paginationChanged)="onPaginationChanged()"
         (rowSelected)="onRowSelected($event)"
-        (cellValueChanged)="onCellValueChanged($event)"
       ></ag-grid-angular>
     </div>
   }

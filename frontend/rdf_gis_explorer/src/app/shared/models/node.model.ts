@@ -9,9 +9,4 @@ export interface NormalizedNode {
   attributes: Record<string, BindingValue>;
   coordinate?: Coordinate;
   temporalEvents?: TemporalEvent[];
-  flags?: {
-    hasAnomaly?: boolean;
-    hasPendingReview?: boolean;
-    isConfirmedDuplicate?: boolean;
-  };
 }

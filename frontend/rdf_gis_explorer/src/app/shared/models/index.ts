@@ -6,4 +6,3 @@ export * from './edge.model';
 export * from './query-result.model';
 export * from './selection.model';
 export * from './filter.model';
-export * from './curation.model';
