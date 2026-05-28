@@ -25,6 +25,18 @@ export class SearchPanelComponent {
 
   onSearchChange(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
+
+    if (!this.searchInput.trim()) {
+      this.abortController?.abort();
+      this.searchActive = false;
+      this.searchResults.set([]);
+      this.searchWait = false;
+      this.searchError = false;
+      this.noResults = false;
+      this.lastSearch = '';
+      return;
+    }
+
     const now = this.searchInput + '';
     this.debounceTimer = setTimeout(() => {
       if (now && now === this.searchInput) {

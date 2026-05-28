@@ -1,42 +1,50 @@
 .main-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr 400px;
-  grid-template-rows: 1fr;
-  grid-template-areas: "search canvas tools";
+  position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 
-.pane {
+.pane-canvas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+
+.pane-canvas app-canvas-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 .pane-search {
-  grid-area: search;
-  padding: 10px;
-  pointer-events: none;
+  position: absolute;
+  top: 46px;
+  left: 10px;
   z-index: 20;
+  pointer-events: none;
 }
 
 .pane-search > * {
   pointer-events: auto;
 }
 
-.pane-canvas {
-  grid-area: canvas;
-  position: relative;
-}
-
 .pane-tools {
-  grid-area: tools;
-  padding: 10px;
-  pointer-events: none;
+  position: absolute;
+  top: 46px;
+  right: 10px;
+  bottom: 10px;
   z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
 }
 
 .pane-tools > * {
   pointer-events: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .overlay {
@@ -67,18 +75,37 @@
 
 .panel-tabs {
   display: flex;
-  align-items: center;
-  gap: 2px;
+  align-items: stretch;
   padding: 4px 6px 0;
   background: #f0f0f0;
   border-bottom: 1px solid #ccc;
 }
 
-.panel-tab {
+.tabs-list {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tabs-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  flex-shrink: 0;
+  padding-left: 8px;
+}
+
+.panel-tab {
+  flex: 1;
+  min-width: 0;
+  max-width: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
   background: #e0e0e0;
   border-radius: 4px 4px 0 0;
   cursor: pointer;
@@ -94,10 +121,18 @@
 }
 
 .tab-name {
-  max-width: 120px;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
+}
+
+.panel-tab.dirty .tab-name::before {
+  content: '• ';
+  color: #e67e22;
+  font-size: 0.9em;
 }
 
 .tab-close {
@@ -127,9 +162,6 @@
   }
 }
 
-.tab-spacer {
-  flex: 1;
-}
 
 .handoff-btn {
   padding: 4px 10px;
