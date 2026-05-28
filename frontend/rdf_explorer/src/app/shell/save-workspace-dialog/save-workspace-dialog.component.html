@@ -3,7 +3,10 @@
 
   <label class="field">
     <span>Nombre</span>
-    <input type="text" [(ngModel)]="name" placeholder="Mi consulta" />
+    <input type="text" [(ngModel)]="name" placeholder="Mi consulta" [class.input-error]="hasNameConflict" />
+    @if (hasNameConflict) {
+      <span class="field-error">Ya existe un workspace con ese nombre.</span>
+    }
   </label>
 
   @if (canOverwrite) {
@@ -21,6 +24,6 @@
 
   <div class="actions">
     <button class="btn-secondary" (click)="cancel()" type="button">Cancelar</button>
-    <button class="btn-primary" (click)="save()" [disabled]="!name.trim()" type="button">Guardar</button>
+    <button class="btn-primary" (click)="save()" [disabled]="!canSave" type="button">Guardar</button>
   </div>
 </div>

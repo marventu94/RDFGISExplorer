@@ -4,30 +4,34 @@
   </div>
   <div class="pane pane-canvas">
     <div class="panel-tabs">
-      @for (panel of workspace.panels(); track panel.id) {
-        <div
-          class="panel-tab"
-          [class.active]="workspace.activePanelId() === panel.id"
-          (click)="switchPanel(panel.id)"
-        >
-          <span class="tab-name">{{ panel.name }}</span>
-          @if (workspace.panels().length > 1) {
-            <button class="tab-close" (click)="removePanel(panel.id, $event)" type="button">&times;</button>
-          }
-        </div>
-      }
-      <button class="tab-add" (click)="addPanel()" type="button" title="Nuevo panel">+</button>
-      <div class="tab-spacer"></div>
-      <button
-        class="handoff-btn"
-        [disabled]="!canHandoff()"
-        (click)="handoffToGis()"
-        type="button"
-        title="Explorar en GIS"
-      >Explorar en GIS</button>
-      <button class="save-btn" (click)="openSaveDialog()" type="button" title="Guardar workspace">
-        &#128190; Guardar
-      </button>
+      <div class="tabs-list">
+        @for (panel of workspace.panels(); track panel.id) {
+          <div
+            class="panel-tab"
+            [class.active]="workspace.activePanelId() === panel.id"
+            [class.dirty]="panel.dirty"
+            (click)="switchPanel(panel.id)"
+          >
+            <span class="tab-name">{{ panel.name }}</span>
+            @if (workspace.panels().length > 1) {
+              <button class="tab-close" (click)="removePanel(panel.id, $event)" type="button">&times;</button>
+            }
+          </div>
+        }
+        <button class="tab-add" (click)="addPanel()" type="button" title="Nuevo panel">+</button>
+      </div>
+      <div class="tabs-actions">
+        <button
+          class="handoff-btn"
+          [disabled]="!canHandoff()"
+          (click)="handoffToGis()"
+          type="button"
+          title="Explorar en GIS"
+        >Explorar en GIS</button>
+        <button class="save-btn" (click)="openSaveDialog()" type="button" title="Guardar workspace">
+          &#128190; Guardar
+        </button>
+      </div>
     </div>
 
     <app-canvas-panel />

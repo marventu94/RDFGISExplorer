@@ -2,7 +2,7 @@
   width: 250px;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  pointer-events: none;
 }
 
 .search-input-container {
@@ -39,14 +39,15 @@
 }
 
 .search-results-panel {
-  flex: 1;
+  max-height: calc(100vh - 80px);
   border: 1px solid #ccc;
   border-radius: 4px;
   margin-top: 6px;
   padding: 6px 12px;
   overflow-y: auto;
-  background-color: rgba(255, 255, 255, 0.75);
+  background-color: rgba(255, 255, 255, 0.95);
   font-size: 0.85rem;
+  pointer-events: auto;
 }
 
 .search-wait {

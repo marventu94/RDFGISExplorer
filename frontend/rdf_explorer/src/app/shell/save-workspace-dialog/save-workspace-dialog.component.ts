@@ -15,13 +15,24 @@ export class SaveWorkspaceDialogComponent {
   readonly data = inject<SaveWorkspaceDialogData>(DIALOG_DATA);
 
   name = this.data.currentName ?? '';
-  mode: 'overwrite' | 'copy' = 'copy';
+  mode: 'overwrite' | 'copy' = !!this.data.currentId && !!this.data.currentName ? 'overwrite' : 'copy';
 
   get canOverwrite(): boolean {
     return !!this.data.currentId && !!this.data.currentName;
   }
 
+  get hasNameConflict(): boolean {
+    const trimmed = this.name.trim().toLowerCase();
+    if (!trimmed) return false;
+    return (this.data.existingNames ?? []).some(n => n.toLowerCase() === trimmed);
+  }
+
+  get canSave(): boolean {
+    return !!this.name.trim() && !this.hasNameConflict;
+  }
+
   save(): void {
+    if (!this.canSave) return;
     const result: SaveWorkspaceDialogResult = {
       name: this.name.trim(),
       overwriteId: this.mode === 'overwrite' ? this.data.currentId : undefined,

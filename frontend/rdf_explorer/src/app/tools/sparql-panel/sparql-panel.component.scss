@@ -1,0 +1,26 @@
+.query-header-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.query-header {
+  flex: 1;
+  min-width: 0;
+}
+
+.gis-btn {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  background: #2ca02c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  &:hover {
+    background: #1f7a1f;
+  }
+}
