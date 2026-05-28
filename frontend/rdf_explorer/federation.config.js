@@ -16,7 +16,18 @@ module.exports = withNativeFederation({
     'rxjs/fetch',
     'rxjs/testing',
     'rxjs/webSocket',
-    // Add further packages you don't need at runtime
+    '@lezer/highlight',
+    'style-mod',
+    '@lezer/common',
+    '@lezer/lr',
+    'crelt',
+    'w3c-keyname',
+    '@marijn/find-cluster-break',
+    'lodash.throttle',
+    'lodash.memoize',
+    '@softarc/native-federation-runtime',
+    '@softarc/native-federation',
+    '@softarc/native-federation-node',
   ],
 
   // Please read our FAQ about sharing libs:
