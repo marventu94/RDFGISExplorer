@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnDestroy } from '@angular/core';
-import { Subject, takeUntil, firstValueFrom } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AgGridAngular } from 'ag-grid-angular';
 import type {
@@ -7,31 +7,26 @@ import type {
   GridApi,
   GridReadyEvent,
   RowSelectedEvent,
-  CellValueChangedEvent,
   ICellRendererParams,
 } from 'ag-grid-community';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 
 import { SelectionService } from '@core/services/selection.service';
-import { CurationService } from '@core/services/curation.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import type {
   QueryResult,
   ResultBinding,
   BindingValue,
   NormalizedNode,
-  CurationRecord,
   Selection,
 } from '@shared/models';
 import { UriCellRendererComponent } from './cell-renderers/uri-cell-renderer.component';
 import { CoordCellRendererComponent } from './cell-renderers/coord-cell-renderer.component';
-import { EditableCellRendererComponent } from './cell-renderers/editable-cell-renderer.component';
 import { PluginCellRendererComponent } from './cell-renderers/plugin-cell-renderer.component';
-import { InlineEditorComponent } from './cell-editors/inline-editor.component';
 
 @Component({
   selector: 'app-table-view',
@@ -49,13 +44,10 @@ import { InlineEditorComponent } from './cell-editors/inline-editor.component';
 })
 export class TableViewComponent implements OnDestroy {
   private readonly selectionService = inject(SelectionService);
-  private readonly curationService = inject(CurationService);
-  private readonly snackBar = inject(MatSnackBar);
   private readonly viewState = inject(DashboardViewStateService);
   private readonly destroy$ = new Subject<void>();
 
   private gridApi: GridApi | null = null;
-  private readonly curationCache = new Map<string, CurationRecord[]>();
   private isInternalSelection = false;
 
   readonly queryResult = signal<QueryResult | null>(null);
@@ -82,7 +74,6 @@ export class TableViewComponent implements OnDestroy {
   });
 
   constructor() {
-    // Restore stored view state
     const storedTable = this.viewState.tableState();
     if (storedTable?.pageSize) {
       this.pageSize.set(storedTable.pageSize);
@@ -94,7 +85,6 @@ export class TableViewComponent implements OnDestroy {
     this.selectionService.filteredQueryResult$
       .pipe(takeUntil(this.destroy$))
       .subscribe((result) => {
-        this.curationCache.clear();
         this.queryResult.set(result);
         if (result) {
           this.buildColumnDefs(result);
@@ -127,14 +117,6 @@ export class TableViewComponent implements OnDestroy {
     this.gridApi.sizeColumnsToFit();
   }
 
-  onFirstDataRendered(): void {
-    void this.loadVisibleCurations();
-  }
-
-  onPaginationChanged(): void {
-    void this.loadVisibleCurations();
-  }
-
   onRowSelected(event: RowSelectedEvent): void {
     if (!event.node.isSelected() || this.isInternalSelection) return;
     const rowData = event.data as Record<string, BindingValue> | undefined;
@@ -144,23 +126,6 @@ export class TableViewComponent implements OnDestroy {
     if (node) {
       this.selectionService.select(node, 'table');
     }
-  }
-
-  onCellValueChanged(event: CellValueChangedEvent): void {
-    const field = event.colDef.field;
-    if (!field) return;
-
-    const rowData = event.data as Record<string, BindingValue>;
-    if (!rowData) return;
-
-    const node = this.buildNodeFromRow(rowData);
-    if (!node) return;
-
-    const rawValue = rowData[field];
-    const newValue = event.newValue as string;
-    const rawString = this.bindingToRawString(rawValue);
-
-    void this.saveCuration(node.uri, field, rawString, newValue);
   }
 
   exportCsv(): void {
@@ -198,8 +163,7 @@ export class TableViewComponent implements OnDestroy {
         filter: true,
         resizable: true,
         minWidth: 100,
-        editable: !isPrimaryUriColumn,
-        cellEditor: isPrimaryUriColumn ? undefined : InlineEditorComponent,
+        editable: false,
         valueGetter: (params) => {
           const val = params.data?.[variable] as BindingValue | undefined;
           return this.bindingToRawString(val);
@@ -212,7 +176,7 @@ export class TableViewComponent implements OnDestroy {
           if (rawBinding?.type === 'coordinate') {
             return { component: CoordCellRendererComponent };
           }
-          return { component: EditableCellRendererComponent };
+          return undefined;
         },
       };
       return colDef;
@@ -320,92 +284,5 @@ export class TableViewComponent implements OnDestroy {
       }
     }
     return null;
-  }
-
-  private async loadVisibleCurations(): Promise<void> {
-    if (!this.gridApi) return;
-    const nodesToLoad: string[] = [];
-
-    this.gridApi.forEachNodeAfterFilterAndSort((gridNode) => {
-      const data = gridNode.data as Record<string, BindingValue> | undefined;
-      if (!data) return;
-      const uri = this.extractUri(data);
-      if (uri && !this.curationCache.has(uri)) {
-        nodesToLoad.push(uri);
-        this.curationCache.set(uri, []);
-      }
-    });
-
-    for (const uri of nodesToLoad) {
-      try {
-        const { records } = await firstValueFrom(this.curationService.getForNode(uri));
-        this.curationCache.set(uri, records);
-        this.attachCurationsToRows(uri, records);
-      } catch {
-        this.curationCache.set(uri, []);
-      }
-    }
-  }
-
-  private attachCurationsToRows(nodeUri: string, records: CurationRecord[]): void {
-    if (!this.gridApi) return;
-
-    const recordByField = new Map<string, CurationRecord>();
-    for (const record of records) {
-      recordByField.set(record.fieldName, record);
-    }
-
-    this.gridApi.forEachNode((gridNode) => {
-      const data = gridNode.data as Record<string, BindingValue> | undefined;
-      if (!data) return;
-      const uri = this.extractUri(data);
-      if (uri !== nodeUri) return;
-
-      for (const [field, record] of recordByField) {
-        (data as Record<string, unknown>)['__curation__' + field] = record;
-      }
-    });
-
-    this.gridApi.refreshCells();
-  }
-
-  private async saveCuration(
-    nodeUri: string,
-    fieldName: string,
-    rawValue: string | null,
-    newValue: string,
-  ): Promise<void> {
-    const existingRecords = this.curationCache.get(nodeUri) ?? [];
-    const existing = existingRecords.find((r) => r.fieldName === fieldName);
-
-    try {
-      if (existing) {
-        await firstValueFrom(
-          this.curationService.update(existing.id, {
-            manualValue: newValue,
-            status: 'corrected',
-          }),
-        );
-        existing.manualValue = newValue;
-        existing.status = 'corrected';
-      } else {
-        const record = await firstValueFrom(
-          this.curationService.create({
-            nodeUri,
-            fieldName,
-            rawValue: rawValue ?? undefined,
-            manualValue: newValue,
-            status: 'corrected',
-          }),
-        );
-        existingRecords.push(record);
-        this.curationCache.set(nodeUri, existingRecords);
-      }
-
-      this.attachCurationsToRows(nodeUri, existingRecords);
-      this.snackBar.open('Guardado', 'Cerrar', { duration: 2000 });
-    } catch {
-      this.snackBar.open('Error al guardar', 'Cerrar', { duration: 3000 });
-    }
   }
 }
