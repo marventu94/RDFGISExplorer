@@ -77,6 +77,15 @@ export class WorkspacePersistenceService {
     }
   }
 
+  renameActivePanel(name: string): void {
+    const activeId = this.activePanelId();
+    this.panels.update(list =>
+      list.map(p =>
+        p.id === activeId ? { ...p, name } : p,
+      ),
+    );
+  }
+
   updateActivePanelGraph(graph: ExplorerSerializedGraph, generatedQuery: string, variables: string[]): void {
     const activeId = this.activePanelId();
     this.panels.update(list =>

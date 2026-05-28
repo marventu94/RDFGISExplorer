@@ -50,7 +50,10 @@
       "esbuild",
       "lmdb",
       "msgpackr-extract"
-    ]
+    ],
+    "patchedDependencies": {
+      "@softarc/native-federation@3.5.5": "patches/@softarc__native-federation@3.5.5.patch"
+    }
   },
   "devDependencies": {
     "@angular-architects/native-federation": "^21.2.3",
