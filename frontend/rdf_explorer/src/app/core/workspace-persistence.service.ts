@@ -13,6 +13,8 @@ export interface PanelState {
   graph: ExplorerSerializedGraph;
   generatedQuery: string;
   variables: string[];
+  dirty: boolean;
+  sourceWorkspaceId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -27,6 +29,7 @@ export class WorkspacePersistenceService {
       graph: { nodes: [], edges: [] },
       generatedQuery: '',
       variables: [],
+      dirty: true,
     },
   ]);
 
@@ -38,13 +41,27 @@ export class WorkspacePersistenceService {
   });
 
   private panelCounter = 0;
+  private isRestoring = false;
+
+  reset(): void {
+    this.panels.set([{
+      id: 'panel-0',
+      name: 'Panel 1',
+      graph: { nodes: [], edges: [] },
+      generatedQuery: '',
+      variables: [],
+      dirty: true,
+    }]);
+    this.activePanelId.set('panel-0');
+    this.panelCounter = 0;
+  }
 
   addPanel(name = `Panel ${this.panels().length + 1}`): string {
     this.panelCounter += 1;
     const id = `panel-${this.panelCounter}`;
     this.panels.update(list => [
       ...list,
-      { id, name, graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [] },
+      { id, name, graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [], dirty: true },
     ]);
     this.activePanelId.set(id);
     return id;
@@ -60,6 +77,7 @@ export class WorkspacePersistenceService {
           graph: { nodes: [], edges: [] },
           generatedQuery: '',
           variables: [],
+          dirty: true,
         };
         this.activePanelId.set(newPanel.id);
         return [newPanel];
@@ -86,11 +104,33 @@ export class WorkspacePersistenceService {
     );
   }
 
+  markActivePanelClean(): void {
+    const activeId = this.activePanelId();
+    this.panels.update(list =>
+      list.map(p => p.id === activeId ? { ...p, dirty: false } : p),
+    );
+  }
+
+  setActivePanelSource(workspaceId: string): void {
+    const activeId = this.activePanelId();
+    this.panels.update(list =>
+      list.map(p => p.id === activeId ? { ...p, sourceWorkspaceId: workspaceId } : p),
+    );
+  }
+
+  markActivePanelDirty(): void {
+    const activeId = this.activePanelId();
+    this.panels.update(list =>
+      list.map(p => p.id === activeId ? { ...p, dirty: true } : p),
+    );
+  }
+
   updateActivePanelGraph(graph: ExplorerSerializedGraph, generatedQuery: string, variables: string[]): void {
+    if (this.isRestoring) return;
     const activeId = this.activePanelId();
     this.panels.update(list =>
       list.map(p =>
-        p.id === activeId ? { ...p, graph, generatedQuery, variables } : p,
+        p.id === activeId ? { ...p, graph, generatedQuery, variables, dirty: true } : p,
       ),
     );
   }
@@ -127,6 +167,7 @@ export class WorkspacePersistenceService {
       graph: p.graph,
       generatedQuery: p.generatedQuery,
       variables: p.variables ?? [],
+      dirty: false,
     }));
 
     this.panels.set(mappedPanels);
@@ -158,6 +199,44 @@ export class WorkspacePersistenceService {
     this.fromPayload(dashboard.payload as ExplorerWorkspacePayload);
   }
 
+  async loadWorkspaceAsTabs(id: string): Promise<boolean> {
+    const existing = this.panels().find(p => p.sourceWorkspaceId === id);
+    if (existing) {
+      this.activePanelId.set(existing.id);
+      return false;
+    }
+
+    const dashboard = await firstValueFrom(this.api.get(id));
+    if (dashboard.kind !== 'explorer') {
+      throw new Error(`Dashboard ${id} is not an explorer workspace`);
+    }
+    const payload = dashboard.payload as ExplorerWorkspacePayload;
+
+    const activePanelIndex = payload.panels.findIndex(p => p.id === payload.activePanelId);
+
+    const newPanels: PanelState[] = payload.panels.map((p) => {
+      this.panelCounter += 1;
+      return {
+        id: `panel-${this.panelCounter}`,
+        name: p.name,
+        graph: p.graph,
+        generatedQuery: p.generatedQuery,
+        variables: p.variables ?? [],
+        dirty: false,
+        sourceWorkspaceId: id,
+      };
+    });
+
+    this.panels.update(list => [...list, ...newPanels]);
+
+    const newActivePanel = newPanels[activePanelIndex >= 0 ? activePanelIndex : 0];
+    if (newActivePanel) {
+      this.activePanelId.set(newActivePanel.id);
+    }
+
+    return true;
+  }
+
   listWorkspaces(): Observable<Dashboard[]> {
     return this.api.list();
   }
@@ -184,6 +263,8 @@ export class WorkspacePersistenceService {
   restoreActivePanel(graph: PropertyGraphService): void {
     const panel = this.activePanel();
     if (!panel) return;
+    this.isRestoring = true;
     graph.restoreGraph(panel.graph);
+    this.isRestoring = false;
   }
 }
