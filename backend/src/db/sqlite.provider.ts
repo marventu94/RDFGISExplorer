@@ -27,7 +27,8 @@ export function createSqliteConnection(dbPath: string): Database.Database {
 }
 
 export function createDashboardsConnection(): Database.Database {
-  const dbPath = process.env['DASHBOARDS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
+  const dbPath =
+    process.env['DASHBOARDS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
   const db = createSqliteConnection(dbPath);
   db.exec(DASHBOARDS_MIGRATIONS_SQL);
   return db;
