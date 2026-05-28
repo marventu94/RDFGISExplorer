@@ -1,0 +1,26 @@
+diff --git a/src/lib/utils/package-info.js b/src/lib/utils/package-info.js
+index 67282d338448a79f23184c24519709990035a692..ba14fdb9a6abea7865cb7e6d727462bdb9582a74 100644
+--- a/src/lib/utils/package-info.js
++++ b/src/lib/utils/package-info.js
+@@ -105,8 +105,19 @@ function findDepPackageJson(packageName, projectRoot) {
+         mainPkgJsonPath = path.join(mainPkgPath, 'package.json');
+     }
+     if (!fs.existsSync(mainPkgJsonPath)) {
+-        // TODO: Add logger
+-        // context.logger.warn('No package.json found for ' + packageName);
++        // Search in pnpm's .pnpm store for non-hoisted transitive dependencies
++        const pnpmStoreDir = path.join(projectRoot, 'node_modules', '.pnpm');
++        const escapedPkgDir = mainPkgName.replace('/', '+');
++        if (fs.existsSync(pnpmStoreDir)) {
++            const pkgDirs = fs.readdirSync(pnpmStoreDir)
++                .filter(f => f.startsWith(escapedPkgDir + '@'));
++            for (const dir of pkgDirs) {
++                const cand = path.join(pnpmStoreDir, dir, 'node_modules', mainPkgName, 'package.json');
++                if (fs.existsSync(cand)) {
++                    return cand;
++                }
++            }
++        }
+         logger_1.logger.verbose('No package.json found for ' + packageName + ' in ' + mainPkgPath);
+         return null;
+     }

@@ -17,7 +17,7 @@ import { SettingsService } from '../../core/settings.service';
 
 @Component({
   selector: 'app-main',
-  imports: [SearchPanelComponent, CanvasPanelComponent, ToolsPanelComponent, SaveWorkspaceDialogComponent],
+  imports: [SearchPanelComponent, CanvasPanelComponent, ToolsPanelComponent],
   templateUrl: './main.component.html',
   styleUrl: './main.component.scss',
 })
@@ -100,6 +100,7 @@ export class MainComponent implements OnInit {
 
     try {
       const typedResult = result as SaveWorkspaceDialogResult;
+      this.workspace.renameActivePanel(typedResult.name);
       const dashboard = await this.workspace.saveWorkspace(typedResult.name, typedResult.overwriteId);
       this.showSnackbar(`Workspace guardado: ${dashboard.name}`);
       if (!typedResult.overwriteId) {

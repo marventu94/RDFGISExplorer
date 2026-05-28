@@ -17,7 +17,7 @@ import {
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule, SaveDashboardDialogComponent],
+  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
 })

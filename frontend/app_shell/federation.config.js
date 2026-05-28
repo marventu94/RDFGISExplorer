@@ -15,6 +15,9 @@ module.exports = withNativeFederation({
     'rxjs/fetch',
     'rxjs/testing',
     'rxjs/webSocket',
+    '@softarc/native-federation-runtime',
+    '@softarc/native-federation',
+    '@softarc/native-federation-node',
     // Add further packages you don't need at runtime
   ],
 
