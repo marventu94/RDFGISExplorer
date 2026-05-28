@@ -27,6 +27,15 @@ h3 {
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 0.9375rem;
+
+    &.input-error {
+      border-color: #c0392b;
+    }
+  }
+
+  .field-error {
+    font-size: 0.8125rem;
+    color: #c0392b;
   }
 }
 

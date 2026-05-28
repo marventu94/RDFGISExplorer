@@ -7,16 +7,21 @@
 
 @for (query of queries(); track $index; let i = $index) {
   <div class="query-block">
-    <div class="query-header clickable no-select" (click)="toggleQuery(i)">
-      <span>{{ isQueryShown(i) ? '&#9660;' : '&#9650;' }}</span>
-      <span>Query {{ i + 1 }}</span>
-      <span> (</span>
-      @for (res of query.select; track res.id) {
-        <span class="query-chip" [style.border-color]="getColor(res)" (click)="onClickResource(res); $event.stopPropagation();">
-          {{ res.getRepr() }}
-        </span>
-      }
-      <span> )</span>
+    <div class="query-header-row">
+      <div class="query-header clickable no-select" (click)="toggleQuery(i)">
+        <span>{{ isQueryShown(i) ? '&#9660;' : '&#9650;' }}</span>
+        <span>Query {{ i + 1 }}</span>
+        <span> (</span>
+        @for (res of query.select; track res.id) {
+          <span class="query-chip" [style.border-color]="getColor(res)" (click)="onClickResource(res); $event.stopPropagation();">
+            {{ res.getRepr() }}
+          </span>
+        }
+        <span> )</span>
+      </div>
+      <button class="gis-btn" (click)="handoffQuery(query)" type="button" title="Explorar en GIS">
+        &#9654; GIS
+      </button>
     </div>
     @if (isQueryShown(i)) {
       <sparql-viewer [content]="getSparql(query)" />

@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, DestroyRef, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { lastValueFrom } from 'rxjs';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { SearchPanelComponent } from '../../shell/search-panel/search-panel.component';
 import { CanvasPanelComponent } from '../../shell/canvas-panel/canvas-panel.component';
 import { ToolsPanelComponent } from '../../shell/tools-panel/tools-panel.component';
@@ -85,13 +85,21 @@ export class MainComponent implements OnInit {
     this.workspace.snapshotActivePanel(this.graph);
 
     const currentPanel = this.workspace.activePanel();
+    const currentId = this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined;
+
+    const allWorkspaces = await firstValueFrom(this.workspace.listWorkspaces());
+    const existingNames = allWorkspaces
+      .filter(w => w.id !== currentId)
+      .map(w => w.name);
+
     const dialogRef = this.dialog.open<SaveWorkspaceDialogResult>(SaveWorkspaceDialogComponent, {
       width: '420px',
       hasBackdrop: true,
       backdropClass: 'cdk-overlay-dark-backdrop',
       data: {
         currentName: currentPanel?.name,
-        currentId: this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined,
+        currentId,
+        existingNames,
       },
     });
 
@@ -102,6 +110,8 @@ export class MainComponent implements OnInit {
       const typedResult = result as SaveWorkspaceDialogResult;
       this.workspace.renameActivePanel(typedResult.name);
       const dashboard = await this.workspace.saveWorkspace(typedResult.name, typedResult.overwriteId);
+      this.workspace.markActivePanelClean();
+      this.workspace.setActivePanelSource(dashboard.id);
       this.showSnackbar(`Workspace guardado: ${dashboard.name}`);
       if (!typedResult.overwriteId) {
         await this.router.navigate([], {
@@ -117,9 +127,9 @@ export class MainComponent implements OnInit {
 
   private async loadWorkspace(id: string): Promise<void> {
     try {
-      await this.workspace.loadWorkspace(id);
+      const loaded = await this.workspace.loadWorkspaceAsTabs(id);
       this.workspace.restoreActivePanel(this.graph);
-      this.showSnackbar('Workspace cargado');
+      if (loaded) this.showSnackbar('Workspace cargado');
     } catch (err) {
       this.showSnackbar(`Error al cargar: ${(err as Error).message}`);
     }
