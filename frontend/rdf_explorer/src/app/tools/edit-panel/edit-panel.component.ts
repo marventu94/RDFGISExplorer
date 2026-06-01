@@ -326,7 +326,10 @@ export class EditPanelComponent {
         this.ngZone.run(() => {
           this.resultFilterLoading = false;
           this.previewAbort = null;
-          const msg = err instanceof Error ? err.message : String(err ?? '');
+          const body = (err as Record<string, unknown>)?.['error'] as Record<string, unknown> | undefined;
+          const msg = typeof body?.['message'] === 'string' ? body['message']
+            : err instanceof Error ? err.message
+            : String(err ?? '');
           this.loadError = msg || 'Error al ejecutar la query.';
         });
       },

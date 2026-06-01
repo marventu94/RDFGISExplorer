@@ -57,12 +57,12 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private readonly selectionService = inject(SelectionService);
   private readonly apiService = inject(ApiService);
-  private readonly persistence = inject(DashboardPersistenceService);
-  private readonly dashboardApi = inject(DashboardApiClient);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
   private readonly queryState = inject(SparqlQueryStateService);
+  private readonly dashboardApi = inject(DashboardApiClient);
+  private readonly persistence = inject(DashboardPersistenceService);
 
   private editorView: EditorView | null = null;
   private fallbackContent = '';
@@ -74,10 +74,10 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected readonly lastResult = signal<QueryResult | null>(null);
   protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
   protected readonly overridesCount = signal(0);
-  protected readonly gisDashboards = signal<Dashboard[]>([]);
-  protected readonly loadingDashboards = signal(false);
 
   protected readonly seedQueries = SEED_QUERIES;
+  protected readonly gisDashboards = signal<Dashboard[]>([]);
+  protected readonly loadingDashboards = signal(false);
 
   constructor() {
     effect(() => {
@@ -100,7 +100,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       this.setEditorContent(serviceQuery);
     }
     this.limit.set(this.queryState.limit());
-    this.loadDashboards();
   }
 
   ngOnDestroy(): void {
@@ -191,20 +190,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected loadDashboards(): void {
-    this.loadingDashboards.set(true);
-    this.dashboardApi.list().subscribe({
-      next: (dashboards) => {
-        this.gisDashboards.set(dashboards.filter((d) => d.kind === 'gis'));
-        this.loadingDashboards.set(false);
-      },
-      error: () => {
-        this.gisDashboards.set([]);
-        this.loadingDashboards.set(false);
-      },
-    });
-  }
-
   protected loadSeedQuery(query: StoredQuery): void {
     const current = this.sparqlText;
     if (current.length > 0) {
@@ -219,6 +204,33 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     } else {
       this.setEditorContent(query.sparql);
     }
+  }
+
+  protected getCategoryIcon(category: string): string {
+    switch (category) {
+      case 'geo':
+        return 'location_on';
+      case 'temporal':
+        return 'schedule';
+      case 'exploration':
+        return 'travel_explore';
+      default:
+        return 'star';
+    }
+  }
+
+  protected loadDashboards(): void {
+    this.loadingDashboards.set(true);
+    this.dashboardApi.list().subscribe({
+      next: (dashboards) => {
+        this.gisDashboards.set(dashboards.filter((d) => d.kind === 'gis'));
+        this.loadingDashboards.set(false);
+      },
+      error: () => {
+        this.gisDashboards.set([]);
+        this.loadingDashboards.set(false);
+      },
+    });
   }
 
   protected loadDashboard(dashboard: Dashboard): void {
@@ -250,19 +262,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         this.snackBar.open('Error al crear el tablero de prueba', 'Cerrar', { duration: 5000, panelClass: 'snackbar-error' });
       },
     });
-  }
-
-  protected getCategoryIcon(category: string): string {
-    switch (category) {
-      case 'geo':
-        return 'location_on';
-      case 'temporal':
-        return 'schedule';
-      case 'exploration':
-        return 'travel_explore';
-      default:
-        return 'star';
-    }
   }
 
   public execute(): void {
