@@ -145,7 +145,7 @@ export class Query {
     const labelSvc = this.ctx.endpointAdapter.labelService?.(this.ctx.lang) ?? null;
     const selectVars = [...new Set(self.select.filter(r => !r.hide).map(r => String(r.variable)))];
     const selectWithLabels = labelSvc
-      ? [...selectVars, ...selectVars.filter(v => !v.endsWith('Label')).map(v => v + 'Label')]
+      ? [...new Set([...selectVars, ...selectVars.filter(v => !v.endsWith('Label')).map(v => v + 'Label')])]
       : selectVars;
     let q = 'SELECT DISTINCT ' + selectWithLabels.join(' ') + ' WHERE {\n';
 
