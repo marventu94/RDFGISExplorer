@@ -183,6 +183,8 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
   loadNodePreview(node: Node, config: Record<string, unknown>): void {
     const q = node.createQuery();
     if (!q) return;
+    if (typeof config['limit'] === 'number') q.limit = config['limit'] as number;
+    if (typeof config['offset'] === 'number') q.offset = config['offset'] as number;
     if (this.endpointAdapter.loadNodePreview) {
       this.endpointAdapter.loadNodePreview(this, node, q, config);
     } else {
@@ -201,6 +203,8 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
   loadPropertyPreview(prop: Property, config: Record<string, unknown>): void {
     const q = prop.createQuery();
     if (!q) return;
+    if (typeof config['limit'] === 'number') q.limit = config['limit'] as number;
+    if (typeof config['offset'] === 'number') q.offset = config['offset'] as number;
     if (this.endpointAdapter.loadPropertyPreview) {
       this.endpointAdapter.loadPropertyPreview(this, prop, q, config);
     } else {
@@ -211,6 +215,8 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
   loadLiteralPreview(lit: Literal, config: Record<string, unknown>): void {
     const q = lit.createQuery();
     if (!q) return;
+    if (typeof config['limit'] === 'number') q.limit = config['limit'] as number;
+    if (typeof config['offset'] === 'number') q.offset = config['offset'] as number;
     if (this.endpointAdapter.loadLiteralPreview) {
       this.endpointAdapter.loadLiteralPreview(this, lit, q, config);
     } else {
