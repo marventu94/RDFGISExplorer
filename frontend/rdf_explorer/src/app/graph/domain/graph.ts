@@ -27,6 +27,8 @@ export interface FilterCatalog {
   regex: FilterMetadata;
   leq: FilterMetadata;
   geq: FilterMetadata;
+  datefrom: FilterMetadata;
+  dateto: FilterMetadata;
 }
 
 export interface Colors {
@@ -51,6 +53,8 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     regex: { name: 'regex', inputs: 1, data: { regex: { type: 'text' } } },
     leq: { name: 'less than', inputs: 1, data: { number: { type: 'number' } } },
     geq: { name: 'more than', inputs: 1, data: { number: { type: 'number' } } },
+    datefrom: { name: 'date from', inputs: 2, data: { date: { type: 'date' }, granularity: { type: 'select', options: [{ value: 'day', label: 'Day' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }] } } },
+    dateto: { name: 'date to', inputs: 2, data: { date: { type: 'date' }, granularity: { type: 'select', options: [{ value: 'day', label: 'Day' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }] } } },
   };
 
   readonly colors: Colors = {

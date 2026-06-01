@@ -143,10 +143,18 @@
                 }
               </select>
               @for (field of newFilterFields; track field.key) {
-                <input class="form-control" [type]="field.meta.type" autocomplete="off"
-                  [placeholder]="field.key"
-                  [ngModel]="field.value"
-                  (ngModelChange)="updateNewFilterData(field.key, $event)" />
+                @if (field.meta.type === 'select') {
+                  <select class="custom-select" [ngModel]="field.value" (ngModelChange)="updateNewFilterData(field.key, $event)">
+                    @for (opt of field.meta.options ?? []; track opt.value) {
+                      <option [value]="opt.value">{{ opt.label }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input class="form-control" [type]="field.meta.type" autocomplete="off"
+                    [placeholder]="field.key"
+                    [ngModel]="field.value"
+                    (ngModelChange)="updateNewFilterData(field.key, $event)" />
+                }
               }
               <button class="btn btn-outline-secondary btn-sm" type="button" (click)="newFilter()">Add</button>
             </div>
@@ -157,12 +165,20 @@
               <div class="input-group input-group-sm">
                 <span class="input-group-text">{{ ef.typeName }}</span>
                 @for (field of ef.fields; track field.key) {
-                  <input class="form-control"
-                    [type]="field.meta.type"
-                    autocomplete="off"
-                    [placeholder]="field.key"
-                    [ngModel]="field.value"
-                    (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
+                  @if (field.meta.type === 'select') {
+                    <select class="custom-select" [ngModel]="field.value" (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)">
+                      @for (opt of field.meta.options ?? []; track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <input class="form-control"
+                      [type]="field.meta.type"
+                      autocomplete="off"
+                      [placeholder]="field.key"
+                      [ngModel]="field.value"
+                      (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
+                  }
                 }
                 <div class="input-group-append clickable" (click)="rmFilter(ef.filter)">
                   <span class="input-group-text">&#128465;</span>

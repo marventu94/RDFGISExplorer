@@ -3,11 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { PropertyGraphService } from '../../graph/property-graph.service';
 import { RequestService } from '../../core/request.service';
 import type { RDFResource, FilterType, FilterMetadata } from '../../graph/domain';
-import type { Filter } from '../../graph/domain';
+import type { Filter, FilterFieldMeta } from '../../graph/domain';
 
 interface FilterField {
   key: string;
-  meta: { type: string };
+  meta: FilterFieldMeta;
   value: string | number | undefined;
 }
 
@@ -230,7 +230,7 @@ export class EditPanelComponent {
     }
     this.newFilterFields = Object.entries(meta.data).map(([k, v]) => ({
       key: k,
-      meta: v as { type: string },
+      meta: v,
       value: this.newFilterData[k] ?? '',
     }));
   }
@@ -246,7 +246,7 @@ export class EditPanelComponent {
       typeName: this.getFilterMeta(f.type)?.name ?? f.type,
       fields: Object.entries(this.getFilterMeta(f.type)?.data ?? {}).map(([k, v]) => ({
         key: k,
-        meta: v as { type: string },
+        meta: v,
         value: (f.data as Record<string, string | number>)[k],
       })),
     }));
