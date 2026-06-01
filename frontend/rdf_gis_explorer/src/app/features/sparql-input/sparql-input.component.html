@@ -3,7 +3,7 @@
 
   <div class="toolbar">
     <div class="toolbar-left">
-      <button mat-button [matMenuTriggerFor]="tablerosMenu">
+      <button mat-button [matMenuTriggerFor]="tablerosMenu" (click)="loadDashboards()">
         <mat-icon>arrow_drop_down</mat-icon>
         Tableros
       </button>

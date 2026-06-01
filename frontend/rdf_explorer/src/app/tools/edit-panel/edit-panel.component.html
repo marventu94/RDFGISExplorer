@@ -93,6 +93,9 @@
       </div>
 
       <div class="custom-container-content active">
+        @if (loadError) {
+          <div class="alert alert-danger alert-sm mt-2 mb-1">{{ loadError }}</div>
+        }
         @if (resultFilterLoading && sel.variable.results.length === 0) {
           <div class="result-loading-msg mt-2 mb-1">Running query...</div>
         }

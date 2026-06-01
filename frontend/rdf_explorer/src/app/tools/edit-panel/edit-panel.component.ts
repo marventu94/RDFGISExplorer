@@ -47,6 +47,7 @@ export class EditPanelComponent {
   resultsPerPage = DEFAULT_RESULTS_PER_PAGE;
   hasMoreResults = false;
   readonly resultsVersion = signal(0);
+  loadError: string | null = null;
   private previewAbort: AbortController | null = null;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -83,6 +84,7 @@ export class EditPanelComponent {
     }
     this.resultOffset = 0;
     this.hasMoreResults = false;
+    this.loadError = null;
     this.isVariable = resource.isVariable();
     this.isConst = !this.isVariable;
     this.isLiteral = !!(resource as unknown as Record<string, unknown>)['parent'];
@@ -304,6 +306,7 @@ export class EditPanelComponent {
 
     this.previewAbort = new AbortController();
     this.resultFilterLoading = true;
+    this.loadError = null;
 
     const config: Record<string, unknown> = {
       limit: this.resultsPerPage,
@@ -317,6 +320,14 @@ export class EditPanelComponent {
           const rlen = sel.variable.results.length;
           this.hasMoreResults = rlen > 0 && rlen >= (this.resultOffset + this.resultsPerPage);
           this.resultsVersion.update(v => v + 1);
+        });
+      },
+      onError: (err: unknown) => {
+        this.ngZone.run(() => {
+          this.resultFilterLoading = false;
+          this.previewAbort = null;
+          const msg = err instanceof Error ? err.message : String(err ?? '');
+          this.loadError = msg || 'Error al ejecutar la query.';
         });
       },
     };
