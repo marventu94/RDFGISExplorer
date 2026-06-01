@@ -2,7 +2,7 @@ export { IdAllocator } from './id-allocator';
 export { Variable } from './variable';
 export type { VariableContext, SparqlBinding, VariableParent } from './variable';
 export { Filter } from './filter';
-export type { FilterType, FilterData, FilterMetadata } from './filter';
+export type { FilterType, FilterData, FilterMetadata, FilterFieldMeta, DateGranularity } from './filter';
 export { RDFResource } from './rdf-resource';
 export type { GraphContext, LabelProvider } from './rdf-resource';
 export { Node } from './node';
