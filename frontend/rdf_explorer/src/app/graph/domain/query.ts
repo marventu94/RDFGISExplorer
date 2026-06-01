@@ -12,6 +12,9 @@ export interface QueryRetrieveConfig {
   canceller?: AbortSignal;
   callback?: () => void;
   varFilter?: string;
+  limit?: number;
+  offset?: number;
+  appendResults?: boolean;
 }
 
 export interface QueryRetriever {
@@ -252,24 +255,34 @@ export class Query {
       return;
     }
     const cfg = config;
+    if (typeof cfg.limit === 'number') this.limit = cfg.limit;
+    if (typeof cfg.offset === 'number') this.offset = cfg.offset;
     const q = this.toSparql();
-    const n = this.select.filter(r => r.variable.isBinded() && r.variable.query !== q).length;
+    const isAppend = cfg.appendResults && (this.offset > 0);
+    const n = this.select.filter(r => r.variable.isBinded() && (isAppend || r.variable.query !== q)).length;
     if (q && n > 0) {
       retriever.execQuery(q, { signal: cfg.canceller }).then(data => {
         if (data.results.bindings.length > 0) {
           this.select.forEach(r => {
-            const values = new Set<string>();
             const variable = r.variable;
             const name = variable.getName();
-            variable.results = data.results.bindings.filter(d => d[name]).map(d => d[name]);
-            variable.results = variable.results.filter(d => (!values.has(d.value) && !!values.add(d.value)));
+            const newResults = data.results.bindings.filter(d => d[name]).map(d => d[name]);
+            if (isAppend) {
+              const existing = new Set(variable.results.map(d => d.value));
+              variable.results = [...variable.results, ...newResults.filter(d => !existing.has(d.value))];
+            } else {
+              const values = new Set<string>();
+              variable.results = newResults.filter(d => (!values.has(d.value) && !!values.add(d.value)));
+            }
             variable.query = q;
           });
         } else {
-          this.select.forEach(r => {
-            r.variable.results = [];
-            r.variable.query = q;
-          });
+          if (!isAppend) {
+            this.select.forEach(r => {
+              r.variable.results = [];
+              r.variable.query = q;
+            });
+          }
         }
         if (cfg.callback) cfg.callback();
       });

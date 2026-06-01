@@ -21,8 +21,73 @@
   text-align: center;
 }
 .result-status.loading {
-  background-color: #fff3cd;
+  background-color: #e8f0fe;
 }
+
+.edit-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #dee2e6;
+  border-top-color: #0d6efd;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: edit-spin 0.6s linear infinite;
+}
+.edit-spinner-sm {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+@keyframes edit-spin {
+  to { transform: rotate(360deg); }
+}
+
+.result-loading-msg {
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  color: #0d6efd;
+  background: #e8f0fe;
+  border-radius: 3px;
+  text-align: center;
+  animation: fadeIn 0.3s ease-in;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.result-footer {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 6px;
+}
+.result-count {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.load-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: #6c757d;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+}
+.load-more-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  color: #495057;
+}
+.load-more-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .uri-row, .result-row {
   margin: 0;
   padding: 2px 0;
@@ -51,6 +116,8 @@
   border-radius: 0 0 3px 3px;
   padding: 6px 10px;
   display: none;
+  max-height: 320px;
+  overflow-y: auto;
 }
 .custom-container-content.active {
   display: block;

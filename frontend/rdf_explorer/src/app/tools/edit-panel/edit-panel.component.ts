@@ -1,4 +1,4 @@
-import { Component, computed, inject, NgZone, effect } from '@angular/core';
+import { Component, computed, inject, NgZone, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PropertyGraphService } from '../../graph/property-graph.service';
 import { RequestService } from '../../core/request.service';
@@ -16,6 +16,8 @@ interface ExistingFilter {
   typeName: string;
   fields: FilterField[];
 }
+
+const DEFAULT_RESULTS_PER_PAGE = 10;
 
 @Component({
   selector: 'app-edit-panel',
@@ -41,6 +43,10 @@ export class EditPanelComponent {
 
   resultFilterValue = '';
   resultFilterLoading = false;
+  resultOffset = 0;
+  resultsPerPage = DEFAULT_RESULTS_PER_PAGE;
+  hasMoreResults = false;
+  readonly resultsVersion = signal(0);
   private previewAbort: AbortController | null = null;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -75,6 +81,8 @@ export class EditPanelComponent {
     if (this.resultFilterValue) {
       this.resultFilterValue = '';
     }
+    this.resultOffset = 0;
+    this.hasMoreResults = false;
     this.isVariable = resource.isVariable();
     this.isConst = !this.isVariable;
     this.isLiteral = !!(resource as unknown as Record<string, unknown>)['parent'];
@@ -96,6 +104,8 @@ export class EditPanelComponent {
     sel.mkVariable();
     this.isVariable = true;
     this.isConst = false;
+    this.resultOffset = 0;
+    this.hasMoreResults = false;
     this.loadPreview();
     this.graph.refresh();
   }
@@ -146,6 +156,8 @@ export class EditPanelComponent {
     const ctx = this.graph as unknown as Record<string, unknown>;
     const vctx = ctx['graphRef'] as unknown as { usedAliases: Set<string>; log: (msg: string) => void };
     sel.variable.addFilter(this.newFilterType, { ...this.newFilterData }, vctx);
+    this.resultOffset = 0;
+    this.hasMoreResults = false;
     this.loadPreview();
     this.graph.refresh();
     this.newFilterType = '';
@@ -158,6 +170,8 @@ export class EditPanelComponent {
     const sel = this.selected();
     if (!sel) return;
     sel.variable.removeFilter(filter);
+    this.resultOffset = 0;
+    this.hasMoreResults = false;
     this.loadPreview();
     this.graph.refresh();
     this.updateExistingFilters();
@@ -177,9 +191,17 @@ export class EditPanelComponent {
     const now = this.resultFilterValue + '';
     this.previewTimer = setTimeout(() => {
       if (now === this.resultFilterValue) {
+        this.resultOffset = 0;
+        this.hasMoreResults = false;
         this.loadPreview();
       }
     }, 400);
+  }
+
+  loadMoreResults(): void {
+    if (this.resultFilterLoading || !this.hasMoreResults) return;
+    this.resultOffset += this.resultsPerPage;
+    this.loadPreview(true);
   }
 
   getLabel(uri: string): string {
@@ -256,25 +278,37 @@ export class EditPanelComponent {
     (filter.data as Record<string, string | number>)[field] = value;
   }
 
-  private loadPreview(): void {
+  private loadPreview(isLoadMore = false): void {
     const sel = this.selected();
     if (!sel || !sel.isVariable()) return;
 
+    if (!isLoadMore) {
+      this.resultOffset = 0;
+      this.hasMoreResults = false;
+    }
+
     if (this.previewAbort) {
       this.previewAbort.abort();
-      this.resultFilterLoading = false;
+      if (!isLoadMore) {
+        this.resultFilterLoading = false;
+      }
     }
 
     this.previewAbort = new AbortController();
     this.resultFilterLoading = true;
 
     const config: Record<string, unknown> = {
-      limit: 10,
+      limit: this.resultsPerPage,
+      offset: this.resultOffset,
+      appendResults: isLoadMore && this.resultOffset > 0,
       canceller: this.previewAbort.signal,
       callback: () => {
         this.ngZone.run(() => {
           this.resultFilterLoading = false;
           this.previewAbort = null;
+          const rlen = sel.variable.results.length;
+          this.hasMoreResults = rlen > 0 && rlen >= (this.resultOffset + this.resultsPerPage);
+          this.resultsVersion.update(v => v + 1);
         });
       },
     };
