@@ -33,13 +33,7 @@
     </button>
 
     <button type="button" class="navbar-btn" (click)="openSaveDialog()">
-      <mat-icon
-        [matBadge]="persistence.isDirty() ? '●' : null"
-        matBadgeSize="small"
-        matBadgeColor="warn"
-        matBadgeOverlap="false"
-        [matBadgeHidden]="!persistence.isDirty()"
-      >save</mat-icon>
+      <mat-icon>save</mat-icon>
       <span>Guardar tablero</span>
     </button>
   </div>

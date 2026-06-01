@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, effect } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import {
   Observable,
   of,
@@ -53,33 +53,6 @@ export class DashboardPersistenceService {
   readonly currentDashboardName = signal<string | null>(null);
   readonly isHydrating = signal(false);
   readonly isDirty = signal(false);
-
-  private _ready = false;
-
-  constructor() {
-    queueMicrotask(() => {
-      this._ready = true;
-    });
-
-    effect(() => {
-      this.queryState.query();
-      if (this._ready && !this.isHydrating()) {
-        this.isDirty.set(true);
-      }
-    });
-
-    effect(() => {
-      this.layout.preset();
-      this.layout.slots();
-      if (this._ready && !this.isHydrating()) {
-        this.isDirty.set(true);
-      }
-    });
-  }
-
-  markClean(): void {
-    this.isDirty.set(false);
-  }
 
   serialize(): Readonly<GisDashboardPayload> {
     const slotCount = this.layout.slotCount();
@@ -185,7 +158,6 @@ export class DashboardPersistenceService {
           }
 
           this.isHydrating.set(false);
-          this.markClean();
           return of(undefined);
         }),
         catchError((err) => {
@@ -225,7 +197,6 @@ export class DashboardPersistenceService {
         tap((dashboard) => {
           this.currentDashboardName.set(dashboard.name);
           this.updateUrl(dashboard.id);
-          this.markClean();
           this.snackBar.open(`Dashboard "${dashboard.name}" actualizado`, 'OK', {
             duration: 3000,
           });
@@ -238,7 +209,6 @@ export class DashboardPersistenceService {
         this.currentDashboardId.set(dashboard.id);
         this.currentDashboardName.set(dashboard.name);
         this.updateUrl(dashboard.id);
-        this.markClean();
         this.snackBar.open(`Dashboard "${dashboard.name}" guardado`, 'OK', {
           duration: 3000,
         });
