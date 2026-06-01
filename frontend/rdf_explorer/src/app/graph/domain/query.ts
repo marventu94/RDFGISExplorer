@@ -11,6 +11,7 @@ import type { Prefix } from '../../core/settings.types';
 export interface QueryRetrieveConfig {
   canceller?: AbortSignal;
   callback?: () => void;
+  onError?: (error: unknown) => void;
   varFilter?: string;
   limit?: number;
   offset?: number;
@@ -142,8 +143,10 @@ export class Query {
     };
 
     const labelSvc = this.ctx.endpointAdapter.labelService?.(this.ctx.lang) ?? null;
-    const selectVars = self.select.filter(r => !r.hide).map(r => String(r.variable));
-    const selectWithLabels = labelSvc ? [...selectVars, ...selectVars.map(v => v + 'Label')] : selectVars;
+    const selectVars = [...new Set(self.select.filter(r => !r.hide).map(r => String(r.variable)))];
+    const selectWithLabels = labelSvc
+      ? [...selectVars, ...selectVars.filter(v => !v.endsWith('Label')).map(v => v + 'Label')]
+      : selectVars;
     let q = 'SELECT DISTINCT ' + selectWithLabels.join(' ') + ' WHERE {\n';
 
     self.triples.forEach(t => {
@@ -299,6 +302,9 @@ export class Query {
             });
           }
         }
+        if (cfg.callback) cfg.callback();
+      }).catch((err: unknown) => {
+        if (cfg.onError) cfg.onError(err);
         if (cfg.callback) cfg.callback();
       });
     } else {

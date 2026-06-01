@@ -2,7 +2,6 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatBadgeModule } from '@angular/material/badge';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FilterBadgesComponent } from '../filter-badges/filter-badges.component';
@@ -18,7 +17,7 @@ import {
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule, MatBadgeModule],
+  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
 })

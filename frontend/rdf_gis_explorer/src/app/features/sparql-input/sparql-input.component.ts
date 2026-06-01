@@ -191,7 +191,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadDashboards(): void {
+  protected loadDashboards(): void {
     this.loadingDashboards.set(true);
     this.dashboardApi.list().subscribe({
       next: (dashboards) => {
