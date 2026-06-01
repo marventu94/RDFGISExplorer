@@ -270,6 +270,14 @@ export class EditPanelComponent {
     }
   }
 
+  onOptionalChange(event: Event): void {
+    const sel = this.selected();
+    if (sel) {
+      sel.optional = (event.target as HTMLInputElement).checked;
+      this.graph.refresh();
+    }
+  }
+
   updateNewFilterData(field: string, value: string | number): void {
     this.newFilterData = { ...this.newFilterData, [field]: value };
   }

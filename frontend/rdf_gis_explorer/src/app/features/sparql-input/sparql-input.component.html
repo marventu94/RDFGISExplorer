@@ -3,51 +3,44 @@
 
   <div class="toolbar">
     <div class="toolbar-left">
-      <button mat-button [matMenuTriggerFor]="libraryMenu">
+      <button mat-button [matMenuTriggerFor]="tablerosMenu">
         <mat-icon>arrow_drop_down</mat-icon>
-        Biblioteca
+        Tableros
       </button>
-      <mat-menu #libraryMenu="matMenu" class="library-menu">
+      <mat-menu #tablerosMenu="matMenu" class="library-menu">
         <div class="menu-section-label">Predefinidas</div>
-        @for (q of seedQueries(); track q.id) {
-          <button mat-menu-item (click)="loadFromLibrary(q)">
+        @for (q of seedQueries; track q.id) {
+          <button mat-menu-item (click)="loadSeedQuery(q)">
             <mat-icon>{{ getCategoryIcon(q.category) }}</mat-icon>
             <span>{{ q.name }}</span>
           </button>
         }
-        @if (userQueries().length > 0) {
-          <mat-divider />
-          <div class="menu-section-label">Mis queries</div>
-          @for (q of userQueries(); track q.id) {
-            <button mat-menu-item (click)="loadFromLibrary(q)">
-              <mat-icon>star</mat-icon>
-              <span>{{ q.name }}</span>
-              <button
-                mat-icon-button
-                class="delete-btn"
-                (click)="deleteCustomQuery(q, $event)"
-                aria-label="Eliminar query"
-              >
-                <mat-icon>close</mat-icon>
-              </button>
+        <mat-divider />
+        <div class="menu-section-label">Mis tableros</div>
+        @if (loadingDashboards()) {
+          <button mat-menu-item disabled>
+            <mat-icon>hourglass_empty</mat-icon>
+            <span>Cargando...</span>
+          </button>
+        } @else if (gisDashboards().length === 0) {
+          <button mat-menu-item disabled>
+            <mat-icon>info</mat-icon>
+            <span>No hay tableros guardados</span>
+          </button>
+        } @else {
+          @for (d of gisDashboards(); track d.id) {
+            <button mat-menu-item (click)="loadDashboard(d)">
+              <mat-icon>dashboard</mat-icon>
+              <span>{{ d.name }}</span>
             </button>
           }
         }
         <mat-divider />
-        <button mat-menu-item (click)="restoreDefaults()">
-          <mat-icon>restore</mat-icon>
-          <span>Restaurar biblioteca por defecto</span>
+        <button mat-menu-item (click)="generateTestDashboard()">
+          <mat-icon>add_circle</mat-icon>
+          <span>Generar tablero de prueba</span>
         </button>
       </mat-menu>
-
-      <button
-        mat-button
-        [disabled]="!hasContent()"
-        (click)="saveCurrentQuery()"
-      >
-        <mat-icon>save</mat-icon>
-        Guardar
-      </button>
 
     </div>
 

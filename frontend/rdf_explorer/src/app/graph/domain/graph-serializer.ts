@@ -74,6 +74,7 @@ export function serializeGraph(graph: PropertyGraph): ExplorerSerializedGraph {
         cur: node.cur,
         star: node.star,
         hide: node.hide,
+        optional: node.optional,
         x: node.x,
         y: node.y,
         variable: serializeVariable(node.variable),
@@ -90,6 +91,7 @@ export function serializeGraph(graph: PropertyGraph): ExplorerSerializedGraph {
           cur: prop.cur,
           star: prop.star,
           hide: prop.hide,
+          optional: prop.optional,
           variable: serializeVariable(prop.variable),
         },
       });
@@ -104,6 +106,7 @@ export function serializeGraph(graph: PropertyGraph): ExplorerSerializedGraph {
             cur: prop.literal.cur,
             star: prop.literal.star,
             hide: prop.literal.hide,
+            optional: prop.literal.optional,
             variable: serializeVariable(prop.literal.variable),
           },
         });
@@ -143,6 +146,7 @@ export function deserializeGraph(
         cur: number;
         star: boolean;
         hide: boolean;
+        optional?: boolean;
         x: number;
         y: number;
         variable: SerializedVariable;
@@ -152,6 +156,7 @@ export function deserializeGraph(
       node.cur = data.cur;
       node.star = data.star;
       node.hide = data.hide;
+      node.optional = data.optional ?? false;
       node.x = data.x;
       node.y = data.y;
       nodeMap.set(el.id, node);
@@ -172,6 +177,7 @@ export function deserializeGraph(
         cur: number;
         star: boolean;
         hide: boolean;
+        optional?: boolean;
         variable: SerializedVariable;
       };
       prop.isVar = data.isVar;
@@ -179,6 +185,7 @@ export function deserializeGraph(
       prop.cur = data.cur;
       prop.star = data.star;
       prop.hide = data.hide;
+      prop.optional = data.optional ?? false;
       propMap.set(el.id, prop);
     }
   }
@@ -198,6 +205,7 @@ export function deserializeGraph(
         cur: number;
         star: boolean;
         hide: boolean;
+        optional?: boolean;
         variable: SerializedVariable;
       };
       lit.isVar = data.isVar;
@@ -205,6 +213,7 @@ export function deserializeGraph(
       lit.cur = data.cur;
       lit.star = data.star;
       lit.hide = data.hide;
+      lit.optional = data.optional ?? false;
       litMap.set(el.id, lit);
     }
   }

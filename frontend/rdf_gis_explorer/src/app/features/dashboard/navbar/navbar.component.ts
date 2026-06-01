@@ -2,6 +2,7 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatBadgeModule } from '@angular/material/badge';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FilterBadgesComponent } from '../filter-badges/filter-badges.component';
@@ -17,7 +18,7 @@ import {
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule],
+  imports: [FilterBadgesComponent, MatIconModule, MatButtonModule, MatMenuModule, MatDialogModule, MatBadgeModule],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
 })
@@ -39,7 +40,8 @@ export class NavbarComponent {
   protected readonly layoutOptions: { preset: LayoutPreset; label: string; icon: string }[] = [
     { preset: 'single', label: '1 vista', icon: 'crop_square' },
     { preset: 'split-h', label: '2 vistas', icon: 'view_column' },
-    { preset: 'triple', label: '3 vistas', icon: 'view_quilt' },
+    { preset: 'triple', label: '3 vistas (1 arriba)', icon: 'view_quilt' },
+    { preset: 'triple-inv', label: '3 vistas (2 arriba)', icon: 'vertical_split' },
     { preset: 'quad', label: '4 vistas', icon: 'grid_view' },
   ];
 

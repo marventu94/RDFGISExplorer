@@ -21,10 +21,10 @@ import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
-import { LibraryService } from './library.service';
-import { StoredQuery } from './seed-queries';
+import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
+import { DashboardApiClient, type Dashboard } from '@core/services/dashboard-api.client';
+import { SEED_QUERIES, type StoredQuery } from './seed-queries';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
-import { SaveQueryDialogComponent } from './save-query-dialog.component';
 import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
 import { applyMappingOverrides, VariableRole } from './mapping-overrides.util';
 import type { QueryResult } from '@shared/models';
@@ -57,7 +57,8 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private readonly selectionService = inject(SelectionService);
   private readonly apiService = inject(ApiService);
-  private readonly libraryService = inject(LibraryService);
+  private readonly persistence = inject(DashboardPersistenceService);
+  private readonly dashboardApi = inject(DashboardApiClient);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
@@ -73,8 +74,10 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected readonly lastResult = signal<QueryResult | null>(null);
   protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
   protected readonly overridesCount = signal(0);
+  protected readonly gisDashboards = signal<Dashboard[]>([]);
+  protected readonly loadingDashboards = signal(false);
 
-  protected readonly libraryQueries = signal<StoredQuery[]>([]);
+  protected readonly seedQueries = SEED_QUERIES;
 
   constructor() {
     effect(() => {
@@ -89,18 +92,15 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.libraryService.queries$.subscribe((queries) => {
-      this.libraryQueries.set(queries);
-    });
     this.createEditor();
     this.setupKeyboardShortcut();
 
-    // Sync initial state from service
     const serviceQuery = this.queryState.query();
     if (serviceQuery) {
       this.setEditorContent(serviceQuery);
     }
     this.limit.set(this.queryState.limit());
+    this.loadDashboards();
   }
 
   ngOnDestroy(): void {
@@ -141,7 +141,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
           basicSetup,
           sparqlLang,
           cmPlaceholder(
-            '-- Escribí tu query SPARQL acá, o usá [▼ Biblioteca] para cargar una predefinida',
+            '-- Escribí tu query SPARQL acá, o usá [▼ Tableros] para cargar una predefinida',
           ),
           updateHasContent,
           ctrlEnterKeymap,
@@ -191,7 +191,21 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected loadFromLibrary(query: StoredQuery): void {
+  private loadDashboards(): void {
+    this.loadingDashboards.set(true);
+    this.dashboardApi.list().subscribe({
+      next: (dashboards) => {
+        this.gisDashboards.set(dashboards.filter((d) => d.kind === 'gis'));
+        this.loadingDashboards.set(false);
+      },
+      error: () => {
+        this.gisDashboards.set([]);
+        this.loadingDashboards.set(false);
+      },
+    });
+  }
+
+  protected loadSeedQuery(query: StoredQuery): void {
     const current = this.sparqlText;
     if (current.length > 0) {
       const dialogRef = this.dialog.open(ConfirmReplaceDialogComponent, {
@@ -207,28 +221,48 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected deleteCustomQuery(query: StoredQuery, event: Event): void {
-    event.stopPropagation();
-    this.libraryService.delete(query.id);
+  protected loadDashboard(dashboard: Dashboard): void {
+    const current = this.sparqlText;
+    const doLoad = () => {
+      this.persistence.load(dashboard.id).subscribe();
+    };
+    if (current.length > 0) {
+      const dialogRef = this.dialog.open(ConfirmReplaceDialogComponent, {
+        width: '360px',
+      });
+      dialogRef.afterClosed().subscribe((confirmed) => {
+        if (confirmed) {
+          doLoad();
+        }
+      });
+    } else {
+      doLoad();
+    }
   }
 
-  protected restoreDefaults(): void {
-    this.libraryService.restoreDefaults();
-    this.snackBar.open('Biblioteca restaurada por defecto', 'OK', { duration: 3000 });
+  protected generateTestDashboard(): void {
+    this.persistence.generateTestDashboard().subscribe({
+      next: () => {
+        this.snackBar.open('Tablero de prueba "Provincias argentinas y sus capitales" creado', 'OK', { duration: 4000 });
+        this.loadDashboards();
+      },
+      error: () => {
+        this.snackBar.open('Error al crear el tablero de prueba', 'Cerrar', { duration: 5000, panelClass: 'snackbar-error' });
+      },
+    });
   }
 
-  protected saveCurrentQuery(): void {
-    const sparql = this.sparqlText;
-    if (!sparql) return;
-
-    const dialogRef = this.dialog.open(SaveQueryDialogComponent, {
-      width: '400px',
-    });
-    dialogRef.afterClosed().subscribe((name: string | undefined) => {
-      if (!name) return;
-      this.libraryService.save(name, sparql);
-      this.snackBar.open(`Query "${name}" guardada en la biblioteca`, 'OK', { duration: 3000 });
-    });
+  protected getCategoryIcon(category: string): string {
+    switch (category) {
+      case 'geo':
+        return 'location_on';
+      case 'temporal':
+        return 'schedule';
+      case 'exploration':
+        return 'travel_explore';
+      default:
+        return 'star';
+    }
   }
 
   public execute(): void {
@@ -353,26 +387,5 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.overridesCount.set(0);
     this.selectionService.setQueryResult(result);
     this.snackBar.open('Mapeo restaurado a detección automática', 'OK', { duration: 3000 });
-  }
-
-  protected seedQueries(): StoredQuery[] {
-    return this.libraryQueries().filter((q) => q.isSeed);
-  }
-
-  protected userQueries(): StoredQuery[] {
-    return this.libraryQueries().filter((q) => !q.isSeed);
-  }
-
-  protected getCategoryIcon(category: string): string {
-    switch (category) {
-      case 'geo':
-        return 'location_on';
-      case 'temporal':
-        return 'schedule';
-      case 'exploration':
-        return 'travel_explore';
-      default:
-        return 'star';
-    }
   }
 }

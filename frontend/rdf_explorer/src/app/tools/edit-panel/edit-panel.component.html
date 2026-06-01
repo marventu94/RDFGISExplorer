@@ -51,6 +51,10 @@
           <input class="form-check-input" id="prop-star" type="checkbox" [checked]="sel.star" (change)="onStarChange($event)" />
           <label class="form-check-label" for="prop-star">Wildcard property</label>
         </div>
+        <div class="form-check form-check-inline mt-1">
+          <input class="form-check-input" id="prop-optional" type="checkbox" [checked]="sel.optional" (change)="onOptionalChange($event)" />
+          <label class="form-check-label" for="prop-optional">OPTIONAL</label>
+        </div>
       }
     </div>
   }

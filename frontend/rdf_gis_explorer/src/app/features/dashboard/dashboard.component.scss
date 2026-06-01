@@ -45,6 +45,15 @@
   }
 }
 
+.views-grid--triple-inv {
+  grid-template-columns: var(--col-left, 50%) 1fr;
+  grid-template-rows: var(--row-top, 50%) 1fr;
+
+  .cell:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 .views-grid--quad {
   grid-template-columns: var(--col-left, 50%) 1fr;
   grid-template-rows: var(--row-top, 50%) 1fr;
