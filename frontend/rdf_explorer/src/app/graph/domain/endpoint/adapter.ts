@@ -7,6 +7,8 @@ import type { GraphContext } from '../rdf-resource';
 export interface DomainEndpointAdapter {
   textFilterTriple(variable: string, keyword: string): string;
 
+  labelService?(language: string): string | null;
+
   loadNodePreview?(
     ctx: GraphContext,
     node: Node,

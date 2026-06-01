@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, signal } from '@angular/core';
 
 export type ViewType = 'table' | 'graph' | 'map' | 'timeline';
-export type LayoutPreset = 'single' | 'split-h' | 'triple' | 'quad';
+export type LayoutPreset = 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad';
 
 interface PersistedState {
   preset: LayoutPreset;
@@ -14,6 +14,7 @@ const SLOT_COUNT: Record<LayoutPreset, number> = {
   single: 1,
   'split-h': 2,
   triple: 3,
+  'triple-inv': 3,
   quad: 4,
 };
 

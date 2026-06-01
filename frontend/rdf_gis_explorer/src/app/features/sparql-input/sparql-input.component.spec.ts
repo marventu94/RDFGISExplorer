@@ -6,9 +6,9 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SparqlInputComponent } from './sparql-input.component';
 import { ApiService } from '@core/services/api.service';
-import { LibraryService } from './library.service';
 import { SelectionService } from '@core/services/selection.service';
-import { SEED_QUERIES } from './seed-queries';
+import { DashboardApiClient } from '@core/services/dashboard-api.client';
+import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import type { QueryResult } from '@shared/models';
 
 function makeQueryResult(overrides: Partial<QueryResult> = {}): QueryResult {
@@ -45,9 +45,13 @@ describe('SparqlInputComponent', () => {
   let fixture: ComponentFixture<SparqlInputComponent>;
   let apiServiceMock: { executeQuery: ReturnType<typeof vi.fn> };
   let selectionServiceMock: { setQueryResult: ReturnType<typeof vi.fn> };
+  let dashboardApiMock: { list: ReturnType<typeof vi.fn> };
+  let persistenceMock: {
+    load: ReturnType<typeof vi.fn>;
+    generateTestDashboard: ReturnType<typeof vi.fn>;
+  };
   let realSnackBar: MatSnackBar;
   let realDialog: MatDialog;
-  let libraryService: LibraryService;
 
   beforeEach(async () => {
     localStorage.clear();
@@ -58,18 +62,26 @@ describe('SparqlInputComponent', () => {
     selectionServiceMock = {
       setQueryResult: vi.fn(),
     };
+    dashboardApiMock = {
+      list: vi.fn().mockReturnValue(of([])),
+    };
+    persistenceMock = {
+      load: vi.fn().mockReturnValue(of(undefined)),
+      generateTestDashboard: vi.fn().mockReturnValue(of({ id: 'test', name: '', kind: 'gis', payload: {}, createdAt: '', updatedAt: '' })),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SparqlInputComponent, NoopAnimationsModule],
       providers: [
         { provide: ApiService, useValue: apiServiceMock },
         { provide: SelectionService, useValue: selectionServiceMock },
+        { provide: DashboardApiClient, useValue: dashboardApiMock },
+        { provide: DashboardPersistenceService, useValue: persistenceMock },
       ],
     }).compileComponents();
 
     realSnackBar = TestBed.inject(MatSnackBar);
     realDialog = TestBed.inject(MatDialog);
-    libraryService = TestBed.inject(LibraryService);
 
     vi.spyOn(MatSnackBar.prototype, 'open').mockImplementation(() => ({ onAction: () => ({ unsubscribe: () => {} }) } as any));
     vi.spyOn(MatDialog.prototype, 'open').mockReturnValue({ afterClosed: () => of(null) } as any);
@@ -100,13 +112,13 @@ describe('SparqlInputComponent', () => {
     expect(asAny().limit()).toBe(500);
   });
 
-  it('should render the library button', () => {
+  it('should render the tableros button', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const buttons = compiled.querySelectorAll('button');
-    const libraryBtn = Array.from(buttons).find(
-      (b) => b.textContent?.includes('Biblioteca'),
+    const tablerosBtn = Array.from(buttons).find(
+      (b) => b.textContent?.includes('Tableros'),
     );
-    expect(libraryBtn).toBeTruthy();
+    expect(tablerosBtn).toBeTruthy();
   });
 
   it('should render the execute button', () => {
@@ -130,16 +142,33 @@ describe('SparqlInputComponent', () => {
     expect(editorArea).toBeTruthy();
   });
 
-  describe('loadFromLibrary', () => {
+  describe('loadSeedQuery', () => {
+    const seedQuery = { id: 'test-seed', name: 'Test', category: 'exploration' as const, sparql: 'SELECT ?x WHERE { ?x ?p ?o }', isSeed: true };
+
     it('should prompt for confirmation when editor has content', () => {
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
-      asAny().loadFromLibrary(SEED_QUERIES[0]);
+      asAny().loadSeedQuery(seedQuery);
       expect(realDialog.open).toHaveBeenCalled();
     });
 
     it('should not prompt when editor is empty', () => {
-      asAny().loadFromLibrary(SEED_QUERIES[0]);
+      asAny().loadSeedQuery(seedQuery);
       expect(realDialog.open).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loadDashboard', () => {
+    const dashboard = { id: 'dash-1', kind: 'gis' as const, name: 'Test Dashboard', payload: {}, createdAt: '', updatedAt: '' };
+
+    it('should prompt for confirmation when editor has content', () => {
+      asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
+      asAny().loadDashboard(dashboard);
+      expect(realDialog.open).toHaveBeenCalled();
+    });
+
+    it('should load dashboard when editor is empty', () => {
+      asAny().loadDashboard(dashboard);
+      expect(persistenceMock.load).toHaveBeenCalledWith('dash-1');
     });
   });
 
@@ -245,39 +274,6 @@ describe('SparqlInputComponent', () => {
     });
   });
 
-  describe('saveCurrentQuery', () => {
-    it('should not open dialog when editor is empty', () => {
-      asAny().saveCurrentQuery();
-      expect(realDialog.open).not.toHaveBeenCalled();
-    });
-
-    it('should open save dialog when editor has content', () => {
-      asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
-      asAny().saveCurrentQuery();
-      expect(realDialog.open).toHaveBeenCalled();
-    });
-
-    it('should save query via LibraryService when name is provided', () => {
-      vi.spyOn(realDialog, 'open').mockReturnValue({ afterClosed: () => of('Mi query') } as any);
-      asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
-      const before = libraryService.customQueries.length;
-      asAny().saveCurrentQuery();
-      expect(libraryService.customQueries.length).toBe(before + 1);
-    });
-  });
-
-  describe('deleteCustomQuery', () => {
-    it('should remove custom query from library', () => {
-      const entry = libraryService.save('ToDelete', 'SELECT ?x WHERE { ?x ?p ?o }');
-      expect(libraryService.customQueries.length).toBe(1);
-
-      const mockEvent = { stopPropagation: vi.fn() } as unknown as Event;
-      asAny().deleteCustomQuery(entry, mockEvent);
-
-      expect(libraryService.customQueries.length).toBe(0);
-    });
-  });
-
   describe('onLimitChange', () => {
     it('should update limit for valid values', () => {
       asAny().onLimitChange(1000);
@@ -285,26 +281,10 @@ describe('SparqlInputComponent', () => {
     });
   });
 
-  describe('restoreDefaults', () => {
-    it('should restore library via libraryService', () => {
-      libraryService.save('Custom', 'SELECT ?x WHERE { ?x ?p ?o }');
-      asAny().restoreDefaults();
-      expect(libraryService.customQueries.length).toBe(0);
-    });
-  });
-
-  describe('seedQueries and userQueries', () => {
-    it('should return seed queries from library', () => {
-      const seeds = asAny().seedQueries();
-      expect(seeds.length).toBe(SEED_QUERIES.length);
-      expect(seeds.every((q: any) => q.isSeed)).toBe(true);
-    });
-
-    it('should return user queries from library', () => {
-      libraryService.save('Custom', 'SELECT ?x WHERE { ?x ?p ?o }');
-      const users = asAny().userQueries();
-      expect(users.length).toBe(1);
-      expect(users.every((q: any) => !q.isSeed)).toBe(true);
+  describe('generateTestDashboard', () => {
+    it('should call persistence.generateTestDashboard', () => {
+      asAny().generateTestDashboard();
+      expect(persistenceMock.generateTestDashboard).toHaveBeenCalled();
     });
   });
 });

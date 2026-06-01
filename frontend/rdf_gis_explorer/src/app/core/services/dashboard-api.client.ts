@@ -16,6 +16,7 @@ export interface GisDashboardPayload {
   backend: 'wikidata' | 'millenniumdb';
   layout: {
     slotsCount: 1 | 2 | 3 | 4;
+    preset?: 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad';
     slots: Array<{ id: string; view: 'map' | 'timeline' | 'graph' | 'table' }>;
   };
   filters: {

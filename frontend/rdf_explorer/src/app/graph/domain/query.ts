@@ -43,6 +43,7 @@ export class Query {
     const dep = new Set<RDFResource>();
     const queue: RDFResource[] = [];
     const triples: RDFResource[][] = [];
+    const optTriples: RDFResource[][] = [];
 
     const enqueue = (x: RDFResource): boolean => {
       if (x.isVariable() && !dep.has(x)) {
@@ -56,7 +57,13 @@ export class Query {
     const addTriple = (s: RDFResource, p: RDFResource, o: RDFResource): boolean => {
       if (triples.some(e => e[0] === s && e[1] === p && e[2] === o))
         return false;
-      triples.push([s, p, o]);
+      if (optTriples.some(e => e[0] === s && e[1] === p && e[2] === o))
+        return false;
+      if (p.optional) {
+        optTriples.push([s, p, o]);
+      } else {
+        triples.push([s, p, o]);
+      }
       [s, p, o].forEach(r => { enqueue(r); });
       return true;
     };
@@ -91,6 +98,7 @@ export class Query {
     }
     this.dep = dep;
     this.triples = triples;
+    this.optionals = optTriples.map(t => [t]);
     this.cache = null;
   }
 
@@ -133,7 +141,10 @@ export class Query {
       }).join(' ') + ' .\n';
     };
 
-    let q = 'SELECT DISTINCT ' + self.select.filter(r => !r.hide).map(r => String(r.variable)).join(' ') + ' WHERE {\n';
+    const labelSvc = this.ctx.endpointAdapter.labelService?.(this.ctx.lang) ?? null;
+    const selectVars = self.select.filter(r => !r.hide).map(r => String(r.variable));
+    const selectWithLabels = labelSvc ? [...selectVars, ...selectVars.map(v => v + 'Label')] : selectVars;
+    let q = 'SELECT DISTINCT ' + selectWithLabels.join(' ') + ' WHERE {\n';
 
     self.triples.forEach(t => {
       q += '  ' + writeTriple(t);
@@ -180,6 +191,10 @@ export class Query {
             return c;
           });
       q += mapped.join(' ') + '}\n';
+    }
+
+    if (labelSvc) {
+      q += '  ' + labelSvc + '\n';
     }
 
     q += '}';
