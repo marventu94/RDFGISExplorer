@@ -68,7 +68,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       elements: this.computeElements(),
       style: CYTOSCAPE_STYLES,
       layout: { name: 'preset' },
-      wheelSensitivity: 0.6,
+      wheelSensitivity: 1.0,
       autoungrabify: false,
       autounselectify: false,
     });
