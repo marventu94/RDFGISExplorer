@@ -48,6 +48,7 @@ export abstract class RDFResource {
   cur = -1;
   star = false;
   hide = false;
+  optional = false;
   x = 0;
   y = 0;
   id!: string | number;

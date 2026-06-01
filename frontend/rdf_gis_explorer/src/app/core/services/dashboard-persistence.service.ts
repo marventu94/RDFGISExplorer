@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, effect } from '@angular/core';
 import {
   Observable,
   of,
@@ -6,6 +6,7 @@ import {
   tap,
   catchError,
   throwError,
+  map,
 } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -17,12 +18,26 @@ import { DashboardViewStateService } from './dashboard-view-state.service';
 import { ApiService } from './api.service';
 import type { NormalizedNode } from '@shared/models';
 
-const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'triple' | 'quad'> = {
+const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad'> = {
   1: 'single',
   2: 'split-h',
   3: 'triple',
   4: 'quad',
 };
+
+const TEST_DASHBOARD_NAME = 'Provincias argentinas y sus capitales (grafo)';
+
+const TEST_DASHBOARD_SPARQL = `PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+SELECT ?province ?provinceLabel ?capital ?capitalLabel ?coord ?inception WHERE {
+  ?province wdt:P31 wd:Q44753 ;
+            wdt:P36 ?capital .
+  OPTIONAL { ?capital wdt:P625 ?coord . }
+  OPTIONAL { ?province wdt:P571 ?inception . }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "es,en" . }
+}`;
 
 @Injectable({ providedIn: 'root' })
 export class DashboardPersistenceService {
@@ -37,10 +52,35 @@ export class DashboardPersistenceService {
   readonly currentDashboardId = signal<string | null>(null);
   readonly currentDashboardName = signal<string | null>(null);
   readonly isHydrating = signal(false);
+  readonly isDirty = signal(false);
 
-  /**
-   * Serializa el estado completo del dashboard GIS en un payload puro.
-   */
+  private _ready = false;
+
+  constructor() {
+    queueMicrotask(() => {
+      this._ready = true;
+    });
+
+    effect(() => {
+      this.queryState.query();
+      if (this._ready && !this.isHydrating()) {
+        this.isDirty.set(true);
+      }
+    });
+
+    effect(() => {
+      this.layout.preset();
+      this.layout.slots();
+      if (this._ready && !this.isHydrating()) {
+        this.isDirty.set(true);
+      }
+    });
+  }
+
+  markClean(): void {
+    this.isDirty.set(false);
+  }
+
   serialize(): Readonly<GisDashboardPayload> {
     const slotCount = this.layout.slotCount();
     const slots = this.layout.getSlotsSnapshot();
@@ -72,6 +112,7 @@ export class DashboardPersistenceService {
       backend: this.queryState.backend(),
       layout: {
         slotsCount: slotCount as 1 | 2 | 3 | 4,
+        preset: this.layout.preset(),
         slots: visibleSlots,
       },
       filters: {
@@ -93,27 +134,20 @@ export class DashboardPersistenceService {
     return Object.freeze(payload);
   }
 
-  /**
-   * Deserializa un payload y reconstruye el estado del dashboard.
-   * Ejecuta la query automáticamente.
-   */
   deserialize(payload: GisDashboardPayload): Observable<void> {
     this.isHydrating.set(true);
 
-    // 1. Query
     this.queryState.query.set(payload.query);
     this.queryState.backend.set(payload.backend);
 
-    // 2. Layout
     const slotsCount = payload.layout.slotsCount;
-    const preset = SLOT_COUNT_TO_PRESET[slotsCount];
+    const preset = payload.layout.preset ?? SLOT_COUNT_TO_PRESET[slotsCount];
     if (preset) {
       const desiredOrder = payload.layout.slots.map((s) => s.view);
       this.layout.preset.set(preset);
       this.layout.slots.set(desiredOrder as ViewType[]);
     }
 
-    // 3. View state
     if (payload.filters.table) {
       this.viewState.tableState.set(payload.filters.table);
     }
@@ -127,7 +161,6 @@ export class DashboardPersistenceService {
       this.viewState.graphState.set(payload.filters.graph);
     }
 
-    // 4. Execute query
     return this.apiService
       .executeQuery({
         sparql: payload.query,
@@ -138,7 +171,6 @@ export class DashboardPersistenceService {
           this.selection.setQueryResult(result);
         }),
         switchMap(() => {
-          // 5. Apply selection
           if (payload.selection) {
             const { selectedIds, pinnedId } = payload.selection;
             if (pinnedId) {
@@ -153,6 +185,7 @@ export class DashboardPersistenceService {
           }
 
           this.isHydrating.set(false);
+          this.markClean();
           return of(undefined);
         }),
         catchError((err) => {
@@ -170,6 +203,19 @@ export class DashboardPersistenceService {
       );
   }
 
+  checkNameConflict(name: string, excludeId?: string | null): Observable<boolean> {
+    return this.api.list().pipe(
+      map((dashboards) =>
+        dashboards.some(
+          (d) =>
+            d.kind === 'gis' &&
+            d.name.toLowerCase() === name.toLowerCase() &&
+            d.id !== (excludeId ?? ''),
+        ),
+      ),
+    );
+  }
+
   save(name: string, mode: 'overwrite' | 'copy'): Observable<Dashboard> {
     const payload = this.serialize();
     const currentId = this.currentDashboardId();
@@ -179,6 +225,7 @@ export class DashboardPersistenceService {
         tap((dashboard) => {
           this.currentDashboardName.set(dashboard.name);
           this.updateUrl(dashboard.id);
+          this.markClean();
           this.snackBar.open(`Dashboard "${dashboard.name}" actualizado`, 'OK', {
             duration: 3000,
           });
@@ -191,7 +238,33 @@ export class DashboardPersistenceService {
         this.currentDashboardId.set(dashboard.id);
         this.currentDashboardName.set(dashboard.name);
         this.updateUrl(dashboard.id);
+        this.markClean();
         this.snackBar.open(`Dashboard "${dashboard.name}" guardado`, 'OK', {
+          duration: 3000,
+        });
+      }),
+    );
+  }
+
+  generateTestDashboard(): Observable<Dashboard> {
+    const payload: GisDashboardPayload = {
+      query: TEST_DASHBOARD_SPARQL,
+      backend: 'wikidata',
+      layout: {
+        slotsCount: 3,
+        preset: 'triple',
+        slots: [
+          { id: 'slot-0', view: 'graph' },
+          { id: 'slot-1', view: 'table' },
+          { id: 'slot-2', view: 'map' },
+        ],
+      },
+      filters: {},
+    };
+
+    return this.api.create({ kind: 'gis', name: TEST_DASHBOARD_NAME, payload }).pipe(
+      tap(() => {
+        this.snackBar.open(`Tablero "${TEST_DASHBOARD_NAME}" creado`, 'OK', {
           duration: 3000,
         });
       }),
