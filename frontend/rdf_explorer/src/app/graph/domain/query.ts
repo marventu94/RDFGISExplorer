@@ -198,6 +198,11 @@ export class Query {
 
     if (labelSvc) {
       q += '  ' + labelSvc + '\n';
+      for (const p of this.ctx.prefixes) {
+        if (p.prefix === 'wikibase' || p.prefix === 'bd') {
+          prefixes.add(p);
+        }
+      }
     }
 
     q += '}';
