@@ -42,11 +42,11 @@ export class DashboardComponent implements AfterViewInit {
 
   protected readonly showVerticalDivider = computed(() => {
     const p = this.preset();
-    return p === 'quad' || p === 'split-h';
+    return p === 'quad' || p === 'split-h' || p === 'triple-inv';
   });
   protected readonly showHorizontalDivider = computed(() => {
     const p = this.preset();
-    return p === 'quad' || p === 'triple';
+    return p === 'quad' || p === 'triple' || p === 'triple-inv';
   });
 
   protected get editorState(): string {

@@ -20,6 +20,8 @@ export class App implements OnInit {
   protected readonly editorCollapsed = this.dashboardLayout.editorCollapsed;
 
   ngOnInit(): void {
+    this.cleanLegacyLocalStorage();
+
     const params = new URLSearchParams(window.location.search);
     const dashboardId = params.get('dashboardId');
 
@@ -41,6 +43,14 @@ export class App implements OnInit {
           window.history.replaceState({}, '', url.toString());
         },
       });
+    }
+  }
+
+  private cleanLegacyLocalStorage(): void {
+    try {
+      localStorage.removeItem('rdf-explorer:queries');
+    } catch {
+      // ignore quota / private-mode errors
     }
   }
 }

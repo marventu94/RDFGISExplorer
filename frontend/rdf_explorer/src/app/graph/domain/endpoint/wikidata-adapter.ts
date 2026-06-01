@@ -19,6 +19,10 @@ export class WikidataAdapter implements DomainEndpointAdapter {
     return variable + ' bif:contains "\'' + keyword + '\'" .';
   }
 
+  labelService(language: string): string {
+    return `SERVICE wikibase:label { bd:serviceParam wikibase:language "${language}". }`;
+  }
+
   loadNodePreview(
     ctx: GraphContext,
     node: Node,

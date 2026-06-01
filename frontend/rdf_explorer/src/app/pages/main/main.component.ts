@@ -14,6 +14,7 @@ import { SaveWorkspaceDialogComponent } from '../../shell/save-workspace-dialog/
 import type { SaveWorkspaceDialogResult } from '../../shell/save-workspace-dialog/save-workspace-dialog.model';
 import { QueryHandoffService } from '../../core/query-handoff.service';
 import { SettingsService } from '../../core/settings.service';
+import { ToolService } from '../../tool/tool.service';
 
 @Component({
   selector: 'app-main',
@@ -32,8 +33,10 @@ export class MainComponent implements OnInit {
   readonly destroyRef = inject(DestroyRef);
   readonly queryHandoff = inject(QueryHandoffService);
   readonly settings = inject(SettingsService);
+  readonly toolService = inject(ToolService);
 
   readonly generatedSparql = computed(() => {
+    void this.graph.revision();
     const { queries } = this.graph.getQueriesForGraph();
     return queries.map(q => q.toSparql()).filter(Boolean).join('\n');
   });
@@ -146,8 +149,18 @@ export class MainComponent implements OnInit {
   }
 
   handoffToGis(): void {
-    const sparql = this.generatedSparql();
-    if (!sparql.trim()) return;
+    void this.graph.revision();
+    const { queries } = this.graph.getQueriesForGraph();
+    const validQueries = queries.filter(q => q.toSparql()?.trim());
+
+    if (validQueries.length === 0) return;
+
+    if (validQueries.length > 1) {
+      this.toolService.active.set('sparql');
+      return;
+    }
+
+    const sparql = validQueries[0].toSparql()!;
 
     const backend: 'wikidata' | 'millenniumdb' =
       this.settings.app().endpoint.url.includes('wikidata')
