@@ -2,10 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { of, BehaviorSubject } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 import { TableViewComponent } from './table-view.component';
 import { SelectionService } from '@core/services/selection.service';
-import { CurationService } from '@core/services/curation.service';
 import type {
   QueryResult,
   ResultBinding,
@@ -72,12 +71,6 @@ describe('TableViewComponent', () => {
     addFilter: ReturnType<typeof vi.fn>;
     removeFilter: ReturnType<typeof vi.fn>;
   };
-  let curationServiceMock: {
-    getForNode: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-    update: ReturnType<typeof vi.fn>;
-  };
-
   beforeEach(async () => {
     selectionServiceMock = {
       filteredQueryResult$: new BehaviorSubject<QueryResult | null>(null),
@@ -94,43 +87,12 @@ describe('TableViewComponent', () => {
       removeFilter: vi.fn(),
     };
 
-    curationServiceMock = {
-      getForNode: vi.fn().mockReturnValue(of({ records: [], duplicates: [] })),
-      create: vi.fn().mockReturnValue(
-        of({
-          id: 1,
-          nodeUri: 'http://example.org/Q1',
-          fieldName: 'cityLabel',
-          rawValue: 'Buenos Aires',
-          scriptValue: null,
-          manualValue: 'Buenos Aires corregido',
-          status: 'corrected' as const,
-          author: 'test@test.com',
-          createdAt: '2025-01-01',
-          updatedAt: '2025-01-01',
-        }),
-      ),
-      update: vi.fn().mockReturnValue(
-        of({
-          id: 1,
-          nodeUri: 'http://example.org/Q1',
-          fieldName: 'cityLabel',
-          manualValue: 'Updated',
-          status: 'corrected' as const,
-          author: 'test@test.com',
-          createdAt: '2025-01-01',
-          updatedAt: '2025-01-02',
-        }),
-      ),
-    };
-
     await TestBed.configureTestingModule({
       imports: [TableViewComponent, NoopAnimationsModule],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: SelectionService, useValue: selectionServiceMock },
-        { provide: CurationService, useValue: curationServiceMock },
       ],
     }).compileComponents();
 
