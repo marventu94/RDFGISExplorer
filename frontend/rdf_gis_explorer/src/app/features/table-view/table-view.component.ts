@@ -269,7 +269,15 @@ export class TableViewComponent implements OnDestroy {
       const nodeUri = this.extractUri(data);
       if (nodeUri === node.uri) {
         gridNode.setSelected(true, false);
-        this.gridApi?.ensureNodeVisible(gridNode, 'middle');
+        const rowIndex = gridNode.rowIndex;
+        if (rowIndex !== null) {
+          const firstDisplayed = this.gridApi!.getFirstDisplayedRowIndex();
+          const lastDisplayed = this.gridApi!.getLastDisplayedRowIndex();
+          const isVisible = rowIndex >= firstDisplayed && rowIndex <= lastDisplayed;
+          if (!isVisible) {
+            this.gridApi?.ensureNodeVisible(gridNode, 'middle');
+          }
+        }
       } else {
         gridNode.setSelected(false, false);
       }
