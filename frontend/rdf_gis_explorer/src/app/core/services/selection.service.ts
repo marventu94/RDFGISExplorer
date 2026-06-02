@@ -135,18 +135,32 @@ export class SelectionService {
     if (!result) return null;
     if (filters.length === 0) return result;
 
-    const filtered = result.nodes.filter((node) =>
+    const passingNodes = result.nodes.filter((node) =>
       filters.every((f) => this.nodePassesFilter(node, f)),
     );
-    const filteredUris = new Set(filtered.map((n) => n.uri));
+    const passingUris = new Set(passingNodes.map((n) => n.uri));
+
+    const neighborUris = new Set<string>();
+    for (const edge of result.edges) {
+      if (passingUris.has(edge.source) && !passingUris.has(edge.target)) {
+        neighborUris.add(edge.target);
+      }
+      if (passingUris.has(edge.target) && !passingUris.has(edge.source)) {
+        neighborUris.add(edge.source);
+      }
+    }
+
+    const displayUris = new Set([...passingUris, ...neighborUris]);
+    const displayNodes = result.nodes.filter((n) => displayUris.has(n.uri));
+
     const edges = result.edges.filter(
-      (e) => filteredUris.has(e.source) && filteredUris.has(e.target),
+      (e) => displayUris.has(e.source) && displayUris.has(e.target),
     );
     const bindings = result.bindings.filter((row) =>
-      Object.values(row).some((v) => v?.type === 'uri' && filteredUris.has(v.value)),
+      Object.values(row).some((v) => v?.type === 'uri' && displayUris.has(v.value)),
     );
 
-    return { ...result, nodes: filtered, edges, bindings };
+    return { ...result, nodes: displayNodes, edges, bindings };
   }
 
   private nodePassesFilter(node: NormalizedNode, filter: Filter): boolean {
