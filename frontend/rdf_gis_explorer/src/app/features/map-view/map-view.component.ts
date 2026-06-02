@@ -392,7 +392,14 @@ export class MapViewComponent implements OnInit, OnDestroy {
       }
     }
     if (points.length === 0) return;
+    
     const bounds = L.latLngBounds(points);
+    const currentBounds = this.map.getBounds();
+    
+    if (currentBounds.contains(bounds)) {
+      return;
+    }
+    
     this.suppressViewportEmit = true;
     this.map.flyToBounds(bounds, { padding: [40, 40], duration: 0.8, maxZoom: 14 });
     setTimeout(() => {
@@ -404,19 +411,24 @@ export class MapViewComponent implements OnInit, OnDestroy {
     if (!this.map || !node.coordinate) return;
 
     const latlng: L.LatLngTuple = [node.coordinate.lat, node.coordinate.lng];
-    if (!this.map.getBounds().contains(latlng)) {
+    const isVisible = this.map.getBounds().contains(latlng);
+
+    if (!isVisible) {
+      this.suppressViewportEmit = true;
       this.map.flyTo(latlng, 14, {
         duration: 1.0,
       });
+      setTimeout(() => {
+        this.suppressViewportEmit = false;
+      }, 1200);
     }
 
     this.clusterGroup?.eachLayer((layer: L.Layer) => {
       const m = layer as L.CircleMarker & { _node?: NormalizedNode };
       if (m._node?.uri === node.uri) {
         const latlng = m.getLatLng();
-        // zoomToShowLayer solo existe en MarkerClusterGroup, no en el fallback LayerGroup
         const cluster = this.clusterGroup as L.MarkerClusterGroup & { zoomToShowLayer?: Function };
-        if (typeof cluster?.zoomToShowLayer === 'function') {
+        if (!isVisible && typeof cluster?.zoomToShowLayer === 'function') {
           cluster.zoomToShowLayer(layer, () => this.addPulseRing(latlng));
         } else {
           this.addPulseRing(latlng);
