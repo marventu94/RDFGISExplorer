@@ -241,8 +241,22 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     const span = winMax - winMin;
     const pad = Math.max(span * 0.2, 1000 * 60 * 60 * 24 * 30);
 
+    const targetStart = winMin - pad;
+    const targetEnd = winMax + pad;
+    
+    const currentWindow = this.timeline.getWindow();
+    if (currentWindow) {
+      const currentStart = currentWindow.start.getTime();
+      const currentEnd = currentWindow.end.getTime();
+      
+      const allVisible = targetStart >= currentStart && targetEnd <= currentEnd;
+      if (allVisible) {
+        return;
+      }
+    }
+
     this.suppressViewportEmit = true;
-    this.timeline.setWindow(new Date(winMin - pad), new Date(winMax + pad), {
+    this.timeline.setWindow(new Date(targetStart), new Date(targetEnd), {
       animation: { duration: 600, easingFunction: 'easeInOutQuad' },
     });
     setTimeout(() => {

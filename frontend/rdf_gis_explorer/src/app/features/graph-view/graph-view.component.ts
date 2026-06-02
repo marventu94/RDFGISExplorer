@@ -191,6 +191,25 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy.elements().style('opacity', 0.2);
     matched.style('opacity', 1.0);
     matched.connectedEdges().style('opacity', 0.6);
+    
+    const extent = this.cy.extent();
+    let allVisible = true;
+    matched.forEach((node) => {
+      const pos = node.position();
+      const isVisible =
+        pos.x >= extent.x1 &&
+        pos.x <= extent.x2 &&
+        pos.y >= extent.y1 &&
+        pos.y <= extent.y2;
+      if (!isVisible) {
+        allVisible = false;
+      }
+    });
+    
+    if (allVisible) {
+      return;
+    }
+    
     this.suppressViewportEmit = true;
     this.cy.animate({
       fit: { eles: matched, padding: 60 },
@@ -462,10 +481,14 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       pos.y <= extent.y2;
 
     if (!isVisible) {
+      this.suppressViewportEmit = true;
       this.cy.animate({
-        fit: { eles: node, padding: 100 },
+        center: { eles: node },
         duration: 600,
       });
+      setTimeout(() => {
+        this.suppressViewportEmit = false;
+      }, 800);
     }
   }
 
