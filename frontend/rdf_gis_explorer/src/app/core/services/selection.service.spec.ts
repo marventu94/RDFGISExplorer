@@ -495,7 +495,7 @@ describe('SelectionService', () => {
     });
 
     describe('edges filtering', () => {
-      it('should only include edges between nodes that survive filtering', () => {
+      it('should keep neighbour nodes and edges connected to nodes that pass the filter', () => {
         const insidePolygon: Polygon = {
           type: 'Polygon',
           coordinates: [
@@ -531,11 +531,11 @@ describe('SelectionService', () => {
         let received: QueryResult | null | undefined;
         service.filteredQueryResult$.subscribe((r) => (received = r));
         service.addFilter(makeGeoFilter({ polygon: insidePolygon }));
-        expect(received!.nodes.length).toBe(1);
-        expect(received!.edges.length).toBe(0);
+        expect(received!.nodes.length).toBe(2);
+        expect(received!.edges.length).toBe(1);
       });
 
-      it('should exclude edges where source survives but target does not', () => {
+      it('should keep neighbour nodes and edges when source survives but target does not', () => {
         const insidePolygon: Polygon = {
           type: 'Polygon',
           coordinates: [
@@ -571,8 +571,8 @@ describe('SelectionService', () => {
         let received: QueryResult | null | undefined;
         service.filteredQueryResult$.subscribe((r) => (received = r));
         service.addFilter(makeGeoFilter({ polygon: insidePolygon }));
-        expect(received!.nodes.length).toBe(1);
-        expect(received!.edges.length).toBe(0);
+        expect(received!.nodes.length).toBe(2);
+        expect(received!.edges.length).toBe(1);
       });
 
       it('should keep edges between nodes that both survive filtering', () => {
