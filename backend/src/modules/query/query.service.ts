@@ -42,7 +42,7 @@ export class QueryService {
       );
     }
 
-    const timeout = parseInt(process.env['SPARQL_TIMEOUT_MS'] ?? '10000', 10);
+    const timeout = parseInt(process.env['SPARQL_TIMEOUT_MS'] ?? '30000', 10);
 
     try {
       return await this.endpoint.execute(sparql, {
@@ -52,7 +52,7 @@ export class QueryService {
     } catch (e) {
       if (e instanceof TimeoutError) {
         throw new HttpException(
-          { error: 'TIMEOUT', message: e.message },
+          { error: 'TIMEOUT', message: e.message, timeoutMs: e.timeoutMs },
           HttpStatus.REQUEST_TIMEOUT,
         );
       }
