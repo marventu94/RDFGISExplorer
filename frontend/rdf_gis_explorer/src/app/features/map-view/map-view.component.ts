@@ -403,9 +403,12 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private flyToNode(node: NormalizedNode): void {
     if (!this.map || !node.coordinate) return;
 
-    this.map.flyTo([node.coordinate.lat, node.coordinate.lng], 14, {
-      duration: 1.0,
-    });
+    const latlng: L.LatLngTuple = [node.coordinate.lat, node.coordinate.lng];
+    if (!this.map.getBounds().contains(latlng)) {
+      this.map.flyTo(latlng, 14, {
+        duration: 1.0,
+      });
+    }
 
     this.clusterGroup?.eachLayer((layer: L.Layer) => {
       const m = layer as L.CircleMarker & { _node?: NormalizedNode };

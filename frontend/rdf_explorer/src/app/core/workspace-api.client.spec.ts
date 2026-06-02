@@ -28,12 +28,12 @@ describe('WorkspaceApiClient', () => {
 
   it('lists dashboards', () => {
     client.list().subscribe();
-    expect(mockHttp.get).toHaveBeenCalledWith('http://localhost:3000/api/dashboards');
+    expect(mockHttp.get).toHaveBeenCalledWith('/api/dashboards');
   });
 
   it('gets a dashboard by id', () => {
     client.get('123').subscribe();
-    expect(mockHttp.get).toHaveBeenCalledWith('http://localhost:3000/api/dashboards/123');
+    expect(mockHttp.get).toHaveBeenCalledWith('/api/dashboards/123');
   });
 
   it('creates an explorer dashboard', () => {
@@ -47,17 +47,17 @@ describe('WorkspaceApiClient', () => {
       },
     };
     client.create(input).subscribe();
-    expect(mockHttp.post).toHaveBeenCalledWith('http://localhost:3000/api/dashboards', input);
+    expect(mockHttp.post).toHaveBeenCalledWith('/api/dashboards', input);
   });
 
   it('updates a dashboard', () => {
     const input = { name: 'Updated' };
     client.update('123', input).subscribe();
-    expect(mockHttp.put).toHaveBeenCalledWith('http://localhost:3000/api/dashboards/123', input);
+    expect(mockHttp.put).toHaveBeenCalledWith('/api/dashboards/123', input);
   });
 
   it('deletes a dashboard', () => {
     client.delete('123').subscribe();
-    expect(mockHttp.delete).toHaveBeenCalledWith('http://localhost:3000/api/dashboards/123');
+    expect(mockHttp.delete).toHaveBeenCalledWith('/api/dashboards/123');
   });
 });
