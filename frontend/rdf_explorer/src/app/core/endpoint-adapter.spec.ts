@@ -135,7 +135,7 @@ describe('GisBackendAdapter', () => {
 
     const promise = adapter.executeQuery(FIXTURE_QUERY_1, { limit: 10 });
 
-    const req = httpTestingController.expectOne('/api/sparql/execute');
+    const req = httpTestingController.expectOne('/api/query/execute');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ sparql: FIXTURE_QUERY_1, limit: 10 });
 
@@ -148,18 +148,18 @@ describe('GisBackendAdapter', () => {
     const adapter = new GisBackendAdapter(httpClient, BASE_URL);
     const promise = adapter.executeQuery(FIXTURE_QUERY_1);
 
-    const req = httpTestingController.expectOne('/api/sparql/execute');
+    const req = httpTestingController.expectOne('/api/query/execute');
     expect(req.request.body).toEqual({ sparql: FIXTURE_QUERY_1, limit: 500 });
 
     req.flush(makeQueryResult());
     await promise;
   });
 
-  it('getPredicates GETs /api/sparql/predicates', async () => {
+  it('getPredicates GETs /api/suggestions/predicates', async () => {
     const adapter = new GisBackendAdapter(httpClient, BASE_URL);
     const promise = adapter.getPredicates();
 
-    const req = httpTestingController.expectOne('/api/sparql/predicates');
+    const req = httpTestingController.expectOne('/api/suggestions/predicates');
     expect(req.request.method).toBe('GET');
 
     req.flush({ predicates: ['http://example.org/P1', 'http://example.org/P2'] });
@@ -311,7 +311,7 @@ describe('Adapter parity', () => {
 
       // Mock GisBackendAdapter HTTP
       const gisPromise = gisAdapter.executeQuery(query);
-      const gisReq = httpTestingController.expectOne('/api/sparql/execute');
+      const gisReq = httpTestingController.expectOne('/api/query/execute');
       gisReq.flush(expected);
       const gisResult = await gisPromise;
 

@@ -155,7 +155,7 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
-      const req = httpMock.expectOne('http://localhost:3000/query/execute');
+      const req = httpMock.expectOne('/api/query/execute');
       expect(req.request.body).toEqual({ sparql: payload.query, limit: 500 });
       req.flush(mockResult);
 
@@ -184,7 +184,7 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
-      httpMock.expectOne('http://localhost:3000/query/execute').flush(makeQueryResult());
+      httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
 
       expect(completed).toBe(true);
       expect(viewState.mapState()).toEqual({ center: [-34.6, -58.4], zoom: 12 });
@@ -213,7 +213,7 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
-      httpMock.expectOne('http://localhost:3000/query/execute').flush(mockResult);
+      httpMock.expectOne('/api/query/execute').flush(mockResult);
 
       expect(completed).toBe(true);
       const selected = selection.getSelectedNodeSnapshot();
@@ -236,7 +236,7 @@ describe('DashboardPersistenceService', () => {
       });
 
       expect(service.isHydrating()).toBe(true);
-      httpMock.expectOne('http://localhost:3000/query/execute').flush(makeQueryResult());
+      httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
 
       expect(completed).toBe(true);
       expect(service.isHydrating()).toBe(false);
@@ -257,7 +257,7 @@ describe('DashboardPersistenceService', () => {
         },
       });
 
-      httpMock.expectOne('http://localhost:3000/query/execute').flush(
+      httpMock.expectOne('/api/query/execute').flush(
         { message: 'Bad Request' },
         { status: 400, statusText: 'Bad Request' },
       );
@@ -294,7 +294,7 @@ describe('DashboardPersistenceService', () => {
       service.deserialize(first).subscribe(() => {
         completed = true;
       });
-      httpMock.expectOne('http://localhost:3000/query/execute').flush(mockResult);
+      httpMock.expectOne('/api/query/execute').flush(mockResult);
 
       expect(completed).toBe(true);
       const second = service.serialize();
@@ -316,7 +316,7 @@ describe('DashboardPersistenceService', () => {
         received = dashboard;
       });
 
-      const req = httpMock.expectOne('http://localhost:3000/api/dashboards');
+      const req = httpMock.expectOne('/api/dashboards');
       expect(req.request.method).toBe('POST');
       expect(req.request.body.kind).toBe('gis');
       expect(req.request.body.name).toBe('Demo');
@@ -347,7 +347,7 @@ describe('DashboardPersistenceService', () => {
         received = dashboard;
       });
 
-      const req = httpMock.expectOne('http://localhost:3000/api/dashboards/dash-456');
+      const req = httpMock.expectOne('/api/dashboards/dash-456');
       expect(req.request.method).toBe('PUT');
       expect(req.request.body.name).toBe('Updated');
 
@@ -374,7 +374,7 @@ describe('DashboardPersistenceService', () => {
         received = dashboard;
       });
 
-      const req = httpMock.expectOne('http://localhost:3000/api/dashboards');
+      const req = httpMock.expectOne('/api/dashboards');
       expect(req.request.method).toBe('POST');
 
       req.flush({
@@ -405,7 +405,7 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
-      const getReq = httpMock.expectOne('http://localhost:3000/api/dashboards/dash-abc');
+      const getReq = httpMock.expectOne('/api/dashboards/dash-abc');
       getReq.flush({
         id: 'dash-abc',
         kind: 'gis',
@@ -415,7 +415,7 @@ describe('DashboardPersistenceService', () => {
         updatedAt: new Date().toISOString(),
       });
 
-      httpMock.expectOne('http://localhost:3000/query/execute').flush(makeQueryResult());
+      httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
 
       expect(completed).toBe(true);
       expect(service.currentDashboardId()).toBe('dash-abc');
@@ -431,7 +431,7 @@ describe('DashboardPersistenceService', () => {
         },
       });
 
-      const getReq = httpMock.expectOne('http://localhost:3000/api/dashboards/dash-explorer');
+      const getReq = httpMock.expectOne('/api/dashboards/dash-explorer');
       getReq.flush({
         id: 'dash-explorer',
         kind: 'explorer',
@@ -452,7 +452,7 @@ describe('DashboardPersistenceService', () => {
         },
       });
 
-      const getReq = httpMock.expectOne('http://localhost:3000/api/dashboards/dash-missing');
+      const getReq = httpMock.expectOne('/api/dashboards/dash-missing');
       getReq.flush(
         { error: 'DASHBOARD_NOT_FOUND', message: 'Not found' },
         { status: 404, statusText: 'Not Found' },
@@ -483,7 +483,7 @@ describe('DashboardPersistenceService', () => {
         },
       });
 
-      const req = httpMock.expectOne('http://localhost:3000/api/dashboards');
+      const req = httpMock.expectOne('/api/dashboards');
       req.flush({ message: 'Server Error' }, { status: 500, statusText: 'Internal Server Error' });
 
       expect(errored).toBe(true);

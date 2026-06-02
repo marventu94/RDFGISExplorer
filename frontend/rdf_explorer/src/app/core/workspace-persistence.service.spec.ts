@@ -56,7 +56,7 @@ describe('WorkspacePersistenceService', () => {
 
   it('creates a replacement when the last panel is removed', () => {
     service.panels.set([
-      { id: 'p1', name: 'Only', graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [] },
+      { id: 'p1', name: 'Only', graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [], dirty: false },
     ]);
     service.activePanelId.set('p1');
     service.removePanel('p1');
