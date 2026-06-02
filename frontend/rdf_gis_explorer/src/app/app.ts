@@ -5,6 +5,11 @@ import { DashboardLayoutService } from '@core/services/dashboard-layout.service'
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+
+// Registrar módulos de AG Grid aquí (no en bootstrap.ts) porque cuando este componente
+// se carga como remote de native federation, bootstrap.ts no se ejecuta.
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 @Component({
   selector: 'app-root',
