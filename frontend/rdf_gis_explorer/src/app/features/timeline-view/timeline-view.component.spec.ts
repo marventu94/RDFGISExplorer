@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { TimelineViewComponent } from './timeline-view.component';
 import { SelectionService } from '@core/services/selection.service';
 import type {
@@ -102,6 +102,19 @@ function createMockTimeline() {
 
 let mockTimelineInstance: ReturnType<typeof createMockTimeline>;
 
+vi.mock('chart.js/auto', () => {
+  const ChartMock = Object.assign(
+    vi.fn(function () {
+      return { destroy: vi.fn() };
+    }),
+    { register: vi.fn() },
+  );
+  return {
+    Chart: ChartMock,
+    registerables: [],
+  };
+});
+
 vi.mock('vis-timeline/standalone', () => ({
   Timeline: vi.fn(function (
     _container: HTMLElement,
@@ -167,15 +180,27 @@ describe('TimelineViewComponent', () => {
       source: 'external',
     });
 
+    const focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
+      uris: new Set(),
+      source: null,
+    });
+    const activeViewSubject = new BehaviorSubject<string | null>(null);
+
     const mockSelectionService = {
       queryResult$: queryResultSubject.asObservable(),
       filteredQueryResult$: filteredQueryResultSubject.asObservable(),
       activeFilters$: activeFiltersSubject.asObservable(),
       selectedNode$: selectedNodeSubject.asObservable(),
+      focus$: focusSubject.asObservable(),
+      activeView$: activeViewSubject.asObservable(),
+      coordinatedViewEnabled$: of(true),
       select: vi.fn(),
       clearSelection: vi.fn(),
       addFilter: vi.fn(),
       removeFilter: vi.fn(),
+      setFocus: vi.fn(),
+      markActiveView: vi.fn(),
+      getActiveView: vi.fn(() => null),
     };
 
     await TestBed.configureTestingModule({
@@ -477,11 +502,13 @@ describe('TimelineViewComponent', () => {
 
       const el = fixture.nativeElement as HTMLElement;
       const zoomBtns = el.querySelectorAll('.zoom-group .toolbar-btn');
-      expect(zoomBtns.length).toBe(4);
-      expect(zoomBtns[0].textContent?.trim()).toBe('Año');
-      expect(zoomBtns[1].textContent?.trim()).toBe('Mes');
-      expect(zoomBtns[2].textContent?.trim()).toBe('Semana');
-      expect(zoomBtns[3].textContent?.trim()).toBe('Día');
+      expect(zoomBtns.length).toBe(6);
+      expect(zoomBtns[0].textContent?.trim()).toBe('10 años');
+      expect(zoomBtns[1].textContent?.trim()).toBe('5 años');
+      expect(zoomBtns[2].textContent?.trim()).toBe('Año');
+      expect(zoomBtns[3].textContent?.trim()).toBe('Mes');
+      expect(zoomBtns[4].textContent?.trim()).toBe('Semana');
+      expect(zoomBtns[5].textContent?.trim()).toBe('Día');
     });
 
     it('should set window to year range', () => {

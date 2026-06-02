@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthController } from './health.controller';
-import { DATABASE_CONNECTION } from '../../db/database.module';
 import { SPARQL_ENDPOINT } from '../../adapters/sparql-endpoint.interface';
 import { QueryResult } from '../../shared/dto/query-result.dto';
 
@@ -23,10 +22,6 @@ const mockSparqlEndpoint = {
   getPredicates: jest.fn(),
 };
 
-const mockDb = {
-  open: true,
-};
-
 describe('HealthController', () => {
   let controller: HealthController;
 
@@ -37,10 +32,6 @@ describe('HealthController', () => {
         {
           provide: SPARQL_ENDPOINT,
           useValue: mockSparqlEndpoint,
-        },
-        {
-          provide: DATABASE_CONNECTION,
-          useValue: mockDb,
         },
       ],
     }).compile();
@@ -58,7 +49,6 @@ describe('HealthController', () => {
     expect(result).toMatchObject({
       status: 'ok',
       backend: 'wikidata',
-      dbConnected: true,
     });
     expect(result.uptime).toBeGreaterThanOrEqual(0);
   });

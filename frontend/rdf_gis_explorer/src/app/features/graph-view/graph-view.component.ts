@@ -452,10 +452,21 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (!this.cy) return;
     const node = this.cy.getElementById(uri);
     if (node.empty()) return;
-    this.cy.animate({
-      fit: { eles: node, padding: 100 },
-      duration: 600,
-    });
+
+    const pos = node.position();
+    const extent = this.cy.extent();
+    const isVisible =
+      pos.x >= extent.x1 &&
+      pos.x <= extent.x2 &&
+      pos.y >= extent.y1 &&
+      pos.y <= extent.y2;
+
+    if (!isVisible) {
+      this.cy.animate({
+        fit: { eles: node, padding: 100 },
+        duration: 600,
+      });
+    }
   }
 
   private collapseHighDegreeNodes(): void {
