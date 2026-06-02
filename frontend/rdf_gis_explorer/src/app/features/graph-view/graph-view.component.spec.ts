@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { GraphViewComponent } from './graph-view.component';
 import { SelectionService } from '@core/services/selection.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
@@ -123,13 +123,24 @@ describe('GraphViewComponent', () => {
       source: 'external',
     });
 
+    const focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
+      uris: new Set(),
+      source: null,
+    });
+    const activeViewSubject = new BehaviorSubject<string | null>(null);
+
     const mockSelectionService = {
       queryResult$: queryResultSubject.asObservable(),
       filteredQueryResult$: filteredQueryResultSubject.asObservable(),
       activeFilters$: activeFiltersSubject.asObservable(),
       selectedNode$: selectedNodeSubject.asObservable(),
+      focus$: focusSubject.asObservable(),
+      activeView$: activeViewSubject.asObservable(),
+      coordinatedViewEnabled$: of(true),
       select: vi.fn(),
       clearSelection: vi.fn(),
+      markActiveView: vi.fn(),
+      getActiveView: vi.fn(() => null),
     };
 
     await TestBed.configureTestingModule({

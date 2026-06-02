@@ -58,7 +58,7 @@ describe('QueryService', () => {
     expect(result).toEqual(mockQueryResult);
     expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      expect.objectContaining({ limit: 500, timeoutMs: 10000 }),
+      expect.objectContaining({ limit: 500, timeoutMs: 30000 }),
     );
   });
 

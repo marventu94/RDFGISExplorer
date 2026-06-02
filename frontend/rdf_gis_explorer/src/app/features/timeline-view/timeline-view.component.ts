@@ -136,14 +136,22 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         this.selectedNode = sel.node;
         this.cdr.markForCheck();
 
-        if (sel.node && sel.node.temporalEvents?.length) {
+        if (sel.node && sel.node.temporalEvents?.length && this.timeline) {
           const mostRecent = sel.node.temporalEvents.reduce((a, b) =>
             a.isoDate > b.isoDate ? a : b,
           );
-          this.timeline?.setSelection([sel.node.uri]);
-          this.timeline?.moveTo(new Date(mostRecent.isoDate), {
-            animation: { duration: 600, easingFunction: 'easeInOutQuad' },
-          });
+          this.timeline.setSelection([sel.node.uri]);
+
+          const targetDate = new Date(mostRecent.isoDate);
+          const window = this.timeline.getWindow();
+          const isVisible =
+            window && targetDate >= window.start && targetDate <= window.end;
+
+          if (!isVisible) {
+            this.timeline.moveTo(targetDate, {
+              animation: { duration: 600, easingFunction: 'easeInOutQuad' },
+            });
+          }
         }
       });
 

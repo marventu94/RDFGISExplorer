@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { MapViewComponent } from './map-view.component';
 import { SelectionService } from '@core/services/selection.service';
 import type { QueryResult, NormalizedNode, Selection, Filter, Coordinate } from '@shared/models';
@@ -61,8 +61,16 @@ vi.mock('leaflet', () => {
     removeLayer: vi.fn(),
     addControl: vi.fn(),
     flyTo: vi.fn(),
+    flyToBounds: vi.fn(),
     invalidateSize: vi.fn(),
     remove: vi.fn(),
+    whenReady: vi.fn((cb: () => void) => cb()),
+    getCenter: vi.fn(() => ({ lat: -34.6, lng: -58.4 })),
+    getZoom: vi.fn(() => 5),
+    getBounds: vi.fn(() => ({
+      contains: vi.fn(() => true),
+    })),
+    setView: vi.fn(),
   };
 
   const mockTileLayer = {
@@ -103,6 +111,7 @@ vi.mock('leaflet', () => {
       Event: { CREATED: 'draw:created' },
     },
     divIcon: vi.fn(function () { return {}; }),
+    latLngBounds: vi.fn(function () { return {}; }),
     Icon: {
       Default: {
         mergeOptions: vi.fn(),
@@ -114,6 +123,15 @@ vi.mock('leaflet', () => {
 
 vi.mock('leaflet.markercluster', () => ({}));
 vi.mock('leaflet-draw', () => ({}));
+vi.mock('leaflet-control-geocoder', () => ({
+  geocoder: vi.fn(() => ({
+    on: vi.fn().mockReturnThis(),
+    addTo: vi.fn().mockReturnThis(),
+  })),
+  geocoders: {
+    nominatim: vi.fn(() => ({})),
+  },
+}));
 
 describe('MapViewComponent', () => {
   let fixture: ComponentFixture<MapViewComponent>;
@@ -138,16 +156,27 @@ describe('MapViewComponent', () => {
   }
 
   async function setUpModule(): Promise<void> {
+    const focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
+      uris: new Set(),
+      source: null,
+    });
+    const activeViewSubject = new BehaviorSubject<string | null>(null);
+
     const mockSelectionService = {
       queryResult$: queryResultSubject.asObservable(),
       filteredQueryResult$: filteredSubject.asObservable(),
       activeFilters$: activeFiltersSubject.asObservable(),
       selectedNode$: selectedNodeSubject.asObservable(),
+      focus$: focusSubject.asObservable(),
+      activeView$: activeViewSubject.asObservable(),
+      coordinatedViewEnabled$: of(true),
       select: selectSpy,
       addFilter: addFilterSpy,
       removeFilter: vi.fn(),
       clearSelection: vi.fn(),
       setQueryResult: vi.fn(),
+      markActiveView: vi.fn(),
+      getActiveView: vi.fn(() => null),
     };
 
     await TestBed.configureTestingModule({
