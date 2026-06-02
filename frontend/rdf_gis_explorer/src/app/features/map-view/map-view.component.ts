@@ -13,6 +13,7 @@ import {
 import { SelectionService } from '@core/services/selection.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { combineLatest, debounceTime, filter, Subject, takeUntil } from 'rxjs';
+import './leaflet-global'; // setea window.L ANTES que los plugins — ver leaflet-global.ts
 import * as L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet-draw';
@@ -77,16 +78,23 @@ export class MapViewComponent implements OnInit, OnDestroy {
       attribution: TILE_LAYERS['osm'].attribution,
     }).addTo(this.map);
 
-    this.clusterGroup = L.markerClusterGroup();
+    // markerClusterGroup falla en native federation cuando L global no coincide
+    // con el módulo bundleado. Fallback a layerGroup para que el mapa siempre funcione.
+    try {
+      this.clusterGroup = L.markerClusterGroup();
+    } catch {
+      this.clusterGroup = L.layerGroup() as unknown as L.MarkerClusterGroup;
+    }
     this.map.addLayer(this.clusterGroup);
 
     this.drawnItems = L.featureGroup();
     this.map!.addLayer(this.drawnItems);
 
-    this.setupDrawControl();
-    this.setupGeocoder();
+    // Los event listeners y setupSubscriptions DEBEN registrarse siempre.
+    // setupDrawControl/setupGeocoder pueden fallar si leaflet-draw/geocoder no augmentaron
+    // la instancia correcta de L en native federation — se envuelven en try-catch para
+    // que su fallo no corte el resto de la inicialización.
     this.setupSubscriptions();
-    this.initResizeObserver();
 
     this.map.on('moveend zoomend', () => {
       if (this.suppressViewportEmit) return;
@@ -102,6 +110,10 @@ export class MapViewComponent implements OnInit, OnDestroy {
       if (this.suppressViewportEmit) return;
       this.selectionService.markActiveView('map');
     });
+
+    try { this.setupDrawControl(); } catch { /* leaflet-draw no disponible en este contexto */ }
+    try { this.setupGeocoder(); } catch { /* geocoder no disponible en este contexto */ }
+    this.initResizeObserver();
 
     // Restore stored view state
     const storedMapState = this.viewState.mapState();
@@ -152,7 +164,17 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private setupDrawControl(): void {
     if (!this.map || !this.drawnItems) return;
 
-    const drawControl = new L.Control.Draw({
+    // leaflet-draw augmenta window.L (variable global libre), no el módulo L.
+    // Resolvemos Draw desde ambos lados para cubrir ambos casos.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyL = L as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const winL = (window as any).L;
+    const DrawControl: new (opts: unknown) => L.Control =
+      anyL.Control?.Draw ?? winL?.Control?.Draw;
+    if (typeof DrawControl !== 'function') return;
+
+    const drawControl = new DrawControl({
       position: 'topright',
       draw: {
         rectangle: false,
@@ -163,17 +185,20 @@ export class MapViewComponent implements OnInit, OnDestroy {
         circlemarker: false,
       },
       edit: {
-        featureGroup: this.drawnItems!,
+        featureGroup: this.drawnItems,
         edit: false,
         remove: false,
       },
-    } as L.Control.DrawConstructorOptions);
-    this.map!.addControl(drawControl);
+    });
+    this.map.addControl(drawControl);
 
-    this.map!.on(L.Draw.Event.CREATED, (e: L.LeafletEvent) => {
-      const layer = e.layer;
+    // 'draw:created' es el valor literal de L.Draw.Event.CREATED.
+    // Usamos el string directamente para evitar TypeError si L.Draw es undefined.
+    this.map.on('draw:created', (e: L.LeafletEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const layer = (e as any).layer as L.Layer & { toGeoJSON(): GeoJSON.Feature };
       this.drawnItems!.addLayer(layer);
-      const geoJson = layer.toGeoJSON() as GeoJSON.Feature;
+      const geoJson = layer.toGeoJSON();
       const filterId = crypto.randomUUID();
       const filter: GeoFilter = {
         id: filterId,
@@ -383,14 +408,16 @@ export class MapViewComponent implements OnInit, OnDestroy {
     });
 
     this.clusterGroup?.eachLayer((layer: L.Layer) => {
-      const m = layer as L.CircleMarker & {
-        _node?: NormalizedNode;
-      };
+      const m = layer as L.CircleMarker & { _node?: NormalizedNode };
       if (m._node?.uri === node.uri) {
         const latlng = m.getLatLng();
-        this.clusterGroup?.zoomToShowLayer(layer, () => {
+        // zoomToShowLayer solo existe en MarkerClusterGroup, no en el fallback LayerGroup
+        const cluster = this.clusterGroup as L.MarkerClusterGroup & { zoomToShowLayer?: Function };
+        if (typeof cluster?.zoomToShowLayer === 'function') {
+          cluster.zoomToShowLayer(layer, () => this.addPulseRing(latlng));
+        } else {
           this.addPulseRing(latlng);
-        });
+        }
       }
     });
   }
