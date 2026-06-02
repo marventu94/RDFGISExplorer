@@ -168,4 +168,4 @@ cd frontend/rdf_gis_explorer && pnpm test
 
 ## Contacto
 
-Martin M. Venturino — `marventurino@gmail.com` — Director: Dr. Diego Torres — Co-director: Dr. Sergio Firmenich
+Martin M. Venturino — `marventurino@gmail.com`
