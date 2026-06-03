@@ -9,7 +9,7 @@ services:
     volumes:
       - sqlite-data:/app/data
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -17,10 +17,30 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend/app_shell
       dockerfile: Dockerfile
     ports:
       - "${FRONTEND_PORT:-4200}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  rdf-explorer:
+    build:
+      context: ./frontend/rdf_explorer
+      dockerfile: Dockerfile
+    ports:
+      - "${RDF_EXPLORER_PORT:-4201}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  rdf-gis-explorer:
+    build:
+      context: ./frontend/rdf_gis_explorer
+      dockerfile: Dockerfile
+    ports:
+      - "${RDF_GIS_EXPLORER_PORT:-4202}:80"
     depends_on:
       backend:
         condition: service_healthy
