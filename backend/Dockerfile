@@ -1,15 +1,16 @@
 FROM node:20-alpine AS builder
+RUN apk add --no-cache python3 make g++ linux-headers
 WORKDIR /app
-RUN npm install -g pnpm
-COPY package*.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+COPY package*.json ./
+RUN npm ci
 COPY . .
-RUN pnpm run build
+RUN npm run build
 
 FROM node:20-alpine
 WORKDIR /app
-RUN npm install -g pnpm
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
 RUN mkdir -p /app/data
+EXPOSE 3000
 CMD ["node", "dist/main.js"]
