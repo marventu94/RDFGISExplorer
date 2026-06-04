@@ -1,0 +1,77 @@
+<div class="panel-header">
+  <h2 class="panel-title">
+    @if (node(); as n) {
+      {{ n.label }}
+    } @else {
+      Sin selección
+    }
+  </h2>
+  <button mat-icon-button (click)="closePanel()" aria-label="Cerrar panel">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-tab-group>
+  <mat-tab label="Datos">
+    <div class="data-tab-container">
+      @if (!node()) {
+        <div class="empty-state">Seleccioná un nodo para ver sus datos</div>
+      } @else {
+        <div class="search-bar">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-icon matPrefix>search</mat-icon>
+            <input
+              matInput
+              placeholder="Buscar en todos los campos…"
+              [ngModel]="searchTerm()"
+              (ngModelChange)="searchTerm.set($event)"
+            />
+            @if (searchTerm()) {
+              <button matSuffix mat-icon-button (click)="searchTerm.set('')" aria-label="Limpiar">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </mat-form-field>
+        </div>
+
+        @if (filteredRows.length === 0) {
+          <div class="empty-state">
+            {{ rows.length === 0 ? 'Sin atributos para mostrar' : 'Sin resultados para "' + searchTerm() + '"' }}
+          </div>
+        } @else {
+          <div class="table-wrapper">
+            <table mat-table [dataSource]="filteredRows">
+              <ng-container matColumnDef="field">
+                <th mat-header-cell *matHeaderCellDef>Campo</th>
+                <td mat-cell *matCellDef="let row"
+                  [matTooltip]="row.field"
+                  matTooltipShowDelay="600"
+                >{{ row.field }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="value">
+                <th mat-header-cell *matHeaderCellDef>Valor</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="cell-value"
+                    [matTooltip]="row.value"
+                    matTooltipShowDelay="600"
+                  >{{ row.value }}</span>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+            </table>
+          </div>
+        }
+      }
+    </div>
+  </mat-tab>
+
+  <mat-tab label="Plugins">
+    <div class="plugin-tab-empty">
+      <mat-icon>extension</mat-icon>
+      <span>Sin plugins instalados</span>
+    </div>
+  </mat-tab>
+</mat-tab-group>
