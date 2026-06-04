@@ -1,28 +1,47 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, signal, ViewChild, OnInit } from '@angular/core';
+import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
 import { DashboardComponent } from '@features/dashboard/dashboard.component';
 import { NavbarComponent } from '@features/dashboard/navbar/navbar.component';
+import { DetailPanelComponent } from '@features/detail-panel/detail-panel.component';
+import { SelectionService } from '@core/services/selection.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 
-// Registrar módulos de AG Grid aquí (no en bootstrap.ts) porque cuando este componente
-// se carga como remote de native federation, bootstrap.ts no se ejecuta.
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MatProgressSpinnerModule, DashboardComponent, NavbarComponent],
+  imports: [
+    MatSidenavModule,
+    MatProgressSpinnerModule,
+    DashboardComponent,
+    NavbarComponent,
+    DetailPanelComponent,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
+  private readonly selectionService = inject(SelectionService);
   private readonly dashboardLayout = inject(DashboardLayoutService);
   protected readonly persistence = inject(DashboardPersistenceService);
   private readonly snackBar = inject(MatSnackBar);
+  protected readonly sidenavOpen = signal(false);
   protected readonly editorCollapsed = this.dashboardLayout.editorCollapsed;
+
+  @ViewChild('sidenav') sidenav!: MatSidenav;
+
+  constructor() {
+    this.selectionService.selectedNode$.subscribe((sel) => {
+      if (sel.node && !this.dashboardLayout.visibleSlots().includes('table')) {
+        this.sidenavOpen.set(true);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.cleanLegacyLocalStorage();
@@ -49,6 +68,10 @@ export class App implements OnInit {
         },
       });
     }
+  }
+
+  protected onSidenavClosed(): void {
+    this.sidenavOpen.set(false);
   }
 
   private cleanLegacyLocalStorage(): void {
