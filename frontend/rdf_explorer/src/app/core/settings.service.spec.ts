@@ -67,6 +67,8 @@ describe('SettingsService', () => {
 
     expect(s1.app().endpoint.url).toBe('http://<host>:<port>/repositories/<repo-id>');
     expect(s1.app().endpoint.label).toBe('graphdb');
+    expect(s1.app().backendMode).toBe('app-backend');
+    expect(s1.app().wikibaseAdapter).toBe(false);
   });
 
   it('reset restores defaults and clears localStorage', () => {

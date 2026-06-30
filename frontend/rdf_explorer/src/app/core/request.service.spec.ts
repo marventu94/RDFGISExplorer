@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   resultLimit: 20,
   backendMode: 'direct',
+  wikibaseAdapter: true,
 };
 
 function createMockSettings(overrides: Partial<AppSettings> = {}) {
