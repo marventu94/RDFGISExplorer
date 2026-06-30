@@ -24,7 +24,7 @@ Backend NestJS (:3000)
 | Proyecto | Path | Framework | PM | Test Runner | Puerto |
 |----------|------|-----------|-----|-------------|--------|
 | Root | `/` | concurrently | npm | - | - |
-| Backend | `backend/` | NestJS 11 | npm | Jest 30 | 3000 |
+| Backend | `backend/` | NestJS 11 / Node.js 24.18.0 | npm | Jest 30 | 3000 |
 | App Shell | `frontend/app_shell/` | Angular 21 | pnpm 10 | Vitest 4 | 4200 |
 | RDF Explorer | `frontend/rdf_explorer/` | Angular 21 | pnpm 10 | Vitest 4 | 4201 |
 | RDF GIS Explorer | `frontend/rdf_gis_explorer/` | Angular 21 | pnpm 10 | Vitest 4 | 4202 |
@@ -49,7 +49,7 @@ cd frontend/rdf_gis_explorer && pnpm test # Vitest
 ## Convenciones de Codigo
 
 ### Backend (NestJS)
-- **Patron:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto, `WikidataAdapter`/`MillenniumDBAdapter` son adaptadores.
+- **Patron:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto, `GenericSparqlAdapter`/`MillenniumDBAdapter` son adaptadores.
 - **DI tokens:** Symbols (`SPARQL_ENDPOINT`, `DASHBOARDS_DB`), no strings.
 - **DTOs:** `class-validator` + `class-transformer`. Validacion global con `ValidationPipe({ transform: true, whitelist: true })`.
 - **Errores:** `HttpExceptionFilter` global mapea `TimeoutError`→408, `UpstreamError`→502, `NotImplementedError`→503.
@@ -76,13 +76,16 @@ cd frontend/rdf_gis_explorer && pnpm test # Vitest
 | `SparqlModule` | `modules/sparql/` | `@Global()`. Provee token `SPARQL_ENDPOINT` via factory segun `SPARQL_BACKEND` env |
 | `QueryModule` | `modules/query/` | Ejecuta SPARQL. Valida con `sparqljs.Parser`. Aplica limites y timeout |
 | `DashboardsModule` | `modules/dashboards/` | CRUD dashboards en SQLite. Payload JSON opaco. Valida `kind` ∈ {gis, explorer} |
-| `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados. Cache en memoria (1h TTL) |
+| `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados + busqueda de entidades (`/api/suggestions/entities`) |
 | `HealthModule` | `modules/health/` | Health check basico + verificacion real del endpoint SPARQL |
+| `AppConfigModule` | `modules/app-config/` | Expose `GET /api/config` con configuracion publica del backend SPARQL |
 
 ## Adaptadores SPARQL
 
-- **`WikidataAdapter`** (completo): Retry con backoff en 429, normalizacion de tipos (uri, literal, coordinate, date, bnode), construccion de grafo (nodes+edges), cache de predicados.
+- **`GenericSparqlAdapter`** (completo): Cliente SPARQL 1.1 generico. URL configurable via `SPARQL_ENDPOINT_URL`. Soporte opcional de Basic Auth via `SPARQL_USERNAME`/`SPARQL_PASSWORD`. Retry con backoff en 429, normalizacion de tipos (uri, literal, coordinate, date, bnode), construccion de grafo (nodes+edges), cache de predicados. `SPARQL_BACKEND=wikidata` es un alias que usa este adaptador por compatibilidad historica.
 - **`MillenniumDBAdapter`** (stub): Lanza `NotImplementedError`. Pendiente fase 2.
+- **Configuracion runtime:** `GET /api/config` expone backend, endpoint URL, capabilities, `supportsWikibaseLabel` y configuracion de busqueda. Los frontends consumen este endpoint para adaptar UI (search, seed queries, handoff).
+- **Busqueda de entidades:** `GET /api/suggestions/entities` usa `wbsearchentities` para Wikidata o `SPARQL_ENTITY_SEARCH_QUERY` para backends genericos.
 - **Interfaz:** `SparqlEndpoint { execute(), getPredicates(), backendName }`.
 
 ## Contrato Front↔Back: `QueryResult`
@@ -152,11 +155,17 @@ El corazon de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `gr
 
 ## Variables de Entorno
 
-Ver `.env.example`. Las principales:
+Ver archivos `.env`, `.env.wikidata` y `.env.graphdb.example`. Las principales:
 
 | Variable | Default | Uso |
 |----------|---------|-----|
-| `SPARQL_BACKEND` | `wikidata` | `wikidata` o `millenniumdb` |
+| `SPARQL_BACKEND` | `wikidata` | `generic`, `wikidata` (alias de generic) o `millenniumdb` |
+| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL. GraphDB: `/repositories/{repoId}` |
+| `SPARQL_USERNAME` | — | Usuario para Basic Auth |
+| `SPARQL_PASSWORD` | — | Password para Basic Auth |
+| `SPARQL_USERNAME` | — | Usuario para Basic Auth |
+| `SPARQL_PASSWORD` | — | Password para Basic Auth |
+| `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para busqueda de entidades. Reemplaza `$keyword` y `$limit` |
 | `SPARQL_USER_AGENT` | `rdf-gis-explorer/0.1` | Obligatorio para Wikidata |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
 | `SPARQL_DEFAULT_LIMIT` | `500` | Limite por defecto |
