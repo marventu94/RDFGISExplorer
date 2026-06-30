@@ -162,10 +162,7 @@ export class MainComponent implements OnInit {
 
     const sparql = validQueries[0].toSparql()!;
 
-    const backend: 'wikidata' | 'millenniumdb' =
-      this.settings.app().endpoint.url.includes('wikidata')
-        ? 'wikidata'
-        : 'millenniumdb';
+    const backend = this.settings.app().endpoint.label || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,

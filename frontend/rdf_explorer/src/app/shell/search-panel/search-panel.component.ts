@@ -1,7 +1,7 @@
 import { Component, inject, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { WikidataSearchService } from '../../tools/search-panel/wikidata-search.service';
-import type { WikidataSearchResult } from '../../tools/search-panel/wikidata-search.service';
+import { EntitySearchService } from '../../tools/search-panel/entity-search.service';
+import type { WikidataSearchResult } from '../../tools/search-panel/search-result.model';
 
 @Component({
   selector: 'app-search-panel',
@@ -10,7 +10,7 @@ import type { WikidataSearchResult } from '../../tools/search-panel/wikidata-sea
   imports: [FormsModule],
 })
 export class SearchPanelComponent {
-  private readonly searchService = inject(WikidataSearchService);
+  private readonly searchService = inject(EntitySearchService);
 
   searchInput = '';
   searchResults = signal<WikidataSearchResult[]>([]);
