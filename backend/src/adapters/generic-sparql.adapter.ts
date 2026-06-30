@@ -15,12 +15,11 @@ import {
   TemporalEvent,
 } from '../shared/dto/query-result.dto';
 
-const WIKIDATA_SPARQL_URL = 'https://query.wikidata.org/sparql';
+const DEFAULT_SPARQL_URL = 'https://query.wikidata.org/sparql';
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_USER_AGENT = 'rdf-gis-explorer/0.1';
 const RETRY_DELAYS_MS = [500, 1500, 4500];
 const PREDICATE_CACHE_TTL_MS = 3_600_000;
-
 const XSD_DATE = 'http://www.w3.org/2001/XMLSchema#date';
 const XSD_DATE_TIME = 'http://www.w3.org/2001/XMLSchema#dateTime';
 const GEOSPARQL_WKT = 'http://www.opengis.net/ont/geosparql#wktLiteral';
@@ -35,7 +34,7 @@ interface WikidataRawResponse {
   results: { bindings: WikidataRawBinding[] };
 }
 
-export class WikidataAdapter implements SparqlEndpoint {
+export class GenericSparqlAdapter implements SparqlEndpoint {
   readonly backendName = 'wikidata' as const;
 
   private predicateCache: string[] | null = null;
@@ -65,7 +64,7 @@ export class WikidataAdapter implements SparqlEndpoint {
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
       try {
         const response = await axios.post<WikidataRawResponse>(
-          WIKIDATA_SPARQL_URL,
+          this.resolveEndpointUrl(),
           new URLSearchParams({ query }),
           {
             headers: {
@@ -73,6 +72,7 @@ export class WikidataAdapter implements SparqlEndpoint {
               Accept: 'application/sparql-results+json',
               'Content-Type': 'application/x-www-form-urlencoded',
             },
+            auth: this.resolveAuth(),
             signal: controller.signal,
           },
         );
@@ -149,7 +149,7 @@ export class WikidataAdapter implements SparqlEndpoint {
     const query = 'SELECT DISTINCT ?p WHERE { ?s ?p ?o } LIMIT 1000';
 
     const response = await axios.post<WikidataRawResponse>(
-      WIKIDATA_SPARQL_URL,
+      this.resolveEndpointUrl(),
       new URLSearchParams({ query }),
       {
         headers: {
@@ -157,6 +157,7 @@ export class WikidataAdapter implements SparqlEndpoint {
           Accept: 'application/sparql-results+json',
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        auth: this.resolveAuth(),
       },
     );
 
@@ -170,6 +171,22 @@ export class WikidataAdapter implements SparqlEndpoint {
     this.predicateCacheAt = now;
 
     return predicates;
+  }
+
+  private resolveEndpointUrl(): string {
+    const url = process.env['SPARQL_ENDPOINT_URL'];
+    if (url) return url;
+    console.warn('SPARQL_ENDPOINT_URL not set, using default Wikidata endpoint');
+    return DEFAULT_SPARQL_URL;
+  }
+
+  private resolveAuth(): { username: string; password: string } | undefined {
+    const username = process.env['SPARQL_USERNAME'];
+    const password = process.env['SPARQL_PASSWORD'];
+    if (username && password) {
+      return { username, password };
+    }
+    return undefined;
   }
 
   private resolveUserAgent(): string {
