@@ -12,9 +12,9 @@ Tesis de Maestria en Ingenieria de Software — Venturino, Martin M. — LIFIA /
   - `frontend/app_shell/` — Host en `:4200`
   - `frontend/rdf_explorer/` — Remote en `:4201`
   - `frontend/rdf_gis_explorer/` — Remote en `:4202`
-- **Backend:** NestJS 11 sobre Node.js (`:3000`)
+- **Backend:** NestJS 11 sobre Node.js 24.18.0 (`:3000`)
 - **DB:** SQLite via `better-sqlite3` (`backend/data/`)
-- **Endpoint SPARQL:** Wikidata (default) / MillenniumDB (stub) — patron Adapter
+- **Endpoint SPARQL:** generico SPARQL 1.1 (configurable via URL) / Wikidata / MillenniumDB (stub) — patron Adapter
 - **Testing:** Vitest (unitarios frontend), Jest (backend)
 - **Package manager:** pnpm 10 (frontend), npm (backend)
 
@@ -48,12 +48,32 @@ npm run dev
 | RDF GIS Explorer (remote) | http://localhost:4200/gis |
 | Backend API | http://localhost:3000 |
 
-### Docker
+### Docker / Podman
+
+El repositorio incluye archivos de entorno listos para usar. Elige el backend SPARQL que quieras:
 
 ```bash
-cp .env.example .env
+# Wikidata (default, sin credenciales)
 docker compose up
+# o con Podman:
+podman compose up
+
+# GraphDB local (requiere credenciales)
+cp .env.graphdb.example .env.graphdb
+# editá .env.graphdb con tus credenciales
+ENV_FILE=.env.graphdb docker compose up
+# o con Podman:
+ENV_FILE=.env.graphdb podman compose up
 ```
+
+| Archivo | Trackeado en git | Contenido |
+|---------|------------------|-----------|
+| `.env` | Si | Configuracion por defecto (Wikidata) |
+| `.env.wikidata` | Si | Configuracion publica para Wikidata |
+| `.env.graphdb` | **No** | Configuracion local con credenciales de GraphDB |
+| `.env.graphdb.example` | Si | Template para GraphDB (sin credenciales reales) |
+
+> `.env.graphdb` esta en `.gitignore` para no subir credenciales. Cada desarrollador debe crear el suyo a partir de `.env.graphdb.example`.
 
 ---
 
@@ -72,7 +92,7 @@ docker compose up
 ```
 backend/                # NestJS 11 + SQLite (better-sqlite3)
   src/
-    adapters/           # SparqlEndpoint: WikidataAdapter, MillenniumDBAdapter (stub)
+    adapters/           # SparqlEndpoint: GenericSparqlAdapter, MillenniumDBAdapter (stub)
     common/filters/     # HttpExceptionFilter global
     db/                 # SQLite provider + migrations
     modules/
@@ -120,6 +140,8 @@ frontend/
 |--------|------|-------------|
 | POST | `/api/query/execute` | Ejecuta consulta SPARQL |
 | GET | `/api/suggestions/predicates` | Lista predicados disponibles |
+| GET | `/api/suggestions/entities?q=&limit=` | Busqueda de entidades |
+| GET | `/api/config` | Configuracion publica del backend SPARQL |
 | GET | `/api/dashboards` | Lista todos los dashboards |
 | GET | `/api/dashboards/recent?limit=10` | Lista los N mas recientes |
 | GET | `/api/dashboards/:id` | Obtiene un dashboard |
@@ -153,16 +175,69 @@ cd frontend/rdf_gis_explorer && pnpm test
 
 | Variable | Default | Uso |
 |----------|---------|-----|
-| `SPARQL_BACKEND` | `wikidata` | Selecciona adaptador (`wikidata` / `millenniumdb`) |
-| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL |
+| `SPARQL_BACKEND` | `wikidata` | Selecciona adaptador (`generic` / `wikidata` / `millenniumdb`). `wikidata` es alias de `generic`. |
+| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL. Para GraphDB usar `/repositories/{repoId}`. |
+| `SPARQL_USERNAME` | — | Usuario para Basic Auth (GraphDB protegido) |
+| `SPARQL_PASSWORD` | — | Password para Basic Auth (GraphDB protegido) |
+| `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para `/api/suggestions/entities`. Reemplaza `$keyword` y `$limit`. |
 | `SPARQL_USER_AGENT` | `rdf-gis-explorer/0.1` | User-Agent (obligatorio para Wikidata) |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout de consultas (ms) |
 | `SPARQL_DEFAULT_LIMIT` | `500` | Limite por defecto |
 | `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |
 | `BACKEND_PORT` | `3000` | Puerto del backend |
-| `FRONTEND_PORT` | `4200` | Puerto del frontend (Docker) |
+| `FRONTEND_PORT` | `4200` | Puerto del frontend (Docker/Podman) |
 | `CORS_ORIGINS` | `http://localhost:4200` | Origenes CORS (separados por coma) |
 | `SQLITE_PATH` | `./data/curation.db` | Ruta SQLite |
+
+---
+
+## Configuracion de backends SPARQL
+
+La configuracion del endpoint SPARQL es **single source of truth** en el backend. El frontend la obtiene via `GET /api/config` al iniciar la aplicacion.
+
+### Wikidata
+
+```env
+SPARQL_BACKEND=wikidata
+SPARQL_ENDPOINT_URL=https://query.wikidata.org/sparql
+SPARQL_USER_AGENT=mi-app/1.0 (mailto:mi@email.com)
+```
+
+El frontend detecta `supportsWikibaseLabel: true` y usa:
+- `wbsearchentities` para busqueda de entidades en RDF Explorer
+- Seed queries con `SERVICE wikibase:label`
+
+### GraphDB local con autenticacion
+
+```env
+SPARQL_BACKEND=graphdb
+SPARQL_ENDPOINT_URL=http://<host>:<port>/repositories/<repo-id>
+SPARQL_USERNAME=<user>
+SPARQL_PASSWORD=<password>
+
+# Opcional: query personalizada para busqueda de entidades
+# SPARQL_ENTITY_SEARCH_QUERY=SELECT DISTINCT ?uri ?label WHERE { ?uri <http://www.w3.org/2000/01/rdf-schema#label> ?label . FILTER regex(?label, "$keyword", "i") } LIMIT $limit
+```
+
+El frontend detecta `supportsWikibaseLabel: false` y:
+- Delega la busqueda de entidades al backend via `GET /api/suggestions/entities?q=...`
+- El backend ejecuta `SPARQL_ENTITY_SEARCH_QUERY` (default: `rdfs:label` + `FILTER regex`)
+- Oculta seed queries especificas de Wikidata en GIS
+
+### Busqueda de entidades
+
+| Backend | Endpoint | Query |
+|---------|----------|-------|
+| Wikidata | `https://www.wikidata.org/w/api.php` | `wbsearchentities` |
+| GraphDB / generico | `/api/suggestions/entities` | `SPARQL_ENTITY_SEARCH_QUERY` (configurable) |
+
+### Agregar un nuevo backend
+
+1. Crear adaptador `SparqlEndpoint` en `backend/src/adapters/` si necesita logica propia.
+2. Agregar el caso en `backend/src/adapters/sparql-endpoint.factory.ts`.
+3. Crear `.env.mibackend` con la configuracion correspondiente.
+4. Opcionalmente definir `SPARQL_ENTITY_SEARCH_QUERY` si el default no aplica.
+5. El frontend se adapta automaticamente via `/api/config`.
 
 ---
 
