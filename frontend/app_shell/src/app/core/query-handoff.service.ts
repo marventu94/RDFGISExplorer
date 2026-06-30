@@ -2,14 +2,14 @@ import { Injectable, signal } from '@angular/core';
 
 export interface HandoffPayload {
   query: string;
-  backend: 'wikidata' | 'millenniumdb';
+  backend: string;
   source: { workspaceId?: string; panelId?: string };
   publishedAt: string;
 }
 
 export interface HandoffPayloadInput {
   query: string;
-  backend: 'wikidata' | 'millenniumdb';
+  backend: string;
   source: { workspaceId?: string; panelId?: string };
 }
 

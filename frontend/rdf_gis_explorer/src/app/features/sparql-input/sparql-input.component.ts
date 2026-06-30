@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ElementRef, ViewChild, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,6 +19,7 @@ import { Parser } from 'sparqljs';
 
 import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
+import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
@@ -57,6 +58,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private readonly selectionService = inject(SelectionService);
   private readonly apiService = inject(ApiService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
@@ -75,7 +77,11 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
   protected readonly overridesCount = signal(0);
 
-  protected readonly seedQueries = SEED_QUERIES;
+  protected readonly seedQueries = computed(() => {
+    const cfg = this.appConfig.config();
+    if (!cfg) return SEED_QUERIES;
+    return cfg.supportsWikibaseLabel ? SEED_QUERIES : [];
+  });
   protected readonly gisDashboards = signal<Dashboard[]>([]);
   protected readonly loadingDashboards = signal(false);
 
@@ -166,7 +172,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.setEditorContent(query);
   }
 
-  public setBackend(backend: 'wikidata' | 'millenniumdb'): void {
+  public setBackend(backend: string): void {
     this.queryState.backend.set(backend);
   }
 
