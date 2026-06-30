@@ -57,24 +57,33 @@ export function queryGetClasses(
   return q;
 }
 
-export function queryGetProperties(uri: string): string {
-  return 'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n' +
-         'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n' +
-         'PREFIX owl: <http://www.w3.org/2002/07/owl#>\n' +
-         'PREFIX bd: <http://www.bigdata.com/rdf#>\n' +
-         'PREFIX wikibase: <http://wikiba.se/ontology#>\n' +
-         'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n' +
-         '  <' + uri + '> ?property [] .\n' +
-         '  ?p wikibase:directClaim ?property .\n' +
-         '  OPTIONAL { ?p rdfs:label ?propertyLabel . FILTER (lang(?propertyLabel) = "en")}\n' +
-         '  BIND(\n' +
-         '    IF(EXISTS { ?property rdf:type owl:ObjectProperty},\n' +
-         '      1,\n' +
-         '      IF(EXISTS {?property rdf:type owl:DatatypeProperty},\n' +
-         '        2,\n' +
-         '        0))\n' +
-         '    as ?kind)\n' +
-         '}';
+export function queryGetProperties(
+  uri: string,
+  opts?: { wikibase?: boolean },
+): string {
+  const useWikibase = opts?.wikibase ?? true;
+  let q = 'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n';
+  q += 'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n';
+  q += 'PREFIX owl: <http://www.w3.org/2002/07/owl#>\n';
+  if (useWikibase) {
+    q += 'PREFIX bd: <http://www.bigdata.com/rdf#>\n';
+    q += 'PREFIX wikibase: <http://wikiba.se/ontology#>\n';
+  }
+  q += 'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n';
+  q += '  <' + uri + '> ?property [] .\n';
+  if (useWikibase) {
+    q += '  ?p wikibase:directClaim ?property .\n';
+  }
+  q += '  OPTIONAL { ?p rdfs:label ?propertyLabel . FILTER (lang(?propertyLabel) = "en")}\n';
+  q += '  BIND(\n';
+  q += '    IF(EXISTS { ?property rdf:type owl:ObjectProperty},\n';
+  q += '      1,\n';
+  q += '      IF(EXISTS {?property rdf:type owl:DatatypeProperty},\n';
+  q += '        2,\n';
+  q += '        0))\n';
+  q += '    as ?kind)\n';
+  q += '}';
+  return q;
 }
 
 export function queryCountValuesType(uri: string, prop: string): string {

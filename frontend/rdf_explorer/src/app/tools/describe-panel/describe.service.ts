@@ -121,7 +121,7 @@ export class DescribeService {
 
     this.current.set(selected);
 
-    this.request.execQuery(queryGetProperties(uri)).then(data => {
+    this.request.execQuery(queryGetProperties(uri, { wikibase: this.settings.app().wikibaseAdapter })).then(data => {
       const cfg = this.settings.describe();
       const properties = data.results.bindings.filter(r =>
         !cfg.exclude.includes(r['property'].value),

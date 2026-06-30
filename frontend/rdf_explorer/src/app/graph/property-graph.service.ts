@@ -68,6 +68,7 @@ export class PropertyGraphService {
       labelUri: settingsVal.labelUri,
       lang: settingsVal.lang,
       prefixes,
+      endpointAdapter: settingsVal.wikibaseAdapter ? new WikidataAdapter() : new GenericAdapter(),
       labelProvider: this.request,
       retriever,
     });
@@ -78,6 +79,9 @@ export class PropertyGraphService {
       const s = this.settings.app();
       this.graphRef.labelUri = s.labelUri;
       this.graphRef.lang = s.lang;
+      this.graphRef.endpointAdapter = s.wikibaseAdapter
+        ? new WikidataAdapter()
+        : new GenericAdapter();
     });
 
     effect(() => {

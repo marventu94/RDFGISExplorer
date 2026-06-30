@@ -106,8 +106,18 @@ describe('queryGetClasses', () => {
 
 describe('queryGetProperties', () => {
   it('includes wikibase:directClaim for Wikidata model', () => {
-    const q = queryGetProperties('http://www.wikidata.org/entity/Q146');
+    const q = queryGetProperties('http://www.wikidata.org/entity/Q146', { wikibase: true });
     expect(q).toContain('wikibase:directClaim');
+    expect(q).toContain('?property []');
+    expect(q).toContain('ObjectProperty');
+    expect(q).toContain('DatatypeProperty');
+    expect(q).toContain('?kind');
+  });
+
+  it('omits wikibase:directClaim for generic backends', () => {
+    const q = queryGetProperties('http://example.org/Q146', { wikibase: false });
+    expect(q).not.toContain('wikibase:directClaim');
+    expect(q).not.toContain('PREFIX wikibase');
     expect(q).toContain('?property []');
     expect(q).toContain('ObjectProperty');
     expect(q).toContain('DatatypeProperty');
