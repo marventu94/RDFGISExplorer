@@ -11,7 +11,7 @@ export interface QueryResult {
     durationMs: number;
     truncated: boolean;
     limitApplied: number;
-    backend: 'wikidata' | 'millenniumdb';
+    backend: string;
   };
 }
 
