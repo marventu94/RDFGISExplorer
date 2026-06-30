@@ -3,6 +3,8 @@ backend/node_modules/
 dist/
 *.db
 data/
+.env.graphdb
+.env.local
 .angular/cache/
 coverage/
 package-lock.json

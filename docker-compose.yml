@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${BACKEND_PORT:-3000}:3000"
-    env_file: .env
+    env_file: ${ENV_FILE:-.env}
     volumes:
       - sqlite-data:/app/data
     healthcheck:
