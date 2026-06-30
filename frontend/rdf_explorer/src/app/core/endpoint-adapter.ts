@@ -92,7 +92,7 @@ export interface QueryResult {
     durationMs: number;
     truncated: boolean;
     limitApplied: number;
-    backend: 'wikidata' | 'millenniumdb';
+    backend: string;
   };
 }
 
@@ -115,7 +115,7 @@ export interface SparqlJsonResult {
 // ========== New RdfBackendAdapter ==========
 
 export interface ExecuteOpts {
-  backend?: 'wikidata' | 'millenniumdb';
+  backend?: string;
   limit?: number;
   timeoutMs?: number;
   signal?: AbortSignal;

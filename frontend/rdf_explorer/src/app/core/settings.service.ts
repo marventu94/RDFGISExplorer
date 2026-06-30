@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import type { AppSettings, EndpointConfig, DescribeConfig, Prefix, SearchClass } from './settings.types';
+import type { AppConfig } from './services/app-config.service';
 
 const STORAGE_KEY = 'rdfexplorer.settings.v1';
 
@@ -117,6 +118,20 @@ export class SettingsService {
   );
   readonly prefixes = signal<readonly Prefix[]>([...DEFAULT_PREFIXES]);
   readonly describe = signal<DescribeConfig>(deepClone(DEFAULT_DESCRIBE));
+
+  initFromConfig(cfg: AppConfig): void {
+    const current = this.app();
+    const updated: AppSettings = {
+      ...current,
+      endpoint: {
+        url: cfg.endpointUrl,
+        type: 'other',
+        label: cfg.backend,
+      },
+    };
+    this.app.set(updated);
+    persist(updated);
+  }
 
   update<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
     this.app.update(current => {
