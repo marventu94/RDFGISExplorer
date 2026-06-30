@@ -1,5 +1,5 @@
 import nock from 'nock';
-import { WikidataAdapter } from './wikidata.adapter';
+import { GenericSparqlAdapter } from './generic-sparql.adapter';
 import { TimeoutError, UpstreamError } from './sparql-endpoint.interface';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -27,13 +27,13 @@ function mockWikidata(response: object, status = 200): nock.Scope {
     .reply(status, response);
 }
 
-describe('WikidataAdapter', () => {
-  let adapter: WikidataAdapter;
+describe('GenericSparqlAdapter', () => {
+  let adapter: GenericSparqlAdapter;
 
   const defaultOpts = { timeoutMs: 10_000, limit: 50 };
 
   beforeEach(() => {
-    adapter = new WikidataAdapter();
+    adapter = new GenericSparqlAdapter();
     process.env['SPARQL_USER_AGENT'] = 'test-agent/1.0';
   });
 
