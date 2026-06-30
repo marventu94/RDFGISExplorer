@@ -347,6 +347,7 @@ describe('createRdfBackendAdapter', () => {
       searchClass: { uri: { type: 'uri', value: 'http://dbpedia.org/ontology/Person' }, label: { type: 'literal', value: 'person', 'xml:lang': 'en' } },
       resultLimit: 20,
       backendMode: 'app-backend',
+      wikibaseAdapter: true,
     };
     const adapter = createRdfBackendAdapter(settings, null as any);
     expect(adapter).toBeInstanceOf(GisBackendAdapter);
@@ -360,6 +361,7 @@ describe('createRdfBackendAdapter', () => {
       searchClass: { uri: { type: 'uri', value: 'http://dbpedia.org/ontology/Person' }, label: { type: 'literal', value: 'person', 'xml:lang': 'en' } },
       resultLimit: 20,
       backendMode: 'direct',
+      wikibaseAdapter: true,
     };
     const adapter = createRdfBackendAdapter(settings, null as any);
     expect(adapter).toBeInstanceOf(LegacyDirectAdapter);

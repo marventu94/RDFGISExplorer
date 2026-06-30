@@ -18,6 +18,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   },
   resultLimit: 20,
   backendMode: 'app-backend',
+  wikibaseAdapter: true,
 };
 
 const DEFAULT_PREFIXES: readonly Prefix[] = [
@@ -128,6 +129,8 @@ export class SettingsService {
         type: 'other',
         label: cfg.backend,
       },
+      backendMode: 'app-backend',
+      wikibaseAdapter: cfg.supportsWikibaseLabel,
     };
     this.app.set(updated);
     persist(updated);

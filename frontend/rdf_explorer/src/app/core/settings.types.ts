@@ -32,4 +32,5 @@ export interface AppSettings {
   searchClass: SearchClass;
   resultLimit: number;
   backendMode: 'app-backend' | 'direct';
+  wikibaseAdapter: boolean;
 }
