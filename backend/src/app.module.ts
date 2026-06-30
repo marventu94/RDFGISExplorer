@@ -6,6 +6,8 @@ import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 import { HealthModule } from './modules/health/health.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 
+import { AppConfigModule } from './modules/app-config/app-config.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -14,6 +16,7 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module';
     SuggestionsModule,
     HealthModule,
     DashboardsModule,
+    AppConfigModule,
   ],
 })
 export class AppModule {}
