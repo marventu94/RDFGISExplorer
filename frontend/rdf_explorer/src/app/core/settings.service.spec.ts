@@ -49,6 +49,26 @@ describe('SettingsService', () => {
     expect(s2.app().lang).toBe('en');
   });
 
+  it('initFromConfig overrides endpoint from backend', () => {
+    const s1 = new SettingsService();
+    s1.initFromConfig({
+      backend: 'graphdb',
+      endpointUrl: 'http://<host>:<port>/repositories/<repo-id>',
+      hasBasicAuth: true,
+      userAgent: 'test',
+      timeoutMs: 10000,
+      defaultLimit: 500,
+      maxLimit: 2000,
+      capabilities: ['sparql11'],
+      supportsWikibaseLabel: false,
+      defaultPrefixes: {},
+      search: { mode: 'sparql', labelProperty: 'http://www.w3.org/2000/01/rdf-schema#label' },
+    });
+
+    expect(s1.app().endpoint.url).toBe('http://<host>:<port>/repositories/<repo-id>');
+    expect(s1.app().endpoint.label).toBe('graphdb');
+  });
+
   it('reset restores defaults and clears localStorage', () => {
     const s1 = new SettingsService();
     s1.update('lang', 'fr');

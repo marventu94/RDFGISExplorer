@@ -61,10 +61,7 @@ export class SparqlPanelComponent {
     const sparql = query.toSparql();
     if (!sparql?.trim()) return;
 
-    const backend: 'wikidata' | 'millenniumdb' =
-      this.settings.app().endpoint.url.includes('wikidata')
-        ? 'wikidata'
-        : 'millenniumdb';
+    const backend = this.settings.app().endpoint.label || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,
