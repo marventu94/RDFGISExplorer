@@ -13,7 +13,7 @@ export interface Dashboard {
 
 export interface GisDashboardPayload {
   query: string;
-  backend: 'wikidata' | 'millenniumdb';
+  backend: string;
   layout: {
     slotsCount: 1 | 2 | 3 | 4;
     preset?: 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad';

@@ -4,6 +4,8 @@ import { DashboardComponent } from '@features/dashboard/dashboard.component';
 import { NavbarComponent } from '@features/dashboard/navbar/navbar.component';
 import { DetailPanelComponent } from '@features/detail-panel/detail-panel.component';
 import { SelectionService } from '@core/services/selection.service';
+import { AppConfigService } from '@core/services/app-config.service';
+import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -27,6 +29,8 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 })
 export class App implements OnInit {
   private readonly selectionService = inject(SelectionService);
+  private readonly appConfig = inject(AppConfigService);
+  private readonly queryState = inject(SparqlQueryStateService);
   private readonly dashboardLayout = inject(DashboardLayoutService);
   protected readonly persistence = inject(DashboardPersistenceService);
   private readonly snackBar = inject(MatSnackBar);
@@ -48,6 +52,7 @@ export class App implements OnInit {
 
     const params = new URLSearchParams(window.location.search);
     const dashboardId = params.get('dashboardId');
+    const handoff = params.get('handoff') === '1';
 
     if (dashboardId) {
       this.persistence.isHydrating.set(true);
@@ -66,6 +71,13 @@ export class App implements OnInit {
           url.searchParams.delete('dashboardId');
           window.history.replaceState({}, '', url.toString());
         },
+      });
+    }
+
+    if (!dashboardId && !handoff) {
+      this.appConfig.load().subscribe({
+        next: (cfg) => this.queryState.backend.set(cfg.backend),
+        error: () => this.queryState.backend.set('wikidata'),
       });
     }
   }
