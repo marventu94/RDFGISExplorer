@@ -194,3 +194,7 @@ Ver archivos `.env`, `.env.wikidata` y `.env.graphdb.example`. Las principales:
 - **El backend NO usa ORM.** Queries SQL directas con `better-sqlite3`.
 - **`sparqljs`** se usa tanto en backend (validacion) como en GIS (validacion en el frontend).
 - **Fases futuras:** MillenniumDB adapter, curation records, duplicate detection (tablas en `db/migrations.sql` no migradas).
+
+## Regla de git
+
+**No commitear ni pushear sin OK explicito del usuario.** Esta regla esta formalizada en el skill `no-commit-without-ok`. `git add`, `git status`, `git diff`, `git fetch` y demas lecturas son libres; todo lo que modifique el historial/estado (`commit`, `push`, `merge`, `rebase`, `reset`, `branch -D`, `tag`, `cherry-pick`, `revert`, `--force`, etc.) requiere autorizacion explicita en el mismo turno ("comitea" / "hace commit" / "subi"). Combinado con el skill `crear-commit`: cuando se autoriza, los commits se firman a nombre del usuario (config de git), nunca con Co-Authored-By de Claude.
