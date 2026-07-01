@@ -10,3 +10,5 @@ coverage/
 package-lock.json
 test-results/
 /pnpm-lock.yaml
+opencode.json
+docs/
