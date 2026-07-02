@@ -75,9 +75,9 @@ describe('AppConfigService', () => {
       expect(config.classColors['http://www.wikidata.org/entity/Q5']).toBe(
         '#9C27B0',
       );
-      expect(
-        config.classColors['http://www.wikidata.org/entity/Q515'],
-      ).toBe('#2196F3');
+      expect(config.classColors['http://www.wikidata.org/entity/Q515']).toBe(
+        '#2196F3',
+      );
     });
   });
 

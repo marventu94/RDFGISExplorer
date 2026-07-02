@@ -13,4 +13,5 @@ export interface AppSettings {
   endpointType: EndpointType;
   endpointLabel: string;
   classColorOverrides: Record<string, string>;
+  theme: 'light' | 'dark';
 }

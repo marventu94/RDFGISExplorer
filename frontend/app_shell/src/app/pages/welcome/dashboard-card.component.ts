@@ -50,18 +50,18 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
   `,
   styles: `
     .card {
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border);
       border-radius: 8px;
       padding: 1rem;
       cursor: pointer;
-      transition: box-shadow 0.2s, border-color 0.2s;
+      transition: box-shadow 0.2s, border-color 0.2s, background-color 0.15s;
     }
     .card:hover,
     .card:focus-visible {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      border-color: #ccc;
-      outline: 2px solid #1a73e8;
+      box-shadow: var(--shadow-md);
+      border-color: var(--color-border-strong);
+      outline: 2px solid var(--color-accent);
       outline-offset: 2px;
     }
     .card__header {
@@ -73,7 +73,7 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
     .card__name {
       font-weight: 500;
       font-size: 0.95rem;
-      color: #333;
+      color: var(--color-text);
       line-height: 1.3;
       word-break: break-word;
     }
@@ -88,21 +88,21 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
       padding: 0.2rem 0.4rem;
       border-radius: 4px;
       font-size: 1.2rem;
-      color: #666;
+      color: var(--color-text-muted);
       line-height: 1;
     }
     .card__menu-trigger:hover {
-      background: #f0f0f0;
-      color: #333;
+      background: var(--color-bg-hover);
+      color: var(--color-text);
     }
     .card__dropdown {
       position: absolute;
       right: 0;
       top: 100%;
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-border);
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: var(--shadow-lg);
       min-width: 140px;
       z-index: 10;
       overflow: hidden;
@@ -116,16 +116,16 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
       text-align: left;
       cursor: pointer;
       font-size: 0.85rem;
-      color: #333;
+      color: var(--color-text);
     }
     .card__dropdown-item:hover {
-      background: #f5f5f5;
+      background: var(--color-bg-hover);
     }
     .card__dropdown-item--danger {
-      color: #d32f2f;
+      color: var(--color-danger);
     }
     .card__dropdown-item--danger:hover {
-      background: #fef2f2;
+      background: color-mix(in srgb, var(--color-danger) 12%, var(--color-bg-hover));
     }
     .card__meta {
       display: flex;
@@ -140,16 +140,16 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
       font-weight: 500;
     }
     .card__chip--gis {
-      background: #e3f2fd;
-      color: #1565c0;
+      background: var(--color-accent-soft);
+      color: var(--color-accent);
     }
     .card__chip--explorer {
-      background: #fce4ec;
-      color: #c62828;
+      background: color-mix(in srgb, var(--color-danger) 15%, var(--color-bg));
+      color: var(--color-danger);
     }
     .card__date {
       font-size: 0.8rem;
-      color: #888;
+      color: var(--color-text-muted);
     }
   `,
 })
