@@ -180,7 +180,7 @@ cd frontend/rdf_gis_explorer && pnpm test
 | `SPARQL_USERNAME` | — | Usuario para Basic Auth (GraphDB protegido) |
 | `SPARQL_PASSWORD` | — | Password para Basic Auth (GraphDB protegido) |
 | `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para `/api/suggestions/entities`. Reemplaza `$keyword` y `$limit`. |
-| `SPARQL_USER_AGENT` | `rdf-gis-explorer/0.1` | User-Agent (obligatorio para Wikidata) |
+| `SPARQL_USER` | `rdf-gis-explorer/0.1` | User-Agent (obligatorio para Wikidata) |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout de consultas (ms) |
 | `SPARQL_DEFAULT_LIMIT` | `500` | Limite por defecto |
 | `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |
@@ -200,7 +200,7 @@ La configuracion del endpoint SPARQL es **single source of truth** en el backend
 ```env
 SPARQL_BACKEND=wikidata
 SPARQL_ENDPOINT_URL=https://query.wikidata.org/sparql
-SPARQL_USER_AGENT=mi-app/1.0 (mailto:mi@email.com)
+SPARQL_USER=mi-app/1.0 (mailto:mi@email.com)
 ```
 
 El frontend detecta `supportsWikibaseLabel: true` y usa:

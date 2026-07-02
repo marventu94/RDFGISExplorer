@@ -190,9 +190,9 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
   }
 
   private resolveUserAgent(): string {
-    const ua = process.env['SPARQL_USER_AGENT'];
+    const ua = process.env['SPARQL_USER'];
     if (!ua) {
-      console.warn('SPARQL_USER_AGENT not set, using default');
+      console.warn('SPARQL_USER not set, using default');
       return DEFAULT_USER_AGENT;
     }
     return ua;
