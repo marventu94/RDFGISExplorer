@@ -45,10 +45,7 @@ export class DashboardsController {
   }
 
   @Put(':id')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateDashboardDto,
-  ): Dashboard {
+  update(@Param('id') id: string, @Body() dto: UpdateDashboardDto): Dashboard {
     return this.dashboardsService.update(id, dto);
   }
 
