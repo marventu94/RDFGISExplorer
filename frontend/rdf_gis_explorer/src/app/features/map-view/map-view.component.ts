@@ -19,7 +19,7 @@ import 'leaflet.markercluster';
 import 'leaflet-draw';
 import * as GeocoderControl from 'leaflet-control-geocoder';
 import type { QueryResult, NormalizedNode, Selection, Filter, GeoFilter } from '@shared/models';
-import { colorForType } from '../../shared/entity-colors';
+import { EntityColorService } from '@core/services/entity-color.service';
 import { TILE_LAYERS } from './tile-layers';
 
 type QueryState = 'no-query' | 'no-coords' | 'filtered-zero' | 'normal';
@@ -54,6 +54,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
 
   private readonly selectionService = inject(SelectionService);
   private readonly viewState = inject(DashboardViewStateService);
+  private readonly colorService = inject(EntityColorService);
   private readonly ngZone = inject(NgZone);
   private readonly cdr = inject(ChangeDetectorRef);
 
@@ -297,7 +298,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
     for (const node of result.nodes) {
       if (!node.coordinate) continue;
 
-      const color = colorForType(node.type);
+      const color = this.colorService.colorForType(node.type);
       const marker = L.circleMarker([node.coordinate.lat, node.coordinate.lng], {
         radius: 8,
         color,

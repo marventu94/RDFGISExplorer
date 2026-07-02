@@ -3,13 +3,15 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AppConfigService } from '@core/services/app-config.service';
+import { SettingsService } from '@core/services/settings.service';
 
-function initializeAppConfig(): (appConfig: AppConfigService) => () => Promise<void> {
-  return (appConfig: AppConfigService) =>
-    () =>
-      firstValueFrom(appConfig.load()).then(() => {
-        // config loaded and cached
-      });
+function initializeApp(): (appConfig: AppConfigService, settings: SettingsService) => () => Promise<void> {
+  return (appConfig: AppConfigService, settings: SettingsService) =>
+    async () => {
+      const cfg = await firstValueFrom(appConfig.load());
+      settings.initFromConfig(cfg);
+      await settings.load();
+    };
 }
 
 export const appConfig: ApplicationConfig = {
@@ -19,8 +21,8 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(),
     {
       provide: APP_INITIALIZER,
-      useFactory: initializeAppConfig(),
-      deps: [AppConfigService],
+      useFactory: initializeApp(),
+      deps: [AppConfigService, SettingsService],
       multi: true,
     },
   ],

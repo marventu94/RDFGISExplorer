@@ -17,7 +17,7 @@ import { Timeline } from 'vis-timeline/standalone';
 import type { DataItem, DataGroup, TimelineOptions } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
 import type { QueryResult, NormalizedNode, Selection, TemporalFilter } from '@shared/models';
-import { colorForType } from '@shared/entity-colors';
+import { EntityColorService } from '@core/services/entity-color.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { PriceChartComponent } from './price-chart.component';
 
@@ -70,6 +70,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     private readonly selectionService: SelectionService,
     private readonly ngZone: NgZone,
     private readonly cdr: ChangeDetectorRef,
+    private readonly colorService: EntityColorService,
   ) {}
 
   ngOnInit(): void {
@@ -436,7 +437,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
       const mostRecent = node.temporalEvents.reduce((a, b) => (a.isoDate > b.isoDate ? a : b));
 
-      const color = colorForType(node.type);
+      const color = this.colorService.colorForType(node.type);
 
       this.items.add({
         id: node.uri,

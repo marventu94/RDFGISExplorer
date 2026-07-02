@@ -7,12 +7,13 @@ import { routes } from './app.routes';
 import { AppConfigService } from './core/services/app-config.service';
 import { SettingsService } from './core/settings.service';
 
-function initializeAppConfig(): (appConfig: AppConfigService, settings: SettingsService) => () => Promise<void> {
+function initializeApp(): (appConfig: AppConfigService, settings: SettingsService) => () => Promise<void> {
   return (appConfig: AppConfigService, settings: SettingsService) =>
-    () =>
-      firstValueFrom(appConfig.load()).then((cfg) => {
-        settings.initFromConfig(cfg);
-      });
+    async () => {
+      const cfg = await firstValueFrom(appConfig.load());
+      settings.initFromConfig(cfg);
+      await settings.load();
+    };
 }
 
 export const appConfig: ApplicationConfig = {
@@ -22,7 +23,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(),
     {
       provide: APP_INITIALIZER,
-      useFactory: initializeAppConfig(),
+      useFactory: initializeApp(),
       deps: [AppConfigService, SettingsService],
       multi: true,
     },

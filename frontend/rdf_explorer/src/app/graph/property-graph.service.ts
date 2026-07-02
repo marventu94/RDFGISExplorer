@@ -2,6 +2,8 @@ import { Injectable, signal, computed, inject, effect } from '@angular/core';
 import { SettingsService } from '../core/settings.service';
 import { RequestService } from '../core/request.service';
 import { LogService } from '../core/log.service';
+import { AppConfigService } from '../core/services/app-config.service';
+import type { Prefix } from '../core/services/app-config.service';
 import {
   PropertyGraph,
   Node,
@@ -15,25 +17,12 @@ import type { DropPayload } from './domain';
 import type { QueryRetriever } from './domain';
 import { serializeGraph, deserializeGraph, type ExplorerSerializedGraph } from './domain/graph-serializer';
 
-/**
- * Angular wrapper around the pure-TypeScript PropertyGraph domain model.
- *
- * Mutations to the graph modify mutable arrays in-place. To make Angular
- * reactivity work without deep diffing, this service bumps a `revision`
- * signal after every mutation. Canvas and tool components should watch
- * `revision` as the trigger for re-rendering.
- *
- * Signals exposed:
- *   - `nodes` / `edges` / `selected` — read-only reactive views
- *   - `revision` — monotonic counter bumped on every mutation
- *
- * Public mutation methods mirror PropertyGraph and bump `revision`.
- */
 @Injectable({ providedIn: 'root' })
 export class PropertyGraphService {
   private readonly settings = inject(SettingsService);
   private readonly request = inject(RequestService);
   private readonly log = inject(LogService);
+  private readonly appConfig = inject(AppConfigService);
 
   readonly revision = signal(0);
 
@@ -54,9 +43,17 @@ export class PropertyGraphService {
     return this.graphRef.selected;
   });
 
+  readonly prefixes = computed<readonly Prefix[]>(() => {
+    const cfg = this.appConfig.config();
+    if (!cfg) return [];
+    return Object.entries(cfg.defaultPrefixes).map(([prefix, uri]) => ({
+      prefix,
+      uri,
+    }));
+  });
+
   constructor() {
     const settingsVal = this.settings.app();
-    const prefixes = this.settings.prefixes();
 
     const retriever: QueryRetriever = {
       execQuery: (query, opts) =>
@@ -67,7 +64,7 @@ export class PropertyGraphService {
     this.graphRef = new PropertyGraph({
       labelUri: settingsVal.labelUri,
       lang: settingsVal.lang,
-      prefixes,
+      prefixes: this.prefixes() as readonly Prefix[],
       endpointAdapter: settingsVal.wikibaseAdapter ? new WikidataAdapter() : new GenericAdapter(),
       labelProvider: this.request,
       retriever,
@@ -85,7 +82,7 @@ export class PropertyGraphService {
     });
 
     effect(() => {
-      this.graphRef.prefixes = this.settings.prefixes();
+      this.graphRef.prefixes = this.prefixes();
     });
 
     effect(() => {

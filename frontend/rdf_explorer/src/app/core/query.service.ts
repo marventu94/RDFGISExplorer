@@ -1,5 +1,18 @@
 import type { EndpointType } from './settings.types';
-import { createEndpointAdapter } from './endpoint-adapter';
+
+export interface QueryContext {
+  lang: string;
+  labelUri: string;
+  endpointType: EndpointType;
+  wikibaseAdapter: boolean;
+}
+
+export const DEFAULT_QUERY_CONTEXT: QueryContext = {
+  lang: 'en',
+  labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+  endpointType: 'other',
+  wikibaseAdapter: false,
+};
 
 function escapeKeyword(keyword: string): string {
   return keyword.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -9,24 +22,57 @@ function u(uri: string): string {
   return '<' + uri + '>';
 }
 
+function labelTriple(ctx: QueryContext, varName: string, valueVar = 'label'): string {
+  return `      ?${varName} <${ctx.labelUri}> ?${valueVar} .\n`;
+}
+
+function langFilter(ctx: QueryContext, varName: string, fallback = false): string {
+  if (fallback) {
+    return `      FILTER (lang(?${varName}) = "" || lang(?${varName}) = "${ctx.lang}")\n`;
+  }
+  return `      FILTER (lang(?${varName}) = "${ctx.lang}")\n`;
+}
+
+function createEndpointAdapter(type: EndpointType) {
+  switch (type) {
+    case 'virtuoso':
+      return {
+        textSearchTriple(label: string, keyword: string, _limit: number) {
+          return `      ?${label} bif:contains "'${keyword}'" .`;
+        },
+      };
+    case 'fuseki':
+      return {
+        textSearchTriple(label: string, keyword: string, limit: number) {
+          return `      ?uri text:query (rdfs:label "${keyword}" ${limit}) .`;
+        },
+      };
+    default:
+      return {
+        textSearchTriple(label: string, keyword: string, _limit: number) {
+          return `      FILTER regex(?${label}, "${keyword}", "i")`;
+        },
+      };
+  }
+}
+
 export function querySearch(
   keyword: string,
-  opts: { type?: string; limit?: number; offset?: number; endpointType: EndpointType },
+  opts: { type?: string; limit?: number; offset?: number } & QueryContext,
 ): string {
-  const type = opts.type ?? 'http://dbpedia.org/ontology/Person';
+  const type = opts.type ?? 'http://www.w3.org/2002/07/owl#Thing';
   const limit = opts.limit ?? 20;
   const adapter = createEndpointAdapter(opts.endpointType);
   const escaped = escapeKeyword(keyword);
 
   let q = 'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n';
-  q += 'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n';
   if (opts.endpointType === 'fuseki') {
     q += 'PREFIX text: <http://jena.apache.org/text#>\n';
   }
   q += 'SELECT DISTINCT ?uri ?label ?type ?tlabel WHERE {\n';
   q += '  { SELECT ?uri ?label WHERE {\n';
-  q += '      ?uri rdfs:label ?label .\n';
-  q += '      FILTER (lang(?label) = "en")\n';
+  q += labelTriple(opts, 'uri', 'label');
+  q += langFilter(opts, 'label');
   if (keyword) {
     q += adapter.textSearchTriple('label', escaped, limit) + '\n';
   }
@@ -37,33 +83,32 @@ export function querySearch(
   q += '\n  }\n';
   q += '  OPTIONAL {\n';
   q += '  ?uri rdf:type ?type .\n';
-  q += '  ?type rdfs:label ?tlabel .\n';
-  q += '  FILTER (lang(?tlabel) = "en")\n}}';
+  q += labelTriple(opts, 'type', 'tlabel');
+  q += langFilter(opts, 'tlabel');
+  q += '}}';
   return q;
 }
 
 export function queryGetClasses(
   uri: string,
-  opts?: { limit?: number; offset?: number },
+  opts: { limit?: number; offset?: number } & QueryContext,
 ): string {
-  let q = 'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n';
-  q += 'SELECT DISTINCT ?uri ?label WHERE {\n';
+  let q = 'SELECT DISTINCT ?uri ?label WHERE {\n';
   q += '  ' + u(uri) + ' a ?uri .\n';
-  q += '  ?uri rdfs:label ?label .\n';
-  q += '  FILTER (lang(?label) = "en")\n';
+  q += labelTriple(opts, 'uri', 'label');
+  q += langFilter(opts, 'label');
   q += '}';
-  if (opts?.limit) q += ' limit ' + opts.limit;
-  if (opts?.offset) q += ' offset ' + opts.offset;
+  if (opts.limit) q += ' limit ' + opts.limit;
+  if (opts.offset) q += ' offset ' + opts.offset;
   return q;
 }
 
 export function queryGetProperties(
   uri: string,
-  opts?: { wikibase?: boolean },
+  opts: QueryContext,
 ): string {
-  const useWikibase = opts?.wikibase ?? true;
+  const useWikibase = opts.wikibaseAdapter;
   let q = 'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n';
-  q += 'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n';
   q += 'PREFIX owl: <http://www.w3.org/2002/07/owl#>\n';
   if (useWikibase) {
     q += 'PREFIX bd: <http://www.bigdata.com/rdf#>\n';
@@ -74,7 +119,9 @@ export function queryGetProperties(
   if (useWikibase) {
     q += '  ?p wikibase:directClaim ?property .\n';
   }
-  q += '  OPTIONAL { ?p rdfs:label ?propertyLabel . FILTER (lang(?propertyLabel) = "en")}\n';
+  q += '  OPTIONAL { ?p <' + opts.labelUri + '> ?propertyLabel .\n';
+  q += langFilter(opts, 'propertyLabel');
+  q += '  }\n';
   q += '  BIND(\n';
   q += '    IF(EXISTS { ?property rdf:type owl:ObjectProperty},\n';
   q += '      1,\n';
@@ -98,16 +145,28 @@ export function queryGetPropUri(uri: string, prop: string): string {
          '  <' + uri + '> <' + prop + '> ?uri .\n}';
 }
 
-export function queryGetPropObject(uri: string, prop: string): string {
-  return 'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n' +
-         'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n' +
-         'SELECT DISTINCT ?uri ?uriLabel WHERE {\n' +
-         '  <' + uri + '> <' + prop + '> ?uri .\n' +
-         '  OPTIONAL { ?uri rdfs:label ?uriLabel . FILTER (lang(?uriLabel) = "en")}\n}';
+export function queryGetPropObject(
+  uri: string,
+  prop: string,
+  ctx: QueryContext,
+): string {
+  let q = 'SELECT DISTINCT ?uri ?uriLabel WHERE {\n';
+  q += '  <' + uri + '> <' + prop + '> ?uri .\n';
+  q += '  OPTIONAL { ?uri <' + ctx.labelUri + '> ?uriLabel .\n';
+  q += langFilter(ctx, 'uriLabel');
+  q += '  }\n';
+  q += '}';
+  return q;
 }
 
-export function queryGetPropDatatype(uri: string, prop: string): string {
-  return 'SELECT DISTINCT ?lit WHERE {\n' +
-         '  <' + uri + '> <' + prop + '> ?lit .\n' +
-         '  FILTER (lang(?lit) = "" || lang(?lit) = "en")\n}';
+export function queryGetPropDatatype(
+  uri: string,
+  prop: string,
+  ctx: QueryContext,
+): string {
+  let q = 'SELECT DISTINCT ?lit WHERE {\n';
+  q += '  <' + uri + '> <' + prop + '> ?lit .\n';
+  q += '  FILTER (lang(?lit) = "" || lang(?lit) = "' + ctx.lang + '")\n';
+  q += '}';
+  return q;
 }

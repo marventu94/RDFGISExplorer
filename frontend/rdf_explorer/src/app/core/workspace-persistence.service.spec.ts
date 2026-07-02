@@ -149,7 +149,6 @@ describe('WorkspacePersistenceService', () => {
       activePanelId: 'p1',
       settings: {
         endpointType: 'fuseki' as const,
-        backendMode: 'direct' as const,
         limit: 50,
       },
     };

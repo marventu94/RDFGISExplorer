@@ -1,7 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { SettingsService } from './settings.service';
-import { WIKIDATA_SEED } from './wikidata-seed';
 import type { QueryResult, BindingValue } from './endpoint-adapter';
 import { createRdfBackendAdapter, type SparqlJsonResult, type SparqlBinding } from './endpoint-adapter';
 
@@ -12,9 +11,7 @@ export class RequestService {
   private readonly settings = inject(SettingsService);
   private readonly http = inject(HttpClient);
 
-  readonly labelCache = signal<ReadonlyMap<string, string>>(
-    new Map(WIKIDATA_SEED),
-  );
+  readonly labelCache = signal<ReadonlyMap<string, string>>(new Map());
 
   getLabel(uri: string): string | undefined {
     return this.labelCache().get(uri);
@@ -32,7 +29,7 @@ export class RequestService {
     query: string,
     opts?: { signal?: AbortSignal },
   ): Promise<T> {
-    const adapter = createRdfBackendAdapter(this.settings.app(), this.http);
+    const adapter = createRdfBackendAdapter(this.http);
     const result = await adapter.executeQuery(query, { signal: opts?.signal });
     const data = toSparqlJsonResult(result);
     this.correlateLabels(data);
@@ -40,7 +37,7 @@ export class RequestService {
   }
 
   async getPredicates(): Promise<string[]> {
-    const adapter = createRdfBackendAdapter(this.settings.app(), this.http);
+    const adapter = createRdfBackendAdapter(this.http);
     return adapter.getPredicates();
   }
 
@@ -113,6 +110,6 @@ function toSparqlBinding(val: BindingValue): SparqlBinding {
       ...(val.datatype ? { datatype: val.datatype } : {}),
     };
   }
-  const raw = (val as any).raw ?? String(val.value);
+  const raw = (val as { raw?: string }).raw ?? String(val.value);
   return { type: 'literal', value: raw };
 }
