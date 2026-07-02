@@ -76,6 +76,10 @@ export class UpdateAppSettingsDto {
   @IsOptional()
   @IsObject()
   classColorOverrides?: Record<string, string>;
+
+  @IsOptional()
+  @IsIn(THEMES)
+  theme?: Theme;
 }
 
 export { ColorOverrideMapConstraint };

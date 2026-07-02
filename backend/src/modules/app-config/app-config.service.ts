@@ -28,6 +28,7 @@ export class AppConfigService {
       wikibaseAdapter: cfg.supportsWikibaseLabel,
       endpointType: 'other',
       endpointLabel: cfg.backend,
+      theme: 'light',
     };
   }
 

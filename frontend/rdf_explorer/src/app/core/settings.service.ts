@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AppConfigService } from './services/app-config.service';
 import { SettingsApiService } from './services/settings-api.service';
@@ -18,6 +18,7 @@ const FALLBACK_SETTINGS: AppSettings = {
   endpointType: 'other',
   endpointLabel: 'unknown',
   classColorOverrides: {},
+  theme: 'light',
 };
 
 @Injectable({ providedIn: 'root' })
@@ -33,6 +34,8 @@ export class SettingsService {
   readonly loaded = this._loaded.asReadonly();
   readonly error = this._error.asReadonly();
 
+  readonly theme = computed<'light' | 'dark'>(() => this._settings().theme);
+
   readonly queryContext = computed<QueryContext>(() => {
     const s = this._settings();
     return {
@@ -42,6 +45,18 @@ export class SettingsService {
       wikibaseAdapter: s.wikibaseAdapter,
     };
   });
+
+  constructor() {
+    effect(() => {
+      const theme = this._settings().theme;
+      if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute(
+          'data-theme',
+          theme === 'dark' ? 'dark' : 'light',
+        );
+      }
+    });
+  }
 
   initFromConfig(cfg: ReturnType<AppConfigService['config']>): void {
     if (cfg && !this._loaded()) {
@@ -97,6 +112,7 @@ export class SettingsService {
       endpointType: cfg.defaults.endpointType,
       endpointLabel: cfg.defaults.endpointLabel,
       classColorOverrides: {},
+      theme: cfg.defaults.theme,
     };
   }
 }

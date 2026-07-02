@@ -23,6 +23,7 @@ const fakeSettings: AppSettings = {
   endpointType: 'other',
   endpointLabel: 'test',
   classColorOverrides: {},
+  theme: 'light',
 };
 
 describe('SettingsApiService', () => {

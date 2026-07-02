@@ -27,6 +27,7 @@ import type {
 import { UriCellRendererComponent } from './cell-renderers/uri-cell-renderer.component';
 import { CoordCellRendererComponent } from './cell-renderers/coord-cell-renderer.component';
 import { PluginCellRendererComponent } from './cell-renderers/plugin-cell-renderer.component';
+import { SettingsService } from '@core/services/settings.service';
 
 @Component({
   selector: 'app-table-view',
@@ -45,7 +46,12 @@ import { PluginCellRendererComponent } from './cell-renderers/plugin-cell-render
 export class TableViewComponent implements OnDestroy {
   private readonly selectionService = inject(SelectionService);
   private readonly viewState = inject(DashboardViewStateService);
+  private readonly settings = inject(SettingsService);
   private readonly destroy$ = new Subject<void>();
+
+  readonly agThemeClass = computed(() =>
+    this.settings.theme() === 'dark' ? 'ag-theme-alpine-dark' : 'ag-theme-alpine',
+  );
 
   private gridApi: GridApi | null = null;
   private isInternalSelection = false;
