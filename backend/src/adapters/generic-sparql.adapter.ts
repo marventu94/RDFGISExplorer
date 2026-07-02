@@ -176,7 +176,9 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
   private resolveEndpointUrl(): string {
     const url = process.env['SPARQL_ENDPOINT_URL'];
     if (url) return url;
-    console.warn('SPARQL_ENDPOINT_URL not set, using default Wikidata endpoint');
+    console.warn(
+      'SPARQL_ENDPOINT_URL not set, using default Wikidata endpoint',
+    );
     return DEFAULT_SPARQL_URL;
   }
 
