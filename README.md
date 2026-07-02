@@ -211,9 +211,9 @@ El frontend detecta `supportsWikibaseLabel: true` y usa:
 
 ```env
 SPARQL_BACKEND=graphdb
-SPARQL_ENDPOINT_URL=http://<host>:<port>/repositories/<repo-id>
-SPARQL_USERNAME=<user>
-SPARQL_PASSWORD=<password>
+SPARQL_ENDPOINT_URL=<GRAPHDB_URL>   # ej: http://localhost:7200/repositories/<repo-id>
+SPARQL_USERNAME=<usuario>
+SPARQL_PASSWORD=<contraseña>
 
 # Opcional: query personalizada para busqueda de entidades
 # SPARQL_ENTITY_SEARCH_QUERY=SELECT DISTINCT ?uri ?label WHERE { ?uri <http://www.w3.org/2000/01/rdf-schema#label> ?label . FILTER regex(?label, "$keyword", "i") } LIMIT $limit
