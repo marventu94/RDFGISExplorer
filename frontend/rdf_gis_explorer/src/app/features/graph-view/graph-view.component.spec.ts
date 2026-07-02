@@ -5,8 +5,10 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, of } from 'rxjs';
 import { GraphViewComponent } from './graph-view.component';
 import { SelectionService } from '@core/services/selection.service';
+import { EntityColorService } from '@core/services/entity-color.service';
+import { AppConfigService } from '@core/services/app-config.service';
+import { SettingsService } from '@core/services/settings.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
-import { ENTITY_TYPE_COLORS, colorForType } from '../../shared/entity-colors';
 
 const mockNode: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q7742',
@@ -247,36 +249,55 @@ describe('GraphViewComponent', () => {
   });
 });
 
-describe('entity-colors', () => {
-  it('should return default color for undefined type', () => {
-    expect(colorForType(undefined)).toBe(ENTITY_TYPE_COLORS['default']);
+describe('EntityColorService', () => {
+  const defaultColor = '#607D8B';
+
+  function buildService(configOverrides: Record<string, string> = {}, settingsOverrides: Record<string, string> = {}) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        EntityColorService,
+        {
+          provide: AppConfigService,
+          useValue: {
+            config: () => ({ classColors: configOverrides } as unknown as ReturnType<AppConfigService['config']>),
+          },
+        },
+        {
+          provide: SettingsService,
+          useValue: {
+            app: () => ({ classColorOverrides: settingsOverrides } as unknown as ReturnType<SettingsService['app']>),
+          },
+        },
+      ],
+    });
+    return TestBed.inject(EntityColorService);
+  }
+
+  it('returns default color for undefined type', () => {
+    const service = buildService();
+    expect(service.colorForType(undefined)).toBe(defaultColor);
   });
 
-  it('should return default color for unknown type', () => {
-    expect(colorForType('http://unknown')).toBe(ENTITY_TYPE_COLORS['default']);
+  it('returns default color for unknown type', () => {
+    const service = buildService();
+    expect(service.colorForType('http://unknown')).toBe(defaultColor);
   });
 
-  it('should return correct color for city type', () => {
-    expect(colorForType('http://www.wikidata.org/entity/Q515')).toBe('#2196F3');
+  it('uses classColors from app config when no override', () => {
+    const service = buildService(
+      { 'http://www.wikidata.org/entity/Q5': '#000000' },
+    );
+    expect(service.colorForType('http://www.wikidata.org/entity/Q5')).toBe('#000000');
   });
 
-  it('should return correct color for human type', () => {
-    expect(colorForType('http://www.wikidata.org/entity/Q5')).toBe('#9C27B0');
-  });
-
-  it('should return correct color for river type', () => {
-    expect(colorForType('http://www.wikidata.org/entity/Q4022')).toBe('#03A9F4');
-  });
-
-  it('should return correct color for museum type', () => {
-    expect(colorForType('http://www.wikidata.org/entity/Q33506')).toBe('#FF9800');
-  });
-
-  it('should return correct color for university type', () => {
-    expect(colorForType('http://www.wikidata.org/entity/Q3918')).toBe('#4CAF50');
-  });
-
-  it('should return correct color for president type', () => {
-    expect(colorForType('http://www.wikidata.org/entity/Q207313')).toBe('#E91E63');
+  it('user override wins over app config', () => {
+    const service = buildService(
+      { 'http://www.wikidata.org/entity/Q5': '#000000' },
+      { 'http://www.wikidata.org/entity/Q5': '#FF00FF' },
+    );
+    expect(service.colorForType('http://www.wikidata.org/entity/Q5')).toBe('#FF00FF');
   });
 });

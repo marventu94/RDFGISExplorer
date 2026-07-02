@@ -153,8 +153,7 @@ export class WorkspacePersistenceService {
       panels: payloadPanels,
       activePanelId: this.activePanelId(),
       settings: {
-        endpointType: this.mapEndpointType(app.endpoint.type),
-        backendMode: app.backendMode,
+        endpointType: this.mapEndpointType(app.endpointType),
         limit: app.resultLimit,
       },
     };
@@ -173,11 +172,7 @@ export class WorkspacePersistenceService {
     this.panels.set(mappedPanels);
     this.activePanelId.set(payload.activePanelId);
 
-    this.settings.update('endpoint', {
-      ...this.settings.app().endpoint,
-      type: payload.settings.endpointType as EndpointType,
-    });
-    this.settings.update('backendMode', payload.settings.backendMode);
+    this.settings.update('endpointType', payload.settings.endpointType as EndpointType);
     this.settings.update('resultLimit', payload.settings.limit);
   }
 

@@ -19,8 +19,9 @@ import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection } from '@shared/models';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
-import { GRAPH_STYLE } from './graph-style';
+import { createGraphStyle } from './graph-style';
 import { LAYOUT_CONFIGS } from './graph-layouts';
+import { EntityColorService } from '@core/services/entity-color.service';
 
 cytoscape.use(cola);
 cytoscape.use(dagre);
@@ -70,6 +71,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private readonly COLLAPSE_DEGREE = 20;
 
   private readonly viewState = inject(DashboardViewStateService);
+  private readonly colorService = inject(EntityColorService);
 
   constructor(
     private selectionService: SelectionService,
@@ -278,7 +280,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy = cytoscape({
       container: this.container.nativeElement,
       elements,
-      style: GRAPH_STYLE,
+      style: createGraphStyle(this.colorService),
       layout: this.getLayoutOptions(defaultLayout),
       wheelSensitivity: 1.0,
       minZoom: 0.05,

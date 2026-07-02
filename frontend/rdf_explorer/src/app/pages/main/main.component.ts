@@ -162,7 +162,7 @@ export class MainComponent implements OnInit {
 
     const sparql = validQueries[0].toSparql()!;
 
-    const backend = this.settings.app().endpoint.label || 'generic';
+    const backend = this.settings.app().endpointLabel || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,
