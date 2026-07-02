@@ -66,7 +66,11 @@ describe('SuggestionsService', () => {
       .query(true)
       .reply(200, {
         search: [
-          { concepturi: 'http://www.wikidata.org/entity/Q1486', label: 'Buenos Aires', description: 'Capital city' },
+          {
+            concepturi: 'http://www.wikidata.org/entity/Q1486',
+            label: 'Buenos Aires',
+            description: 'Capital city',
+          },
         ],
       });
 
@@ -91,7 +95,10 @@ describe('SuggestionsService', () => {
         head: { vars: ['uri', 'label'] },
         results: {
           bindings: [
-            { uri: { type: 'uri', value: 'http://example.org/entity/1' }, label: { type: 'literal', value: 'Entity One' } },
+            {
+              uri: { type: 'uri', value: 'http://example.org/entity/1' },
+              label: { type: 'literal', value: 'Entity One' },
+            },
           ],
         },
       });
@@ -100,5 +107,83 @@ describe('SuggestionsService', () => {
     expect(results).toHaveLength(1);
     expect(results[0].uri).toBe('http://example.org/entity/1');
     expect(results[0].label).toBe('Entity One');
+  });
+
+  it('should inject class filter into SPARQL when classUri provided (generic backend)', async () => {
+    configGet.mockImplementation((key: string) => {
+      const values: Record<string, string> = {
+        SPARQL_BACKEND: 'graphdb',
+        SPARQL_ENDPOINT_URL: 'http://localhost:7200/repositories/test',
+      };
+      return values[key];
+    });
+
+    let capturedQuery: string | null = null;
+    nock('http://localhost:7200')
+      .post('/repositories/test')
+      .reply(200, function (_uri, body) {
+        const raw = typeof body === 'string' ? body : String(body);
+        const params = new URLSearchParams(raw);
+        capturedQuery = params.get('query') ?? '';
+        return {
+          head: { vars: ['uri', 'label'] },
+          results: { bindings: [] },
+        };
+      });
+
+    await service.searchEntities('entity', 10, 'http://example.org/Class');
+    expect(capturedQuery).toContain('?uri a <http://example.org/Class>');
+  });
+
+  it('should post-filter wikidata results by P31 when classUri provided', async () => {
+    configGet.mockImplementation((key: string) => {
+      const values: Record<string, string> = {
+        SPARQL_BACKEND: 'wikidata',
+        SPARQL_ENDPOINT_URL: 'https://query.wikidata.org/sparql',
+      };
+      return values[key];
+    });
+
+    nock('https://www.wikidata.org')
+      .get('/w/api.php')
+      .query(true)
+      .reply(200, {
+        search: [
+          {
+            concepturi: 'http://www.wikidata.org/entity/Q5',
+            label: 'human',
+          },
+          {
+            concepturi: 'http://www.wikidata.org/entity/Q515',
+            label: 'city',
+          },
+        ],
+      });
+
+    nock('https://query.wikidata.org')
+      .post('/sparql')
+      .reply(200, {
+        results: {
+          bindings: [
+            { uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' } },
+          ],
+        },
+      });
+
+    const results = await service.searchEntities(
+      'human',
+      10,
+      'http://www.wikidata.org/entity/Q5',
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].uri).toBe('http://www.wikidata.org/entity/Q5');
+  });
+
+  it('should reject invalid classUri', async () => {
+    await expect(
+      service.searchEntities('entity', 10, 'not a uri with spaces'),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('classUri is not a valid IRI'),
+    });
   });
 });

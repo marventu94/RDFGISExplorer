@@ -7,6 +7,7 @@ import { HealthModule } from './modules/health/health.module';
 import { DashboardsModule } from './modules/dashboards/dashboards.module';
 
 import { AppConfigModule } from './modules/app-config/app-config.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AppConfigModule } from './modules/app-config/app-config.module';
     HealthModule,
     DashboardsModule,
     AppConfigModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

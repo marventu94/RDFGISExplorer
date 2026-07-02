@@ -16,6 +16,8 @@ Backend NestJS (:3000)
 ├── /api/query/execute      → Ejecuta SPARQL via adaptador
 ├── /api/dashboards (CRUD)  → SQLite (better-sqlite3)
 ├── /api/suggestions        → Autocompletado predicados
+├── /api/settings (GET/PUT) → Preferencias del usuario (SQLite, singleton)
+├── /api/config             → Configuracion runtime (env) + defaults
 └── /api/health             → Health checks
 ```
 
@@ -78,7 +80,8 @@ cd frontend/rdf_gis_explorer && pnpm test # Vitest
 | `DashboardsModule` | `modules/dashboards/` | CRUD dashboards en SQLite. Payload JSON opaco. Valida `kind` ∈ {gis, explorer} |
 | `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados + busqueda de entidades (`/api/suggestions/entities`) |
 | `HealthModule` | `modules/health/` | Health check basico + verificacion real del endpoint SPARQL |
-| `AppConfigModule` | `modules/app-config/` | Expose `GET /api/config` con configuracion publica del backend SPARQL |
+| `AppConfigModule` | `modules/app-config/` | `GET /api/config`: runtime config (env) + `labelUri`, `describe` y `defaults` para nuevas settings |
+| `SettingsModule` | `modules/settings/` | `GET/PUT /api/settings`: preferencias del usuario en SQLite (singleton, JSON opaco en `data`) |
 
 ## Adaptadores SPARQL
 
@@ -138,10 +141,54 @@ El corazon de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `gr
 
 - **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + seleccion → POST `/api/dashboards`.
 - **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → POST `/api/dashboards`.
-- **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`).
-- **Settings Explorer:** `localStorage` (`rdfexplorer.settings.v1`).
+- **Settings Explorer:** `SettingsService` consume `GET/PUT /api/settings` (SQLite). El front no tiene estado persistente propio. `load()` se ejecuta en `APP_INITIALIZER`.
+- **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro, no es config.
 - **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`.
-- **AutoRun handoff:** `localStorage` (`platform.handoff.autoRun`).
+- **AutoRun handoff:** `localStorage` (`platform.handoff.autoRun`) — preferencia de UX per-device.
+
+## Configuracion y Settings
+
+Dos endpoints, dos responsabilidades, una sola fuente de verdad (el backend):
+
+### Runtime config — `GET /api/config` (read-only para el cliente)
+
+Derivado de variables de entorno. Configura el comportamiento de toda la plataforma:
+
+```ts
+AppConfig {
+  backend, endpointUrl, hasBasicAuth, userAgent, timeoutMs, defaultLimit, maxLimit,
+  capabilities, supportsWikibaseLabel, defaultPrefixes, search,
+  labelUri,            // rdfs:label por default
+  describe,            // UI hints: { exclude, objects, datatype, text, image, external }
+  defaults             // bootstrap para nuevas settings (SettingsDefaults)
+}
+```
+
+`AppConfigService` (frontend) cachea esta respuesta y la expone como `signal<AppConfig | null>`. Consumidores: `DescribeService` (usa `describe`), `PropertyGraphService` (usa `defaultPrefixes`), `SettingsService` (usa `defaults`).
+
+### Preferencias del usuario — `GET/PUT /api/settings` (persiste en SQLite)
+
+Tabla `settings` con un único registro (`id = 1`, columna `data` JSON opaco, `updated_at`). El front no toca SQLite directo — todo via API:
+
+```ts
+AppSettings {
+  lang, labelUri, searchClass, resultLimit, wikibaseAdapter, endpointType, endpointLabel
+}
+```
+
+Validación con `class-validator` (DTOs en `modules/settings/dto/`). Errores → 400 con `{ error: 'INVALID_SETTINGS' }`.
+
+`SettingsService` (frontend) inyecta `AppConfigService` + `SettingsApiService`:
+- En el constructor, bootstrap con los `defaults` de la config
+- `load()` (async) hace GET y sobreescribe con lo persistido
+- `update(key, value)` aplica local + PUT fire-and-forget; rollback si falla
+- `reset()` restaura defaults + PUT full
+
+### Lo que NO se persiste
+
+- **Endpoint URL**: viene de `SPARQL_ENDPOINT_URL` (env). El front no puede apuntar a otro endpoint sin tocar el backend.
+- **Prefixes**: vienen de `AppConfig.defaultPrefixes`. Neutrales (rdf, rdfs) o Wikidata (wd, wdt, etc.) según el backend activo.
+- **Wikidata/Dbpedia hardcodeados**: eliminados. Los URIs específicos de Wikidata viven en `AppConfigService` solo cuando `backend === 'wikidata'`.
 
 ## Routing del Shell
 
@@ -172,7 +219,8 @@ Ver archivos `.env`, `.env.wikidata` y `.env.graphdb.example`. Las principales:
 | `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |
 | `BACKEND_PORT` | `3000` | Puerto backend |
 | `CORS_ORIGINS` | `http://localhost:4200` | CORS |
-| `DASHBOARDS_SQLITE_PATH` | `./data/dashboards.sqlite` | Path SQLite |
+| `DASHBOARDS_SQLITE_PATH` | `./data/dashboards.sqlite` | Path SQLite (dashboards + settings) |
+| `SETTINGS_SQLITE_PATH` | `./data/dashboards.sqlite` | Path SQLite de settings. Por defecto reusa el de dashboards. |
 
 ## Path Aliases (TypeScript)
 

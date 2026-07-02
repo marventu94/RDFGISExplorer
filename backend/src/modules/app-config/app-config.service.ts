@@ -1,0 +1,165 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type {
+  AppConfigDto,
+  SearchClassDto,
+  SettingsDefaultsDto,
+} from './dto/app-config.dto';
+
+@Injectable()
+export class AppConfigService {
+  constructor(private readonly config: ConfigService) {}
+
+  getConfig(): AppConfigDto {
+    return {
+      ...this.buildRuntimeConfig(),
+      classColors: this.getClassColors(),
+      defaults: this.getSettingsDefaults(),
+    };
+  }
+
+  getSettingsDefaults(): SettingsDefaultsDto {
+    const cfg = this.buildRuntimeConfig();
+    return {
+      lang: 'en',
+      resultLimit: cfg.defaultLimit,
+      labelUri: cfg.labelUri,
+      searchClass: this.defaultSearchClassFor(cfg),
+      wikibaseAdapter: cfg.supportsWikibaseLabel,
+      endpointType: 'other',
+      endpointLabel: cfg.backend,
+    };
+  }
+
+  private buildRuntimeConfig(): Omit<AppConfigDto, 'defaults'> {
+    const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
+    const endpointUrl =
+      this.config.get<string>('SPARQL_ENDPOINT_URL') ??
+      'https://query.wikidata.org/sparql';
+    const userAgent =
+      this.config.get<string>('SPARQL_USER') ?? 'rdf-gis-explorer/0.1';
+    const username = this.config.get<string>('SPARQL_USERNAME');
+    const password = this.config.get<string>('SPARQL_PASSWORD');
+
+    const isWikidata = backend === 'wikidata';
+    const defaultLimit = parseInt(
+      this.config.get<string>('SPARQL_DEFAULT_LIMIT') ?? '500',
+      10,
+    );
+    const maxLimit = parseInt(
+      this.config.get<string>('SPARQL_MAX_LIMIT') ?? '2000',
+      10,
+    );
+    const labelUri = 'http://www.w3.org/2000/01/rdf-schema#label';
+
+    return {
+      backend,
+      endpointUrl,
+      hasBasicAuth: Boolean(username && password),
+      userAgent,
+      timeoutMs: parseInt(
+        this.config.get<string>('SPARQL_TIMEOUT_MS') ?? '30000',
+        10,
+      ),
+      defaultLimit,
+      maxLimit,
+      capabilities: [
+        'sparql11',
+        'queryExecute',
+        'predicateSuggestions',
+        'entitySearch',
+      ],
+      supportsWikibaseLabel: isWikidata,
+      defaultPrefixes: isWikidata
+        ? {
+            rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+            rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
+            wd: 'http://www.wikidata.org/entity/',
+            wdt: 'http://www.wikidata.org/prop/direct/',
+            wikibase: 'http://wikiba.se/ontology#',
+            bd: 'http://www.bigdata.com/rdf#',
+          }
+        : {
+            rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+            rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
+          },
+      search: isWikidata
+        ? {
+            mode: 'wikidata-api',
+            endpoint: 'https://www.wikidata.org/w/api.php',
+            labelProperty: labelUri,
+          }
+        : {
+            mode: 'sparql',
+            labelProperty: labelUri,
+          },
+      labelUri,
+      describe: isWikidata
+        ? {
+            exclude: [
+              'http://www.wikidata.org/prop/direct/P443',
+              'http://www.wikidata.org/prop/direct/P109',
+            ],
+            objects: ['http://www.wikidata.org/prop/direct/P31'],
+            datatype: [],
+            text: ['http://www.dbpedia.org/ontology/abstract'],
+            image: [
+              'http://www.wikidata.org/prop/direct/P18',
+              'http://www.wikidata.org/prop/direct/P154',
+              'http://www.wikidata.org/prop/direct/P41',
+              'http://www.wikidata.org/prop/direct/P94',
+              'http://www.wikidata.org/prop/direct/P158',
+              'http://www.wikidata.org/prop/direct/P242',
+              'http://www.wikidata.org/prop/direct/P948',
+            ],
+            external: [
+              'http://www.wikidata.org/prop/direct/P2035',
+              'http://www.wikidata.org/prop/direct/P2888',
+              'http://www.wikidata.org/prop/direct/P973',
+              'http://www.wikidata.org/prop/direct/P856',
+              'http://www.wikidata.org/prop/direct/P3264',
+              'http://www.wikidata.org/prop/direct/P1896',
+              'http://www.wikidata.org/prop/direct/P1581',
+            ],
+          }
+        : {
+            exclude: [],
+            objects: ['http://www.w3.org/1999/02/22-rdf-syntax-ns#type'],
+            datatype: [],
+            text: ['http://www.w3.org/2000/01/rdf-schema#comment'],
+            image: [],
+            external: [],
+          },
+    };
+  }
+
+  private defaultSearchClassFor(
+    cfg: Omit<AppConfigDto, 'defaults'>,
+  ): SearchClassDto {
+    if (cfg.backend === 'wikidata') {
+      return {
+        uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' },
+        label: { type: 'literal', value: 'human', 'xml:lang': 'en' },
+      };
+    }
+    return {
+      uri: { type: 'uri', value: 'http://www.w3.org/2002/07/owl#Thing' },
+      label: { type: 'literal', value: 'thing', 'xml:lang': 'en' },
+    };
+  }
+
+  private getClassColors(): Record<string, string> {
+    const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
+    if (backend === 'wikidata') {
+      return {
+        'http://www.wikidata.org/entity/Q515': '#2196F3',
+        'http://www.wikidata.org/entity/Q5': '#9C27B0',
+        'http://www.wikidata.org/entity/Q4022': '#03A9F4',
+        'http://www.wikidata.org/entity/Q33506': '#FF9800',
+        'http://www.wikidata.org/entity/Q3918': '#4CAF50',
+        'http://www.wikidata.org/entity/Q207313': '#E91E63',
+      };
+    }
+    return {};
+  }
+}

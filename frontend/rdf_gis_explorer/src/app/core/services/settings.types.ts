@@ -1,8 +1,9 @@
-import type { SearchClass } from './services/app-config.service';
-
-export type { SearchClass, Prefix, DescribeConfig, SettingsDefaults } from './services/app-config.service';
-
 export type EndpointType = 'virtuoso' | 'fuseki' | 'other';
+
+export interface SearchClass {
+  uri: { type: 'uri'; value: string };
+  label: { type: 'literal'; value: string; 'xml:lang'?: string };
+}
 
 export interface AppSettings {
   lang: string;

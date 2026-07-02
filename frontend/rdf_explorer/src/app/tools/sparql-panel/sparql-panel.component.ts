@@ -61,7 +61,7 @@ export class SparqlPanelComponent {
     const sparql = query.toSparql();
     if (!sparql?.trim()) return;
 
-    const backend = this.settings.app().endpoint.label || 'generic';
+    const backend = this.settings.app().endpointLabel || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,
