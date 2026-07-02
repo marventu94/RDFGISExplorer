@@ -21,6 +21,9 @@ export type SupportedLang = (typeof SUPPORTED_LANGS)[number];
 export const ENDPOINT_TYPES = ['virtuoso', 'fuseki', 'other'] as const;
 export type EndpointType = (typeof ENDPOINT_TYPES)[number];
 
+export const THEMES = ['light', 'dark'] as const;
+export type Theme = (typeof THEMES)[number];
+
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const URI_PATTERN = /^[a-z][a-z0-9+.-]*:[^\s<>"]*$/i;
 
@@ -102,4 +105,7 @@ export class AppSettingsDto {
   @IsObject()
   @Validate(ColorOverrideMapConstraint)
   classColorOverrides!: Record<string, string>;
+
+  @IsIn(THEMES)
+  theme!: Theme;
 }

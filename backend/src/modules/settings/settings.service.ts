@@ -89,6 +89,7 @@ export class SettingsService {
         endpointType: defaults.endpointType,
         endpointLabel: defaults.endpointLabel,
         classColorOverrides: {},
+        theme: defaults.theme,
       };
     }
     return deepClone(this.cachedDefaults);
