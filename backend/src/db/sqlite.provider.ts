@@ -22,6 +22,25 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `;
 
+function normalizeBackend(backend: string | undefined): string {
+  if (!backend) return 'wikidata';
+  const safe = backend.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return safe || 'wikidata';
+}
+
+function resolveDashboardsPath(): string {
+  const explicit = process.env['DASHBOARDS_SQLITE_PATH'];
+  if (explicit && explicit.trim() !== '') return path.resolve(explicit);
+  const backend = normalizeBackend(process.env['SPARQL_BACKEND']);
+  return path.resolve(`./data/${backend}.sqlite`);
+}
+
+function resolveSettingsPath(): string {
+  const explicit = process.env['SETTINGS_SQLITE_PATH'];
+  if (explicit && explicit.trim() !== '') return explicit;
+  return resolveDashboardsPath();
+}
+
 export function createSqliteConnection(dbPath: string): Database.Database {
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
@@ -35,17 +54,21 @@ export function createSqliteConnection(dbPath: string): Database.Database {
 }
 
 export function createDashboardsConnection(): Database.Database {
-  const dbPath =
-    process.env['DASHBOARDS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
+  const dbPath = resolveDashboardsPath();
   const db = createSqliteConnection(dbPath);
   db.exec(DASHBOARDS_MIGRATIONS_SQL);
   return db;
 }
 
 export function createSettingsConnection(): Database.Database {
-  const dbPath =
-    process.env['SETTINGS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
+  const dbPath = resolveSettingsPath();
   const db = createSqliteConnection(dbPath);
   db.exec(SETTINGS_MIGRATIONS_SQL);
   return db;
 }
+
+export const __testing = {
+  resolveDashboardsPath,
+  resolveSettingsPath,
+  normalizeBackend,
+};

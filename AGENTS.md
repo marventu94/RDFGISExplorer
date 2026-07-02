@@ -219,8 +219,34 @@ Ver archivos `.env`, `.env.wikidata` y `.env.graphdb.example`. Las principales:
 | `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |
 | `BACKEND_PORT` | `3000` | Puerto backend |
 | `CORS_ORIGINS` | `http://localhost:4200` | CORS |
-| `DASHBOARDS_SQLITE_PATH` | `./data/dashboards.sqlite` | Path SQLite (dashboards + settings) |
-| `SETTINGS_SQLITE_PATH` | `./data/dashboards.sqlite` | Path SQLite de settings. Por defecto reusa el de dashboards. |
+| `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | Path SQLite dashboards. Si está set, override del default. |
+| `SETTINGS_SQLITE_PATH` | mismo que `DASHBOARDS_SQLITE_PATH` | Path SQLite settings. Por defecto reusa el de dashboards. |
+| `SPARQL_PROTECTED_BACKENDS` | `wikidata,graphdb` | Backends cuyos archivos SQLite en `data/` se conservan al correr `npm run clean:unused-data`. |
+
+## Persistencia SQLite por backend
+
+Cada backend tiene su propio archivo SQLite, derivado de `SPARQL_BACKEND`:
+
+| `SPARQL_BACKEND` | Archivo SQLite (default) |
+|---|---|
+| `wikidata` | `data/wikidata.sqlite` |
+| `graphdb` | `data/graphdb.sqlite` |
+| `generic` | `data/generic.sqlite` |
+| `millenniumdb` | `data/millenniumdb.sqlite` |
+
+`SETTINGS_SQLITE_PATH` reusa el de dashboards por default. Ambos paths pueden overridearse con sus env vars respectivas.
+
+Limpieza de archivos sin uso:
+
+```bash
+cd backend
+npm run clean:unused-data            # reporta candidatos, exit 1 si hay
+npm run clean:unused-data:force     # los borra (incluye -shm/-wal siblings)
+```
+
+`SPARQL_PROTECTED_BACKENDS` (default `wikidata,graphdb`) controla qué archivos en `data/` se preservan aunque no sean el activo. Útil cuando el proyecto puede correr con varios backends.
+
+`data/curation.db` y `data/dashboards.sqlite` (path pre-refactor) son detectados como `legacy-path` u `orphan-backend` y aparecen como candidatos por default.
 
 ## Path Aliases (TypeScript)
 
