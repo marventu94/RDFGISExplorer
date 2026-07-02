@@ -43,7 +43,7 @@ describe('WorkspaceApiClient', () => {
       payload: {
         panels: [],
         activePanelId: '',
-        settings: { endpointType: 'generic' as const, backendMode: 'app-backend' as const, limit: 20 },
+        settings: { endpointType: 'generic' as const, limit: 20 },
       },
     };
     client.create(input).subscribe();

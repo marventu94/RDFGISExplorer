@@ -2,6 +2,30 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, shareReplay, tap } from 'rxjs';
 
+export interface DescribeConfig {
+  exclude: string[];
+  objects: string[];
+  datatype: string[];
+  text: string[];
+  image: string[];
+  external: string[];
+}
+
+export interface SearchClass {
+  uri: { type: 'uri'; value: string; 'xml:lang'?: string };
+  label: { type: 'literal'; value: string; 'xml:lang'?: string };
+}
+
+export interface SettingsDefaults {
+  lang: string;
+  resultLimit: number;
+  labelUri: string;
+  searchClass: SearchClass;
+  wikibaseAdapter: boolean;
+  endpointType: 'virtuoso' | 'fuseki' | 'other';
+  endpointLabel: string;
+}
+
 export interface AppConfig {
   backend: string;
   endpointUrl: string;
@@ -18,6 +42,10 @@ export interface AppConfig {
     endpoint?: string;
     labelProperty: string;
   };
+  labelUri: string;
+  describe: DescribeConfig;
+  classColors: Record<string, string>;
+  defaults: SettingsDefaults;
 }
 
 @Injectable({ providedIn: 'root' })

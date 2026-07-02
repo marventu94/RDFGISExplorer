@@ -1,8 +1,7 @@
-import type { EndpointType, AppSettings } from './settings.types';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-// ========== Legacy EndpointAdapter (text search only) ==========
+// ========== Legacy text-search adapters (Virtuoso / Fuseki / Generic) ==========
 
 export interface EndpointAdapter {
   textSearchTriple(label: string, keyword: string, limit: number): string;
@@ -26,7 +25,7 @@ export class GenericAdapter implements EndpointAdapter {
   }
 }
 
-export function createEndpointAdapter(type: EndpointType): EndpointAdapter {
+export function createEndpointAdapter(type: string): EndpointAdapter {
   switch (type) {
     case 'virtuoso':
       return new VirtuosoAdapter();
@@ -37,7 +36,7 @@ export function createEndpointAdapter(type: EndpointType): EndpointAdapter {
   }
 }
 
-// ========== QueryResult types (mirror backend/src/shared/dto/query-result.dto.ts) ==========
+// ========== QueryResult (mirrors backend/src/shared/dto/query-result.dto.ts) ==========
 
 export interface Coordinate {
   lat: number;
@@ -96,6 +95,19 @@ export interface QueryResult {
   };
 }
 
+export interface ExecuteOpts {
+  limit?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export interface RdfBackendAdapter {
+  readonly id: string;
+  textSearchTriple(label: string, keyword: string, limit: number): string;
+  executeQuery(query: string, opts?: ExecuteOpts): Promise<QueryResult>;
+  getPredicates(): Promise<string[]>;
+}
+
 // ========== Raw SPARQL JSON types ==========
 
 export interface SparqlBinding {
@@ -111,24 +123,6 @@ export interface SparqlJsonResult {
     bindings: Array<Record<string, SparqlBinding>>;
   };
 }
-
-// ========== New RdfBackendAdapter ==========
-
-export interface ExecuteOpts {
-  backend?: string;
-  limit?: number;
-  timeoutMs?: number;
-  signal?: AbortSignal;
-}
-
-export interface RdfBackendAdapter {
-  readonly id: string;
-  textSearchTriple(label: string, keyword: string, limit: number): string;
-  executeQuery(query: string, opts: ExecuteOpts): Promise<QueryResult>;
-  getPredicates(): Promise<string[]>;
-}
-
-// ========== GisBackendAdapter ==========
 
 export class GisBackendAdapter implements RdfBackendAdapter {
   readonly id = 'gis-backend';
@@ -158,101 +152,9 @@ export class GisBackendAdapter implements RdfBackendAdapter {
   }
 }
 
-// ========== LegacyDirectAdapter ==========
-
-export class LegacyDirectAdapter implements RdfBackendAdapter {
-  readonly id = 'legacy-direct';
-
-  constructor(private readonly endpointUrl: string) {}
-
-  textSearchTriple(label: string, keyword: string, limit: number): string {
-    return new GenericAdapter().textSearchTriple(label, keyword, limit);
-  }
-
-  async executeQuery(query: string, opts: ExecuteOpts = {}): Promise<QueryResult> {
-    const params = new URLSearchParams({
-      format: 'json',
-      query,
-    });
-    const url = `${this.endpointUrl}?origin=*&${params.toString()}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      signal: opts.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`SPARQL query failed: ${response.status} ${response.statusText}`);
-    }
-
-    const raw = (await response.json()) as SparqlJsonResult;
-    return this.toQueryResult(raw, opts);
-  }
-
-  async getPredicates(): Promise<string[]> {
-    const query = 'SELECT DISTINCT ?p WHERE { ?s ?p ?o } LIMIT 1000';
-    const result = await this.executeQuery(query);
-    const predicates: string[] = [];
-    for (const row of result.bindings) {
-      const p = row['p'];
-      if (p && p.type === 'uri') {
-        predicates.push(p.value);
-      }
-    }
-    return predicates;
-  }
-
-  private toQueryResult(raw: SparqlJsonResult, opts: ExecuteOpts = {}): QueryResult {
-    const variables = raw.head?.vars ?? [];
-    const bindings: ResultBinding[] = (raw.results?.bindings ?? []).map((row) => {
-      const result: ResultBinding = {};
-      for (const [key, cell] of Object.entries(row)) {
-        result[key] = this.normalizeValue(cell);
-      }
-      return result;
-    });
-
-    return {
-      variables,
-      bindings,
-      nodes: [],
-      edges: [],
-      meta: {
-        durationMs: 0,
-        truncated: false,
-        limitApplied: opts.limit ?? 0,
-        backend: 'wikidata',
-      },
-    };
-  }
-
-  private normalizeValue(raw: SparqlBinding): BindingValue {
-    if (raw.type === 'uri') {
-      return { type: 'uri', value: raw.value };
-    }
-    if (raw.type === 'bnode') {
-      return { type: 'bnode', value: raw.value };
-    }
-    if (raw.type === 'literal') {
-      return {
-        type: 'literal',
-        value: raw.value,
-        ...(raw['xml:lang'] ? { lang: raw['xml:lang'] } : {}),
-        ...(raw.datatype ? { datatype: raw.datatype } : {}),
-      };
-    }
-    return { type: 'literal', value: raw.value };
-  }
-}
-
-// ========== Factory ==========
-
 export function createRdfBackendAdapter(
-  settings: AppSettings,
   http: HttpClient,
+  baseUrl: string = '',
 ): RdfBackendAdapter {
-  if (settings.backendMode === 'direct') {
-    return new LegacyDirectAdapter(settings.endpoint.url);
-  }
-  return new GisBackendAdapter(http, '');
+  return new GisBackendAdapter(http, baseUrl);
 }

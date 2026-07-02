@@ -14,6 +14,14 @@ CREATE TABLE IF NOT EXISTS dashboards (
 CREATE INDEX IF NOT EXISTS idx_dashboards_updated ON dashboards(updated_at DESC);
 `;
 
+const SETTINGS_MIGRATIONS_SQL = `
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`;
+
 export function createSqliteConnection(dbPath: string): Database.Database {
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
@@ -31,5 +39,13 @@ export function createDashboardsConnection(): Database.Database {
     process.env['DASHBOARDS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
   const db = createSqliteConnection(dbPath);
   db.exec(DASHBOARDS_MIGRATIONS_SQL);
+  return db;
+}
+
+export function createSettingsConnection(): Database.Database {
+  const dbPath =
+    process.env['SETTINGS_SQLITE_PATH'] ?? './data/dashboards.sqlite';
+  const db = createSqliteConnection(dbPath);
+  db.exec(SETTINGS_MIGRATIONS_SQL);
   return db;
 }

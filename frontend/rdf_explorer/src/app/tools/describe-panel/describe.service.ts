@@ -11,6 +11,8 @@ import {
 } from '../../core/query.service';
 import type { RDFResource } from '../../graph/domain';
 import { PropertyGraphService } from '../../graph/property-graph.service';
+import { AppConfigService } from '../../core/services/app-config.service';
+import type { DescribeConfig } from '../../core/services/app-config.service';
 
 export interface DescribeBucketItem {
   uri: string;
@@ -44,8 +46,22 @@ export class DescribeService {
   private readonly settings = inject(SettingsService);
   private readonly log = inject(LogService);
   private readonly graph = inject(PropertyGraphService);
+  private readonly appConfig = inject(AppConfigService);
 
   private cache: CachedResource[] = [];
+
+  private describeCfg(): DescribeConfig {
+    return (
+      this.appConfig.config()?.describe ?? {
+        exclude: [],
+        objects: [],
+        datatype: [],
+        text: [],
+        image: [],
+        external: [],
+      }
+    );
+  }
 
   readonly current = signal<DescribedResource | null>(null);
 
@@ -121,8 +137,8 @@ export class DescribeService {
 
     this.current.set(selected);
 
-    this.request.execQuery(queryGetProperties(uri, { wikibase: this.settings.app().wikibaseAdapter })).then(data => {
-      const cfg = this.settings.describe();
+    this.request.execQuery(queryGetProperties(uri, this.settings.queryContext())).then(data => {
+      const cfg = this.describeCfg();
       const properties = data.results.bindings.filter(r =>
         !cfg.exclude.includes(r['property'].value),
       );
@@ -177,14 +193,14 @@ export class DescribeService {
   }
 
   private loadDatatype(selected: CachedResource, prop: string): void {
-    this.request.execQuery(queryGetPropDatatype(selected.uri, prop)).then(data => {
+    this.request.execQuery(queryGetPropDatatype(selected.uri, prop, this.settings.queryContext())).then(data => {
       selected.results[prop] = data.results.bindings.map(s => s['lit'].value);
       this.bump();
     });
   }
 
   private loadObject(selected: CachedResource, prop: string): void {
-    this.request.execQuery(queryGetPropObject(selected.uri, prop)).then(data => {
+    this.request.execQuery(queryGetPropObject(selected.uri, prop, this.settings.queryContext())).then(data => {
       selected.results[prop] = data.results.bindings.map(s => {
         const obj: { uri: string; label?: string } = { uri: s['uri'].value };
         if (s['uriLabel']) obj.label = s['uriLabel'].value;
@@ -197,7 +213,7 @@ export class DescribeService {
   private sort(): void {
     const cur = this.current() as CachedResource | null;
     if (!cur) return;
-    const cfg = this.settings.describe();
+    const cfg = this.describeCfg();
     cur.objects.sort((a, b) => cfg.objects.indexOf(b.uri) - cfg.objects.indexOf(a.uri));
     this.bump();
   }

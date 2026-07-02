@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { SuggestionsService } from './suggestions.service';
+import type { EntitySearchQueryDto } from './dto/entity-search-query.dto';
 
 @Controller('suggestions')
 export class SuggestionsController {
@@ -13,12 +14,11 @@ export class SuggestionsController {
   }
 
   @Get('entities')
-  searchEntities(
-    @Query('q') q: string,
-    @Query('limit') limit?: string,
-  ): Promise<{ entities: import('./suggestions.service').EntitySearchResult[] }> {
+  searchEntities(@Query() query: EntitySearchQueryDto): Promise<{
+    entities: import('./suggestions.service').EntitySearchResult[];
+  }> {
     return this.suggestionsService
-      .searchEntities(q ?? '', limit ? parseInt(limit, 10) : 20)
+      .searchEntities(query.q ?? '', query.limit, query.classUri)
       .then((entities) => ({ entities }));
   }
 }

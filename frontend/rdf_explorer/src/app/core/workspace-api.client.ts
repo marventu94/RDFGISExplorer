@@ -29,7 +29,6 @@ export interface ExplorerWorkspacePayload {
   activePanelId: string;
   settings: {
     endpointType: 'virtuoso' | 'fuseki' | 'generic';
-    backendMode: 'app-backend' | 'direct';
     limit: number;
   };
 }
