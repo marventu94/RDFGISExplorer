@@ -35,6 +35,7 @@ export interface SettingsDefaults {
   wikibaseAdapter: boolean;
   endpointType: 'virtuoso' | 'fuseki' | 'other';
   endpointLabel: string;
+  theme: 'light' | 'dark';
 }
 
 export interface AppConfig {

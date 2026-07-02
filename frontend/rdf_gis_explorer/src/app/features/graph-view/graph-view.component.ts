@@ -22,6 +22,7 @@ import { DashboardViewStateService } from '@core/services/dashboard-view-state.s
 import { createGraphStyle } from './graph-style';
 import { LAYOUT_CONFIGS } from './graph-layouts';
 import { EntityColorService } from '@core/services/entity-color.service';
+import { SettingsService } from '@core/services/settings.service';
 
 cytoscape.use(cola);
 cytoscape.use(dagre);
@@ -72,6 +73,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   private readonly viewState = inject(DashboardViewStateService);
   private readonly colorService = inject(EntityColorService);
+  private readonly settings = inject(SettingsService);
 
   constructor(
     private selectionService: SelectionService,
@@ -280,7 +282,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy = cytoscape({
       container: this.container.nativeElement,
       elements,
-      style: createGraphStyle(this.colorService),
+      style: createGraphStyle(
+        this.colorService,
+        () => this.settings.theme() === 'dark',
+      ),
       layout: this.getLayoutOptions(defaultLayout),
       wheelSensitivity: 1.0,
       minZoom: 0.05,

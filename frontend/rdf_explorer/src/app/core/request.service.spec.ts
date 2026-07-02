@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   endpointType: 'other',
   endpointLabel: 'wikidata',
   classColorOverrides: {},
+  theme: 'light',
 };
 
 function createMockSettings(overrides: Partial<AppSettings> = {}) {

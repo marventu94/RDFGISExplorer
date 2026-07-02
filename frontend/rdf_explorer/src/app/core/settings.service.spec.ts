@@ -35,6 +35,7 @@ const fakeConfig: AppConfig = {
     wikibaseAdapter: true,
     endpointType: 'other',
     endpointLabel: 'wikidata',
+    theme: 'light',
   },
 };
 
@@ -50,6 +51,7 @@ const storedSettings = {
   endpointType: 'fuseki',
   endpointLabel: 'my fuseki',
   classColorOverrides: {},
+  theme: 'dark',
 };
 
 function setup() {

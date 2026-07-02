@@ -27,6 +27,7 @@ const fakeDefaults: SettingsDefaultsDto = {
   wikibaseAdapter: true,
   endpointType: 'other',
   endpointLabel: 'wikidata',
+  theme: 'light',
 };
 
 describe('SettingsService', () => {
@@ -169,7 +170,9 @@ describe('SettingsService', () => {
       const updated = await service.updateSettings({
         classColorOverrides: { 'http://www.wikidata.org/entity/Q5': '#FF00FF' },
       });
-      expect(updated.classColorOverrides['http://www.wikidata.org/entity/Q5']).toBe('#FF00FF');
+      expect(
+        updated.classColorOverrides['http://www.wikidata.org/entity/Q5'],
+      ).toBe('#FF00FF');
     });
   });
 });
