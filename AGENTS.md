@@ -166,7 +166,7 @@ Ver archivos `.env`, `.env.wikidata` y `.env.graphdb.example`. Las principales:
 | `SPARQL_USERNAME` | — | Usuario para Basic Auth |
 | `SPARQL_PASSWORD` | — | Password para Basic Auth |
 | `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para busqueda de entidades. Reemplaza `$keyword` y `$limit` |
-| `SPARQL_USER_AGENT` | `rdf-gis-explorer/0.1` | Obligatorio para Wikidata |
+| `SPARQL_USER` | `rdf-gis-explorer/0.1` | Obligatorio para Wikidata |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
 | `SPARQL_DEFAULT_LIMIT` | `500` | Limite por defecto |
 | `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |

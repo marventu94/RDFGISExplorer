@@ -34,12 +34,12 @@ describe('GenericSparqlAdapter', () => {
 
   beforeEach(() => {
     adapter = new GenericSparqlAdapter();
-    process.env['SPARQL_USER_AGENT'] = 'test-agent/1.0';
+    process.env['SPARQL_USER'] = 'test-agent/1.0';
   });
 
   afterEach(() => {
     nock.cleanAll();
-    delete process.env['SPARQL_USER_AGENT'];
+    delete process.env['SPARQL_USER'];
     delete process.env['SPARQL_BACKEND'];
   });
 
@@ -552,8 +552,8 @@ describe('GenericSparqlAdapter', () => {
   });
 
   describe('User-Agent resolution', () => {
-    it('uses default when SPARQL_USER_AGENT is not set', async () => {
-      delete process.env['SPARQL_USER_AGENT'];
+    it('uses default when SPARQL_USER is not set', async () => {
+      delete process.env['SPARQL_USER'];
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {
         /* noop */
       });
@@ -565,7 +565,7 @@ describe('GenericSparqlAdapter', () => {
 
       await adapter.execute('SELECT * WHERE { ?s ?p ?o }', defaultOpts);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('SPARQL_USER_AGENT'),
+        expect.stringContaining('SPARQL_USER'),
       );
       warnSpy.mockRestore();
     });
