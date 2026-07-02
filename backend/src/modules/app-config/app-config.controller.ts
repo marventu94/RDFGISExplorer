@@ -30,7 +30,7 @@ export class AppConfigController {
       this.config.get<string>('SPARQL_ENDPOINT_URL') ??
       'https://query.wikidata.org/sparql';
     const userAgent =
-      this.config.get<string>('SPARQL_USER_AGENT') ?? 'rdf-gis-explorer/0.1';
+      this.config.get<string>('SPARQL_USER') ?? 'rdf-gis-explorer/0.1';
     const username = this.config.get<string>('SPARQL_USERNAME');
     const password = this.config.get<string>('SPARQL_PASSWORD');
 

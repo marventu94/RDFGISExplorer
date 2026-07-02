@@ -16,7 +16,7 @@ describe('AppConfigController', () => {
               const values: Record<string, string> = {
                 SPARQL_BACKEND: 'wikidata',
                 SPARQL_ENDPOINT_URL: 'https://query.wikidata.org/sparql',
-                SPARQL_USER_AGENT: 'test-agent/1.0',
+                SPARQL_USER: 'test-agent/1.0',
                 SPARQL_TIMEOUT_MS: '10000',
                 SPARQL_DEFAULT_LIMIT: '500',
                 SPARQL_MAX_LIMIT: '2000',

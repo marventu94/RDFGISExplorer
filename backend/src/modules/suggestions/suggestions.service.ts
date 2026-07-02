@@ -48,13 +48,16 @@ export class SuggestionsService {
       origin: '*',
     });
 
+    const userAgent = this.config.get<string>('SPARQL_USER');
     const response = await axios.get<{
       search?: Array<{
         concepturi: string;
         label?: string;
         description?: string;
       }>;
-    }>(`https://www.wikidata.org/w/api.php?${params.toString()}`);
+    }>(`https://www.wikidata.org/w/api.php?${params.toString()}`, {
+      headers: userAgent ? { 'User-Agent': userAgent } : undefined,
+    });
 
     return (response.data.search ?? []).map((r) => ({
       uri: r.concepturi,
