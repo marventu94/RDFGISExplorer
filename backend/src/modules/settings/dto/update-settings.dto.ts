@@ -15,11 +15,11 @@ import {
 import { Type } from 'class-transformer';
 import {
   ENDPOINT_TYPES,
-  EndpointType,
   SearchClassDto,
   SUPPORTED_LANGS,
-  SupportedLang,
+  THEMES,
 } from './app-settings.dto';
+import type { EndpointType, SupportedLang, Theme } from './app-settings.dto';
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const URI_PATTERN = /^[a-z][a-z0-9+.-]*:[^\s<>"]*$/i;

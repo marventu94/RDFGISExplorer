@@ -32,7 +32,7 @@ export class AppConfigService {
     };
   }
 
-  private buildRuntimeConfig(): Omit<AppConfigDto, 'defaults'> {
+  private buildRuntimeConfig(): Omit<AppConfigDto, 'defaults' | 'classColors'> {
     const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
     const endpointUrl =
       this.config.get<string>('SPARQL_ENDPOINT_URL') ??
@@ -135,7 +135,7 @@ export class AppConfigService {
   }
 
   private defaultSearchClassFor(
-    cfg: Omit<AppConfigDto, 'defaults'>,
+    cfg: Omit<AppConfigDto, 'defaults' | 'classColors'>,
   ): SearchClassDto {
     if (cfg.backend === 'wikidata') {
       return {
