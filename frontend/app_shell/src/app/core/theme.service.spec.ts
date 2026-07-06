@@ -11,6 +11,14 @@ function clearDom(): void {
   document.documentElement.removeAttribute('data-theme');
 }
 
+function setThemeCookie(theme: 'light' | 'dark'): void {
+  document.cookie = `${THEME_STORAGE_KEY}=${theme};path=/`;
+}
+
+function clearThemeCookie(): void {
+  document.cookie = `${THEME_STORAGE_KEY}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+}
+
 function makeService(): { service: ThemeService; httpMock: HttpTestingController } {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -24,48 +32,48 @@ function makeService(): { service: ThemeService; httpMock: HttpTestingController
 
 describe('ThemeService', () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearThemeCookie();
     clearDom();
   });
 
   afterEach(() => {
-    localStorage.clear();
+    clearThemeCookie();
     clearDom();
     vi.restoreAllMocks();
   });
 
-  it('falls back to light when localStorage is empty', () => {
+  it('falls back to light when no cookie and no system preference', () => {
     const { service } = makeService();
     expect(service.theme()).toBe('light');
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
-  it('reads theme from localStorage on construction', () => {
-    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+  it('reads theme from cookie on construction', () => {
+    setThemeCookie('dark');
     const { service } = makeService();
     expect(service.theme()).toBe('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 
-  it('survives a corrupted localStorage value', () => {
-    localStorage.setItem(THEME_STORAGE_KEY, 'rainbow');
+  it('survives a corrupted cookie value', () => {
+    document.cookie = `${THEME_STORAGE_KEY}=rainbow;path=/`;
     const { service } = makeService();
     expect(service.theme()).toBe('light');
   });
 
-  it('toggle() switches theme and updates localStorage + document attribute', () => {
+  it('toggle() switches theme and updates cookie + document attribute', () => {
     const { service } = makeService();
     expect(service.theme()).toBe('light');
     service.toggle();
     TestBed.flushEffects();
     expect(service.theme()).toBe('dark');
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    expect(document.cookie).toContain(`${THEME_STORAGE_KEY}=dark`);
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 
     service.toggle();
     TestBed.flushEffects();
     expect(service.theme()).toBe('light');
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    expect(document.cookie).toContain(`${THEME_STORAGE_KEY}=light`);
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 

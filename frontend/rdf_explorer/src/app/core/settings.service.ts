@@ -38,11 +38,12 @@ export class SettingsService {
 
   readonly queryContext = computed<QueryContext>(() => {
     const s = this._settings();
+    const cfg = this.appConfig.config();
     return {
       lang: s.lang || DEFAULT_QUERY_CONTEXT.lang,
       labelUri: s.labelUri || DEFAULT_QUERY_CONTEXT.labelUri,
       endpointType: s.endpointType,
-      wikibaseAdapter: s.wikibaseAdapter,
+      wikibaseAdapter: cfg?.supportsWikibaseLabel ?? false,
     };
   });
 
@@ -67,7 +68,8 @@ export class SettingsService {
   async load(): Promise<void> {
     try {
       const settings = await firstValueFrom(this.api.get());
-      this._settings.set(settings);
+      const merged = this.mergeWithConfigDefaults(settings);
+      this._settings.set(merged);
       this._error.set(null);
     } catch (err) {
       this._error.set((err as Error).message ?? 'Failed to load settings');
@@ -81,7 +83,7 @@ export class SettingsService {
     const next: AppSettings = { ...current, [key]: value };
     this._settings.set(next);
     this.api.put({ [key]: value }).subscribe({
-      next: (saved) => this._settings.set(saved),
+      next: (saved) => this._settings.set(this.mergeWithConfigDefaults(saved)),
       error: (err: unknown) => {
         this._error.set((err as Error).message ?? 'Failed to persist settings');
         this._settings.set(current);
@@ -94,12 +96,23 @@ export class SettingsService {
     if (!cfg) return;
     const defaults = this.fromConfigDefaults(cfg);
     this._settings.set(defaults);
-    this.api.put(defaults).subscribe();
+    this.api.put(defaults).subscribe({
+      next: (saved) => this._settings.set(this.mergeWithConfigDefaults(saved)),
+    });
   }
 
   private bootstrap(): AppSettings {
     const cfg = this.appConfig.config();
     return cfg ? this.fromConfigDefaults(cfg) : FALLBACK_SETTINGS;
+  }
+
+  private mergeWithConfigDefaults(settings: AppSettings): AppSettings {
+    const cfg = this.appConfig.config();
+    if (!cfg) return settings;
+    return {
+      ...settings,
+      wikibaseAdapter: cfg.defaults.wikibaseAdapter,
+    };
   }
 
   private fromConfigDefaults(cfg: NonNullable<ReturnType<AppConfigService['config']>>): AppSettings {

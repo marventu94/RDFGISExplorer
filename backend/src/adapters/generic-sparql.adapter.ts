@@ -17,7 +17,8 @@ import {
 
 const DEFAULT_SPARQL_URL = 'https://query.wikidata.org/sparql';
 const DEFAULT_TIMEOUT_MS = 10_000;
-const DEFAULT_USER_AGENT = 'rdf-gis-explorer/0.1';
+export const DEFAULT_USER_AGENT =
+  'rdf-gis-explorer/0.1 (https://github.com/marventu94/RDFGISExplorer; mailto:mar_venturino@hotmail.com)';
 const RETRY_DELAYS_MS = [500, 1500, 4500];
 const PREDICATE_CACHE_TTL_MS = 3_600_000;
 const XSD_DATE = 'http://www.w3.org/2001/XMLSchema#date';
@@ -120,13 +121,14 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
           await this.delay(RETRY_DELAYS_MS[attempt]);
           continue;
         }
+        const upstreamBody = JSON.stringify(err.response?.data ?? {});
         if (status === 429) {
-          throw new UpstreamError(429, 'Retries exhausted');
+          throw new UpstreamError(429, `Retries exhausted (body: ${upstreamBody})`);
         }
         if (status >= 500) {
-          throw new UpstreamError(status, err.message);
+          throw new UpstreamError(status, `${err.message} (body: ${upstreamBody})`);
         }
-        throw new UpstreamError(status, err.message);
+        throw new UpstreamError(status, `${err.message} (body: ${upstreamBody})`);
       }
     }
 
