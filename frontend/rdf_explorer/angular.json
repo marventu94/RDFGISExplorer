@@ -63,7 +63,7 @@
               }
             ],
             "styles": ["src/styles.scss", "node_modules/shepherd.js/dist/css/shepherd.css"],
-            "polyfills": ["es-module-shims"]
+            "polyfills": ["src/polyfills.ts", "es-module-shims"]
           },
           "configurations": {
             "production": {
