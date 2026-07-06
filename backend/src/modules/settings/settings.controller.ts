@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import type { AppSettingsDto } from './dto/app-settings.dto';
-import type { UpdateAppSettingsDto } from './dto/update-settings.dto';
+import { UpdateAppSettingsDto } from './dto/update-settings.dto';
 
 @Controller('settings')
 export class SettingsController {

@@ -120,7 +120,10 @@ export class DescribeService {
       return;
     }
 
-    this.log.add('Describe ' + uri);
+    const query = queryGetProperties(uri, this.settings.queryContext());
+    this.log.add('Describe ' + uri + ' | wikibase=' + this.settings.queryContext().wikibaseAdapter);
+    console.debug('[DescribeService] load:', uri);
+    console.debug('[DescribeService] query:\n', query);
 
     const selected: CachedResource = {
       uri,
@@ -137,7 +140,7 @@ export class DescribeService {
 
     this.current.set(selected);
 
-    this.request.execQuery(queryGetProperties(uri, this.settings.queryContext())).then(data => {
+    this.request.execQuery(query).then(data => {
       const cfg = this.describeCfg();
       const properties = data.results.bindings.filter(r =>
         !cfg.exclude.includes(r['property'].value),
@@ -179,6 +182,10 @@ export class DescribeService {
         }
       }
       this.sort();
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[DescribeService] execQuery failed for', uri, ':', msg);
+      console.error('[DescribeService] failed query:\n', query);
     });
 
     this.cache.push(selected);
