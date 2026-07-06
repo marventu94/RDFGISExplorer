@@ -2,6 +2,7 @@
   "name": "rdf-gis-explorer",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "dev": "concurrently --raw --names backend,shell,explorer,gis \"npm run dev:backend\" \"npm run dev:shell\" \"npm run dev:explorer\" \"npm run dev:gis\"",
     "dev:backend": "cd backend && npm run start:dev",
