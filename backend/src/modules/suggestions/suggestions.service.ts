@@ -1,8 +1,9 @@
-import { Injectable, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { SPARQL_ENDPOINT } from '../../adapters/sparql-endpoint.interface';
 import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
+import { DEFAULT_USER_AGENT } from '../../adapters/generic-sparql.adapter';
 
 export interface EntitySearchResult {
   uri: string;
@@ -11,6 +12,7 @@ export interface EntitySearchResult {
 }
 
 const URI_PATTERN = /^[a-z][a-z0-9+.-]*:[^\s<>"]*$/i;
+const OWL_THING = 'http://www.w3.org/2002/07/owl#Thing';
 
 function isValidUri(value: string): boolean {
   return URI_PATTERN.test(value);
@@ -18,6 +20,8 @@ function isValidUri(value: string): boolean {
 
 @Injectable()
 export class SuggestionsService {
+  private readonly log = new Logger(SuggestionsService.name);
+
   constructor(
     @Inject(SPARQL_ENDPOINT) private readonly endpoint: SparqlEndpoint,
     private readonly config: ConfigService,
@@ -33,6 +37,9 @@ export class SuggestionsService {
     classUri?: string,
   ): Promise<EntitySearchResult[]> {
     const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
+    this.log.log(
+      `[searchEntities] q="${keyword}" limit=${limit} classUri=${classUri ?? '(none)'} backend=${backend}`,
+    );
     const normalizedClass =
       classUri && isValidUri(classUri) ? classUri : undefined;
     if (classUri && !normalizedClass) {
@@ -42,10 +49,14 @@ export class SuggestionsService {
       });
     }
 
+    let result: EntitySearchResult[];
     if (backend === 'wikidata') {
-      return this.wikidataSearch(keyword, limit, normalizedClass);
+      result = await this.wikidataSearch(keyword, limit, normalizedClass);
+    } else {
+      result = await this.sparqlSearch(keyword, limit, normalizedClass);
     }
-    return this.sparqlSearch(keyword, limit, normalizedClass);
+    this.log.log(`[searchEntities] returning ${result.length} entities`);
+    return result;
   }
 
   private async wikidataSearch(
@@ -65,16 +76,29 @@ export class SuggestionsService {
       origin: '*',
     });
 
-    const userAgent = this.config.get<string>('SPARQL_USER');
+    const userAgent = this.config.get<string>('SPARQL_USER') || DEFAULT_USER_AGENT;
+    const url = `https://www.wikidata.org/w/api.php?${params.toString()}`;
+    this.log.log(`[wikidataSearch] GET ${url} | UA=${userAgent}`);
+
     const response = await axios.get<{
       search?: Array<{
         concepturi: string;
         label?: string;
         description?: string;
       }>;
-    }>(`https://www.wikidata.org/w/api.php?${params.toString()}`, {
-      headers: userAgent ? { 'User-Agent': userAgent } : undefined,
+    }>(url, {
+      headers: { 'User-Agent': userAgent },
     });
+
+    this.log.log(
+      `[wikidataSearch] response status=${response.status} keys=${Object.keys(response.data).join(',')} warnings=${JSON.stringify(response.data['warnings'] ?? 'none')} search.length=${response.data.search?.length ?? 0}`,
+    );
+
+    if ((response.data.search?.length ?? 0) === 0) {
+      this.log.warn(
+        `[wikidataSearch] EMPTY SEARCH. full response: ${JSON.stringify(response.data).slice(0, 800)}`,
+      );
+    }
 
     const candidates = (response.data.search ?? []).map((r) => ({
       uri: r.concepturi,
@@ -82,10 +106,30 @@ export class SuggestionsService {
       description: r.description,
     }));
 
+    if (candidates.length > 0) {
+      this.log.log(
+        `[wikidataSearch] first candidate: ${candidates[0].label} (${candidates[0].uri})`,
+      );
+    }
+
     if (!classUri || candidates.length === 0) {
+      this.log.log(
+        `[wikidataSearch] no classUri or 0 candidates → returning ${candidates.length} directly`,
+      );
       return candidates;
     }
 
+    // owl#Thing is a generic OWL root class — no Wikidata item uses it as a
+    // P31 (instance-of) value, so the SPARQL filter would always return 0.
+    // Treat it as "no class filter" and return all candidates.
+    if (classUri === OWL_THING) {
+      this.log.log(
+        `[wikidataSearch] classUri is owl#Thing → skipping filterByClass, returning ${candidates.length} candidates`,
+      );
+      return candidates;
+    }
+
+    this.log.log(`[wikidataSearch] calling filterByClass with ${classUri}`);
     return this.filterByClass(candidates, classUri);
   }
 
@@ -117,8 +161,14 @@ export class SuggestionsService {
       const matching = new Set(
         response.data.results.bindings.map((b) => b['uri']?.value).filter(Boolean),
       );
+      this.log.log(
+        `[filterByClass] SPARQL returned ${matching.size} matches for ${classUri}`,
+      );
       return candidates.filter((c) => matching.has(c.uri));
-    } catch {
+    } catch (err) {
+      this.log.warn(
+        `[filterByClass] SPARQL error: ${(err as Error).message} → returning all ${candidates.length} candidates`,
+      );
       return candidates;
     }
   }

@@ -16,8 +16,11 @@
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('platform.theme');
-          if (t !== 'dark' && t !== 'light') t = 'light';
+          var m = document.cookie.match(/(?:^|;\s*)platform\.theme=(dark|light)/);
+          var t = m ? m[1] : null;
+          if (t !== 'dark' && t !== 'light') {
+            t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+          }
           document.documentElement.setAttribute('data-theme', t);
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light');

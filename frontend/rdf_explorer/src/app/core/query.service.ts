@@ -113,23 +113,26 @@ export function queryGetProperties(
   if (useWikibase) {
     q += 'PREFIX bd: <http://www.bigdata.com/rdf#>\n';
     q += 'PREFIX wikibase: <http://wikiba.se/ontology#>\n';
-  }
-  q += 'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n';
-  q += '  <' + uri + '> ?property [] .\n';
-  if (useWikibase) {
+    q += 'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n';
+    q += '  { SELECT ?property WHERE { <' + uri + '> ?property []. } LIMIT 250 }\n';
     q += '  ?p wikibase:directClaim ?property .\n';
+    q += '  OPTIONAL { ?property wikibase:propertyType ?propType }\n';
+    q += '  BIND(\n';
+    q += '    IF(BOUND(?propType) && ?propType = wikibase:WikibaseItem, "1", "2")\n';
+    q += '    as ?kind)\n';
+    q += '  SERVICE wikibase:label { bd:serviceParam wikibase:language "'
+      + opts.lang + '". }\n';
+    q += '}';
+  } else {
+    q += 'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n';
+    q += '  <' + uri + '> ?property [] .\n';
+    q += '  OPTIONAL { ?property <' + opts.labelUri + '> ?propertyLabel .\n';
+    q += langFilter(opts, 'propertyLabel');
+    q += '  }\n';
+    q += '  BIND("0" AS ?kind)\n';
+    q += '}\n';
+    q += 'LIMIT 250';
   }
-  q += '  OPTIONAL { ?p <' + opts.labelUri + '> ?propertyLabel .\n';
-  q += langFilter(opts, 'propertyLabel');
-  q += '  }\n';
-  q += '  BIND(\n';
-  q += '    IF(EXISTS { ?property rdf:type owl:ObjectProperty},\n';
-  q += '      1,\n';
-  q += '      IF(EXISTS {?property rdf:type owl:DatatypeProperty},\n';
-  q += '        2,\n';
-  q += '        0))\n';
-  q += '    as ?kind)\n';
-  q += '}';
   return q;
 }
 

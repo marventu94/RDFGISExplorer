@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { RouterLink, Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { ThemeService } from '../core/theme.service';
 
 @Component({
@@ -9,6 +9,23 @@ import { ThemeService } from '../core/theme.service';
   template: `
     <header class="top-bar">
       <div class="top-bar__left">
+        <svg class="top-bar__logo" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z" />
+          <path d="M2 12h20" />
+        </svg>
+        <span class="top-bar__title">RDF GIS Platform</span>
+      </div>
+
+      <nav class="top-bar__breadcrumb">
+        <a routerLink="/" class="top-bar__crumb">Inicio</a>
+        @if (currentPath !== '/') {
+          <span class="top-bar__separator">›</span>
+          <span class="top-bar__crumb top-bar__crumb--active">{{ currentLabel }}</span>
+        }
+      </nav>
+
+      <div class="top-bar__right">
         <button
           type="button"
           class="top-bar__theme-toggle"
@@ -34,32 +51,6 @@ import { ThemeService } from '../core/theme.service';
             </svg>
           }
         </button>
-        <svg class="top-bar__logo" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z" />
-          <path d="M2 12h20" />
-        </svg>
-        <span class="top-bar__title">RDF GIS Platform</span>
-      </div>
-
-      <nav class="top-bar__breadcrumb">
-        <a routerLink="/" class="top-bar__crumb">Inicio</a>
-        @if (currentPath !== '/') {
-          <span class="top-bar__separator">›</span>
-          <span class="top-bar__crumb top-bar__crumb--active">{{ currentLabel }}</span>
-        }
-      </nav>
-
-      <div class="top-bar__right">
-        @if (currentPath !== '/') {
-          <a routerLink="/" class="top-bar__back">Volver al inicio</a>
-        }
-        <a routerLink="/settings" class="top-bar__settings" aria-label="Configuración">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </a>
       </div>
     </header>
   `,
@@ -155,38 +146,6 @@ import { ThemeService } from '../core/theme.service';
       align-items: center;
       gap: 0.75rem;
       flex-shrink: 0;
-    }
-
-    .top-bar__back {
-      text-decoration: none;
-      color: var(--color-accent);
-      font-size: 0.85rem;
-      font-weight: 500;
-      white-space: nowrap;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-
-    .top-bar__settings {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0.4rem;
-      border-radius: 50%;
-      color: var(--top-bar-icon);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      transition: background-color 0.15s ease, color 0.15s ease;
-
-      &:hover,
-      &:focus-visible {
-        background: var(--top-bar-icon-hover-bg);
-        color: var(--top-bar-icon-hover-fg);
-      }
     }
   `,
 })

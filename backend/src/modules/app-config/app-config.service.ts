@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DEFAULT_USER_AGENT } from '../../adapters/generic-sparql.adapter';
 import type {
   AppConfigDto,
   SearchClassDto,
@@ -38,7 +39,7 @@ export class AppConfigService {
       this.config.get<string>('SPARQL_ENDPOINT_URL') ??
       'https://query.wikidata.org/sparql';
     const userAgent =
-      this.config.get<string>('SPARQL_USER') ?? 'rdf-gis-explorer/0.1';
+      this.config.get<string>('SPARQL_USER') ?? DEFAULT_USER_AGENT;
     const username = this.config.get<string>('SPARQL_USERNAME');
     const password = this.config.get<string>('SPARQL_PASSWORD');
 
