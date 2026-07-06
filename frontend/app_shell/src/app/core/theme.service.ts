@@ -7,26 +7,52 @@ export const THEME_STORAGE_KEY = 'platform.theme';
 export const THEME_EVENT = 'platform:theme-changed';
 
 const VALID_THEMES: ReadonlySet<Theme> = new Set(['light', 'dark']);
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365; // 1 year
 
-function isValidTheme(value: string | null): value is Theme {
-  return value !== null && (VALID_THEMES as Set<string>).has(value);
+function isValidTheme(value: string | null | undefined): value is Theme {
+  return value !== null && value !== undefined && (VALID_THEMES as Set<string>).has(value);
+}
+
+function readCookie(name: string): string | null {
+  try {
+    if (typeof document === 'undefined') return null;
+    const re = new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)');
+    const m = document.cookie.match(re);
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCookie(name: string, value: string, maxAgeSeconds: number): void {
+  try {
+    if (typeof document === 'undefined') return;
+    document.cookie = `${name}=${encodeURIComponent(value)};path=/;max-age=${maxAgeSeconds};SameSite=Lax`;
+  } catch {
+    /* cookies may be disabled; the document attribute still applies */
+  }
+}
+
+function systemPrefersDark(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
+  } catch {
+    return false;
+  }
 }
 
 function readStoredTheme(): Theme {
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return isValidTheme(stored) ? stored : 'light';
-  } catch {
-    return 'light';
-  }
+  const fromCookie = readCookie(THEME_STORAGE_KEY);
+  if (isValidTheme(fromCookie)) return fromCookie;
+  return systemPrefersDark() ? 'dark' : 'light';
 }
 
 function writeStoredTheme(theme: Theme): void {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    /* localStorage may be disabled; the document attribute still applies */
-  }
+  writeCookie(THEME_STORAGE_KEY, theme, COOKIE_MAX_AGE_SECONDS);
 }
 
 function applyTheme(theme: Theme): void {
@@ -48,7 +74,7 @@ export class ThemeService {
   constructor() {
     applyTheme(this._theme());
 
-    // Local side effects only — apply CSS attribute and persist to localStorage.
+    // Local side effects only — apply CSS attribute and persist to cookie.
     // The remote PUT is handled in setTheme/toggle so we don't fire on every
     // backendSynced flip.
     effect(() => {
@@ -91,6 +117,6 @@ export class ThemeService {
   private persistToBackend(theme: Theme): void {
     this.http
       .put('/api/settings', { theme })
-      .subscribe({ error: () => {/* best-effort; localStorage is the source of truth at boot */} });
+      .subscribe({ error: () => {/* best-effort; the cookie is the source of truth at boot */} });
   }
 }

@@ -9,7 +9,10 @@ import { RequestService } from '../../core/request.service';
   templateUrl: './describe-panel.component.html',
   standalone: true,
   imports: [FormsModule],
-  styles: [`.c-img { width: 100%; height: auto; display: block; }`],
+  styles: [
+    `.c-img { width: 100%; height: auto; display: block; }`,
+    `.desc-uri-link, .ell { word-break: break-all; white-space: normal; }`,
+  ],
 })
 export class DescribePanelComponent {
   private readonly describeService = inject(DescribeService);

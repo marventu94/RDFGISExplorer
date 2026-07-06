@@ -138,10 +138,17 @@ export class GisBackendAdapter implements RdfBackendAdapter {
 
   async executeQuery(query: string, opts: ExecuteOpts = {}): Promise<QueryResult> {
     const body = { sparql: query, limit: opts.limit ?? 500 };
-    const result = await firstValueFrom(
-      this.http.post<QueryResult>(`${this.baseUrl}/api/query/execute`, body),
-    );
-    return result;
+    try {
+      const result = await firstValueFrom(
+        this.http.post<QueryResult>(`${this.baseUrl}/api/query/execute`, body),
+      );
+      return result;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[GisBackendAdapter] Query failed:', msg);
+      console.error('[GisBackendAdapter] SPARQL:\n', query);
+      throw err;
+    }
   }
 
   async getPredicates(): Promise<string[]> {

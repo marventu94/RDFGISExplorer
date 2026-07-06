@@ -560,7 +560,7 @@ describe('GenericSparqlAdapter', () => {
 
       nock(WIKIDATA_BASE)
         .post(WIKIDATA_PATH)
-        .matchHeader('User-Agent', 'rdf-gis-explorer/0.1')
+        .matchHeader('User-Agent', /rdf-gis-explorer\/0\.1/)
         .reply(200, FIXTURE);
 
       await adapter.execute('SELECT * WHERE { ?s ?p ?o }', defaultOpts);
