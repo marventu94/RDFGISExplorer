@@ -10,7 +10,9 @@
 #   - rdf_gis_explorer (Angular)  :4202
 #
 # Uso:
-#   ./start.sh
+#   ./start.sh                  # usa .env (Wikidata por defecto)
+#   ./start.sh .env.graphdb     # usa .env.graphdb
+#   ./start.sh --env .env.graphdb
 #
 # Ctrl+C detiene todos los servicios (concurrently propaga la senal).
 
@@ -20,10 +22,29 @@ cd "$(dirname "$0")"
 
 CYAN=$'\033[1;36m'
 DIM=$'\033[2m'
+YELLOW=$'\033[1;33m'
 RESET=$'\033[0m'
+
+ENV_FILE=".env"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env) ENV_FILE="$2"; shift 2 ;;
+    --env=*) ENV_FILE="${1#*=}"; shift ;;
+    *) ENV_FILE="$1"; shift ;;
+  esac
+done
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "ERROR: $ENV_FILE no encontrado" >&2
+  exit 1
+fi
+
+export DOTENV_CONFIG_PATH="$(realpath "$ENV_FILE")"
 
 echo "${CYAN}>> RDF GIS Explorer (dev)${RESET}"
 echo "${DIM}   cwd: $(pwd)${RESET}"
+echo "${YELLOW}   env: $ENV_FILE${RESET}"
 
 # 1. Cargar nvm
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"

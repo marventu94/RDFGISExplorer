@@ -1,6 +1,7 @@
 import { Component, inject, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EntitySearchService } from '../../tools/search-panel/entity-search.service';
+import { RequestService } from '../../core/request.service';
 import type { WikidataSearchResult } from '../../tools/search-panel/search-result.model';
 
 @Component({
@@ -11,6 +12,7 @@ import type { WikidataSearchResult } from '../../tools/search-panel/search-resul
 })
 export class SearchPanelComponent {
   private readonly searchService = inject(EntitySearchService);
+  private readonly request = inject(RequestService);
 
   searchInput = '';
   searchResults = signal<WikidataSearchResult[]>([]);
@@ -82,5 +84,6 @@ export class SearchPanelComponent {
   onDragStart(event: DragEvent, result: WikidataSearchResult): void {
     event.dataTransfer?.setData('uri', result.uri);
     event.dataTransfer?.setData('prop', '');
+    this.request.setLabel(result.uri, result.label);
   }
 }
