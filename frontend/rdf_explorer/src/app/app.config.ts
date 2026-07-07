@@ -5,14 +5,11 @@ import { firstValueFrom } from 'rxjs';
 
 import { routes } from './app.routes';
 import { AppConfigService } from './core/services/app-config.service';
-import { SettingsService } from './core/settings.service';
 
-function initializeApp(): (appConfig: AppConfigService, settings: SettingsService) => () => Promise<void> {
-  return (appConfig: AppConfigService, settings: SettingsService) =>
+function initializeApp(): (appConfig: AppConfigService) => () => Promise<void> {
+  return (appConfig: AppConfigService) =>
     async () => {
-      const cfg = await firstValueFrom(appConfig.load());
-      settings.initFromConfig(cfg);
-      await settings.load();
+      await firstValueFrom(appConfig.load());
     };
 }
 
@@ -24,7 +21,7 @@ export const appConfig: ApplicationConfig = {
     {
       provide: APP_INITIALIZER,
       useFactory: initializeApp(),
-      deps: [AppConfigService, SettingsService],
+      deps: [AppConfigService],
       multi: true,
     },
   ]

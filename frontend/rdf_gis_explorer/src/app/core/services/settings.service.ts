@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AppConfigService } from './app-config.service';
@@ -12,11 +12,7 @@ const FALLBACK_SETTINGS: AppSettings = {
     label: { type: 'literal', value: 'thing' },
   },
   resultLimit: 500,
-  wikibaseAdapter: false,
   endpointType: 'other',
-  endpointLabel: 'unknown',
-  classColorOverrides: {},
-  theme: 'light',
 };
 
 @Injectable({ providedIn: 'root' })
@@ -31,20 +27,6 @@ export class SettingsService {
   readonly app = this._settings.asReadonly();
   readonly loaded = this._loaded.asReadonly();
   readonly error = this._error.asReadonly();
-
-  readonly theme = computed<'light' | 'dark'>(() => this._settings().theme);
-
-  constructor() {
-    effect(() => {
-      const t = this._settings().theme;
-      if (typeof document !== 'undefined') {
-        document.documentElement.setAttribute(
-          'data-theme',
-          t === 'dark' ? 'dark' : 'light',
-        );
-      }
-    });
-  }
 
   initFromConfig(cfg: NonNullable<ReturnType<AppConfigService['config']>>): void {
     if (cfg && !this._loaded()) {
@@ -81,11 +63,7 @@ export class SettingsService {
       labelUri: cfg.defaults.labelUri,
       searchClass: cfg.defaults.searchClass,
       resultLimit: cfg.defaults.resultLimit,
-      wikibaseAdapter: cfg.defaults.wikibaseAdapter,
       endpointType: cfg.defaults.endpointType,
-      endpointLabel: cfg.defaults.endpointLabel,
-      classColorOverrides: {},
-      theme: cfg.defaults.theme,
     };
   }
 }

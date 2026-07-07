@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { labelOf, toCurie } from './label.util';
-import type { Prefix } from './settings.types';
+import type { Prefix } from './services/app-config.service';
 
 const prefixes: readonly Prefix[] = [
   { prefix: 'wd', uri: 'http://www.wikidata.org/entity/' },

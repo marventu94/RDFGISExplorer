@@ -21,7 +21,6 @@ import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
 import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
-import { SettingsService } from '@core/services/settings.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { DashboardApiClient, type Dashboard } from '@core/services/dashboard-api.client';
@@ -60,7 +59,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly selectionService = inject(SelectionService);
   private readonly apiService = inject(ApiService);
   private readonly appConfig = inject(AppConfigService);
-  private readonly settings = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
@@ -153,7 +151,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
           updateHasContent,
           ctrlEnterKeymap,
           EditorView.lineWrapping,
-          ...(this.settings.theme() === 'dark' ? [sparqlInputDarkTheme] : []),
         ],
       }),
       parent: this.editorContainer.nativeElement,
@@ -398,35 +395,4 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.snackBar.open('Mapeo restaurado a detección automática', 'OK', { duration: 3000 });
   }
 }
-
-const sparqlInputDarkTheme = EditorView.theme(
-  {
-    '&': {
-      backgroundColor: 'var(--cm-bg)',
-      color: 'var(--cm-text)',
-    },
-    '.cm-content': {
-      caretColor: 'var(--cm-cursor)',
-    },
-    '.cm-focused .cm-cursor': {
-      borderLeftColor: 'var(--cm-cursor)',
-    },
-    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection':
-      {
-        backgroundColor: 'var(--cm-selection)',
-      },
-    '.cm-gutters': {
-      backgroundColor: 'var(--cm-gutter-bg)',
-      color: 'var(--cm-gutter-fg)',
-      border: 'none',
-    },
-    '.cm-activeLine': {
-      backgroundColor: 'var(--cm-active-line-bg)',
-    },
-    '.cm-activeLineGutter': {
-      backgroundColor: 'var(--cm-active-line-bg)',
-    },
-  },
-  { dark: true },
-);
 

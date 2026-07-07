@@ -73,6 +73,13 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       autounselectify: false,
     });
 
+    this.cy.on('viewport', () => {
+      this.graph.viewport.set({
+        zoom: this.cy.zoom(),
+        pan: { ...this.cy.pan() },
+      });
+    });
+
     this.installPlugins();
     this.installInteractions();
     this.subscribeToGraphChanges();
@@ -288,7 +295,20 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     });
 
     this.cy.nodes('[kind = "property"], [kind = "literal"], [kind = "title-spacer"]').ungrabify();
+    this.applySavedViewport();
     this.syncSelectionHighlight();
+  }
+
+  private applySavedViewport(): void {
+    const vp = this.graph.viewport();
+    if (!vp) return;
+    const cyZoom = this.cy.zoom();
+    const cyPan = this.cy.pan();
+    if (Math.abs(cyZoom - vp.zoom) > 0.01 ||
+        Math.abs(cyPan.x - vp.pan.x) > 1 ||
+        Math.abs(cyPan.y - vp.pan.y) > 1) {
+      this.cy.viewport({ zoom: vp.zoom, pan: vp.pan });
+    }
   }
 
   private syncSelectionHighlight(): void {
