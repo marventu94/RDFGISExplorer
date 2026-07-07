@@ -112,21 +112,24 @@ describe('queryGetClasses', () => {
 
 describe('queryGetProperties', () => {
   it('includes wikibase:directClaim when wikibase adapter enabled', () => {
-    const q = queryGetProperties('http://www.wikidata.org/entity/Q146', { ...ctx, wikibaseAdapter: true });
+    const q = queryGetProperties('http://www.wikidata.org/entity/Q146', { ...ctx, supportsWikibaseLabel: true });
     expect(q).toContain('wikibase:directClaim');
     expect(q).toContain('?property []');
-    expect(q).toContain('ObjectProperty');
-    expect(q).toContain('DatatypeProperty');
+    expect(q).toContain('wikibase:propertyType');
+    expect(q).toContain('wikibase:WikibaseItem');
     expect(q).toContain('?kind');
+    expect(q).toContain('?p wikibase:propertyType');
+    expect(q).not.toContain('?property wikibase:propertyType');
+    expect(q).not.toContain('SERVICE wikibase:label');
+    expect(q).not.toContain('SELECT ?property WHERE');
   });
 
   it('omits wikibase:directClaim when wikibase adapter disabled', () => {
-    const q = queryGetProperties('http://example.org/Q146', { ...ctx, wikibaseAdapter: false });
+    const q = queryGetProperties('http://example.org/Q146', { ...ctx, supportsWikibaseLabel: false });
     expect(q).not.toContain('wikibase:directClaim');
     expect(q).not.toContain('PREFIX wikibase');
     expect(q).toContain('?property []');
-    expect(q).toContain('ObjectProperty');
-    expect(q).toContain('DatatypeProperty');
+    expect(q).toContain('BIND("0" AS ?kind)');
     expect(q).toContain('?kind');
   });
 });
