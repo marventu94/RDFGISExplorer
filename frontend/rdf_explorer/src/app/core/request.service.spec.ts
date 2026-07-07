@@ -6,50 +6,55 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 import { RequestService, SparqlJsonResult } from './request.service';
-import { SettingsService } from './settings.service';
+import { AppConfigService } from './services/app-config.service';
 import { signal } from '@angular/core';
-import type { AppSettings } from './settings.types';
 
-const DEFAULT_SETTINGS: AppSettings = {
-  lang: 'en',
+const fakeConfig = {
+  backend: 'test',
+  endpointUrl: 'http://localhost/sparql',
+  hasBasicAuth: false,
+  userAgent: 'test',
+  timeoutMs: 30000,
+  defaultLimit: 20,
+  maxLimit: 1000,
+  capabilities: [],
+  supportsWikibaseLabel: false,
+  defaultPrefixes: {},
+  search: { mode: 'sparql' as const, labelProperty: 'rdfs:label' },
   labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
-  searchClass: {
-    uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' },
-    label: { type: 'literal', value: 'human', 'xml:lang': 'en' },
+  describe: { exclude: [], objects: [], datatype: [], text: [], image: [], external: [] },
+  classColors: {},
+  defaults: {
+    lang: 'en',
+    resultLimit: 20,
+    labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+    searchClass: {
+      uri: { type: 'uri' as const, value: 'http://www.w3.org/2002/07/owl#Thing' },
+      label: { type: 'literal' as const, value: 'thing' },
+    },
+    endpointType: 'other' as const,
   },
-  resultLimit: 20,
-  wikibaseAdapter: true,
-  endpointType: 'other',
-  endpointLabel: 'wikidata',
-  classColorOverrides: {},
-  theme: 'light',
 };
 
-function createMockSettings(overrides: Partial<AppSettings> = {}) {
+function createMockAppConfig() {
   return {
-    app: signal({ ...DEFAULT_SETTINGS, ...overrides }),
-    loaded: signal(true),
-    error: signal(null),
-    update: vi.fn(),
-    reset: vi.fn(),
+    config: signal(fakeConfig),
+    queryContext: signal({ lang: 'en', labelUri: 'rdfs:label', endpointType: 'other' as const, wikibaseAdapter: false }),
     load: vi.fn(),
-    initFromConfig: vi.fn(),
-  } as unknown as SettingsService;
+  } as unknown as AppConfigService;
 }
 
 describe('RequestService', () => {
   let service: RequestService;
-  let mockSettings: SettingsService;
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
     TestBed.resetTestingModule();
-    mockSettings = createMockSettings();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: SettingsService, useValue: mockSettings },
+        { provide: AppConfigService, useValue: createMockAppConfig() },
       ],
     });
     service = TestBed.inject(RequestService);

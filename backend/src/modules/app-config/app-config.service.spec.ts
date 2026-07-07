@@ -62,8 +62,6 @@ describe('AppConfigService', () => {
       expect(defaults.lang).toBe('en');
       expect(defaults.resultLimit).toBe(config.defaultLimit);
       expect(defaults.labelUri).toBe(config.labelUri);
-      expect(defaults.wikibaseAdapter).toBe(config.supportsWikibaseLabel);
-      expect(defaults.endpointLabel).toBe(config.backend);
       expect(defaults.endpointType).toBe('other');
       expect(defaults.searchClass.uri.value).toBe(
         'http://www.wikidata.org/entity/Q5',
@@ -126,8 +124,6 @@ describe('AppConfigService', () => {
       expect(defaults.searchClass.uri.value).toBe(
         'http://www.w3.org/2002/07/owl#Thing',
       );
-      expect(defaults.wikibaseAdapter).toBe(false);
-      expect(defaults.endpointLabel).toBe('generic');
     });
 
     it('returns empty classColors for generic backend', () => {

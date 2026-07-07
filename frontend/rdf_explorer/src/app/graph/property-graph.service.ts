@@ -1,5 +1,4 @@
 import { Injectable, signal, computed, inject, effect } from '@angular/core';
-import { SettingsService } from '../core/settings.service';
 import { RequestService } from '../core/request.service';
 import { LogService } from '../core/log.service';
 import { AppConfigService } from '../core/services/app-config.service';
@@ -19,12 +18,12 @@ import { serializeGraph, deserializeGraph, type ExplorerSerializedGraph } from '
 
 @Injectable({ providedIn: 'root' })
 export class PropertyGraphService {
-  private readonly settings = inject(SettingsService);
   private readonly request = inject(RequestService);
   private readonly log = inject(LogService);
   private readonly appConfig = inject(AppConfigService);
 
   readonly revision = signal(0);
+  readonly viewport = signal<{ zoom: number; pan: { x: number; y: number } } | null>(null);
 
   private readonly graphRef: PropertyGraph;
 
@@ -53,7 +52,7 @@ export class PropertyGraphService {
   });
 
   constructor() {
-    const settingsVal = this.settings.app();
+    const app = this.appConfig.config();
 
     const retriever: QueryRetriever = {
       execQuery: (query, opts) =>
@@ -62,10 +61,10 @@ export class PropertyGraphService {
     };
 
     this.graphRef = new PropertyGraph({
-      labelUri: settingsVal.labelUri,
-      lang: settingsVal.lang,
+      labelUri: app?.labelUri ?? 'http://www.w3.org/2000/01/rdf-schema#label',
+      lang: app?.defaults.lang ?? 'en',
       prefixes: this.prefixes() as readonly Prefix[],
-      endpointAdapter: settingsVal.wikibaseAdapter ? new WikidataAdapter() : new GenericAdapter(),
+      endpointAdapter: app?.supportsWikibaseLabel ? new WikidataAdapter() : new GenericAdapter(),
       labelProvider: this.request,
       retriever,
     });
@@ -73,10 +72,11 @@ export class PropertyGraphService {
     this.graphRef.log = (msg: string) => this.log.add(msg);
 
     effect(() => {
-      const s = this.settings.app();
-      this.graphRef.labelUri = s.labelUri;
-      this.graphRef.lang = s.lang;
-      this.graphRef.endpointAdapter = s.wikibaseAdapter
+      const cfg = this.appConfig.config();
+      if (!cfg) return;
+      this.graphRef.labelUri = cfg.labelUri;
+      this.graphRef.lang = cfg.defaults.lang;
+      this.graphRef.endpointAdapter = cfg.supportsWikibaseLabel
         ? new WikidataAdapter()
         : new GenericAdapter();
     });

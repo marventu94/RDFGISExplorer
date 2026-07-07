@@ -21,10 +21,7 @@ export interface SettingsDefaults {
   resultLimit: number;
   labelUri: string;
   searchClass: SearchClass;
-  wikibaseAdapter: boolean;
   endpointType: 'virtuoso' | 'fuseki' | 'other';
-  endpointLabel: string;
-  theme: 'light' | 'dark';
 }
 
 export interface AppConfig {
