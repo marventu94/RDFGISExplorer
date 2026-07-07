@@ -48,10 +48,12 @@ describe('SparqlInputComponent', () => {
   let dashboardApiMock: { list: ReturnType<typeof vi.fn> };
   let persistenceMock: {
     load: ReturnType<typeof vi.fn>;
-    generateTestDashboard: ReturnType<typeof vi.fn>;
+    currentDashboardId: ReturnType<typeof vi.fn>;
+    clearCurrent: ReturnType<typeof vi.fn>;
   };
   let realSnackBar: MatSnackBar;
   let realDialog: MatDialog;
+  let originalConfirm: typeof window.confirm;
 
   beforeEach(async () => {
     localStorage.clear();
@@ -67,7 +69,8 @@ describe('SparqlInputComponent', () => {
     };
     persistenceMock = {
       load: vi.fn().mockReturnValue(of(undefined)),
-      generateTestDashboard: vi.fn().mockReturnValue(of({ id: 'test', name: '', kind: 'gis', payload: {}, createdAt: '', updatedAt: '' })),
+      currentDashboardId: vi.fn().mockReturnValue(null),
+      clearCurrent: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
@@ -86,6 +89,9 @@ describe('SparqlInputComponent', () => {
     vi.spyOn(MatSnackBar.prototype, 'open').mockImplementation(() => ({ onAction: () => ({ unsubscribe: () => {} }) } as any));
     vi.spyOn(MatDialog.prototype, 'open').mockReturnValue({ afterClosed: () => of(null) } as any);
 
+    originalConfirm = window.confirm;
+    window.confirm = vi.fn().mockReturnValue(true);
+
     fixture = TestBed.createComponent(SparqlInputComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -94,6 +100,7 @@ describe('SparqlInputComponent', () => {
   afterEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    window.confirm = originalConfirm;
   });
 
   function asAny(): any {
@@ -142,33 +149,40 @@ describe('SparqlInputComponent', () => {
     expect(editorArea).toBeTruthy();
   });
 
-  describe('loadSeedQuery', () => {
-    const seedQuery = { id: 'test-seed', name: 'Test', category: 'exploration' as const, sparql: 'SELECT ?x WHERE { ?x ?p ?o }', isSeed: true };
-
-    it('should prompt for confirmation when editor has content', () => {
-      asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
-      asAny().loadSeedQuery(seedQuery);
-      expect(realDialog.open).toHaveBeenCalled();
-    });
-
-    it('should not prompt when editor is empty', () => {
-      asAny().loadSeedQuery(seedQuery);
-      expect(realDialog.open).not.toHaveBeenCalled();
-    });
-  });
-
   describe('loadDashboard', () => {
     const dashboard = { id: 'dash-1', kind: 'gis' as const, name: 'Test Dashboard', payload: {}, createdAt: '', updatedAt: '' };
 
     it('should prompt for confirmation when editor has content', () => {
+      vi.useFakeTimers();
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().loadDashboard(dashboard);
+      vi.advanceTimersByTime(0);
       expect(realDialog.open).toHaveBeenCalled();
+      vi.useRealTimers();
     });
 
     it('should load dashboard when editor is empty', () => {
       asAny().loadDashboard(dashboard);
       expect(persistenceMock.load).toHaveBeenCalledWith('dash-1');
+    });
+  });
+
+  describe('newDashboard', () => {
+    it('should show confirmation popup', () => {
+      asAny().newDashboard();
+      expect(window.confirm).toHaveBeenCalled();
+    });
+
+    it('should clear state when confirmed', () => {
+      window.confirm = vi.fn().mockReturnValue(true);
+      asAny().newDashboard();
+      expect(persistenceMock.clearCurrent).toHaveBeenCalled();
+    });
+
+    it('should not clear state when cancelled', () => {
+      window.confirm = vi.fn().mockReturnValue(false);
+      asAny().newDashboard();
+      expect(persistenceMock.clearCurrent).not.toHaveBeenCalled();
     });
   });
 
@@ -278,13 +292,6 @@ describe('SparqlInputComponent', () => {
     it('should update limit for valid values', () => {
       asAny().onLimitChange(1000);
       expect(asAny().limit()).toBe(1000);
-    });
-  });
-
-  describe('generateTestDashboard', () => {
-    it('should call persistence.generateTestDashboard', () => {
-      asAny().generateTestDashboard();
-      expect(persistenceMock.generateTestDashboard).toHaveBeenCalled();
     });
   });
 });

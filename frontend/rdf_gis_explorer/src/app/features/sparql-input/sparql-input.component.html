@@ -8,20 +8,6 @@
         Tableros
       </button>
       <mat-menu #tablerosMenu="matMenu" class="library-menu">
-        <div class="menu-section-label">Predefinidas</div>
-        @if (seedQueries().length === 0) {
-          <button mat-menu-item disabled>
-            <mat-icon>info</mat-icon>
-            <span>No hay queries predefinidas para este backend</span>
-          </button>
-        }
-        @for (q of seedQueries(); track q.id) {
-          <button mat-menu-item (click)="loadSeedQuery(q)">
-            <mat-icon>{{ getCategoryIcon(q.category) }}</mat-icon>
-            <span>{{ q.name }}</span>
-          </button>
-        }
-        <mat-divider />
         <div class="menu-section-label">Mis tableros</div>
         @if (loadingDashboards()) {
           <button mat-menu-item disabled>
@@ -42,9 +28,9 @@
           }
         }
         <mat-divider />
-        <button mat-menu-item (click)="generateTestDashboard()">
+        <button mat-menu-item (click)="newDashboard()">
           <mat-icon>add_circle</mat-icon>
-          <span>Generar tablero de prueba</span>
+          <span>Generar tablero nuevo</span>
         </button>
       </mat-menu>
     </div>
