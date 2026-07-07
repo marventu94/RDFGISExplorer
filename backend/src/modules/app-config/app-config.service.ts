@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync, existsSync } from 'fs';
+import { resolve } from 'path';
 import { DEFAULT_USER_AGENT } from '../../adapters/generic-sparql.adapter';
 import type {
   AppConfigDto,
@@ -69,19 +71,7 @@ export class AppConfigService {
         'entitySearch',
       ],
       supportsWikibaseLabel: isWikidata,
-      defaultPrefixes: isWikidata
-        ? {
-            rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-            rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
-            wd: 'http://www.wikidata.org/entity/',
-            wdt: 'http://www.wikidata.org/prop/direct/',
-            wikibase: 'http://wikiba.se/ontology#',
-            bd: 'http://www.bigdata.com/rdf#',
-          }
-        : {
-            rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-            rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
-          },
+      defaultPrefixes: this.buildPrefixes(),
       search: isWikidata
         ? {
             mode: 'wikidata-api',
@@ -159,6 +149,26 @@ export class AppConfigService {
         'http://www.wikidata.org/entity/Q207313': '#E91E63',
       };
     }
+    return {};
+  }
+
+  private buildPrefixes(): Record<string, string> {
+    const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
+    const customPath = this.config.get<string>('SPARQL_PREFIXES_PATH');
+    const defaultPath = resolve(process.cwd(), 'config', `prefixes.${backend}.json`);
+    const filePath = customPath ? resolve(process.cwd(), customPath) : defaultPath;
+
+    if (existsSync(filePath)) {
+      try {
+        const prefixes = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, string>;
+        const count = Object.keys(prefixes).length;
+        console.log(`Loaded ${count} prefixes from ${filePath}: ${Object.keys(prefixes).join(', ')}`);
+        return prefixes;
+      } catch {
+        console.warn(`Failed to parse ${filePath}`);
+      }
+    }
+    console.warn(`Prefixes file not found: ${filePath}`);
     return {};
   }
 }

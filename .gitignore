@@ -15,3 +15,4 @@ docs/
 .agents/
 skills-lock.json
 .node-version-built
+backend/config/prefixes.graphdb.json
