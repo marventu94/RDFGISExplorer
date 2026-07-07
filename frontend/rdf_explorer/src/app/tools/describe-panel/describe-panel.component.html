@@ -161,3 +161,5 @@
 } @else {
   <h3 class="ta-center mb-0">No URIs to describe</h3>
 }
+<!-- trigger re-render when prefixes load -->
+@if (defaultPrefixes(); as _) {}
