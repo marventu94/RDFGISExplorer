@@ -41,6 +41,15 @@ module.exports = withNativeFederation({
     'leaflet-control-geocoder',
     'leaflet-draw',
     'leaflet.markercluster',
+    // AG Grid es privativo de este remote: no compartir via federation.
+    // Si se comparte con shareAll+singleton, el host (que no lo tiene en sus deps)
+    // omite el @nf-internal/chunk-* en su import-map (ignoreUnusedDeps) y el
+    // remote no resuelve el specifier al cargar el componente.
+    'ag-grid-community',
+    'ag-grid-angular',
+    '@ag-grid-community/core',
+    '@ag-grid-community/client-side-row-model',
+    '@ag-grid-community/styles',
   ],
 
   // Please read our FAQ about sharing libs:
