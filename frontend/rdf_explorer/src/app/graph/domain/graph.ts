@@ -10,7 +10,7 @@ import { IdAllocator } from './id-allocator';
 import type { FilterType, FilterMetadata } from './filter';
 import type { DomainEndpointAdapter } from './endpoint/adapter';
 import { GenericAdapter } from './endpoint/generic-adapter';
-import type { Prefix } from '../../core/settings.types';
+import type { Prefix } from '../../core/services/app-config.service';
 import type { DropPayload } from './drop-payload';
 import { createCatsExample, createW3cExample, createMosquitoExample, createCancerExample } from './examples/canned-examples';
 

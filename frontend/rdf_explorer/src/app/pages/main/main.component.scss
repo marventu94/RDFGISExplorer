@@ -109,17 +109,20 @@
   padding: 6px 10px;
   background: var(--color-bg-active);
   color: var(--explorer-text-muted);
-  border-radius: 4px 4px 0 0;
+  border-radius: 6px 6px 0 0;
   cursor: pointer;
   font-size: 0.8125rem;
   user-select: none;
   transition: background-color 0.15s, color 0.15s;
+  margin-bottom: -1px;
+
+  &:hover {
+    color: var(--explorer-text);
+  }
 
   &.active {
-    background: var(--explorer-bg);
-    color: var(--explorer-text);
-    border-bottom: 1px solid var(--explorer-bg);
-    margin-bottom: -1px;
+    background: var(--color-accent);
+    color: var(--color-text-on-accent);
     font-weight: 500;
   }
 }

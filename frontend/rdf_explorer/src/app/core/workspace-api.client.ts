@@ -22,6 +22,7 @@ export interface ExplorerPanelSnapshot {
   graph: ExplorerSerializedGraph;
   generatedQuery: string;
   variables?: string[];
+  viewport?: { zoom: number; pan: { x: number; y: number } };
 }
 
 export interface ExplorerWorkspacePayload {

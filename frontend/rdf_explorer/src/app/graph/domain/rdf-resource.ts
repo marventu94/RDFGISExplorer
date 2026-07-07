@@ -1,6 +1,6 @@
 import type { Variable, VariableContext, SparqlBinding } from './variable';
 import { Variable as VariableImpl } from './variable';
-import type { Prefix } from '../../core/settings.types';
+import type { Prefix } from '../../core/services/app-config.service';
 import type { Query } from './query';
 import type { IdAllocator } from './id-allocator';
 import type { Edge } from './edge';

@@ -7,7 +7,6 @@ import { GraphViewComponent } from './graph-view.component';
 import { SelectionService } from '@core/services/selection.service';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { AppConfigService } from '@core/services/app-config.service';
-import { SettingsService } from '@core/services/settings.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
 
 const mockNode: NormalizedNode = {
@@ -252,7 +251,7 @@ describe('GraphViewComponent', () => {
 describe('EntityColorService', () => {
   const defaultColor = '#607D8B';
 
-  function buildService(configOverrides: Record<string, string> = {}, settingsOverrides: Record<string, string> = {}) {
+  function buildService(configOverrides: Record<string, string> = {}) {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -263,12 +262,6 @@ describe('EntityColorService', () => {
           provide: AppConfigService,
           useValue: {
             config: () => ({ classColors: configOverrides } as unknown as ReturnType<AppConfigService['config']>),
-          },
-        },
-        {
-          provide: SettingsService,
-          useValue: {
-            app: () => ({ classColorOverrides: settingsOverrides } as unknown as ReturnType<SettingsService['app']>),
           },
         },
       ],
@@ -286,18 +279,10 @@ describe('EntityColorService', () => {
     expect(service.colorForType('http://unknown')).toBe(defaultColor);
   });
 
-  it('uses classColors from app config when no override', () => {
+  it('uses classColors from app config', () => {
     const service = buildService(
       { 'http://www.wikidata.org/entity/Q5': '#000000' },
     );
     expect(service.colorForType('http://www.wikidata.org/entity/Q5')).toBe('#000000');
-  });
-
-  it('user override wins over app config', () => {
-    const service = buildService(
-      { 'http://www.wikidata.org/entity/Q5': '#000000' },
-      { 'http://www.wikidata.org/entity/Q5': '#FF00FF' },
-    );
-    expect(service.colorForType('http://www.wikidata.org/entity/Q5')).toBe('#FF00FF');
   });
 });

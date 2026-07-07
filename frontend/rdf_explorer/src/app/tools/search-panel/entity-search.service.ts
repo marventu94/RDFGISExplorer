@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { LogService } from '../../core/log.service';
-import { SettingsService } from '../../core/settings.service';
+import { AppConfigService } from '../../core/services/app-config.service';
 import type { WikidataSearchResult } from './search-result.model';
 
 interface EntitySearchResponse {
@@ -13,14 +13,14 @@ interface EntitySearchResponse {
 export class EntitySearchService {
   private readonly http = inject(HttpClient);
   private readonly log = inject(LogService);
-  private readonly settings = inject(SettingsService);
+  private readonly appConfig = inject(AppConfigService);
 
   async search(input: string, signal?: AbortSignal): Promise<WikidataSearchResult[]> {
-    const classUri = this.settings.app().searchClass.uri.value;
+    const classUri = this.appConfig.searchClass().uri.value;
 
     const params = new URLSearchParams({
       q: input,
-      limit: String(this.settings.app().resultLimit),
+      limit: String(this.appConfig.resultLimit()),
     });
     if (classUri) {
       params.set('classUri', classUri);

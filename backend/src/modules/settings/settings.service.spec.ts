@@ -24,10 +24,7 @@ const fakeDefaults: SettingsDefaultsDto = {
     uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' },
     label: { type: 'literal', value: 'human', 'xml:lang': 'en' },
   },
-  wikibaseAdapter: true,
   endpointType: 'other',
-  endpointLabel: 'wikidata',
-  theme: 'light',
 };
 
 describe('SettingsService', () => {
@@ -77,9 +74,7 @@ describe('SettingsService', () => {
           label: { type: 'literal', value: 'x' },
         },
         resultLimit: 100,
-        wikibaseAdapter: false,
         endpointType: 'fuseki',
-        endpointLabel: 'my fuseki',
       };
       mockDb.prepare.mockReturnValue({
         get: jest.fn().mockReturnValue({ data: JSON.stringify(stored) }),
@@ -130,49 +125,6 @@ describe('SettingsService', () => {
       await expect(
         service.updateSettings({ endpointType: 'invalid' as never }),
       ).rejects.toMatchObject({ code: 'INVALID_SETTINGS' });
-    });
-
-    it('rejects color override with malformed color', async () => {
-      mockDb.prepare.mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-        all: jest.fn(),
-      });
-
-      await expect(
-        service.updateSettings({
-          classColorOverrides: { 'http://example.org/X': 'red' },
-        }),
-      ).rejects.toMatchObject({ code: 'INVALID_SETTINGS' });
-    });
-
-    it('rejects color override with malformed URI', async () => {
-      mockDb.prepare.mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-        all: jest.fn(),
-      });
-
-      await expect(
-        service.updateSettings({
-          classColorOverrides: { 'not a uri': '#FF0000' },
-        }),
-      ).rejects.toMatchObject({ code: 'INVALID_SETTINGS' });
-    });
-
-    it('accepts well-formed color override map', async () => {
-      mockDb.prepare.mockReturnValue({
-        get: jest.fn().mockReturnValue(undefined),
-        run: jest.fn(),
-        all: jest.fn(),
-      });
-
-      const updated = await service.updateSettings({
-        classColorOverrides: { 'http://www.wikidata.org/entity/Q5': '#FF00FF' },
-      });
-      expect(
-        updated.classColorOverrides['http://www.wikidata.org/entity/Q5'],
-      ).toBe('#FF00FF');
     });
   });
 });

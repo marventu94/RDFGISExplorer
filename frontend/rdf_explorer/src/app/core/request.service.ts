@@ -1,6 +1,5 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { SettingsService } from './settings.service';
 import type { QueryResult, BindingValue } from './endpoint-adapter';
 import { createRdfBackendAdapter, type SparqlJsonResult, type SparqlBinding } from './endpoint-adapter';
 
@@ -8,7 +7,6 @@ export type { SparqlBinding, SparqlJsonResult } from './endpoint-adapter';
 
 @Injectable({ providedIn: 'root' })
 export class RequestService {
-  private readonly settings = inject(SettingsService);
   private readonly http = inject(HttpClient);
 
   readonly labelCache = signal<ReadonlyMap<string, string>>(new Map());

@@ -26,10 +26,7 @@ export class AppConfigService {
       resultLimit: cfg.defaultLimit,
       labelUri: cfg.labelUri,
       searchClass: this.defaultSearchClassFor(cfg),
-      wikibaseAdapter: cfg.supportsWikibaseLabel,
       endpointType: 'other',
-      endpointLabel: cfg.backend,
-      theme: 'light',
     };
   }
 

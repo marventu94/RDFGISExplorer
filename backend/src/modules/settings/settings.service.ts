@@ -85,11 +85,7 @@ export class SettingsService {
         labelUri: defaults.labelUri,
         searchClass: defaults.searchClass,
         resultLimit: defaults.resultLimit,
-        wikibaseAdapter: defaults.wikibaseAdapter,
         endpointType: defaults.endpointType,
-        endpointLabel: defaults.endpointLabel,
-        classColorOverrides: {},
-        theme: defaults.theme,
       };
     }
     return deepClone(this.cachedDefaults);

@@ -10,9 +10,5 @@ export interface AppSettings {
   labelUri: string;
   searchClass: SearchClass;
   resultLimit: number;
-  wikibaseAdapter: boolean;
   endpointType: EndpointType;
-  endpointLabel: string;
-  classColorOverrides: Record<string, string>;
-  theme: 'light' | 'dark';
 }
