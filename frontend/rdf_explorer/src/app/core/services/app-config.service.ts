@@ -1,6 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, shareReplay, tap } from 'rxjs';
 import type { QueryContext } from '../query.service';
 
 export type EndpointType = 'virtuoso' | 'fuseki' | 'other';
@@ -65,6 +64,17 @@ export class AppConfigService {
   private readonly http = inject(HttpClient);
   readonly config = signal<AppConfig | null>(null);
 
+  constructor() {
+    this.http.get<AppConfig>('/api/config').subscribe({
+      next: (cfg) => {
+        this.config.set(cfg);
+      },
+      error: (err) => {
+        console.error('[AppConfigService] failed to load config:', err);
+      },
+    });
+  }
+
   readonly queryContext = computed<QueryContext>(() => {
     const cfg = this.config();
     const defaults = cfg?.defaults;
@@ -72,7 +82,7 @@ export class AppConfigService {
       lang: defaults?.lang ?? 'en',
       labelUri: cfg?.labelUri ?? 'http://www.w3.org/2000/01/rdf-schema#label',
       endpointType: defaults?.endpointType ?? 'other',
-      wikibaseAdapter: cfg?.supportsWikibaseLabel ?? false,
+      supportsWikibaseLabel: cfg?.supportsWikibaseLabel ?? false,
     };
   });
 
@@ -103,12 +113,7 @@ export class AppConfigService {
     this.config()?.supportsWikibaseLabel ?? false,
   );
 
-  private readonly config$ = this.http.get<AppConfig>('/api/config').pipe(
-    tap((cfg) => this.config.set(cfg)),
-    shareReplay(1),
+  readonly defaultPrefixes = computed<Record<string, string>>(() =>
+    this.config()?.defaultPrefixes ?? {},
   );
-
-  load(): Observable<AppConfig> {
-    return this.config$;
-  }
 }

@@ -43,9 +43,8 @@ export class PropertyGraphService {
   });
 
   readonly prefixes = computed<readonly Prefix[]>(() => {
-    const cfg = this.appConfig.config();
-    if (!cfg) return [];
-    return Object.entries(cfg.defaultPrefixes).map(([prefix, uri]) => ({
+    const p = this.appConfig.defaultPrefixes();
+    return Object.entries(p).map(([prefix, uri]) => ({
       prefix,
       uri,
     }));
@@ -82,7 +81,8 @@ export class PropertyGraphService {
     });
 
     effect(() => {
-      this.graphRef.prefixes = this.prefixes();
+      const p = this.prefixes();
+      this.graphRef.prefixes = p;
     });
 
     effect(() => {

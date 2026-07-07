@@ -39,7 +39,7 @@ const fakeConfig = {
 function createMockAppConfig() {
   return {
     config: signal(fakeConfig),
-    queryContext: signal({ lang: 'en', labelUri: 'rdfs:label', endpointType: 'other' as const, wikibaseAdapter: false }),
+    queryContext: signal({ lang: 'en', labelUri: 'rdfs:label', endpointType: 'other' as const, supportsWikibaseLabel: false }),
     load: vi.fn(),
   } as unknown as AppConfigService;
 }

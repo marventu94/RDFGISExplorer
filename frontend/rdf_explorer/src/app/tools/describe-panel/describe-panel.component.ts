@@ -33,6 +33,11 @@ export class DescribePanelComponent {
   readonly request = inject(RequestService);
   private readonly appConfig = inject(AppConfigService);
 
+  constructor() {
+    const keys = Object.keys(this.appConfig.defaultPrefixes());
+    console.log('[describe-panel] constructor - backend:', this.appConfig.config()?.backend, 'prefixes keys:', keys);
+  }
+
   readonly selected = computed(() => this.describeService.current());
   readonly loading = computed(() => this.describeService.loading());
   readonly hasMoreProperties = computed(() => this.describeService.hasMoreProperties());
@@ -85,10 +90,12 @@ export class DescribePanelComponent {
     return results[propUri] ?? [];
   }
 
+  readonly defaultPrefixes = computed(() => this.appConfig.defaultPrefixes());
+
   getLabel(uri: string): string {
     const cached = this.request.getLabel(uri);
     if (cached) return cached;
-    const abbreviated = abbreviateUri(uri, this.appConfig.config()?.defaultPrefixes ?? {});
+    const abbreviated = abbreviateUri(uri, this.appConfig.defaultPrefixes());
     if (abbreviated) return abbreviated;
     return '<' + uri + '>';
   }
