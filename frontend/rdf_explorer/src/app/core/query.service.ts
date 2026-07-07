@@ -1,4 +1,4 @@
-import type { EndpointType } from './settings.types';
+import type { EndpointType } from './services/app-config.service';
 
 export interface QueryContext {
   lang: string;
@@ -106,6 +106,8 @@ export function queryGetClasses(
 export function queryGetProperties(
   uri: string,
   opts: QueryContext,
+  page = 0,
+  pageSize = 50,
 ): string {
   const useWikibase = opts.wikibaseAdapter;
   let q = 'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n';
@@ -114,7 +116,7 @@ export function queryGetProperties(
     q += 'PREFIX bd: <http://www.bigdata.com/rdf#>\n';
     q += 'PREFIX wikibase: <http://wikiba.se/ontology#>\n';
     q += 'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n';
-    q += '  { SELECT ?property WHERE { <' + uri + '> ?property []. } LIMIT 250 }\n';
+    q += '  { SELECT ?property WHERE { <' + uri + '> ?property []. } LIMIT ' + pageSize + ' OFFSET ' + (page * pageSize) + ' }\n';
     q += '  ?p wikibase:directClaim ?property .\n';
     q += '  OPTIONAL { ?property wikibase:propertyType ?propType }\n';
     q += '  BIND(\n';
@@ -131,7 +133,7 @@ export function queryGetProperties(
     q += '  }\n';
     q += '  BIND("0" AS ?kind)\n';
     q += '}\n';
-    q += 'LIMIT 250';
+    q += 'LIMIT ' + pageSize + ' OFFSET ' + (page * pageSize);
   }
   return q;
 }
@@ -145,7 +147,7 @@ export function queryCountValuesType(uri: string, prop: string): string {
 
 export function queryGetPropUri(uri: string, prop: string): string {
   return 'SELECT ?uri WHERE {\n' +
-         '  <' + uri + '> <' + prop + '> ?uri .\n}';
+         '  <' + uri + '> <' + prop + '> ?uri .\n} LIMIT 100';
 }
 
 export function queryGetPropObject(
@@ -158,7 +160,7 @@ export function queryGetPropObject(
   q += '  OPTIONAL { ?uri <' + ctx.labelUri + '> ?uriLabel .\n';
   q += langFilter(ctx, 'uriLabel');
   q += '  }\n';
-  q += '}';
+  q += '} LIMIT 100';
   return q;
 }
 
@@ -170,6 +172,35 @@ export function queryGetPropDatatype(
   let q = 'SELECT DISTINCT ?lit WHERE {\n';
   q += '  <' + uri + '> <' + prop + '> ?lit .\n';
   q += '  FILTER (lang(?lit) = "" || lang(?lit) = "' + ctx.lang + '")\n';
-  q += '}';
+  q += '} LIMIT 100';
   return q;
+}
+
+export function querySearchProperty(
+  uri: string,
+  search: string,
+  opts: QueryContext,
+): string {
+  const escaped = search.replace(/[\\"']/g, '\\$&');
+  const useWikibase = opts.wikibaseAdapter;
+  if (useWikibase) {
+    return 'PREFIX bd: <http://www.bigdata.com/rdf#>\n' +
+      'PREFIX wikibase: <http://wikiba.se/ontology#>\n' +
+      'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n' +
+      '  <' + uri + '> ?property [] .\n' +
+      '  ?p wikibase:directClaim ?property .\n' +
+      '  OPTIONAL { ?property wikibase:propertyType ?propType }\n' +
+      '  BIND(IF(BOUND(?propType) && ?propType = wikibase:WikibaseItem, "1", "2") as ?kind)\n' +
+      '  SERVICE wikibase:label { bd:serviceParam wikibase:language "' + opts.lang + '". }\n' +
+      '  FILTER(CONTAINS(LCASE(?propertyLabel), LCASE("' + escaped + '")))\n' +
+      '} LIMIT 20';
+  }
+  return 'SELECT DISTINCT ?property ?propertyLabel ?kind WHERE {\n' +
+    '  <' + uri + '> ?property [] .\n' +
+    '  OPTIONAL { ?property <' + opts.labelUri + '> ?propertyLabel .\n' +
+    langFilter(opts, 'propertyLabel') +
+    '  }\n' +
+    '  BIND("0" AS ?kind)\n' +
+    '  FILTER(CONTAINS(LCASE(?propertyLabel), LCASE("' + escaped + '")))\n' +
+    '} LIMIT 20';
 }

@@ -12,6 +12,9 @@ import { RequestService } from '../../core/request.service';
   styles: [
     `.c-img { width: 100%; height: auto; display: block; }`,
     `.desc-uri-link, .ell { word-break: break-all; white-space: normal; }`,
+    `.desc-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 0; gap: 12px; color: var(--explorer-text-muted); font-size: 0.875rem; }`,
+    `.desc-spinner { display: block; width: 28px; height: 28px; border: 3px solid var(--explorer-panel-border); border-top-color: var(--color-accent); border-radius: 50%; animation: desc-spin 0.6s linear infinite; }`,
+    `@keyframes desc-spin { to { transform: rotate(360deg); } }`,
   ],
 })
 export class DescribePanelComponent {
@@ -19,6 +22,18 @@ export class DescribePanelComponent {
   readonly request = inject(RequestService);
 
   readonly selected = computed(() => this.describeService.current());
+  readonly loading = computed(() => this.describeService.loading());
+  readonly hasMoreProperties = computed(() => this.describeService.hasMoreProperties());
+
+  loadMore(): void {
+    this.describeService.loadMoreProperties();
+  }
+
+  searchBackend(): void {
+    this.describeService.searchAndLoadProperty(this.objectSearch);
+  }
+
+  readonly objectsEmpty = computed(() => this.selected()?.objects?.length === 0);
 
   show = { datatype: false, objects: true, external: false };
   objectSearch = '';

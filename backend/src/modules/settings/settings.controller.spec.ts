@@ -12,9 +12,7 @@ const baseSettings: AppSettingsDto = {
     label: { type: 'literal', value: 'human', 'xml:lang': 'en' },
   },
   resultLimit: 500,
-  wikibaseAdapter: true,
   endpointType: 'other',
-  endpointLabel: 'wikidata',
 };
 
 describe('SettingsController', () => {

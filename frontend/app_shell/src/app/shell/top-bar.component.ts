@@ -1,6 +1,5 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ThemeService } from '../core/theme.service';
 
 @Component({
   selector: 'app-top-bar',
@@ -24,34 +23,6 @@ import { ThemeService } from '../core/theme.service';
           <span class="top-bar__crumb top-bar__crumb--active">{{ currentLabel }}</span>
         }
       </nav>
-
-      <div class="top-bar__right">
-        <button
-          type="button"
-          class="top-bar__theme-toggle"
-          (click)="theme.toggle()"
-          [attr.aria-label]="theme.nextLabel()"
-          [attr.title]="theme.nextLabel()"
-        >
-          @if (theme.isDark()) {
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2" />
-              <path d="M12 20v2" />
-              <path d="m4.93 4.93 1.41 1.41" />
-              <path d="m17.66 17.66 1.41 1.41" />
-              <path d="M2 12h2" />
-              <path d="M20 12h2" />
-              <path d="m6.34 17.66-1.41 1.41" />
-              <path d="m19.07 4.93-1.41 1.41" />
-            </svg>
-          } @else {
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          }
-        </button>
-      </div>
     </header>
   `,
   styles: `
@@ -64,7 +35,6 @@ import { ThemeService } from '../core/theme.service';
       border-bottom: 1px solid var(--top-bar-border);
       height: 56px;
       box-sizing: border-box;
-      transition: background-color 0.15s ease, border-color 0.15s ease;
     }
 
     .top-bar__left {
@@ -83,33 +53,6 @@ import { ThemeService } from '../core/theme.service';
       font-size: 1.1rem;
       white-space: nowrap;
       color: var(--top-bar-title);
-    }
-
-    .top-bar__theme-toggle {
-      background: none;
-      border: 1px solid var(--color-border);
-      cursor: pointer;
-      padding: 0.4rem;
-      border-radius: 50%;
-      color: var(--top-bar-icon);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-
-      &:hover {
-        background: var(--top-bar-icon-hover-bg);
-        color: var(--top-bar-icon-hover-fg);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--color-accent);
-        outline-offset: 2px;
-      }
-
-      &:active {
-        transform: scale(0.95);
-      }
     }
 
     .top-bar__breadcrumb {
@@ -140,18 +83,9 @@ import { ThemeService } from '../core/theme.service';
       color: var(--color-text-subtle);
       font-size: 1.1rem;
     }
-
-    .top-bar__right {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-shrink: 0;
-    }
   `,
 })
 export class TopBarComponent {
-  protected readonly theme = inject(ThemeService);
-
   get currentPath(): string {
     return window.location.pathname;
   }
