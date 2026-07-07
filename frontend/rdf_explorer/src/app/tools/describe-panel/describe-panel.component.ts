@@ -3,6 +3,17 @@ import { FormsModule } from '@angular/forms';
 import { DescribeService } from './describe.service';
 import type { DescribeObjectItem, DescribeBucketItem } from './describe.service';
 import { RequestService } from '../../core/request.service';
+import { AppConfigService } from '../../core/services/app-config.service';
+
+function abbreviateUri(uri: string, prefixes: Record<string, string>): string | null {
+  const entries = Object.entries(prefixes).sort((a, b) => b[1].length - a[1].length);
+  for (const [prefix, baseUri] of entries) {
+    if (uri.startsWith(baseUri)) {
+      return prefix + ':' + uri.slice(baseUri.length);
+    }
+  }
+  return null;
+}
 
 @Component({
   selector: 'app-describe-panel',
@@ -20,6 +31,7 @@ import { RequestService } from '../../core/request.service';
 export class DescribePanelComponent {
   private readonly describeService = inject(DescribeService);
   readonly request = inject(RequestService);
+  private readonly appConfig = inject(AppConfigService);
 
   readonly selected = computed(() => this.describeService.current());
   readonly loading = computed(() => this.describeService.loading());
@@ -74,7 +86,11 @@ export class DescribePanelComponent {
   }
 
   getLabel(uri: string): string {
-    return this.request.getLabel(uri) ?? '<' + uri + '>';
+    const cached = this.request.getLabel(uri);
+    if (cached) return cached;
+    const abbreviated = abbreviateUri(uri, this.appConfig.config()?.defaultPrefixes ?? {});
+    if (abbreviated) return abbreviated;
+    return '<' + uri + '>';
   }
 
   isObjectItem(item: unknown): item is DescribeObjectItem {
