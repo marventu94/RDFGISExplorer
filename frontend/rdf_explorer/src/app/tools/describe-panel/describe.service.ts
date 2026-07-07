@@ -180,7 +180,7 @@ export class DescribeService {
       0,
       this.PROPERTY_PAGE_SIZE,
     );
-    this.log.add('Describe ' + uri + ' | wikibase=' + this.appConfig.queryContext().wikibaseAdapter);
+    this.log.add('Describe ' + uri);
 
     const selected: CachedResource = {
       uri,
