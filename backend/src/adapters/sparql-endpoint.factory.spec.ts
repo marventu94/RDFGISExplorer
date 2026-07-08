@@ -32,14 +32,14 @@ describe('createSparqlEndpoint', () => {
     process.env['SPARQL_BACKEND'] = 'something-unknown';
     const endpoint: SparqlEndpoint = createSparqlEndpoint();
     expect(endpoint).toBeInstanceOf(GenericSparqlAdapter);
-    expect(endpoint.backendName).toBe('wikidata');
+    expect(endpoint.backendName).toBe('something-unknown');
   });
 
   it('returns GenericSparqlAdapter when SPARQL_BACKEND=generic', () => {
     process.env['SPARQL_BACKEND'] = 'generic';
     const endpoint: SparqlEndpoint = createSparqlEndpoint();
     expect(endpoint).toBeInstanceOf(GenericSparqlAdapter);
-    expect(endpoint.backendName).toBe('wikidata');
+    expect(endpoint.backendName).toBe('generic');
   });
 
   it('returns MillenniumDBAdapter when SPARQL_BACKEND=millenniumdb', () => {
