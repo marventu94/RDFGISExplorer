@@ -6,7 +6,7 @@ import type { Dashboard } from './dashboard.model';
 @Injectable({ providedIn: 'root' })
 export class DashboardApiClient {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:3000/api/dashboards';
+  private readonly baseUrl = '/api/dashboards';
 
   getRecent(): Observable<Dashboard[]> {
     return this.http.get<Dashboard[]>(`${this.baseUrl}/recent`);
@@ -16,7 +16,7 @@ export class DashboardApiClient {
     return this.http.get<Dashboard>(`${this.baseUrl}/${id}`);
   }
 
-  create(dto: { kind: 'gis' | 'explorer'; name: string; payload: Record<string, unknown> }): Observable<Dashboard> {
+  create(dto: { kind: 'gis' | 'explorer'; name: string; payload: object }): Observable<Dashboard> {
     return this.http.post<Dashboard>(`${this.baseUrl}`, dto);
   }
 

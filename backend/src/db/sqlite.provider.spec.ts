@@ -2,15 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import * as path from 'path';
 import { __testing } from './sqlite.provider';
 
-const { resolveDashboardsPath, resolveSettingsPath, normalizeBackend } =
-  __testing;
+const { resolveDashboardsPath, normalizeBackend } = __testing;
 
 describe('sqlite.provider path resolution', () => {
   const ORIGINAL_ENV = { ...process.env };
 
   beforeEach(() => {
     delete process.env['DASHBOARDS_SQLITE_PATH'];
-    delete process.env['SETTINGS_SQLITE_PATH'];
     delete process.env['SPARQL_BACKEND'];
   });
 
@@ -48,15 +46,5 @@ describe('sqlite.provider path resolution', () => {
     expect(resolveDashboardsPath()).toBe(
       path.resolve('./data/wikidata.sqlite'),
     );
-  });
-
-  it('shares path between settings and dashboards by default', () => {
-    process.env['SPARQL_BACKEND'] = 'graphdb';
-    expect(resolveSettingsPath()).toBe(resolveDashboardsPath());
-  });
-
-  it('allows explicit SETTINGS_SQLITE_PATH override', () => {
-    process.env['SETTINGS_SQLITE_PATH'] = '/var/lib/settings-only.sqlite';
-    expect(resolveSettingsPath()).toBe('/var/lib/settings-only.sqlite');
   });
 });
