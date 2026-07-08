@@ -3,10 +3,6 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import {
-  VirtuosoAdapter,
-  FusekiAdapter,
-  GenericAdapter,
-  createEndpointAdapter,
   GisBackendAdapter,
   createRdfBackendAdapter,
   type QueryResult,
@@ -40,51 +36,6 @@ function makeQueryResult(overrides: Partial<QueryResult> = {}): QueryResult {
   };
 }
 
-describe('VirtuosoAdapter', () => {
-  it('produces bif:contains triple', () => {
-    const a = new VirtuosoAdapter();
-    const result = a.textSearchTriple('label', 'Einstein', 20);
-    expect(result).toContain('bif:contains');
-    expect(result).toContain("'Einstein'");
-    expect(result).toContain('?label');
-  });
-});
-
-describe('FusekiAdapter', () => {
-  it('produces text:query triple with limit', () => {
-    const a = new FusekiAdapter();
-    const result = a.textSearchTriple('label', 'Einstein', 20);
-    expect(result).toContain('text:query');
-    expect(result).toContain('"Einstein"');
-    expect(result).toContain('20');
-  });
-});
-
-describe('GenericAdapter', () => {
-  it('produces FILTER regex fragment', () => {
-    const a = new GenericAdapter();
-    const result = a.textSearchTriple('label', 'Einstein', 20);
-    expect(result).toContain('FILTER regex');
-    expect(result).toContain('?label');
-    expect(result).toContain('"Einstein"');
-    expect(result).toContain('"i"');
-  });
-});
-
-describe('createEndpointAdapter', () => {
-  it('returns VirtuosoAdapter for virtuoso', () => {
-    expect(createEndpointAdapter('virtuoso')).toBeInstanceOf(VirtuosoAdapter);
-  });
-
-  it('returns FusekiAdapter for fuseki', () => {
-    expect(createEndpointAdapter('fuseki')).toBeInstanceOf(FusekiAdapter);
-  });
-
-  it('returns GenericAdapter for other', () => {
-    expect(createEndpointAdapter('other')).toBeInstanceOf(GenericAdapter);
-  });
-});
-
 describe('GisBackendAdapter', () => {
   let httpClient: HttpClient;
   let httpTestingController: HttpTestingController;
@@ -106,7 +57,7 @@ describe('GisBackendAdapter', () => {
     expect(adapter.id).toBe('gis-backend');
   });
 
-  it('textSearchTriple delegates to GenericAdapter', () => {
+  it('textSearchTriple produces FILTER regex fragment', () => {
     const adapter = new GisBackendAdapter(httpClient, BASE_URL);
     const result = adapter.textSearchTriple('label', 'test', 10);
     expect(result).toContain('FILTER regex');

@@ -1,99 +1,19 @@
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-// ========== Legacy text-search adapters (Virtuoso / Fuseki / Generic) ==========
+// ========== QueryResult: contrato compartido en packages/contracts ==========
 
-export interface EndpointAdapter {
-  textSearchTriple(label: string, keyword: string, limit: number): string;
-}
+import type { QueryResult } from '@rdfgis/contracts';
 
-export class VirtuosoAdapter implements EndpointAdapter {
-  textSearchTriple(label: string, keyword: string, _limit: number): string {
-    return `      ?${label} bif:contains "'${keyword}'" .`;
-  }
-}
-
-export class FusekiAdapter implements EndpointAdapter {
-  textSearchTriple(label: string, keyword: string, limit: number): string {
-    return `      ?uri text:query (rdfs:label "${keyword}" ${limit}) .`;
-  }
-}
-
-export class GenericAdapter implements EndpointAdapter {
-  textSearchTriple(label: string, keyword: string, _limit: number): string {
-    return `      FILTER regex(?${label}, "${keyword}", "i")`;
-  }
-}
-
-export function createEndpointAdapter(type: string): EndpointAdapter {
-  switch (type) {
-    case 'virtuoso':
-      return new VirtuosoAdapter();
-    case 'fuseki':
-      return new FusekiAdapter();
-    default:
-      return new GenericAdapter();
-  }
-}
-
-// ========== QueryResult (mirrors backend/src/shared/dto/query-result.dto.ts) ==========
-
-export interface Coordinate {
-  lat: number;
-  lng: number;
-}
-
-export interface TemporalEvent {
-  field: string;
-  isoDate: string;
-  numericValue?: number;
-}
-
-export type BindingValue =
-  | { type: 'uri'; value: string }
-  | { type: 'literal'; value: string; datatype?: string; lang?: string }
-  | { type: 'bnode'; value: string }
-  | { type: 'coordinate'; value: Coordinate; raw: string }
-  | { type: 'date'; value: string; raw: string };
-
-export interface ResultBinding {
-  [variableName: string]: BindingValue;
-}
-
-export interface NormalizedNode {
-  uri: string;
-  label: string;
-  type?: string;
-  attributes: Record<string, BindingValue>;
-  coordinate?: Coordinate;
-  temporalEvents?: TemporalEvent[];
-  flags?: {
-    hasAnomaly?: boolean;
-    hasPendingReview?: boolean;
-    isConfirmedDuplicate?: boolean;
-  };
-}
-
-export interface NormalizedEdge {
-  id: string;
-  source: string;
-  target: string;
-  predicate: string;
-  predicateLabel?: string;
-}
-
-export interface QueryResult {
-  variables: string[];
-  bindings: ResultBinding[];
-  nodes: NormalizedNode[];
-  edges: NormalizedEdge[];
-  meta: {
-    durationMs: number;
-    truncated: boolean;
-    limitApplied: number;
-    backend: string;
-  };
-}
+export type {
+  Coordinate,
+  TemporalEvent,
+  BindingValue,
+  ResultBinding,
+  NormalizedNode,
+  NormalizedEdge,
+  QueryResult,
+} from '@rdfgis/contracts';
 
 export interface ExecuteOpts {
   limit?: number;
@@ -132,8 +52,11 @@ export class GisBackendAdapter implements RdfBackendAdapter {
     private readonly baseUrl: string = '',
   ) {}
 
-  textSearchTriple(label: string, keyword: string, limit: number): string {
-    return new GenericAdapter().textSearchTriple(label, keyword, limit);
+  textSearchTriple(label: string, keyword: string, _limit: number): string {
+    // Escape propio (defensa en profundidad): no depender de que el caller
+    // pre-escape el keyword antes de interpolarlo en el literal SPARQL.
+    const escaped = keyword.replace(/[\\"']/g, '\\$&');
+    return `      FILTER regex(?${label}, "${escaped}", "i")`;
   }
 
   async executeQuery(query: string, opts: ExecuteOpts = {}): Promise<QueryResult> {
