@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import nock from 'nock';
-import { SuggestionsService } from './suggestions.service';
+import { SuggestionsService, escapeSparqlLiteral } from './suggestions.service';
 import { SPARQL_ENDPOINT } from '../../adapters/sparql-endpoint.interface';
 
 const mockPredicates = [
@@ -78,6 +78,55 @@ describe('SuggestionsService', () => {
     expect(results).toHaveLength(1);
     expect(results[0].uri).toBe('http://www.wikidata.org/entity/Q1486');
     expect(results[0].label).toBe('Buenos Aires');
+  });
+
+  describe('escapeSparqlLiteral', () => {
+    it('escapes backslashes before quotes (order matters)', () => {
+      expect(escapeSparqlLiteral('a\\b')).toBe('a\\\\b');
+      expect(escapeSparqlLiteral('a"b')).toBe('a\\"b');
+      expect(escapeSparqlLiteral('a\\"b')).toBe('a\\\\\\"b');
+    });
+
+    it('escapes newlines and carriage returns', () => {
+      expect(escapeSparqlLiteral('a\nb\rc')).toBe('a\\nb\\rc');
+    });
+
+    it('leaves normal text untouched', () => {
+      expect(escapeSparqlLiteral('Buenos Aires')).toBe('Buenos Aires');
+    });
+  });
+
+  it('escapes injection attempts in the SPARQL search keyword', async () => {
+    configGet.mockImplementation((key: string) => {
+      const values: Record<string, string> = {
+        SPARQL_BACKEND: 'graphdb',
+        SPARQL_ENDPOINT_URL: 'http://localhost:7200/repositories/test',
+      };
+      return values[key];
+    });
+
+    let sentQuery = '';
+    nock('http://localhost:7200')
+      .post('/repositories/test', (body: unknown) => {
+        // nock parsea el form-urlencoded a un objeto { query: '...' }
+        if (typeof body === 'string') {
+          sentQuery = decodeURIComponent(body.replace(/\+/g, ' '));
+        } else {
+          sentQuery = (body as Record<string, string>)['query'] ?? '';
+        }
+        return true;
+      })
+      .reply(200, { head: { vars: [] }, results: { bindings: [] } });
+
+    // keyword malicioso: corta el literal, inyecta un patrón y usa $& de replace
+    await service.searchEntities('x\\" } UNION { ?s ?p ?o } #$&', 10);
+
+    // el literal queda cerrado: backslash y comilla escapados
+    expect(sentQuery).toContain('x\\\\\\" } UNION');
+    // no quedó una comilla sin escapar que corte el string
+    expect(sentQuery).not.toContain('x\\" }');
+    // $& no se expandió como patrón de reemplazo (quedaría el query duplicado)
+    expect(sentQuery).toContain('#$&');
   });
 
   it('should search entities via SPARQL when backend is not wikidata', async () => {
