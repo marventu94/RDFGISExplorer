@@ -1,4 +1,4 @@
-import type { Prefix } from './settings.types';
+import type { Prefix } from './services/app-config.service';
 
 export function toCurie(uri: string, prefixes: readonly Prefix[]): [string, Prefix | null] {
   for (const p of prefixes) {

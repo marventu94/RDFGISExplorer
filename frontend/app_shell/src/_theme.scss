@@ -1,0 +1,110 @@
+// =============================================================================
+// Theme tokens (light + dark)
+// =============================================================================
+// Single source of truth for the app's color palette. Override per-theme
+// via the [data-theme="dark"] attribute on <html> (set by ThemeService).
+// All component styles should consume these via var(--token-name); do not
+// hardcode colors.
+
+:root,
+:root[data-theme='light'] {
+  // Surfaces
+  --color-bg: #ffffff;
+  --color-bg-surface: #f8f9fa;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #f1f3f5;
+  --color-bg-active: #e9ecef;
+  --color-bg-inverse: #212529;
+
+  // Borders
+  --color-border: #dee2e6;
+  --color-border-strong: #ced4da;
+  --color-border-subtle: #e9ecef;
+
+  // Text
+  --color-text: #212529;
+  --color-text-muted: #6c757d;
+  --color-text-subtle: #adb5bd;
+  --color-text-inverse: #ffffff;
+  --color-text-on-accent: #ffffff;
+
+  // Accent
+  --color-accent: #0d6efd;
+  --color-accent-hover: #0b5ed7;
+  --color-accent-soft: #e7f1ff;
+
+  // Semantic
+  --color-success: #198754;
+  --color-warning: #fd7e14;
+  --color-danger: #dc3545;
+
+  // Code
+  --color-code-bg: #f1f3f5;
+
+  // Shadow
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+
+  // Component tokens
+  --top-bar-bg: var(--color-bg);
+  --top-bar-border: var(--color-border);
+  --top-bar-title: var(--color-text);
+  --top-bar-crumb: var(--color-text-muted);
+  --top-bar-crumb-active: var(--color-text);
+  --top-bar-icon: var(--color-text-muted);
+  --top-bar-icon-hover-bg: var(--color-bg-hover);
+  --top-bar-icon-hover-fg: var(--color-text);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  // Surfaces — slate scale
+  --color-bg: #0f172a;
+  --color-bg-surface: #1e293b;
+  --color-bg-elevated: #1e293b;
+  --color-bg-hover: #334155;
+  --color-bg-active: #475569;
+  --color-bg-inverse: #f1f5f9;
+
+  // Borders
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-border-subtle: #1e293b;
+
+  // Text
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-text-subtle: #64748b;
+  --color-text-inverse: #0f172a;
+  --color-text-on-accent: #0f172a;
+
+  // Accent — softer blue
+  --color-accent: #60a5fa;
+  --color-accent-hover: #93c5fd;
+  --color-accent-soft: #1e3a5f;
+
+  // Semantic
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+
+  // Code
+  --color-code-bg: #0b1220;
+
+  // Shadow — stronger alpha for dark backgrounds
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
+
+  // Component tokens
+  --top-bar-bg: var(--color-bg-surface);
+  --top-bar-border: var(--color-border);
+  --top-bar-title: var(--color-text);
+  --top-bar-crumb: var(--color-text-muted);
+  --top-bar-crumb-active: var(--color-text);
+  --top-bar-icon: var(--color-text-muted);
+  --top-bar-icon-hover-bg: var(--color-bg-hover);
+  --top-bar-icon-hover-fg: var(--color-text);
+}

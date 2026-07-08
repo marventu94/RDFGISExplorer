@@ -92,7 +92,10 @@ export class DashboardsService {
     }
 
     const name = dto.name !== undefined ? dto.name : existing.name;
-    const payload = dto.payload !== undefined ? JSON.stringify(dto.payload) : existing.payload;
+    const payload =
+      dto.payload !== undefined
+        ? JSON.stringify(dto.payload)
+        : existing.payload;
     const now = new Date().toISOString();
 
     this.db

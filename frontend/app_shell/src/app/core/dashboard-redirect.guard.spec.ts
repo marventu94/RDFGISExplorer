@@ -56,21 +56,21 @@ describe('dashboardRedirectGuard', () => {
 
   it('redirects to /gis?dashboardId=:id when kind is gis', async () => {
     const promise = getGuardResult('dash-1');
-    httpMock.expectOne('http://localhost:3000/api/dashboards/dash-1').flush(gisDashboard);
+    httpMock.expectOne('/api/dashboards/dash-1').flush(gisDashboard);
     const urlTree = await promise;
     expect(router.serializeUrl(urlTree as UrlTree)).toBe('/gis?dashboardId=dash-1');
   });
 
   it('redirects to /explorer?workspaceId=:id when kind is explorer', async () => {
     const promise = getGuardResult('dash-2');
-    httpMock.expectOne('http://localhost:3000/api/dashboards/dash-2').flush(explorerDashboard);
+    httpMock.expectOne('/api/dashboards/dash-2').flush(explorerDashboard);
     const urlTree = await promise;
     expect(router.serializeUrl(urlTree as UrlTree)).toBe('/explorer?workspaceId=dash-2');
   });
 
   it('redirects to / with snackbar on 404', async () => {
     const promise = getGuardResult('unknown');
-    httpMock.expectOne('http://localhost:3000/api/dashboards/unknown').flush(null, {
+    httpMock.expectOne('/api/dashboards/unknown').flush(null, {
       status: 404,
       statusText: 'Not Found',
     });

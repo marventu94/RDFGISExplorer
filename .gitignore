@@ -3,8 +3,15 @@ backend/node_modules/
 dist/
 *.db
 data/
+.env.graphdb
+.env.local
 .angular/cache/
 coverage/
 package-lock.json
 test-results/
-/pnpm-lock.yaml
+opencode.json
+docs/
+.agents/
+skills-lock.json
+.node-version-built
+backend/config/prefixes.graphdb.json

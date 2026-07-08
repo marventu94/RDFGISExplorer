@@ -6,7 +6,7 @@ import { Node } from './node';
 import { Property } from './property';
 import { Literal } from './literal';
 import type { SparqlBinding } from './variable';
-import type { Prefix } from '../../core/settings.types';
+import type { Prefix } from '../../core/services/app-config.service';
 
 export interface QueryRetrieveConfig {
   canceller?: AbortSignal;
