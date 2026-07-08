@@ -3,15 +3,13 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AppConfigService } from '@core/services/app-config.service';
-import { SettingsService } from '@core/services/settings.service';
 
-function initializeApp(): (appConfig: AppConfigService, settings: SettingsService) => () => Promise<void> {
-  return (appConfig: AppConfigService, settings: SettingsService) =>
-    async () => {
-      const cfg = await firstValueFrom(appConfig.load());
-      settings.initFromConfig(cfg);
-      await settings.load();
-    };
+// Solo corre cuando la app arranca standalone; como remote del shell la
+// config se carga async (App.ngOnInit / AppConfigService.load con shareReplay).
+function initializeApp(): (appConfig: AppConfigService) => () => Promise<void> {
+  return (appConfig: AppConfigService) => async () => {
+    await firstValueFrom(appConfig.load());
+  };
 }
 
 export const appConfig: ApplicationConfig = {
@@ -22,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     {
       provide: APP_INITIALIZER,
       useFactory: initializeApp(),
-      deps: [AppConfigService, SettingsService],
+      deps: [AppConfigService],
       multi: true,
     },
   ],

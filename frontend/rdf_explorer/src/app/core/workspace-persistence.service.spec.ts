@@ -4,7 +4,6 @@ import { of, throwError } from 'rxjs';
 import { WorkspacePersistenceService } from './workspace-persistence.service';
 import { WorkspaceApiClient, type Dashboard } from './workspace-api.client';
 import { PropertyGraphService } from '../graph/property-graph.service';
-import { SettingsService } from './settings.service';
 
 function createMockClient(): WorkspaceApiClient {
   return {
@@ -28,7 +27,6 @@ describe('WorkspacePersistenceService', () => {
       providers: [
         WorkspacePersistenceService,
         PropertyGraphService,
-        SettingsService,
         { provide: WorkspaceApiClient, useValue: mockClient },
       ],
     });

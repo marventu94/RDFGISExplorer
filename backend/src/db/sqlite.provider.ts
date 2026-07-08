@@ -14,14 +14,6 @@ CREATE TABLE IF NOT EXISTS dashboards (
 CREATE INDEX IF NOT EXISTS idx_dashboards_updated ON dashboards(updated_at DESC);
 `;
 
-const SETTINGS_MIGRATIONS_SQL = `
-CREATE TABLE IF NOT EXISTS settings (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-`;
-
 function normalizeBackend(backend: string | undefined): string {
   if (!backend) return 'wikidata';
   const safe = backend.toLowerCase().replace(/[^a-z0-9_-]/g, '');
@@ -33,12 +25,6 @@ function resolveDashboardsPath(): string {
   if (explicit && explicit.trim() !== '') return path.resolve(explicit);
   const backend = normalizeBackend(process.env['SPARQL_BACKEND']);
   return path.resolve(`./data/${backend}.sqlite`);
-}
-
-function resolveSettingsPath(): string {
-  const explicit = process.env['SETTINGS_SQLITE_PATH'];
-  if (explicit && explicit.trim() !== '') return explicit;
-  return resolveDashboardsPath();
 }
 
 export function createSqliteConnection(dbPath: string): Database.Database {
@@ -60,15 +46,7 @@ export function createDashboardsConnection(): Database.Database {
   return db;
 }
 
-export function createSettingsConnection(): Database.Database {
-  const dbPath = resolveSettingsPath();
-  const db = createSqliteConnection(dbPath);
-  db.exec(SETTINGS_MIGRATIONS_SQL);
-  return db;
-}
-
 export const __testing = {
   resolveDashboardsPath,
-  resolveSettingsPath,
   normalizeBackend,
 };
