@@ -1,15 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import type { Dashboard } from '@rdfgis/contracts';
 
-export interface Dashboard {
-  id: string;
-  kind: 'gis' | 'explorer';
-  name: string;
-  payload: object;
-  createdAt: string;
-  updatedAt: string;
-}
+// Contrato compartido: la fuente de verdad vive en packages/contracts.
+export type { Dashboard } from '@rdfgis/contracts';
 
 export interface GisDashboardPayload {
   query: string;

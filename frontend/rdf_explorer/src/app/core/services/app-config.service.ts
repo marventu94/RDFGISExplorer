@@ -1,62 +1,21 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { QueryContext } from '../query.service';
+import type { AppConfig, SearchClass } from '@rdfgis/contracts';
 
-export type EndpointType = 'virtuoso' | 'fuseki' | 'other';
-
-export interface SearchClassBinding {
-  type: 'uri' | 'literal';
-  value: string;
-  'xml:lang'?: string;
-}
-
-export interface SearchClass {
-  uri: SearchClassBinding;
-  label: SearchClassBinding;
-}
-
-export interface DescribeConfig {
-  exclude: string[];
-  objects: string[];
-  datatype: string[];
-  text: string[];
-  image: string[];
-  external: string[];
-}
+// Contrato compartido: la fuente de verdad vive en packages/contracts.
+export type {
+  EndpointType,
+  SearchClassBinding,
+  SearchClass,
+  DescribeConfig,
+  SettingsDefaults,
+  AppConfig,
+} from '@rdfgis/contracts';
 
 export interface Prefix {
   prefix: string;
   uri: string;
-}
-
-export interface SettingsDefaults {
-  lang: string;
-  resultLimit: number;
-  labelUri: string;
-  searchClass: SearchClass;
-  endpointType: 'virtuoso' | 'fuseki' | 'other';
-}
-
-export interface AppConfig {
-  backend: string;
-  endpointUrl: string;
-  hasBasicAuth: boolean;
-  userAgent: string;
-  timeoutMs: number;
-  defaultLimit: number;
-  maxLimit: number;
-  capabilities: string[];
-  supportsWikibaseLabel: boolean;
-  defaultPrefixes: Record<string, string>;
-  search: {
-    mode: 'wikidata-api' | 'sparql';
-    endpoint?: string;
-    labelProperty: string;
-  };
-  labelUri: string;
-  describe: DescribeConfig;
-  classColors: Record<string, string>;
-  defaults: SettingsDefaults;
 }
 
 @Injectable({ providedIn: 'root' })

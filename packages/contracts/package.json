@@ -1,0 +1,15 @@
+{
+  "name": "@rdfgis/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contratos compartidos backend<->frontends (solo tipos TypeScript)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "pnpm run build"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  }
+}

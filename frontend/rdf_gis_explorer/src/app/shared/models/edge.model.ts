@@ -1,7 +1,2 @@
-export interface NormalizedEdge {
-  id: string;
-  source: string;
-  target: string;
-  predicate: string;
-  predicateLabel?: string;
-}
+// Contrato compartido: la fuente de verdad vive en packages/contracts.
+export type { NormalizedEdge } from '@rdfgis/contracts';
