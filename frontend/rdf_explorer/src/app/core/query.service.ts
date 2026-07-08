@@ -15,7 +15,9 @@ export const DEFAULT_QUERY_CONTEXT: QueryContext = {
 };
 
 function escapeKeyword(keyword: string): string {
-  return keyword.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  // Incluye comilla simple: el bif:contains de Virtuoso envuelve el keyword
+  // en "'...'" y una ' sin escapar corta el literal.
+  return keyword.replace(/[\\"']/g, '\\$&');
 }
 
 function u(uri: string): string {
