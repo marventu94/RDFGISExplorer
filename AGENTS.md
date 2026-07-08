@@ -2,98 +2,121 @@
 
 ## Arquitectura General
 
-Plataforma de micro-frontends con **Module Federation** (`@angular-architects/native-federation`, sin Webpack).
+Plataforma de micro-frontends con **Native Federation** (`@angular-architects/native-federation`, sin Webpack).
 
 ```
 AppShell (host, :4200)
-├── /           → WelcomePage (dashboards recientes)
-├── /settings   → SettingsPage
-├── /explorer   → remote: rdf_explorer (:4201) → MainComponent
-├── /gis        → remote: rdf_gis_explorer (:4202) → App
-└── /dashboards/:id → dashboardRedirectGuard → redirige segun kind
+├── /               → WelcomePage (dashboards recientes)
+├── /explorer       → remote: rdf_explorer (:4201) → MainComponent
+├── /gis            → remote: rdf_gis_explorer (:4202) → App
+├── /dashboards/:id → dashboardRedirectGuard → redirige según kind (gis/explorer)
+└── /**             → redirect a /
 
 Backend NestJS (:3000)
-├── /api/query/execute      → Ejecuta SPARQL via adaptador
+├── /api/query/execute      → Ejecuta SPARQL vía adaptador
 ├── /api/dashboards (CRUD)  → SQLite (better-sqlite3)
-├── /api/suggestions        → Autocompletado predicados
-├── /api/settings (GET/PUT) → Preferencias del usuario (SQLite, singleton)
-├── /api/config             → Configuracion runtime (env) + defaults
-└── /api/health             → Health checks
+├── /api/suggestions        → Autocompletado predicados + búsqueda de entidades
+├── /api/config             → Configuración runtime (env + prefixes) para los frontends
+└── /api/health[/sparql]    → Health checks
 ```
+
+Los tipos compartidos entre backend y frontends viven en **`packages/contracts`**
+(`@rdfgis/contracts`, solo tipos): `QueryResult`, `AppConfig`, `Dashboard`.
 
 ## Estructura del Monorepo
 
-| Proyecto | Path | Framework | PM | Test Runner | Puerto |
-|----------|------|-----------|-----|-------------|--------|
-| Root | `/` | concurrently | npm | - | - |
-| Backend | `backend/` | NestJS 11 / Node.js 24.18.0 | npm | Jest 30 | 3000 |
-| App Shell | `frontend/app_shell/` | Angular 21 | pnpm 10 | Vitest 4 | 4200 |
-| RDF Explorer | `frontend/rdf_explorer/` | Angular 21 | pnpm 10 | Vitest 4 | 4201 |
-| RDF GIS Explorer | `frontend/rdf_gis_explorer/` | Angular 21 | pnpm 10 | Vitest 4 | 4202 |
+Workspace **pnpm** (`pnpm-workspace.yaml` en la raíz): un solo `pnpm install` instala todo.
+
+| Proyecto | Path | Framework | Test Runner | Puerto |
+|----------|------|-----------|-------------|--------|
+| Root | `/` | concurrently | — | — |
+| Contracts | `packages/contracts/` | TypeScript (solo tipos) | — | — |
+| Backend | `backend/` | NestJS 11 / Node.js 24.18.0 | Jest 30 | 3000 |
+| App Shell | `frontend/app_shell/` | Angular 21 | Vitest 4 (vía `ng test`) | 4200 |
+| RDF Explorer | `frontend/rdf_explorer/` | Angular 21 | Vitest 4 (vía `ng test`) | 4201 |
+| RDF GIS Explorer | `frontend/rdf_gis_explorer/` | Angular 21 | Vitest 4 (vía `ng test`) | 4202 |
 
 ## Comandos
 
 ```bash
-# Dev (levanta todo)
-npm run dev
+./start.sh                     # dev con hot reload; --env .env.graphdb para otro backend
+npm run dev                    # igual, sin el bootstrap de nvm/corepack
 
-# Backend
-cd backend && npm run start:dev    # dev server
-cd backend && npm test             # unit tests (Jest)
-cd backend && npm run lint         # ESLint
+cd backend && pnpm run start:dev   # backend solo
+cd backend && pnpm test            # unit tests (Jest)
+cd backend && pnpm run lint        # ESLint
 
-# Frontend (cada app por separado)
-cd frontend/app_shell && pnpm test       # Vitest
-cd frontend/rdf_explorer && pnpm test    # Vitest
-cd frontend/rdf_gis_explorer && pnpm test # Vitest
+cd frontend/<app> && pnpm test     # unit tests (Vitest vía ng test)
 ```
 
-## Convenciones de Codigo
+## Convenciones de Código
 
 ### Backend (NestJS)
-- **Patron:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto, `GenericSparqlAdapter`/`MillenniumDBAdapter` son adaptadores.
+- **Patrón:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto; `GenericSparqlAdapter` / `MillenniumDBAdapter` son adaptadores. El factory (`sparql-endpoint.factory.ts`) elige por `SPARQL_BACKEND` y le pasa el nombre al adaptador (`backendName` refleja el valor configurado, se reporta en `/api/health` y `QueryResult.meta.backend`).
 - **DI tokens:** Symbols (`SPARQL_ENDPOINT`, `DASHBOARDS_DB`), no strings.
-- **DTOs:** `class-validator` + `class-transformer`. Validacion global con `ValidationPipe({ transform: true, whitelist: true })`.
+- **DTOs:** `class-validator` + `class-transformer`. Validación global con `ValidationPipe({ transform: true, whitelist: true })`.
 - **Errores:** `HttpExceptionFilter` global mapea `TimeoutError`→408, `UpstreamError`→502, `NotImplementedError`→503.
-- **DB:** `better-sqlite3` sincronico, WAL mode. Tabla `dashboards` con JSON opaco en columna `payload`.
+- **DB:** `better-sqlite3` sincrónico, WAL mode. Tabla `dashboards` con JSON opaco en columna `payload`.
 - **Tests:** Jest con `nock` para mock HTTP, `supertest` para endpoints, `@nestjs/testing` para modules.
 
 ### Frontend (Angular 21)
 - **Standalone components** en toda la app. Sin NgModules.
 - **Reactividad:** Angular Signals (`signal`, `computed`, `effect`) + RxJS `BehaviorSubject` donde aplica.
-- **Module Federation:** Cada remote expone un solo componente via `federation.config.js` → `exposes: { './Component': '...' }`.
-- **Shared deps:** `shareAll({ singleton: true, strictVersion: true })` — todas las deps son singletons compartidos.
-- **Estilos:** SCSS inline en componentes. Angular Material theme en `styles.scss` del shell.
-- **Tests:** Vitest (no Karma/Jasmine). Archivos `*.spec.ts` junto al codigo.
+- **Native Federation:** cada remote expone un solo componente vía `federation.config.js` → `exposes: { './Component': '...' }`.
+- **Estilos:** SCSS por componente. Angular Material theme en `styles.scss` del shell.
+- **Tests:** archivos `*.spec.ts` junto al código, corren con Vitest vía `ng test` (ver Notas Importantes).
 
-### Comunicacion Shell ↔ Remotes
-- **QueryHandoffService:** `sessionStorage` + `CustomEvent('query-handoff')` + `storage` event. TTL 5 min. Semantica de un solo uso (`consume()`).
-- **Dashboards:** API REST `/api/dashboards`. El shell tiene `DashboardStoreService` reactivo. Los remotes tienen sus propios API clients.
-- **Proxy dev:** Cada frontend tiene `proxy.conf.json` que redirige `/api` → `http://localhost:3000`.
+### Shared deps de federation (¡leer antes de tocar `federation.config.js`!)
+- Base: `shareAll({ singleton: true, strictVersion: true })` en host y remotes.
+- **El host comparte `@angular/material` y `@angular/cdk` explícitamente con `includeSecondaries: { keepAll: true }`** aunque no los importe en su código. Motivo: con `ignoreUnusedDeps`, si el host no los provee, cada remote carga su PROPIA copia del CDK; con dos copias vivas aparecen los warnings NG0912 (Component ID collision) y `MatDialog` crashea (`this._portalOutlet is undefined`: el `viewChild(CdkPortalOutlet)` heredado no matchea la directiva de la otra copia). `keepAll: true` es lo que hace que la entrada sobreviva al filtro de `ignoreUnusedDeps`.
+- **AG Grid es privativo del remote GIS** (está en su `skip`): si se comparte, el host lo omite del import map y el remote no resuelve el specifier.
+- Leaflet, sparqljs y otros CJS/UMD tampoco se comparten (skip en el remote GIS); `leaflet-global.ts` setea `window.L` para los plugins.
+- Patch de `@softarc/native-federation` (`frontend/rdf_gis_explorer/patches/`): resuelve package.json de deps transitivas no-hoisted en el store de pnpm. Referenciado en `pnpm-workspace.yaml`.
 
-## Modulos del Backend
+### Comunicación Shell ↔ Remotes
+- **QueryHandoffService** (duplicado deliberadamente en `rdf_explorer` y `rdf_gis_explorer`; los servicios de app no se pueden compartir por federation): `sessionStorage` + `CustomEvent('query-handoff')` + `storage` event. TTL 5 min. Semántica de un solo uso (`consume()`).
+- **Dashboards:** API REST `/api/dashboards`. El shell tiene `DashboardStoreService` reactivo; los remotes tienen sus propios API clients. Todos usan URLs **relativas** (`/api/...`) — nunca hardcodear `http://localhost:3000` (rompe Docker; el proxy dev y nginx ya rutean `/api`).
+- **Proxy dev:** cada frontend tiene `proxy.conf.json` que redirige `/api` → `http://localhost:3000`. En Docker, el `nginx.conf` de cada frontend hace lo mismo hacia `backend:3000`.
 
-| Modulo | Path | Responsabilidad |
+## Módulos del Backend
+
+| Módulo | Path | Responsabilidad |
 |--------|------|-----------------|
-| `SparqlModule` | `modules/sparql/` | `@Global()`. Provee token `SPARQL_ENDPOINT` via factory segun `SPARQL_BACKEND` env |
-| `QueryModule` | `modules/query/` | Ejecuta SPARQL. Valida con `sparqljs.Parser`. Aplica limites y timeout |
-| `DashboardsModule` | `modules/dashboards/` | CRUD dashboards en SQLite. Payload JSON opaco. Valida `kind` ∈ {gis, explorer} |
-| `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados + busqueda de entidades (`/api/suggestions/entities`) |
-| `HealthModule` | `modules/health/` | Health check basico + verificacion real del endpoint SPARQL |
-| `AppConfigModule` | `modules/app-config/` | `GET /api/config`: runtime config (env) + `labelUri`, `describe` y `defaults` para nuevas settings |
-| `SettingsModule` | `modules/settings/` | `GET/PUT /api/settings`: preferencias del usuario en SQLite (singleton, JSON opaco en `data`) |
+| `SparqlModule` | `modules/sparql/` | `@Global()`. Provee token `SPARQL_ENDPOINT` vía factory según `SPARQL_BACKEND` |
+| `QueryModule` | `modules/query/` | Ejecuta SPARQL. Valida con `sparqljs.Parser`. Aplica límites y timeout |
+| `DashboardsModule` | `modules/dashboards/` | CRUD dashboards en SQLite. Payload JSON opaco (máx 1MB). `kind` ∈ {gis, explorer} |
+| `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados + búsqueda de entidades |
+| `HealthModule` | `modules/health/` | `/api/health` (usado por Docker) + `/api/health/sparql` (chequea el endpoint upstream) |
+| `AppConfigModule` | `modules/app-config/` | `GET /api/config`: env + `defaultPrefixes` + `describe`/`classColors`/`defaults` |
+
+(No hay módulo de settings: se eliminó junto con su tabla SQLite al quedar sin
+consumidores. Los defaults que necesita el Explorer viajan en `/api/config`.)
 
 ## Adaptadores SPARQL
 
-- **`GenericSparqlAdapter`** (completo): Cliente SPARQL 1.1 generico. URL configurable via `SPARQL_ENDPOINT_URL`. Soporte opcional de Basic Auth via `SPARQL_USERNAME`/`SPARQL_PASSWORD`. Retry con backoff en 429, normalizacion de tipos (uri, literal, coordinate, date, bnode), construccion de grafo (nodes+edges), cache de predicados. `SPARQL_BACKEND=wikidata` es un alias que usa este adaptador por compatibilidad historica.
-- **`MillenniumDBAdapter`** (stub): Lanza `NotImplementedError`. Pendiente fase 2.
-- **Configuracion runtime:** `GET /api/config` expone backend, endpoint URL, capabilities, `supportsWikibaseLabel` y configuracion de busqueda. Los frontends consumen este endpoint para adaptar UI (search, seed queries, handoff).
-- **Busqueda de entidades:** `GET /api/suggestions/entities` usa `wbsearchentities` para Wikidata o `SPARQL_ENTITY_SEARCH_QUERY` para backends genericos.
-- **Interfaz:** `SparqlEndpoint { execute(), getPredicates(), backendName }`.
+- **`GenericSparqlAdapter`** (completo): cliente SPARQL 1.1 genérico (POST form-urlencoded). URL vía `SPARQL_ENDPOINT_URL`, Basic Auth opcional (`SPARQL_USERNAME`/`SPARQL_PASSWORD`), retry con backoff en 429, normalización de tipos (uri, literal, coordinate WKT, date, bnode), construcción de grafo (nodes+edges), cache de predicados 1h. Se usa para cualquier `SPARQL_BACKEND` distinto de `millenniumdb`.
+- **`MillenniumDBAdapter`** (stub): lanza `NotImplementedError`. Pendiente fase 2.
+- **Interfaz:** `SparqlEndpoint { execute(), getPredicates(), backendName }` (`backendName: string` = valor de `SPARQL_BACKEND`).
 
-## Contrato Front↔Back: `QueryResult`
+## Prefixes SPARQL
 
-Definido en `backend/src/shared/dto/query-result.dto.ts` y espejado en `frontend/rdf_gis_explorer/src/app/shared/models/`.
+- Fuente: `backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). El repo trae `prefixes.wikidata.json` y `prefixes.graphdb.example.json`; `prefixes.graphdb.json` real está gitignoreado.
+- Se exponen como `defaultPrefixes` en `GET /api/config`.
+- **rdf_explorer** los usa en la generación de queries y para abreviar URIs (describe panel).
+- **rdf_gis_explorer** precarga el bloque `PREFIX ...` en el editor CodeMirror (`SparqlInputComponent.seedDefaultPrefixes()`): al iniciar con editor vacío y al crear tablero nuevo. Nunca pisa un handoff ni un tablero cargado.
+- El backend **no** inyecta prefixes al ejecutar: la query debe ser autocontenida (la validación con `sparqljs` en front y back lo exige).
+- El `Dockerfile` del backend copia `config/` — si se agregan archivos de config nuevos fuera de esa carpeta, actualizar el Dockerfile.
+
+## Contratos Front↔Back: `@rdfgis/contracts`
+
+La fuente de verdad única es **`packages/contracts/src/`** (`query-result.ts`,
+`app-config.ts`, `dashboard.ts`). Los archivos históricos
+(`backend/src/shared/dto/query-result.dto.ts`, `frontend/rdf_gis_explorer/src/app/shared/models/*`,
+`frontend/rdf_explorer/src/app/core/endpoint-adapter.ts`, etc.) son re-exports
+type-only — **los cambios de contrato se hacen SOLO en el paquete** y tsc los
+propaga/valida en las 4 apps. El paquete va en `devDependencies` (`workspace:*`):
+al ser solo tipos no entra en el `shareAll` de federation ni en el runtime.
+Se compila con su script `prepare` en cada `pnpm install`.
 
 ```typescript
 QueryResult {
@@ -101,7 +124,7 @@ QueryResult {
   bindings: ResultBinding[]      // filas raw
   nodes: NormalizedNode[]        // grafo normalizado
   edges: NormalizedEdge[]
-  meta: { durationMs, truncated, limitApplied, backend }
+  meta: { durationMs, truncated, limitApplied, backend }  // backend: string
 }
 
 BindingValue = { type: 'uri' } | { type: 'literal' } | { type: 'bnode' } | { type: 'coordinate' } | { type: 'date' }
@@ -112,163 +135,95 @@ NormalizedEdge { id, source, target, predicate, predicateLabel? }
 
 ## RDF Explorer — Dominio del Grafo
 
-El corazon de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `graph/domain/`:
+El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `graph/domain/`:
 
-- **`PropertyGraph`**: Contenedor de nodes, edges. Mutaciones, query building (BFS → SPARQL), drop handling.
+- **`PropertyGraph`**: contenedor de nodes, edges. Mutaciones, query building (BFS → SPARQL), drop handling.
 - **`RDFResource`** (abstract) → `Node`, `Property`, `Literal`. Cada uno tiene `Variable` (alias, filtros).
-- **`Query`**: Genera SPARQL desde el grafo. BFS, triples, OPTIONALS, VALUES, FILTERs, SERVICE wikibase:label.
+- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label.
 - **`Filter`**: 9 tipos (text, lang, regex, leq, geq, isuri, isliteral, datefrom, dateto).
-- **`GraphSerializer`**: Serializa/deserializa PropertyGraph ↔ JSON para persistencia.
-- **`PropertyGraphService`**: Wrapper Angular con signals. `revision` counter para reactividad.
+- **`GraphSerializer`**: serializa/deserializa PropertyGraph ↔ JSON para persistencia.
+- **`PropertyGraphService`**: wrapper Angular con signals. `revision` counter para reactividad.
 - **`CanvasGraphComponent`**: Cytoscape.js con compound nodes, edgehandles, context-menus, drag&drop.
 
 ## RDF GIS Explorer — Vistas Coordinadas
 
-4 vistas sincronizadas via `SelectionService` (BehaviorSubject):
+4 vistas sincronizadas vía `SelectionService` (BehaviorSubject):
 
-| Vista | Libreria | Filtra por | Emite |
+| Vista | Librería | Filtra por | Emite |
 |-------|----------|-----------|-------|
-| Table | AG Grid 35 | Quick filter | select, focus |
+| Table | AG Grid 35 (`rowSelection` con la API objeto ≥32.2) | Quick filter | select, focus |
 | Map | Leaflet 1.9 + markercluster + draw | GeoFilter (polygon) | select, focus |
-| Graph | Cytoscape 3.33 (cola+dagre) | Max 300 nodos | select, focus |
-| Timeline | vis-timeline 8.5 | TemporalFilter (rango) | select, focus |
+| Graph | Cytoscape 3.34 (cola+dagre) | Máx 300 nodos | select, focus |
+| Timeline | vis-timeline 8.x | TemporalFilter (rango) | select, focus |
 
-**Coordinated View:** Cada vista emite `setFocus(uris)` al hacer pan/zoom. Las demas ajustan su viewport. Toggle global en navbar.
+**Coordinated View:** cada vista emite `setFocus(uris)` al hacer pan/zoom. Las demás ajustan su viewport. Toggle global en navbar.
 
-**SelectionService:** Fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal).
+**SelectionService:** fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal).
 
 ## Persistencia
 
-- **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + seleccion → POST `/api/dashboards`.
-- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → POST `/api/dashboards`.
-- **Settings Explorer:** `SettingsService` consume `GET/PUT /api/settings` (SQLite). El front no tiene estado persistente propio. `load()` se ejecuta en `APP_INITIALIZER`.
-- **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro, no es config.
-- **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`.
-- **AutoRun handoff:** `localStorage` (`platform.handoff.autoRun`) — preferencia de UX per-device.
+- **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + selección → `/api/dashboards` (`kind: 'gis'`).
+- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`).
+- **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro.
+- **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) para la preferencia de auto-ejecución.
 
-## Configuracion y Settings
+## Persistencia SQLite por backend
 
-Dos endpoints, dos responsabilidades, una sola fuente de verdad (el backend):
+Cada backend tiene su propio archivo SQLite, derivado de `SPARQL_BACKEND`: `data/${SPARQL_BACKEND}.sqlite` (override: `DASHBOARDS_SQLITE_PATH`).
 
-### Runtime config — `GET /api/config` (read-only para el cliente)
+```bash
+cd backend
+pnpm run clean:unused-data          # reporta archivos SQLite sin uso, exit 1 si hay
+pnpm run clean:unused-data:force    # los borra (incluye -shm/-wal siblings)
+```
 
-Derivado de variables de entorno. Configura el comportamiento de toda la plataforma:
+`SPARQL_PROTECTED_BACKENDS` (default `wikidata,graphdb`) controla qué archivos en `data/` se preservan aunque no sean el activo.
+
+## Configuración runtime — `GET /api/config`
+
+Derivada de env vars + `config/prefixes.*.json`. Read-only para el cliente:
 
 ```ts
 AppConfig {
   backend, endpointUrl, hasBasicAuth, userAgent, timeoutMs, defaultLimit, maxLimit,
   capabilities, supportsWikibaseLabel, defaultPrefixes, search,
-  labelUri,            // rdfs:label por default
-  describe,            // UI hints: { exclude, objects, datatype, text, image, external }
-  defaults             // bootstrap para nuevas settings (SettingsDefaults)
+  labelUri,     // rdfs:label por default
+  describe,     // UI hints: { exclude, objects, datatype, text, image, external }
+  classColors,  // colores por clase (solo poblado para wikidata)
+  defaults      // defaults que consume el Explorer (lang, resultLimit, labelUri, searchClass, endpointType)
 }
 ```
 
-`AppConfigService` (frontend) cachea esta respuesta y la expone como `signal<AppConfig | null>`. Consumidores: `DescribeService` (usa `describe`), `PropertyGraphService` (usa `defaultPrefixes`), `SettingsService` (usa `defaults`).
-
-### Preferencias del usuario — `GET/PUT /api/settings` (persiste en SQLite)
-
-Tabla `settings` con un único registro (`id = 1`, columna `data` JSON opaco, `updated_at`). El front no toca SQLite directo — todo via API:
-
-```ts
-AppSettings {
-  lang, labelUri, searchClass, resultLimit, wikibaseAdapter, endpointType, endpointLabel
-}
-```
-
-Validación con `class-validator` (DTOs en `modules/settings/dto/`). Errores → 400 con `{ error: 'INVALID_SETTINGS' }`.
-
-`SettingsService` (frontend) inyecta `AppConfigService` + `SettingsApiService`:
-- En el constructor, bootstrap con los `defaults` de la config
-- `load()` (async) hace GET y sobreescribe con lo persistido
-- `update(key, value)` aplica local + PUT fire-and-forget; rollback si falla
-- `reset()` restaura defaults + PUT full
-
-### Lo que NO se persiste
-
-- **Endpoint URL**: viene de `SPARQL_ENDPOINT_URL` (env). El front no puede apuntar a otro endpoint sin tocar el backend.
-- **Prefixes**: vienen de `AppConfig.defaultPrefixes`. Neutrales (rdf, rdfs) o Wikidata (wd, wdt, etc.) según el backend activo.
-- **Wikidata/Dbpedia hardcodeados**: eliminados. Los URIs específicos de Wikidata viven en `AppConfigService` solo cuando `backend === 'wikidata'`.
-
-## Routing del Shell
-
-| Path | Carga | Componente |
-|------|-------|------------|
-| `/` | Lazy local | `WelcomePageComponent` |
-| `/settings` | Lazy local | `SettingsPageComponent` |
-| `/explorer` | `loadRemoteModule('rdf_explorer')` | `MainComponent` |
-| `/gis` | `loadRemoteModule('rdf_gis_explorer')` | `App` |
-| `/dashboards/:id` | Guard redirect | `dashboardRedirectGuard` → `/gis?dashboardId=` o `/explorer?workspaceId=` |
+Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, classColors, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros.
 
 ## Variables de Entorno
 
-Ver archivos `.env`, `.env.wikidata` y `.env.graphdb.example`. Las principales:
-
-| Variable | Default | Uso |
-|----------|---------|-----|
-| `SPARQL_BACKEND` | `wikidata` | `generic`, `wikidata` (alias de generic) o `millenniumdb` |
-| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL. GraphDB: `/repositories/{repoId}` |
-| `SPARQL_USERNAME` | — | Usuario para Basic Auth |
-| `SPARQL_PASSWORD` | — | Password para Basic Auth |
-| `SPARQL_USERNAME` | — | Usuario para Basic Auth |
-| `SPARQL_PASSWORD` | — | Password para Basic Auth |
-| `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para busqueda de entidades. Reemplaza `$keyword` y `$limit` |
-| `SPARQL_USER` | `rdf-gis-explorer/0.1` | Obligatorio para Wikidata |
-| `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
-| `SPARQL_DEFAULT_LIMIT` | `500` | Limite por defecto |
-| `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |
-| `BACKEND_PORT` | `3000` | Puerto backend |
-| `CORS_ORIGINS` | `http://localhost:4200` | CORS |
-| `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | Path SQLite dashboards. Si está set, override del default. |
-| `SETTINGS_SQLITE_PATH` | mismo que `DASHBOARDS_SQLITE_PATH` | Path SQLite settings. Por defecto reusa el de dashboards. |
-| `SPARQL_PROTECTED_BACKENDS` | `wikidata,graphdb` | Backends cuyos archivos SQLite en `data/` se conservan al correr `npm run clean:unused-data`. |
-
-## Persistencia SQLite por backend
-
-Cada backend tiene su propio archivo SQLite, derivado de `SPARQL_BACKEND`:
-
-| `SPARQL_BACKEND` | Archivo SQLite (default) |
-|---|---|
-| `wikidata` | `data/wikidata.sqlite` |
-| `graphdb` | `data/graphdb.sqlite` |
-| `generic` | `data/generic.sqlite` |
-| `millenniumdb` | `data/millenniumdb.sqlite` |
-
-`SETTINGS_SQLITE_PATH` reusa el de dashboards por default. Ambos paths pueden overridearse con sus env vars respectivas.
-
-Limpieza de archivos sin uso:
-
-```bash
-cd backend
-npm run clean:unused-data            # reporta candidatos, exit 1 si hay
-npm run clean:unused-data:force     # los borra (incluye -shm/-wal siblings)
-```
-
-`SPARQL_PROTECTED_BACKENDS` (default `wikidata,graphdb`) controla qué archivos en `data/` se preservan aunque no sean el activo. Útil cuando el proyecto puede correr con varios backends.
-
-`data/curation.db` y `data/dashboards.sqlite` (path pre-refactor) son detectados como `legacy-path` u `orphan-backend` y aparecen como candidatos por default.
+Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa está en `README.md#variables-de-entorno`. No hay `LOG_LEVEL` ni `SQLITE_PATH` (obsoletas, eliminadas).
 
 ## Path Aliases (TypeScript)
 
 ### rdf_gis_explorer
 ```
-@shared/*  → src/app/shared/*
-@core/*    → src/app/core/*
+@shared/*   → src/app/shared/*
+@core/*     → src/app/core/*
 @features/* → src/app/features/*
 ```
 
 ## Notas Importantes
 
 - **No hay NgModules** en el frontend. Todo es standalone components + `provideX()` en `app.config.ts`.
-- **El shell NO expone componentes** como remote. Solo consume remotes.
-- **rdf_explorer expone** `MainComponent` (pagina completa de 3 paneles).
-- **rdf_gis_explorer expone** `App` (componente raiz con navbar + dashboard).
-- **`leaflet-global.ts`** en GIS: hack para federation — setea `window.L = L` para plugins CJS.
-- **Patch de `@softarc/native-federation`** en GIS: `patches/@softarc__native-federation@3.5.5.patch`.
+- **El shell NO expone componentes** como remote; solo consume remotes. Su `app.config.ts` no tiene initializers (el ex-`SettingsService` del shell se eliminó: nadie consumía el resultado).
+- **Tests de frontends**: el target `test` de cada `angular.json` fija `buildTarget: <proyecto>:esbuild:development` + `runner: vitest` (el target `build` de native-federation no sirve para compilar tests). `tsconfig.spec.json` debe incluir `src/polyfills.ts`. En specs, las factories de `vi.mock` se hoistean: helpers compartidos entre factory y tests van dentro de `vi.hoisted()` (ver `graph-view` y `timeline-view` specs).
+- **Interpolación en SPARQL**: nunca interpolar input del usuario en un literal sin escapar `\`, `"`, `'` y saltos de línea (backend: `escapeSparqlLiteral` en `suggestions.service.ts`; explorer: `escapeKeyword`). Con `String.replace`, pasar el reemplazo como función para que `$&`/`$'` no se expandan. URIs externas se validan con `isValidUri` antes de entrar a `VALUES { <...> }`.
+- **Docker**: las 4 imágenes se buildean con contexto en la **raíz del repo** (`docker-compose.yml` usa `context: .` + `dockerfile: <dir>/Dockerfile`) para compartir el lockfile del workspace y `packages/contracts`. El patrón: copiar manifests de todo el workspace + patches, `pnpm install --frozen-lockfile --filter "{./<dir>}..."`, copiar el código de la app, buildear contracts y la app. El volumen de datos del backend monta en `/repo/backend/data`.
+- **Cytoscape:** NO pasar `wheelSensitivity` en las opciones (ni siquiera `1.0`): el default ya es 1 y Cytoscape ≥3.31 normaliza el scroll por `deltaMode` (fix Firefox/Linux integrado); definir la opción solo dispara un warning.
+- **Warning benigno conocido:** `wrong event specified: touchleave` viene de Leaflet 1.9 + leaflet-draw (upstream), no es un bug nuestro.
+- **APP_INITIALIZER del remote GIS** (`rdf_gis_explorer/app.config.ts`) solo corre standalone; cargado como remote, la config se carga async (`App.ngOnInit` / `AppConfigService.load()` con `shareReplay`). No asumir config disponible sincrónicamente en componentes del GIS.
 - **El backend NO usa ORM.** Queries SQL directas con `better-sqlite3`.
-- **`sparqljs`** se usa tanto en backend (validacion) como en GIS (validacion en el frontend).
-- **Fases futuras:** MillenniumDB adapter, curation records, duplicate detection (tablas en `db/migrations.sql` no migradas).
+- **`sparqljs`** se usa en backend (validación) y en GIS (validación en el frontend).
+- **Límites acoplados:** `@Max(2000)` en `execute-query.dto.ts` está hardcodeado; si se sube `SPARQL_MAX_LIMIT` por env, hay que subir también el DTO.
+- **Fases futuras:** MillenniumDB adapter, curation records, duplicate detection (tablas en `db/migrations.sql`, hoy sin uso).
 
 ## Regla de git
 
-**No commitear ni pushear sin OK explicito del usuario.** Esta regla esta formalizada en el skill `no-commit-without-ok`. `git add`, `git status`, `git diff`, `git fetch` y demas lecturas son libres; todo lo que modifique el historial/estado (`commit`, `push`, `merge`, `rebase`, `reset`, `branch -D`, `tag`, `cherry-pick`, `revert`, `--force`, etc.) requiere autorizacion explicita en el mismo turno ("comitea" / "hace commit" / "subi"). Combinado con el skill `crear-commit`: cuando se autoriza, los commits se firman a nombre del usuario (config de git), nunca con Co-Authored-By de Claude.
+**No commitear ni pushear sin OK explícito del usuario.** `git add`, `git status`, `git diff`, `git fetch` y demás lecturas son libres; todo lo que modifique el historial/estado (`commit`, `push`, `merge`, `rebase`, `reset`, `branch -D`, `tag`, `cherry-pick`, `revert`, `--force`, etc.) requiere autorización explícita en el mismo turno ("comiteá" / "hacé commit" / "subí"). Cuando se autoriza, seguir el skill `crear-commit`: los commits se firman a nombre del usuario (config de git), nunca con Co-Authored-By de Claude.
