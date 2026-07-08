@@ -18,6 +18,19 @@ function isValidUri(value: string): boolean {
   return URI_PATTERN.test(value);
 }
 
+/**
+ * Escapa un valor para interpolarlo dentro de un string literal SPARQL ("...").
+ * Cubre backslash, comilla doble y saltos de línea; sin esto, un keyword
+ * terminado en `\` o con `"` permite cortar el literal e inyectar SPARQL.
+ */
+export function escapeSparqlLiteral(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r');
+}
+
 @Injectable()
 export class SuggestionsService {
   private readonly log = new Logger(SuggestionsService.name);
@@ -37,7 +50,12 @@ export class SuggestionsService {
     classUri?: string,
   ): Promise<EntitySearchResult[]> {
     const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
-    this.log.log(
+    const maxLimit = parseInt(
+      this.config.get<string>('SPARQL_MAX_LIMIT') ?? '2000',
+      10,
+    );
+    limit = Math.min(limit, maxLimit);
+    this.log.debug(
       `[searchEntities] q="${keyword}" limit=${limit} classUri=${classUri ?? '(none)'} backend=${backend}`,
     );
     const normalizedClass =
@@ -55,7 +73,7 @@ export class SuggestionsService {
     } else {
       result = await this.sparqlSearch(keyword, limit, normalizedClass);
     }
-    this.log.log(`[searchEntities] returning ${result.length} entities`);
+    this.log.debug(`[searchEntities] returning ${result.length} entities`);
     return result;
   }
 
@@ -78,7 +96,7 @@ export class SuggestionsService {
 
     const userAgent = this.config.get<string>('SPARQL_USER') || DEFAULT_USER_AGENT;
     const url = `https://www.wikidata.org/w/api.php?${params.toString()}`;
-    this.log.log(`[wikidataSearch] GET ${url} | UA=${userAgent}`);
+    this.log.debug(`[wikidataSearch] GET ${url}`);
 
     const response = await axios.get<{
       search?: Array<{
@@ -90,15 +108,9 @@ export class SuggestionsService {
       headers: { 'User-Agent': userAgent },
     });
 
-    this.log.log(
-      `[wikidataSearch] response status=${response.status} keys=${Object.keys(response.data).join(',')} warnings=${JSON.stringify(response.data['warnings'] ?? 'none')} search.length=${response.data.search?.length ?? 0}`,
+    this.log.debug(
+      `[wikidataSearch] status=${response.status} search.length=${response.data.search?.length ?? 0}`,
     );
-
-    if ((response.data.search?.length ?? 0) === 0) {
-      this.log.warn(
-        `[wikidataSearch] EMPTY SEARCH. full response: ${JSON.stringify(response.data).slice(0, 800)}`,
-      );
-    }
 
     const candidates = (response.data.search ?? []).map((r) => ({
       uri: r.concepturi,
@@ -106,16 +118,7 @@ export class SuggestionsService {
       description: r.description,
     }));
 
-    if (candidates.length > 0) {
-      this.log.log(
-        `[wikidataSearch] first candidate: ${candidates[0].label} (${candidates[0].uri})`,
-      );
-    }
-
     if (!classUri || candidates.length === 0) {
-      this.log.log(
-        `[wikidataSearch] no classUri or 0 candidates → returning ${candidates.length} directly`,
-      );
       return candidates;
     }
 
@@ -123,13 +126,9 @@ export class SuggestionsService {
     // P31 (instance-of) value, so the SPARQL filter would always return 0.
     // Treat it as "no class filter" and return all candidates.
     if (classUri === OWL_THING) {
-      this.log.log(
-        `[wikidataSearch] classUri is owl#Thing → skipping filterByClass, returning ${candidates.length} candidates`,
-      );
       return candidates;
     }
 
-    this.log.log(`[wikidataSearch] calling filterByClass with ${classUri}`);
     return this.filterByClass(candidates, classUri);
   }
 
@@ -137,7 +136,11 @@ export class SuggestionsService {
     candidates: EntitySearchResult[],
     classUri: string,
   ): Promise<EntitySearchResult[]> {
-    const values = candidates
+    // Las URIs vienen de la respuesta del upstream: no interpolarlas en el
+    // query sin validarlas (una URI con espacios o `>` corta el VALUES).
+    const safeCandidates = candidates.filter((c) => isValidUri(c.uri));
+    if (safeCandidates.length === 0) return candidates;
+    const values = safeCandidates
       .map((c) => `<${c.uri}>`)
       .join(' ');
     const query = `SELECT ?uri WHERE {
@@ -161,7 +164,7 @@ export class SuggestionsService {
       const matching = new Set(
         response.data.results.bindings.map((b) => b['uri']?.value).filter(Boolean),
       );
-      this.log.log(
+      this.log.debug(
         `[filterByClass] SPARQL returned ${matching.size} matches for ${classUri}`,
       );
       return candidates.filter((c) => matching.has(c.uri));
@@ -191,9 +194,12 @@ SELECT DISTINCT ?uri ?label WHERE {
 }
 LIMIT $limit`;
 
+    // Forma función de replace: un keyword con `$&`/`$'` inyectaría patrones
+    // de sustitución si se pasara como string de reemplazo.
+    const escapedKeyword = escapeSparqlLiteral(keyword);
     const query = template
-      .replace(/\$keyword/g, keyword.replace(/"/g, '\\"'))
-      .replace(/\$limit/g, String(limit));
+      .replace(/\$keyword/g, () => escapedKeyword)
+      .replace(/\$limit/g, () => String(limit));
 
     const endpointUrl = this.config.get<string>('SPARQL_ENDPOINT_URL');
     if (!endpointUrl) {

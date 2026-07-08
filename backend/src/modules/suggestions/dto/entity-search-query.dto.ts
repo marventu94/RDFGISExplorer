@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class EntitySearchQueryDto {
   @IsString()
@@ -9,7 +9,6 @@ export class EntitySearchQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(2000)
   limit?: number;
 
   @IsOptional()
