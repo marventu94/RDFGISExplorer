@@ -11,6 +11,13 @@
   <h3 class="ta-center mb-0 wrap">{{ getLabel(sel.uri) }}</h3>
   <hr class="desc-hr" />
 
+  @if (loading()) {
+    <div class="desc-loading" role="status" aria-label="Loading properties...">
+      <span class="desc-spinner"></span>
+      <span>Loading properties...</span>
+    </div>
+  } @else {
+
   @if (sel.image.length > 0) {
     @if (getResultsForProp(sel.results, sel.image[0].uri); as imgResults) {
       @if (imgResults.length > 0) {
@@ -75,15 +82,27 @@
       {{ show.objects ? '&#9660;' : '&#9650;' }} Object properties
       <span class="pull-right">[{{ sel.objects.length }}]</span>
     </h5>
-    @if (show.objects) {
-      <input
-        class="form-control form-control-sm mb-2"
-        type="text"
-        placeholder="Search properties..."
-        [(ngModel)]="objectSearch"
-        (click)="$event.stopPropagation()"
-      />
-      @for (prop of getFilteredObjects(sel.objects); track prop.uri; let idx = $index) {
+  }
+  @if (show.objects) {
+    <input
+      class="form-control form-control-sm mb-2"
+      type="text"
+      placeholder="Search properties..."
+      [(ngModel)]="objectSearch"
+      (click)="$event.stopPropagation()"
+    />
+    @if (sel.objects.length === 0 && !objectSearch) {
+      <div class="text-muted small mb-2">No object properties loaded yet.</div>
+    }
+    @if (objectSearch && getFilteredObjects(sel.objects).length === 0 && !loading()) {
+      <div class="text-muted small mb-2">
+        No match in loaded list.
+        <button class="btn btn-sm btn-link p-0" (click)="searchBackend(); $event.stopPropagation()" type="button">
+          Search backend for "{{ objectSearch }}"
+        </button>
+      </div>
+    }
+    @for (prop of getFilteredObjects(sel.objects); track prop.uri; let idx = $index) {
         <div class="prop-rect" [class.active]="isObjActive(prop.uri)">
           <div class="prop-head" (click)="toggleObj(prop.uri)">
             <span class="prop-title" [id]="'propId' + idx" draggable="true" (dragstart)="onDragProperty($event, prop.uri)" [title]="prop.uri">
@@ -111,7 +130,6 @@
             </div>
           }
         </div>
-      }
     }
   }
 
@@ -133,6 +151,15 @@
       }
     }
   }
+
+  @if (hasMoreProperties() && !loading()) {
+    <button class="btn btn-sm btn-outline-primary d-block w-100 mt-2" (click)="loadMore()" type="button">
+      Load more properties
+    </button>
+  }
+  }
 } @else {
   <h3 class="ta-center mb-0">No URIs to describe</h3>
 }
+<!-- trigger re-render when prefixes load -->
+@if (defaultPrefixes(); as _) {}

@@ -75,16 +75,6 @@ export class Variable {
     return this.alias ? this.alias : String(this.id);
   }
 
-  /** @deprecated Legacy method from AngularJS codebase. Unused. */
-  setOptions(opts: Partial<{ show: boolean; count: boolean }>): void {
-    const validOpts = ['show', 'count'] as const;
-    for (const key of validOpts) {
-      if (key in opts) {
-        (this.options as Record<string, boolean>)[key] = (opts as Record<string, boolean>)[key];
-      }
-    }
-  }
-
   addFilter(type: FilterType, data: FilterData, context: VariableContext): Filter {
     context.log('New filter (' + type + ') for variable ' + String(this) + ' (' + this.id + ')');
     const filter = new FilterImpl(this, type, data);

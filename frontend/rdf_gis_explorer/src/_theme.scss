@@ -1,0 +1,108 @@
+// GIS-specific tokens (light + dark). Coordinate with Angular Material via
+// color-scheme; the standard --mat-sys-* variables are switched automatically.
+
+:root,
+:root[data-theme='light'] {
+  // Surfaces
+  --gis-bg: #ffffff;
+  --gis-panel-bg: #f8f9fa;
+  --gis-panel-border: #dee2e6;
+  --gis-dashboard-bg: #f8f9fa;
+  --gis-toolbar-bg: #ffffff;
+  --gis-toolbar-border: #dee2e6;
+  --gis-input-bg: #ffffff;
+  --gis-input-border: #ced4da;
+  --gis-input-text: #212529;
+  --gis-tab-bg: #f8f9fa;
+  --gis-tab-active-bg: #ffffff;
+  --gis-tab-border: #dee2e6;
+
+  // Text
+  --gis-text: #212529;
+  --gis-text-muted: #6c757d;
+  --gis-text-subtle: #adb5bd;
+  --gis-link: #0d6efd;
+
+  // Accent
+  --gis-accent: #0d6efd;
+  --gis-accent-soft: #e7f1ff;
+  --gis-accent-border: #86b7fe;
+
+  // Cytoscape (graph view)
+  --cy-node-bg: #6c757d;
+  --cy-node-border: #495057;
+  --cy-node-label: #212529;
+  --cy-edge: #adb5bd;
+
+  // CodeMirror (SPARQL editor)
+  --cm-bg: #ffffff;
+  --cm-gutter-bg: #f8f9fa;
+  --cm-gutter-fg: #6c757d;
+  --cm-text: #212529;
+  --cm-cursor: #212529;
+  --cm-selection: #d0d8ff;
+  --cm-active-line-bg: #f1f8ff;
+
+  // AG Grid (table)
+  --ag-header-bg: #f8f9fa;
+  --ag-header-fg: #212529;
+  --ag-row-bg: #ffffff;
+  --ag-row-alt-bg: #f8f9fa;
+  --ag-row-hover-bg: #e9ecef;
+  --ag-border: #dee2e6;
+  --ag-text: #212529;
+
+  // Leaflet
+  --leaflet-popup-bg: #ffffff;
+  --leaflet-popup-text: #212529;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --gis-bg: #0f172a;
+  --gis-panel-bg: #1e293b;
+  --gis-panel-border: #334155;
+  --gis-dashboard-bg: #0f172a;
+  --gis-toolbar-bg: #1e293b;
+  --gis-toolbar-border: #334155;
+  --gis-input-bg: #0f172a;
+  --gis-input-border: #475569;
+  --gis-input-text: #f1f5f9;
+  --gis-tab-bg: #1e293b;
+  --gis-tab-active-bg: #0f172a;
+  --gis-tab-border: #334155;
+
+  --gis-text: #f1f5f9;
+  --gis-text-muted: #94a3b8;
+  --gis-text-subtle: #64748b;
+  --gis-link: #60a5fa;
+
+  --gis-accent: #60a5fa;
+  --gis-accent-soft: #1e3a5f;
+  --gis-accent-border: #60a5fa;
+
+  --cy-node-bg: #475569;
+  --cy-node-border: #94a3b8;
+  --cy-node-label: #f1f5f9;
+  --cy-edge: #475569;
+
+  --cm-bg: #0b1220;
+  --cm-gutter-bg: #0f172a;
+  --cm-gutter-fg: #64748b;
+  --cm-text: #e2e8f0;
+  --cm-cursor: #f1f5f9;
+  --cm-selection: #1e3a5f;
+  --cm-active-line-bg: #1e293b;
+
+  --ag-header-bg: #1e293b;
+  --ag-header-fg: #f1f5f9;
+  --ag-row-bg: #0f172a;
+  --ag-row-alt-bg: #1e293b;
+  --ag-row-hover-bg: #334155;
+  --ag-border: #334155;
+  --ag-text: #f1f5f9;
+
+  --leaflet-popup-bg: #1e293b;
+  --leaflet-popup-text: #f1f5f9;
+}

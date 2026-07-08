@@ -1,12 +1,6 @@
 <div class="tools" id="tools">
   <div class="right-buttons" id="right-buttons">
-    <button
-      class="tool-btn"
-      id="help-button"
-      [class.active]="toolService.active() === 'help'"
-      (click)="toolService.toggle('help')"
-      type="button"
-    >&#9432;</button>
+
     <button
       class="tool-btn"
       [class.active]="toolService.active() === 'describe'"
@@ -27,12 +21,6 @@
     >&lt;/&gt;</button>
     <button
       class="tool-btn"
-      [class.active]="toolService.active() === 'settings'"
-      (click)="toolService.toggle('settings')"
-      type="button"
-    >&#9881;</button>
-    <button
-      class="tool-btn"
       [class.active]="toolService.active() === 'log'"
       (click)="toolService.toggle('log')"
       type="button"
@@ -50,12 +38,6 @@
         }
         @case ('sparql') {
           <app-sparql-panel />
-        }
-        @case ('settings') {
-          <app-settings-panel />
-        }
-        @case ('help') {
-          <app-help-panel />
         }
         @case ('log') {
           <app-log-panel />

@@ -25,20 +25,6 @@ const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'triple' | 'tr
   4: 'quad',
 };
 
-const TEST_DASHBOARD_NAME = 'Provincias argentinas y sus capitales (grafo)';
-
-const TEST_DASHBOARD_SPARQL = `PREFIX wd: <http://www.wikidata.org/entity/>
-PREFIX wdt: <http://www.wikidata.org/prop/direct/>
-PREFIX wikibase: <http://wikiba.se/ontology#>
-PREFIX bd: <http://www.bigdata.com/rdf#>
-SELECT ?province ?provinceLabel ?capital ?capitalLabel ?coord ?inception WHERE {
-  ?province wdt:P31 wd:Q44753 ;
-            wdt:P36 ?capital .
-  OPTIONAL { ?capital wdt:P625 ?coord . }
-  OPTIONAL { ?province wdt:P571 ?inception . }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "es,en" . }
-}`;
-
 @Injectable({ providedIn: 'root' })
 export class DashboardPersistenceService {
   private readonly api = inject(DashboardApiClient);
@@ -216,31 +202,6 @@ export class DashboardPersistenceService {
     );
   }
 
-  generateTestDashboard(): Observable<Dashboard> {
-    const payload: GisDashboardPayload = {
-      query: TEST_DASHBOARD_SPARQL,
-      backend: 'wikidata',
-      layout: {
-        slotsCount: 3,
-        preset: 'triple',
-        slots: [
-          { id: 'slot-0', view: 'graph' },
-          { id: 'slot-1', view: 'table' },
-          { id: 'slot-2', view: 'map' },
-        ],
-      },
-      filters: {},
-    };
-
-    return this.api.create({ kind: 'gis', name: TEST_DASHBOARD_NAME, payload }).pipe(
-      tap(() => {
-        this.snackBar.open(`Tablero "${TEST_DASHBOARD_NAME}" creado`, 'OK', {
-          duration: 3000,
-        });
-      }),
-    );
-  }
-
   private updateUrl(dashboardId: string): void {
     const url = new URL(window.location.href);
     url.searchParams.set('dashboardId', dashboardId);
@@ -270,6 +231,10 @@ export class DashboardPersistenceService {
   clearCurrent(): void {
     this.currentDashboardId.set(null);
     this.currentDashboardName.set(null);
+    this.isDirty.set(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('dashboardId');
+    window.history.replaceState({}, '', url.toString());
   }
 
   private findNodeByUri(uri: string): NormalizedNode | null {

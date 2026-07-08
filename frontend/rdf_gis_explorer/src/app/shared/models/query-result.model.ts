@@ -1,20 +1,7 @@
-import { ResultBinding } from './binding.model';
-import { NormalizedNode } from './node.model';
-import { NormalizedEdge } from './edge.model';
+// Contrato compartido: la fuente de verdad vive en packages/contracts.
+export type { QueryResult } from '@rdfgis/contracts';
 
-export interface QueryResult {
-  variables: string[];
-  bindings: ResultBinding[];
-  nodes: NormalizedNode[];
-  edges: NormalizedEdge[];
-  meta: {
-    durationMs: number;
-    truncated: boolean;
-    limitApplied: number;
-    backend: 'wikidata' | 'millenniumdb';
-  };
-}
-
+// Tipo propio de esta app (request del editor SPARQL hacia el backend).
 export interface SparqlRequest {
   sparql: string;
   limit?: number;

@@ -43,7 +43,11 @@
           }
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "frontend:esbuild:development",
+            "runner": "vitest"
+          }
         },
         "esbuild": {
           "builder": "@angular/build:application",
@@ -62,8 +66,13 @@
                 "output": "/"
               }
             ],
-            "styles": ["src/styles.scss"],
-            "polyfills": ["es-module-shims"]
+            "styles": [
+              "src/styles.scss"
+            ],
+            "polyfills": [
+              "src/polyfills.ts",
+              "es-module-shims"
+            ]
           },
           "configurations": {
             "production": {

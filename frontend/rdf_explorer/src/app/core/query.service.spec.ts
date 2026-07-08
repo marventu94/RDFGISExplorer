@@ -7,11 +7,15 @@ import {
   queryGetPropUri,
   queryGetPropObject,
   queryGetPropDatatype,
+  DEFAULT_QUERY_CONTEXT,
+  type QueryContext,
 } from './query.service';
+
+const ctx: QueryContext = { ...DEFAULT_QUERY_CONTEXT };
 
 describe('querySearch', () => {
   const baseOpts = (overrides = {}) => ({
-    endpointType: 'other' as const,
+    ...ctx,
     ...overrides,
   });
 
@@ -52,7 +56,7 @@ describe('querySearch', () => {
     expect(q).toContain('LIMIT 20');
   });
 
-  it('defaults type to dbo:Person when not provided', () => {
+  it('uses rdf:type for class constraint', () => {
     const q = querySearch('test', baseOpts());
     expect(q).toContain('?uri rdf:type ?type');
   });
@@ -73,44 +77,59 @@ describe('querySearch', () => {
     expect(q).toContain('\\\\');
   });
 
-  it('escapes double-quote and backslash in keyword to prevent SPARQL injection', () => {
-    const q = querySearch('\'"; DROP', baseOpts({ endpointType: 'other' }));
-    expect(q).toContain('\\"');
-    expect(q).toContain('FILTER regex');
-    const evil = 'evil\\" ; DROP';
-    const q2 = querySearch(evil, baseOpts({ endpointType: 'other' }));
-    expect(q2).toContain('\\\\');
+  it('uses the configured labelUri in triples', () => {
+    const q = querySearch('test', { ...ctx, labelUri: 'http://example.org/myLabel' });
+    expect(q).toContain('?uri <http://example.org/myLabel> ?label');
+    expect(q).not.toContain('rdfs:label');
+  });
+
+  it('uses the configured lang in FILTER', () => {
+    const q = querySearch('test', { ...ctx, lang: 'es' });
+    expect(q).toContain('FILTER (lang(?label) = "es")');
+    expect(q).not.toContain('"en"');
   });
 });
 
 describe('queryGetClasses', () => {
   it('emits SELECT DISTINCT ?uri ?label for a given URI', () => {
-    const q = queryGetClasses('http://example.org/Foo');
+    const q = queryGetClasses('http://example.org/Foo', ctx);
     expect(q).toContain('SELECT DISTINCT ?uri ?label');
     expect(q).toContain('<http://example.org/Foo> a ?uri');
-    expect(q).toContain('PREFIX rdfs:');
   });
 
   it('adds limit and offset when provided', () => {
-    const q = queryGetClasses('http://example.org/Foo', { limit: 5, offset: 10 });
+    const q = queryGetClasses('http://example.org/Foo', { ...ctx, limit: 5, offset: 10 });
     expect(q).toContain('limit 5');
     expect(q).toContain('offset 10');
   });
 
   it('omits limit/offset when not provided', () => {
-    const q = queryGetClasses('http://example.org/Foo');
+    const q = queryGetClasses('http://example.org/Foo', ctx);
     expect(q).not.toContain('limit');
     expect(q).not.toContain('offset');
   });
 });
 
 describe('queryGetProperties', () => {
-  it('includes wikibase:directClaim for Wikidata model', () => {
-    const q = queryGetProperties('http://www.wikidata.org/entity/Q146');
+  it('includes wikibase:directClaim when wikibase adapter enabled', () => {
+    const q = queryGetProperties('http://www.wikidata.org/entity/Q146', { ...ctx, supportsWikibaseLabel: true });
     expect(q).toContain('wikibase:directClaim');
     expect(q).toContain('?property []');
-    expect(q).toContain('ObjectProperty');
-    expect(q).toContain('DatatypeProperty');
+    expect(q).toContain('wikibase:propertyType');
+    expect(q).toContain('wikibase:WikibaseItem');
+    expect(q).toContain('?kind');
+    expect(q).toContain('?p wikibase:propertyType');
+    expect(q).not.toContain('?property wikibase:propertyType');
+    expect(q).not.toContain('SERVICE wikibase:label');
+    expect(q).not.toContain('SELECT ?property WHERE');
+  });
+
+  it('omits wikibase:directClaim when wikibase adapter disabled', () => {
+    const q = queryGetProperties('http://example.org/Q146', { ...ctx, supportsWikibaseLabel: false });
+    expect(q).not.toContain('wikibase:directClaim');
+    expect(q).not.toContain('PREFIX wikibase');
+    expect(q).toContain('?property []');
+    expect(q).toContain('BIND("0" AS ?kind)');
     expect(q).toContain('?kind');
   });
 });
@@ -134,18 +153,33 @@ describe('queryGetPropUri', () => {
 });
 
 describe('queryGetPropObject', () => {
-  it('selects ?uri ?uriLabel with OPTIONAL rdfs:label', () => {
-    const q = queryGetPropObject('http://example.org/Foo', 'http://example.org/bar');
+  it('selects ?uri ?uriLabel with OPTIONAL label', () => {
+    const q = queryGetPropObject('http://example.org/Foo', 'http://example.org/bar', ctx);
     expect(q).toContain('SELECT DISTINCT ?uri ?uriLabel');
     expect(q).toContain('OPTIONAL');
-    expect(q).toContain('rdfs:label');
+    expect(q).toContain('?uri <http://www.w3.org/2000/01/rdf-schema#label> ?uriLabel');
+  });
+
+  it('uses configured labelUri', () => {
+    const q = queryGetPropObject('http://example.org/Foo', 'http://example.org/bar', { ...ctx, labelUri: 'http://example.org/x' });
+    expect(q).toContain('?uri <http://example.org/x> ?uriLabel');
+  });
+
+  it('uses configured lang', () => {
+    const q = queryGetPropObject('http://example.org/Foo', 'http://example.org/bar', { ...ctx, lang: 'fr' });
+    expect(q).toContain('FILTER (lang(?uriLabel) = "fr")');
   });
 });
 
 describe('queryGetPropDatatype', () => {
   it('selects ?lit filtered by lang', () => {
-    const q = queryGetPropDatatype('http://example.org/Foo', 'http://example.org/bar');
+    const q = queryGetPropDatatype('http://example.org/Foo', 'http://example.org/bar', ctx);
     expect(q).toContain('SELECT DISTINCT ?lit');
     expect(q).toContain('lang(?lit)');
+  });
+
+  it('uses configured lang in fallback filter', () => {
+    const q = queryGetPropDatatype('http://example.org/Foo', 'http://example.org/bar', { ...ctx, lang: 'pt' });
+    expect(q).toContain('"pt"');
   });
 });

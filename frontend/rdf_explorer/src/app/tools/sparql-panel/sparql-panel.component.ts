@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { PropertyGraphService } from '../../graph/property-graph.service';
 import { SparqlViewerComponent } from './sparql-viewer/sparql-viewer.component';
 import { QueryHandoffService } from '../../core/query-handoff.service';
-import { SettingsService } from '../../core/settings.service';
+import { AppConfigService } from '../../core/services/app-config.service';
 import { WorkspacePersistenceService } from '../../core/workspace-persistence.service';
 import type { Query, RDFResource } from '../../graph/domain';
 import { Node } from '../../graph/domain';
@@ -20,7 +20,7 @@ import { Property } from '../../graph/domain';
 export class SparqlPanelComponent {
   private readonly graph = inject(PropertyGraphService);
   private readonly queryHandoff = inject(QueryHandoffService);
-  private readonly settings = inject(SettingsService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly workspace = inject(WorkspacePersistenceService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -61,10 +61,7 @@ export class SparqlPanelComponent {
     const sparql = query.toSparql();
     if (!sparql?.trim()) return;
 
-    const backend: 'wikidata' | 'millenniumdb' =
-      this.settings.app().endpoint.url.includes('wikidata')
-        ? 'wikidata'
-        : 'millenniumdb';
+    const backend = this.appConfig.config()?.backend || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,

@@ -1,0 +1,78 @@
+// Explorer-specific tokens (light + dark)
+:root,
+:root[data-theme='light'] {
+  // Surfaces
+  --explorer-bg: #ffffff;
+  --explorer-panel-bg: #f8f9fa;
+  --explorer-panel-border: #dee2e6;
+  --explorer-toolbar-bg: #f8f9fa;
+  --explorer-toolbar-border: #dee2e6;
+  --explorer-toolbar-btn: #495057;
+  --explorer-toolbar-btn-hover-bg: #e9ecef;
+  --explorer-canvas-bg: #ffffff;
+  --explorer-input-bg: #ffffff;
+  --explorer-input-border: #ced4da;
+  --explorer-input-focus-border: #86b7fe;
+
+  // Text
+  --explorer-text: #212529;
+  --explorer-text-muted: #6c757d;
+  --explorer-text-subtle: #adb5bd;
+  --explorer-link: #0d6efd;
+  --explorer-code-text: #d6336c;
+
+  // Cytoscape
+  --cy-node-bg: #6c757d;
+  --cy-node-border: #495057;
+  --cy-node-label: #212529;
+  --cy-edge: #adb5bd;
+  --cy-edge-arrow: #adb5bd;
+  --cy-node-selected: #0d6efd;
+  --cy-edge-selected: #0d6efd;
+
+  // Form
+  --form-bg: #ffffff;
+  --form-border: #dee2e6;
+  --form-section-bg: #f8f9fa;
+
+  // Accent surfaces
+  --highlight-soft: #e7f1ff;
+  --highlight-strong: #0d6efd;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --explorer-bg: #0f172a;
+  --explorer-panel-bg: #1e293b;
+  --explorer-panel-border: #334155;
+  --explorer-toolbar-bg: #1e293b;
+  --explorer-toolbar-border: #334155;
+  --explorer-toolbar-btn: #cbd5e1;
+  --explorer-toolbar-btn-hover-bg: #334155;
+  --explorer-canvas-bg: #0f172a;
+  --explorer-input-bg: #1e293b;
+  --explorer-input-border: #475569;
+  --explorer-input-focus-border: #60a5fa;
+
+  --explorer-text: #f1f5f9;
+  --explorer-text-muted: #94a3b8;
+  --explorer-text-subtle: #64748b;
+  --explorer-link: #60a5fa;
+  --explorer-code-text: #f472b6;
+
+  --cy-node-bg: #475569;
+  --cy-node-border: #94a3b8;
+  --cy-node-label: #f1f5f9;
+  --cy-edge: #475569;
+  --cy-edge-arrow: #475569;
+  --cy-node-selected: #60a5fa;
+  --cy-edge-selected: #60a5fa;
+
+  --form-bg: #1e293b;
+  --form-border: #334155;
+  --form-section-bg: #0f172a;
+
+  --highlight-soft: #1e3a5f;
+  --highlight-strong: #60a5fa;
+}

@@ -103,26 +103,32 @@ type FilterKind = 'all' | 'gis' | 'explorer';
       padding: 1.5rem;
       border-radius: 12px;
       text-decoration: none;
-      transition: transform 0.2s, box-shadow 0.2s;
-      border: 1px solid #e0e0e0;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-elevated);
+      color: var(--color-text);
     }
     .welcome__cta:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: var(--shadow-lg);
     }
     .welcome__cta--explorer {
-      background: linear-gradient(135deg, #fce4ec 0%, #fff 100%);
-      border-color: #f8bbd0;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--color-danger) 18%, var(--color-bg-elevated)) 0%,
+        var(--color-bg-elevated) 100%);
+      border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
     }
     .welcome__cta--gis {
-      background: linear-gradient(135deg, #e3f2fd 0%, #fff 100%);
-      border-color: #bbdefb;
+      background: linear-gradient(135deg,
+        color-mix(in srgb, var(--color-accent) 18%, var(--color-bg-elevated)) 0%,
+        var(--color-bg-elevated) 100%);
+      border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
     }
     .welcome__cta-icon {
       flex-shrink: 0;
     }
-    .welcome__cta--explorer .welcome__cta-icon { color: #c62828; }
-    .welcome__cta--gis .welcome__cta-icon { color: #1565c0; }
+    .welcome__cta--explorer .welcome__cta-icon { color: var(--color-danger); }
+    .welcome__cta--gis .welcome__cta-icon { color: var(--color-accent); }
     .welcome__cta-text {
       display: flex;
       flex-direction: column;
@@ -130,11 +136,11 @@ type FilterKind = 'all' | 'gis' | 'explorer';
     .welcome__cta-title {
       font-size: 1.1rem;
       font-weight: 600;
-      color: #333;
+      color: var(--color-text);
     }
     .welcome__cta-sub {
       font-size: 0.85rem;
-      color: #666;
+      color: var(--color-text-muted);
       margin-top: 0.2rem;
     }
     .welcome__recent-header {
@@ -146,7 +152,7 @@ type FilterKind = 'all' | 'gis' | 'explorer';
     .welcome__recent-title {
       font-size: 1.1rem;
       font-weight: 600;
-      color: #333;
+      color: var(--color-text);
       margin: 0;
     }
     .welcome__filters {
@@ -155,22 +161,22 @@ type FilterKind = 'all' | 'gis' | 'explorer';
     }
     .welcome__filter {
       padding: 0.35rem 0.75rem;
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--color-border);
       border-radius: 6px;
-      background: #fff;
+      background: var(--color-bg-elevated);
       cursor: pointer;
       font-size: 0.85rem;
-      color: #666;
+      color: var(--color-text-muted);
       transition: all 0.2s;
     }
     .welcome__filter:hover {
-      border-color: #1a73e8;
-      color: #1a73e8;
+      border-color: var(--color-accent);
+      color: var(--color-accent);
     }
     .welcome__filter--active {
-      background: #1a73e8;
-      color: #fff;
-      border-color: #1a73e8;
+      background: var(--color-accent);
+      color: var(--color-text-on-accent);
+      border-color: var(--color-accent);
     }
     .welcome__grid {
       display: grid;
@@ -186,29 +192,30 @@ type FilterKind = 'all' | 'gis' | 'explorer';
       text-align: center;
     }
     .welcome__empty-text {
-      color: #888;
+      color: var(--color-text-muted);
       font-size: 1rem;
       margin: 1rem 0;
     }
     .welcome__empty-cta {
       display: inline-block;
       padding: 0.6rem 1.5rem;
-      background: #1a73e8;
-      color: #fff;
+      background: var(--color-accent);
+      color: var(--color-text-on-accent);
       border-radius: 8px;
       text-decoration: none;
       font-weight: 500;
       font-size: 0.9rem;
+      transition: background-color 0.2s;
     }
     .welcome__empty-cta:hover {
-      background: #1557b0;
+      background: var(--color-accent-hover);
     }
     .welcome__loading {
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 3rem 1rem;
-      color: #888;
+      color: var(--color-text-muted);
     }
     .welcome__loading-text {
       font-size: 0.95rem;

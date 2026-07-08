@@ -68,9 +68,18 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       elements: this.computeElements(),
       style: CYTOSCAPE_STYLES,
       layout: { name: 'preset' },
-      wheelSensitivity: 1.0,
+      // No pasar wheelSensitivity: el default ya es 1 y Cytoscape >= 3.31
+      // normaliza el scroll por deltaMode (fix para Firefox/Linux integrado).
+      // Definir la opción, incluso en 1.0, solo dispara el warning de consola.
       autoungrabify: false,
       autounselectify: false,
+    });
+
+    this.cy.on('viewport', () => {
+      this.graph.viewport.set({
+        zoom: this.cy.zoom(),
+        pan: { ...this.cy.pan() },
+      });
     });
 
     this.installPlugins();
@@ -288,7 +297,20 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     });
 
     this.cy.nodes('[kind = "property"], [kind = "literal"], [kind = "title-spacer"]').ungrabify();
+    this.applySavedViewport();
     this.syncSelectionHighlight();
+  }
+
+  private applySavedViewport(): void {
+    const vp = this.graph.viewport();
+    if (!vp) return;
+    const cyZoom = this.cy.zoom();
+    const cyPan = this.cy.pan();
+    if (Math.abs(cyZoom - vp.zoom) > 0.01 ||
+        Math.abs(cyPan.x - vp.pan.x) > 1 ||
+        Math.abs(cyPan.y - vp.pan.y) > 1) {
+      this.cy.viewport({ zoom: vp.zoom, pan: vp.pan });
+    }
   }
 
   private syncSelectionHighlight(): void {

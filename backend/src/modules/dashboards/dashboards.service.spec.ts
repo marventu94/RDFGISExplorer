@@ -191,12 +191,18 @@ describe('DashboardsService', () => {
       };
 
       mockDb.prepare.mockReturnValue({
-        get: jest.fn().mockReturnValueOnce(existing).mockReturnValueOnce(updated),
+        get: jest
+          .fn()
+          .mockReturnValueOnce(existing)
+          .mockReturnValueOnce(updated),
         run: jest.fn(),
         all: jest.fn(),
       });
 
-      const dto: UpdateDashboardDto = { name: 'New Name', payload: { new: true } };
+      const dto: UpdateDashboardDto = {
+        name: 'New Name',
+        payload: { new: true },
+      };
       const result = service.update('uuid-1', dto);
       expect(result.name).toBe('New Name');
       expect(result.payload).toEqual({ new: true });
@@ -218,7 +224,10 @@ describe('DashboardsService', () => {
       };
 
       mockDb.prepare.mockReturnValue({
-        get: jest.fn().mockReturnValueOnce(existing).mockReturnValueOnce(updated),
+        get: jest
+          .fn()
+          .mockReturnValueOnce(existing)
+          .mockReturnValueOnce(updated),
         run: jest.fn(),
         all: jest.fn(),
       });
