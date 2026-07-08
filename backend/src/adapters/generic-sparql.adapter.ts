@@ -36,7 +36,7 @@ interface WikidataRawResponse {
 }
 
 export class GenericSparqlAdapter implements SparqlEndpoint {
-  readonly backendName = 'wikidata' as const;
+  constructor(readonly backendName: string = 'wikidata') {}
 
   private predicateCache: string[] | null = null;
   private predicateCacheAt = 0;
@@ -100,7 +100,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
             durationMs: Date.now() - t0,
             truncated,
             limitApplied: opts.limit,
-            backend: 'wikidata',
+            backend: this.backendName,
           },
         };
       } catch (err) {
