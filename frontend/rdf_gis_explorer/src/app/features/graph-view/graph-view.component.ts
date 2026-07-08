@@ -285,7 +285,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         () => false,
       ),
       layout: this.getLayoutOptions(defaultLayout),
-      wheelSensitivity: 1.0,
+      // No pasar wheelSensitivity: el default ya es 1 y Cytoscape >= 3.31
+      // normaliza el scroll por deltaMode (fix para Firefox/Linux integrado).
+      // Definir la opción, incluso en 1.0, solo dispara el warning de consola.
       minZoom: 0.05,
       maxZoom: 5,
     });
