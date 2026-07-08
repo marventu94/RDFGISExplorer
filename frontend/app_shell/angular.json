@@ -43,7 +43,11 @@
           }
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "app_shell:esbuild:development",
+            "runner": "vitest"
+          }
         },
         "esbuild": {
           "builder": "@angular/build:application",

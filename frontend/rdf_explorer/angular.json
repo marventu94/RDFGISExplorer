@@ -43,7 +43,11 @@
           }
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "app:esbuild:development",
+            "runner": "vitest"
+          }
         },
         "esbuild": {
           "builder": "@angular/build:application",
@@ -62,8 +66,14 @@
                 "output": "/"
               }
             ],
-            "styles": ["src/styles.scss", "node_modules/shepherd.js/dist/css/shepherd.css"],
-            "polyfills": ["src/polyfills.ts", "es-module-shims"]
+            "styles": [
+              "src/styles.scss",
+              "node_modules/shepherd.js/dist/css/shepherd.css"
+            ],
+            "polyfills": [
+              "src/polyfills.ts",
+              "es-module-shims"
+            ]
           },
           "configurations": {
             "production": {
