@@ -67,40 +67,47 @@ function createMockQueryResult(nodes: NormalizedNode[]): QueryResult {
   };
 }
 
-function createMockTimeline() {
-  const onCallbacks: Map<string, (...args: unknown[]) => void> = new Map();
+// vi.hoisted: las factories de vi.mock se hoistean y no ven el scope del módulo;
+// el holder expone la factory y la instancia actual para factory y tests.
+const timelineMock = vi.hoisted(() => {
+  function createMockTimeline() {
+    const onCallbacks: Map<string, (...args: unknown[]) => void> = new Map();
+
+    return {
+      on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+        onCallbacks.set(event, cb);
+      }),
+      setItems: vi.fn(),
+      setGroups: vi.fn(),
+      setSelection: vi.fn(),
+      moveTo: vi.fn(),
+      redraw: vi.fn(),
+      destroy: vi.fn(),
+      setWindow: vi.fn(),
+      getWindow: vi.fn(() => ({
+        start: new Date('2000-01-01'),
+        end: new Date('2000-01-01'),
+      })),
+      simulateSelect(items: string[]): void {
+        const cb = onCallbacks.get('select');
+        if (cb) {
+          cb({ items });
+        }
+      },
+      simulateRangeChanged(start: Date, end: Date, byUser: boolean): void {
+        const cb = onCallbacks.get('rangechanged');
+        if (cb) {
+          cb({ start, end, byUser });
+        }
+      },
+    };
+  }
 
   return {
-    on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
-      onCallbacks.set(event, cb);
-    }),
-    setItems: vi.fn(),
-    setGroups: vi.fn(),
-    setSelection: vi.fn(),
-    moveTo: vi.fn(),
-    redraw: vi.fn(),
-    destroy: vi.fn(),
-    setWindow: vi.fn(),
-    getWindow: vi.fn(() => ({
-      start: new Date('2000-01-01'),
-      end: new Date('2000-01-01'),
-    })),
-    simulateSelect(items: string[]): void {
-      const cb = onCallbacks.get('select');
-      if (cb) {
-        cb({ items });
-      }
-    },
-    simulateRangeChanged(start: Date, end: Date, byUser: boolean): void {
-      const cb = onCallbacks.get('rangechanged');
-      if (cb) {
-        cb({ start, end, byUser });
-      }
-    },
+    createMockTimeline,
+    instance: undefined as unknown as ReturnType<typeof createMockTimeline>,
   };
-}
-
-let mockTimelineInstance: ReturnType<typeof createMockTimeline>;
+});
 
 vi.mock('chart.js/auto', () => {
   const ChartMock = Object.assign(
@@ -122,8 +129,8 @@ vi.mock('vis-timeline/standalone', () => ({
     _groups: unknown,
     _options: unknown,
   ) {
-    mockTimelineInstance = createMockTimeline();
-    return mockTimelineInstance;
+    timelineMock.instance = timelineMock.createMockTimeline();
+    return timelineMock.instance;
   }),
 }));
 
@@ -169,7 +176,7 @@ describe('TimelineViewComponent', () => {
   let selectedNodeSubject: BehaviorSubject<Selection>;
 
   beforeEach(async () => {
-    mockTimelineInstance = createMockTimeline();
+    timelineMock.instance = timelineMock.createMockTimeline();
     resizeObserverCallbacks.clear();
 
     queryResultSubject = new BehaviorSubject<QueryResult | null>(null);
@@ -312,8 +319,8 @@ describe('TimelineViewComponent', () => {
       fixture.detectChanges();
 
       expect(component.queryState).toBe('normal');
-      expect(mockTimelineInstance.setItems).toHaveBeenCalled();
-      expect(mockTimelineInstance.setGroups).toHaveBeenCalled();
+      expect(timelineMock.instance.setItems).toHaveBeenCalled();
+      expect(timelineMock.instance.setGroups).toHaveBeenCalled();
     });
 
     it('should show toolbar in normal state', () => {
@@ -356,7 +363,7 @@ describe('TimelineViewComponent', () => {
       filteredQueryResultSubject.next(result);
       fixture.detectChanges();
 
-      mockTimelineInstance.simulateRangeChanged(
+      timelineMock.instance.simulateRangeChanged(
         new Date('1900-01-01'),
         new Date('1950-01-01'),
         true,
@@ -371,7 +378,7 @@ describe('TimelineViewComponent', () => {
       filteredQueryResultSubject.next(result);
       fixture.detectChanges();
 
-      mockTimelineInstance.simulateRangeChanged(
+      timelineMock.instance.simulateRangeChanged(
         new Date('1900-01-01'),
         new Date('1950-01-01'),
         false,
@@ -389,7 +396,7 @@ describe('TimelineViewComponent', () => {
       fixture.detectChanges();
 
       const selectionService = TestBed.inject(SelectionService);
-      mockTimelineInstance.simulateSelect([nodeWithDates.uri]);
+      timelineMock.instance.simulateSelect([nodeWithDates.uri]);
 
       expect(selectionService.select).toHaveBeenCalledWith(
         nodeWithDates,
@@ -404,7 +411,7 @@ describe('TimelineViewComponent', () => {
       fixture.detectChanges();
 
       const selectionService = TestBed.inject(SelectionService);
-      mockTimelineInstance.simulateSelect([]);
+      timelineMock.instance.simulateSelect([]);
 
       expect(selectionService.select).not.toHaveBeenCalled();
     });
@@ -416,8 +423,8 @@ describe('TimelineViewComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(mockTimelineInstance.setSelection).not.toHaveBeenCalled();
-      expect(mockTimelineInstance.moveTo).not.toHaveBeenCalled();
+      expect(timelineMock.instance.setSelection).not.toHaveBeenCalled();
+      expect(timelineMock.instance.moveTo).not.toHaveBeenCalled();
     });
 
     it('should scroll to node on external selection with dates', () => {
@@ -426,8 +433,8 @@ describe('TimelineViewComponent', () => {
       filteredQueryResultSubject.next(result);
       fixture.detectChanges();
 
-      mockTimelineInstance.setSelection.mockClear();
-      mockTimelineInstance.moveTo.mockClear();
+      timelineMock.instance.setSelection.mockClear();
+      timelineMock.instance.moveTo.mockClear();
 
       selectedNodeSubject.next({
         node: nodeWithOneDate,
@@ -435,10 +442,10 @@ describe('TimelineViewComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(mockTimelineInstance.setSelection).toHaveBeenCalledWith([
+      expect(timelineMock.instance.setSelection).toHaveBeenCalledWith([
         nodeWithOneDate.uri,
       ]);
-      expect(mockTimelineInstance.moveTo).toHaveBeenCalledWith(
+      expect(timelineMock.instance.moveTo).toHaveBeenCalledWith(
         new Date('1816-07-09T00:00:00Z'),
         {
           animation: { duration: 600, easingFunction: 'easeInOutQuad' },
@@ -454,7 +461,7 @@ describe('TimelineViewComponent', () => {
 
       expect(component.selectedNode).toBeNull();
 
-      mockTimelineInstance.simulateSelect([nodeWithDates.uri]);
+      timelineMock.instance.simulateSelect([nodeWithDates.uri]);
       expect(component.selectedNode).toBe(nodeWithDates);
     });
   });
@@ -466,7 +473,7 @@ describe('TimelineViewComponent', () => {
       filteredQueryResultSubject.next(result);
       fixture.detectChanges();
 
-      mockTimelineInstance.simulateRangeChanged(
+      timelineMock.instance.simulateRangeChanged(
         new Date('1900-05-15T00:00:00Z'),
         new Date('1950-12-25T00:00:00Z'),
         true,
@@ -519,7 +526,7 @@ describe('TimelineViewComponent', () => {
 
       // Access protected method via bracket access
       (component as unknown as Record<'zoomTo', (level: unknown) => void>).zoomTo(0);
-      expect(mockTimelineInstance.setWindow).toHaveBeenCalled();
+      expect(timelineMock.instance.setWindow).toHaveBeenCalled();
     });
 
     it('should not call setWindow when timeline is undefined', () => {
@@ -537,10 +544,10 @@ describe('TimelineViewComponent', () => {
       filteredQueryResultSubject.next(result);
       fixture.detectChanges();
 
-      mockTimelineInstance.redraw.mockClear();
+      timelineMock.instance.redraw.mockClear();
       window.dispatchEvent(new Event('resize'));
 
-      expect(mockTimelineInstance.redraw).toHaveBeenCalled();
+      expect(timelineMock.instance.redraw).toHaveBeenCalled();
     });
 
     it('should not throw when redraw called without timeline', () => {
@@ -557,7 +564,7 @@ describe('TimelineViewComponent', () => {
       fixture.detectChanges();
 
       component.ngOnDestroy();
-      expect(mockTimelineInstance.destroy).toHaveBeenCalled();
+      expect(timelineMock.instance.destroy).toHaveBeenCalled();
     });
 
     it('should not throw on destroy without timeline', () => {

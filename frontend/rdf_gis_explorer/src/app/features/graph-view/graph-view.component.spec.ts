@@ -49,46 +49,51 @@ function createMockQueryResult(
   };
 }
 
-function createMockCy() {
-  const collectionObj = {
-    style: vi.fn().mockReturnThis(),
-    data: vi.fn(),
-    id: vi.fn(() => 'mock-id'),
-    empty: vi.fn(() => false),
-    closedNeighborhood: vi.fn(function (this: Record<string, unknown>) {
-      return this;
-    }),
-    difference: vi.fn(function (this: Record<string, unknown>) {
-      return this;
-    }),
-    forEach: vi.fn(),
-    degree: vi.fn(() => 5),
-    connectedEdges: vi.fn(function (this: Record<string, unknown>) {
-      return this;
-    }),
-    connectedNodes: vi.fn(function (this: Record<string, unknown>) {
-      return this;
-    }),
-    filter: vi.fn(function (this: Record<string, unknown>) {
-      return this;
-    }),
-  };
-  return {
-    destroy: vi.fn(),
-    resize: vi.fn(),
-    fit: vi.fn(),
-    zoom: vi.fn(),
-    center: vi.fn(),
-    layout: vi.fn(() => ({ run: vi.fn() })),
-    elements: vi.fn(() => collectionObj),
-    nodes: vi.fn(() => collectionObj),
-    getElementById: vi.fn(() => collectionObj),
-    on: vi.fn(),
-    ready: vi.fn((cb: () => void) => cb()),
-    animate: vi.fn(),
-    style: vi.fn().mockReturnThis(),
-  };
-}
+// vi.hoisted: la factory de vi.mock se hoistea y no ve el scope del módulo;
+// esto hace que createMockCy exista tanto para la factory como para los tests.
+const { createMockCy } = vi.hoisted(() => {
+  function createMockCy() {
+    const collectionObj = {
+      style: vi.fn().mockReturnThis(),
+      data: vi.fn(),
+      id: vi.fn(() => 'mock-id'),
+      empty: vi.fn(() => false),
+      closedNeighborhood: vi.fn(function (this: Record<string, unknown>) {
+        return this;
+      }),
+      difference: vi.fn(function (this: Record<string, unknown>) {
+        return this;
+      }),
+      forEach: vi.fn(),
+      degree: vi.fn(() => 5),
+      connectedEdges: vi.fn(function (this: Record<string, unknown>) {
+        return this;
+      }),
+      connectedNodes: vi.fn(function (this: Record<string, unknown>) {
+        return this;
+      }),
+      filter: vi.fn(function (this: Record<string, unknown>) {
+        return this;
+      }),
+    };
+    return {
+      destroy: vi.fn(),
+      resize: vi.fn(),
+      fit: vi.fn(),
+      zoom: vi.fn(),
+      center: vi.fn(),
+      layout: vi.fn(() => ({ run: vi.fn() })),
+      elements: vi.fn(() => collectionObj),
+      nodes: vi.fn(() => collectionObj),
+      getElementById: vi.fn(() => collectionObj),
+      on: vi.fn(),
+      ready: vi.fn((cb: () => void) => cb()),
+      animate: vi.fn(),
+      style: vi.fn().mockReturnThis(),
+    };
+  }
+  return { createMockCy };
+});
 
 vi.mock('cytoscape', () => {
   const mockCyBuilder = vi.fn(() => createMockCy());
