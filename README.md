@@ -1,43 +1,40 @@
 # RDF GIS Explorer
 
-Plataforma unificada para exploracion visual de grafos de conocimiento (KG) con dimensiones geo-espaciales y temporales. Combina dos herramientas — **RDF Explorer** (construccion visual de queries SPARQL) y **RDF GIS Explorer** (dashboard de vistas coordinadas: tabla, grafo, mapa, linea de tiempo) — bajo un unico *AppShell* con Module Federation.
+Plataforma unificada para exploración visual de grafos de conocimiento (KG) con dimensiones geo-espaciales y temporales. Combina dos herramientas — **RDF Explorer** (construcción visual de queries SPARQL) y **RDF GIS Explorer** (dashboard de vistas coordinadas: tabla, grafo, mapa, línea de tiempo) — bajo un único *AppShell* con Module Federation.
 
-Tesis de Maestria en Ingenieria de Software — Venturino, Martin M. — LIFIA / UNLP, 2025.
+El backend actúa como proxy configurable hacia **cualquier endpoint SPARQL 1.1**: se valida hoy contra Wikidata y una instancia de GraphDB, y se adapta a otros endpoints configurando la URL, credenciales y prefixes por variables de entorno (ver [Configuración de backends SPARQL](#configuración-de-backends-sparql)).
+
+Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFIA / UNLP, 2025.
 
 ---
 
 ## Stack
 
-- **Frontend:** Angular 21 (Module Federation via `@angular-architects/native-federation`)
+- **Frontend:** Angular 21 (Native Federation vía `@angular-architects/native-federation`)
   - `frontend/app_shell/` — Host en `:4200`
   - `frontend/rdf_explorer/` — Remote en `:4201`
   - `frontend/rdf_gis_explorer/` — Remote en `:4202`
-- **Backend:** NestJS 11 sobre Node.js (`:3000`)
-- **DB:** SQLite via `better-sqlite3` (`backend/data/`)
-- **Endpoint SPARQL:** Wikidata (default) / MillenniumDB (stub) — patron Adapter
-- **Testing:** Vitest (unitarios frontend), Jest (backend)
-- **Package manager:** pnpm 10 (frontend), npm (backend)
+- **Backend:** NestJS 11 sobre Node.js 24.18.0 (`:3000`)
+- **DB:** SQLite vía `better-sqlite3` (`backend/data/`, un archivo por backend SPARQL)
+- **Endpoint SPARQL:** genérico SPARQL 1.1 (URL configurable) / Wikidata / MillenniumDB (stub) — patrón Adapter
+- **Testing:** Jest (backend), Vitest (frontends — ver [Tests](#tests))
+- **Package manager:** pnpm (workspace único en la raíz, `pnpm-workspace.yaml`)
 
 ---
 
-## Como levantar el proyecto
+## Cómo levantar el proyecto
 
 ### Desarrollo local
 
 ```bash
-# Instalar dependencias del backend
-cd backend && npm install && cd ..
+# Instalar dependencias de todo el workspace (backend + 3 frontends)
+pnpm install
 
-# Instalar dependencias del app shell
-cd frontend/app_shell && pnpm install && cd ../..
+# Levantar todo: backend (:3000), shell (:4200), explorer (:4201) y gis (:4202)
+./start.sh                    # usa .env (Wikidata por defecto)
+./start.sh --env .env.graphdb # usa otro archivo de entorno
 
-# Instalar dependencias de rdf_explorer
-cd frontend/rdf_explorer && pnpm install && cd ../..
-
-# Instalar dependencias de rdf_gis_explorer
-cd frontend/rdf_gis_explorer && pnpm install && cd ../..
-
-# Levantar backend (:3000), shell (:4200), explorer (:4201) y gis (:4202)
+# Alternativa sin start.sh (requiere Node 24 activo, ver .nvmrc)
 npm run dev
 ```
 
@@ -46,63 +43,83 @@ npm run dev
 | App Shell (host) | http://localhost:4200 |
 | RDF Explorer (remote) | http://localhost:4200/explorer |
 | RDF GIS Explorer (remote) | http://localhost:4200/gis |
-| Backend API | http://localhost:3000 |
+| Backend API | http://localhost:3000/api |
 
-### Docker
+### Docker / Podman
+
+Las imágenes se buildean con **contexto en la raíz del repo** (los Dockerfiles
+comparten el lockfile del workspace pnpm y el paquete `packages/contracts`).
 
 ```bash
-cp .env.example .env
+# Wikidata (default, sin credenciales)
 docker compose up
+
+# GraphDB local (requiere credenciales)
+cp .env.graphdb.example .env.graphdb
+# editá .env.graphdb con tus credenciales
+ENV_FILE=.env.graphdb docker compose up
 ```
+
+| Archivo | Trackeado en git | Contenido |
+|---------|------------------|-----------|
+| `.env` | Sí | Configuración por defecto (Wikidata) |
+| `.env.graphdb` | **No** | Configuración local con credenciales de GraphDB |
+| `.env.graphdb.example` | Sí | Template para GraphDB (sin credenciales reales) |
+
+> `.env.graphdb` está en `.gitignore` para no subir credenciales. Cada desarrollador debe crear el suyo a partir de `.env.graphdb.example`.
 
 ---
 
 ## Flujo principal de la plataforma
 
 1. **Welcome** (`/`) — Tableros recientes guardados (mix de Explorer y GIS) con filtros y CTAs.
-2. **RDF Explorer** (`/explorer`) — Construccion visual de queries SPARQL; guardar workspace.
-3. **Handoff** — Boton "Explorar en GIS" migra la query generada al dashboard GIS.
+2. **RDF Explorer** (`/explorer`) — Construcción visual de queries SPARQL; guardar workspace.
+3. **Handoff** — Botón "Explorar en GIS" migra la query generada al dashboard GIS.
 4. **RDF GIS Explorer** (`/gis`) — Ejecutar query, explorar resultados en 1-4 vistas coordinadas, guardar dashboard.
-5. **Persistencia** — Todo se guarda en el backend NestJS; recargar y abrir desde Welcome restaura el estado identico.
+5. **Persistencia** — Todo se guarda en el backend NestJS; recargar y abrir desde Welcome restaura el estado idéntico.
 
 ---
 
 ## Estructura del repo
 
 ```
+packages/
+  contracts/            # @rdfgis/contracts: tipos compartidos back<->front (QueryResult, AppConfig, Dashboard)
 backend/                # NestJS 11 + SQLite (better-sqlite3)
+  config/               # prefixes.<backend>.json (prefixes SPARQL por backend)
   src/
-    adapters/           # SparqlEndpoint: WikidataAdapter, MillenniumDBAdapter (stub)
+    adapters/           # SparqlEndpoint: GenericSparqlAdapter, MillenniumDBAdapter (stub)
     common/filters/     # HttpExceptionFilter global
-    db/                 # SQLite provider + migrations
+    db/                 # SQLite provider (un archivo por SPARQL_BACKEND)
     modules/
-      dashboards/       # CRUD dashboards (SQLite)
-      health/           # Health check + SPARQL endpoint check
-      query/            # Ejecucion de queries SPARQL
-      sparql/           # Modulo global: provee SPARQL_ENDPOINT token
-      suggestions/      # Autocompletado de predicados
-    shared/dto/         # Contrato QueryResult (front<->back)
+      app-config/       # GET /api/config: runtime config para los frontends
+      dashboards/       # CRUD dashboards/workspaces (SQLite)
+      health/           # Health check + verificación del endpoint SPARQL
+      query/            # Ejecución de queries SPARQL (validación sparqljs, límites, timeout)
+      sparql/           # Módulo global: provee el token SPARQL_ENDPOINT
+      suggestions/      # Autocompletado de predicados + búsqueda de entidades
+    shared/dto/         # Re-exporta el contrato QueryResult desde @rdfgis/contracts
 frontend/
-  app_shell/            # Host Angular 21 + WelcomePage + routing + Module Federation
+  app_shell/            # Host Angular 21 + WelcomePage + routing + Native Federation
     src/app/
-      core/             # DashboardStoreService, QueryHandoffService, SnackbarService
-      pages/            # WelcomePage, SettingsPage
+      core/             # DashboardStoreService, DashboardApiClient, redirect guard
+      pages/welcome/    # WelcomePage
       shell/            # TopBar
   rdf_explorer/         # Remote: editor visual SPARQL (Cytoscape.js)
     src/app/
-      core/             # SettingsService, RequestService, QueryService, WorkspacePersistence
+      core/             # RequestService, QueryService, WorkspacePersistence, QueryHandoff
       graph/            # Dominio puro (PropertyGraph, Node, Edge, Query, Filter)
-        canvas-graph/   # Visualizacion Cytoscape.js
+        canvas-graph/   # Visualización Cytoscape.js
         domain/         # Modelo de dominio sin Angular
       pages/main/       # Layout 3 paneles (search + canvas + tools)
-      tools/            # describe, edit, sparql, settings, help, log
+      tools/            # describe, edit, sparql, log
       shell/            # search-panel, canvas-panel, tools-panel
   rdf_gis_explorer/     # Remote: dashboard 4 vistas coordinadas
     src/app/
-      core/services/    # SelectionService, DashboardPersistence, LayoutService
+      core/services/    # SelectionService, DashboardPersistence, AppConfig, Layout
       features/
         dashboard/      # Orquestador: editor + grid de vistas + navbar
-        sparql-input/   # Editor CodeMirror 6 + ejecucion SPARQL
+        sparql-input/   # Editor CodeMirror 6 + ejecución SPARQL (precarga prefixes)
         table-view/     # AG Grid Community
         map-view/       # Leaflet + markercluster + draw + geocoder
         graph-view/     # Cytoscape.js (cola + dagre layouts)
@@ -116,18 +133,20 @@ frontend/
 
 **Prefijo global:** `/api`
 
-| Metodo | Ruta | Descripcion |
+| Método | Ruta | Descripción |
 |--------|------|-------------|
-| POST | `/api/query/execute` | Ejecuta consulta SPARQL |
-| GET | `/api/suggestions/predicates` | Lista predicados disponibles |
+| POST | `/api/query/execute` | Ejecuta consulta SPARQL `{ sparql, limit? }` |
+| GET | `/api/suggestions/predicates` | Lista predicados disponibles (cache 1h) |
+| GET | `/api/suggestions/entities?q=&limit=&classUri=` | Búsqueda de entidades |
+| GET | `/api/config` | Configuración pública del backend (incluye `defaultPrefixes`) |
 | GET | `/api/dashboards` | Lista todos los dashboards |
-| GET | `/api/dashboards/recent?limit=10` | Lista los N mas recientes |
+| GET | `/api/dashboards/recent?limit=10` | Lista los N más recientes |
 | GET | `/api/dashboards/:id` | Obtiene un dashboard |
 | POST | `/api/dashboards` | Crea dashboard `{ kind, name, payload }` |
 | PUT | `/api/dashboards/:id` | Actualiza dashboard |
 | DELETE | `/api/dashboards/:id` | Elimina dashboard |
-| GET | `/api/health` | Health check basico |
-| GET | `/api/health/sparql` | Health check del endpoint SPARQL |
+| GET | `/api/health` | Health check básico (usado por Docker healthcheck) |
+| GET | `/api/health/sparql` | Health check del endpoint SPARQL upstream |
 
 ---
 
@@ -135,17 +154,17 @@ frontend/
 
 ```bash
 # Backend (Jest)
-cd backend && npm test
+cd backend && pnpm test
 
-# Frontend app_shell (Vitest)
+# Frontends (Vitest vía ng test)
 cd frontend/app_shell && pnpm test
-
-# Frontend rdf_explorer (Vitest)
 cd frontend/rdf_explorer && pnpm test
-
-# Frontend rdf_gis_explorer (Vitest)
 cd frontend/rdf_gis_explorer && pnpm test
 ```
+
+> El builder `unit-test` de Angular usa el target `esbuild:development` como
+> `buildTarget` (configurado en cada `angular.json`) porque el target `build`
+> de native-federation no sirve para compilar tests.
 
 ---
 
@@ -153,19 +172,76 @@ cd frontend/rdf_gis_explorer && pnpm test
 
 | Variable | Default | Uso |
 |----------|---------|-----|
-| `SPARQL_BACKEND` | `wikidata` | Selecciona adaptador (`wikidata` / `millenniumdb`) |
-| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL |
-| `SPARQL_USER_AGENT` | `rdf-gis-explorer/0.1` | User-Agent (obligatorio para Wikidata) |
+| `SPARQL_BACKEND` | `wikidata` | Nombre del backend. `millenniumdb` usa su stub; cualquier otro valor (`wikidata`, `graphdb`, `generic`, ...) usa el adaptador genérico. Define también el archivo SQLite y el de prefixes. |
+| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL. Para GraphDB: `http://<host>:7200/repositories/<repoId>` |
+| `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Basic Auth (GraphDB protegido) |
+| `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para `/api/suggestions/entities`. Reemplaza `$keyword` y `$limit`. |
+| `SPARQL_USER` | `rdf-gis-explorer/0.1` | User-Agent (obligatorio para Wikidata) |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout de consultas (ms) |
-| `SPARQL_DEFAULT_LIMIT` | `500` | Limite por defecto |
-| `SPARQL_MAX_LIMIT` | `2000` | Limite maximo |
+| `SPARQL_DEFAULT_LIMIT` | `500` | Límite por defecto |
+| `SPARQL_MAX_LIMIT` | `2000` | Límite máximo |
+| `SPARQL_PREFIXES_PATH` | `backend/config/prefixes.${SPARQL_BACKEND}.json` | Archivo JSON `{ prefix: uri }` con los prefixes del backend |
 | `BACKEND_PORT` | `3000` | Puerto del backend |
-| `FRONTEND_PORT` | `4200` | Puerto del frontend (Docker) |
-| `CORS_ORIGINS` | `http://localhost:4200` | Origenes CORS (separados por coma) |
-| `SQLITE_PATH` | `./data/curation.db` | Ruta SQLite |
+| `FRONTEND_PORT` / `RDF_EXPLORER_PORT` / `RDF_GIS_EXPLORER_PORT` | `4200` / `4201` / `4202` | Puertos de los frontends (Docker/Podman) |
+| `CORS_ORIGINS` | `http://localhost:4200` | Orígenes CORS (separados por coma) |
+| `DASHBOARDS_SQLITE_PATH` | `backend/data/${SPARQL_BACKEND}.sqlite` | Override del SQLite de dashboards |
+| `SPARQL_PROTECTED_BACKENDS` | `wikidata,graphdb` | Backends cuyos SQLite se preservan en `clean:unused-data` |
+
+---
+
+## Configuración de backends SPARQL
+
+La configuración del endpoint SPARQL es **single source of truth** en el backend. Los frontends la obtienen vía `GET /api/config` al iniciar.
+
+### Wikidata
+
+```env
+SPARQL_BACKEND=wikidata
+SPARQL_ENDPOINT_URL=https://query.wikidata.org/sparql
+SPARQL_USER=mi-app/1.0 (mailto:mi@email.com)
+```
+
+El frontend detecta `supportsWikibaseLabel: true` y usa `wbsearchentities` para la búsqueda de entidades en RDF Explorer.
+
+### GraphDB local con autenticación
+
+```env
+SPARQL_BACKEND=graphdb
+SPARQL_ENDPOINT_URL=http://localhost:7200/repositories/<repo-id>
+SPARQL_USERNAME=<usuario>
+SPARQL_PASSWORD=<contraseña>
+
+# Opcional: query personalizada para búsqueda de entidades
+# SPARQL_ENTITY_SEARCH_QUERY=SELECT DISTINCT ?uri ?label WHERE { ?uri <http://www.w3.org/2000/01/rdf-schema#label> ?label . FILTER regex(?label, "$keyword", "i") } LIMIT $limit
+```
+
+El frontend detecta `supportsWikibaseLabel: false` y delega la búsqueda de entidades al backend (`GET /api/suggestions/entities`), que ejecuta `SPARQL_ENTITY_SEARCH_QUERY` (default: `rdfs:label` + `FILTER regex`).
+
+### Prefixes
+
+Los prefixes se configuran por backend en `backend/config/prefixes.<backend>.json`
+(o en la ruta que indique `SPARQL_PREFIXES_PATH`):
+
+```json
+{ "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#", "wd": "http://www.wikidata.org/entity/" }
+```
+
+- El repo trae `prefixes.wikidata.json`; para GraphDB copiá `prefixes.graphdb.example.json` a `prefixes.graphdb.json` y ajustá (está gitignoreado por si contiene namespaces internos).
+- Viajan a los frontends como `defaultPrefixes` en `GET /api/config`.
+- **RDF Explorer** los usa para generar queries y abreviar URIs.
+- **RDF GIS Explorer** los precarga como bloque `PREFIX ...` en el editor SPARQL (editor vacío o tablero nuevo).
+- El backend **no** inyecta prefixes en las queries: la query enviada a `/api/query/execute` debe ser autocontenida.
+
+### Agregar un nuevo backend
+
+1. Crear `.env.mibackend` con `SPARQL_BACKEND=mibackend` y la URL/credenciales del endpoint. El adaptador genérico (`GenericSparqlAdapter`) se usa automáticamente.
+2. Crear `backend/config/prefixes.mibackend.json` con los prefixes del dataset.
+3. Opcionalmente definir `SPARQL_ENTITY_SEARCH_QUERY` si el default no aplica.
+4. Solo si el endpoint necesita lógica propia (protocolo no estándar), crear un adaptador `SparqlEndpoint` en `backend/src/adapters/` y agregar el caso en `sparql-endpoint.factory.ts`.
+5. Los frontends se adaptan automáticamente vía `/api/config`.
 
 ---
 
 ## Contacto
 
-Martin M. Venturino — `marventurino@gmail.com`
+Martín M. Venturino — `marventurino@gmail.com`

@@ -21,6 +21,7 @@ export interface SerializedGraphEdge {
 export interface ExplorerSerializedGraph {
   nodes: SerializedGraphNode[];
   edges: SerializedGraphEdge[];
+  viewport?: { zoom: number; pan: { x: number; y: number } };
 }
 
 interface SerializedVariable {

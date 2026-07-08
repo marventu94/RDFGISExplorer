@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Parser } from 'sparqljs';
 import {
   SPARQL_ENDPOINT,
@@ -9,8 +9,12 @@ import {
 import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
 import type { QueryResult } from '../../shared/dto/query-result.dto';
 
+const MAX_QUERY_LOG_LEN = 500;
+
 @Injectable()
 export class QueryService {
+  private readonly logger = new Logger(QueryService.name);
+
   constructor(
     @Inject(SPARQL_ENDPOINT) private readonly endpoint: SparqlEndpoint,
   ) {}
@@ -43,6 +47,10 @@ export class QueryService {
     }
 
     const timeout = parseInt(process.env['SPARQL_TIMEOUT_MS'] ?? '30000', 10);
+    const preview = sparql.length > MAX_QUERY_LOG_LEN
+      ? sparql.slice(0, MAX_QUERY_LOG_LEN) + '...'
+      : sparql;
+    this.logger.debug(`Executing SPARQL (limit=${resolvedLimit}, timeout=${timeout}ms): ${preview}`);
 
     try {
       return await this.endpoint.execute(sparql, {
@@ -51,12 +59,14 @@ export class QueryService {
       });
     } catch (e) {
       if (e instanceof TimeoutError) {
+        this.logger.error(`Timeout after ${e.timeoutMs}ms: ${preview}`);
         throw new HttpException(
           { error: 'TIMEOUT', message: e.message, timeoutMs: e.timeoutMs },
           HttpStatus.REQUEST_TIMEOUT,
         );
       }
       if (e instanceof UpstreamError) {
+        this.logger.error(`Upstream error status=${e.status}: ${e.message}`);
         throw new HttpException(
           { error: 'UPSTREAM_ERROR', message: e.message },
           HttpStatus.BAD_GATEWAY,

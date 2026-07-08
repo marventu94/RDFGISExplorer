@@ -55,9 +55,9 @@ import { DialogModule, DialogRef } from '@angular/cdk/dialog';
       <hr />
 
       <p class="just">
-        Supongamos que queremos obtener todos los lagos de Chile disponibles en
-        <span class="mono">www.wikidata.org</span> (inglés), la interfaz permite llegar a la misma consulta de múltiples
-        formas, explicaremos en particular dos patrones: comenzar con una variable o comenzar con algo conocido.
+        Supongamos que queremos obtener todos los lagos de Chile disponibles en el endpoint SPARQL
+        configurado en el backend, la interfaz permite llegar a la misma consulta de múltiples formas,
+        explicaremos en particular dos patrones: comenzar con una variable o comenzar con algo conocido.
       </p>
 
       <h4>Forma 1: Comenzando con una variable</h4>

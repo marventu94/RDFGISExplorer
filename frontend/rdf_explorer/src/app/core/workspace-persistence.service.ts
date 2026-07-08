@@ -3,8 +3,7 @@ import { firstValueFrom, Observable } from 'rxjs';
 import type { ExplorerSerializedGraph } from '../graph/domain/graph-serializer';
 import type { ExplorerWorkspacePayload, ExplorerPanelSnapshot, Dashboard } from './workspace-api.client';
 import { WorkspaceApiClient } from './workspace-api.client';
-import { SettingsService } from './settings.service';
-import type { EndpointType } from './settings.types';
+import { AppConfigService } from './services/app-config.service';
 import { PropertyGraphService } from '../graph/property-graph.service';
 
 export interface PanelState {
@@ -15,12 +14,13 @@ export interface PanelState {
   variables: string[];
   dirty: boolean;
   sourceWorkspaceId?: string;
+  viewport?: { zoom: number; pan: { x: number; y: number } };
 }
 
 @Injectable({ providedIn: 'root' })
 export class WorkspacePersistenceService {
   private readonly api = inject(WorkspaceApiClient);
-  private readonly settings = inject(SettingsService);
+  private readonly appConfig = inject(AppConfigService);
 
   readonly panels = signal<readonly PanelState[]>([
     {
@@ -135,27 +135,28 @@ export class WorkspacePersistenceService {
     );
   }
 
-  private mapEndpointType(type: EndpointType): 'virtuoso' | 'fuseki' | 'generic' {
+  private mapEndpointType(type: 'virtuoso' | 'fuseki' | 'other'): 'virtuoso' | 'fuseki' | 'generic' {
     return type === 'virtuoso' || type === 'fuseki' ? type : 'generic';
   }
 
   private toPayload(): ExplorerWorkspacePayload {
-    const app = this.settings.app();
+    const endpointType = this.appConfig.endpointType();
+    const limit = this.appConfig.resultLimit();
     const payloadPanels: ExplorerPanelSnapshot[] = this.panels().map(p => ({
       id: p.id,
       name: p.name,
       graph: p.graph,
       generatedQuery: p.generatedQuery,
       variables: p.variables,
+      viewport: p.viewport,
     }));
 
     return {
       panels: payloadPanels,
       activePanelId: this.activePanelId(),
       settings: {
-        endpointType: this.mapEndpointType(app.endpoint.type),
-        backendMode: app.backendMode,
-        limit: app.resultLimit,
+        endpointType: this.mapEndpointType(endpointType),
+        limit,
       },
     };
   }
@@ -168,17 +169,11 @@ export class WorkspacePersistenceService {
       generatedQuery: p.generatedQuery,
       variables: p.variables ?? [],
       dirty: false,
+      viewport: p.viewport,
     }));
 
     this.panels.set(mappedPanels);
     this.activePanelId.set(payload.activePanelId);
-
-    this.settings.update('endpoint', {
-      ...this.settings.app().endpoint,
-      type: payload.settings.endpointType as EndpointType,
-    });
-    this.settings.update('backendMode', payload.settings.backendMode);
-    this.settings.update('resultLimit', payload.settings.limit);
   }
 
   async saveWorkspace(name: string, overwriteId?: string): Promise<Dashboard> {
@@ -251,10 +246,11 @@ export class WorkspacePersistenceService {
     const queries = graph.getQueriesForGraph();
     const generatedQuery = queries.queries.map(q => q.toSparql()).filter(Boolean).join('\n');
     const variables = queries.queries.flatMap(q => q.select.map(r => String(r.variable)));
+    const viewport = graph.viewport();
     this.panels.update(list =>
       list.map(p =>
         p.id === activeId
-          ? { ...p, graph: snapshot, generatedQuery, variables }
+          ? { ...p, graph: snapshot, generatedQuery, variables, viewport: viewport ?? undefined }
           : p,
       ),
     );
@@ -265,6 +261,9 @@ export class WorkspacePersistenceService {
     if (!panel) return;
     this.isRestoring = true;
     graph.restoreGraph(panel.graph);
+    if (panel.viewport) {
+      graph.viewport.set(panel.viewport);
+    }
     this.isRestoring = false;
   }
 }

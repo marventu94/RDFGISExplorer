@@ -44,23 +44,13 @@
     "vis-data": "^8.0.4",
     "vis-timeline": "^8.5.1"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "esbuild",
-      "lmdb",
-      "msgpackr-extract"
-    ],
-    "patchedDependencies": {
-      "@softarc/native-federation@3.5.5": "patches/@softarc__native-federation@3.5.5.patch"
-    }
-  },
   "devDependencies": {
     "@angular-architects/native-federation": "^21.2.3",
     "@angular-devkit/build-angular": "^21.2.11",
     "@angular/build": "^21.2.11",
     "@angular/cli": "^21.2.11",
     "@angular/compiler-cli": "^21.2.0",
+    "@rdfgis/contracts": "workspace:*",
     "@types/cytoscape": "^3.31.0",
     "@types/geojson": "^7946.0.16",
     "@types/leaflet": "^1.9.21",

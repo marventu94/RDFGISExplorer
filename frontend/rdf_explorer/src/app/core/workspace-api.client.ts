@@ -1,15 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import type { Dashboard } from '@rdfgis/contracts';
 
-export interface Dashboard {
-  id: string;
-  kind: 'gis' | 'explorer';
-  name: string;
-  payload: object;
-  createdAt: string;
-  updatedAt: string;
-}
+// Contrato compartido: la fuente de verdad vive en packages/contracts.
+export type { Dashboard } from '@rdfgis/contracts';
 
 export interface ExplorerSerializedGraph {
   nodes: Array<{ id: string; type: string; data: Record<string, unknown> }>;
@@ -22,6 +17,7 @@ export interface ExplorerPanelSnapshot {
   graph: ExplorerSerializedGraph;
   generatedQuery: string;
   variables?: string[];
+  viewport?: { zoom: number; pan: { x: number; y: number } };
 }
 
 export interface ExplorerWorkspacePayload {
@@ -29,7 +25,6 @@ export interface ExplorerWorkspacePayload {
   activePanelId: string;
   settings: {
     endpointType: 'virtuoso' | 'fuseki' | 'generic';
-    backendMode: 'app-backend' | 'direct';
     limit: number;
   };
 }

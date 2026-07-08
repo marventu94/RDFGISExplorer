@@ -9,9 +9,8 @@ import type { QueryRetrieveConfig, QueryRetriever } from './query';
 import { IdAllocator } from './id-allocator';
 import type { FilterType, FilterMetadata } from './filter';
 import type { DomainEndpointAdapter } from './endpoint/adapter';
-import { WikidataAdapter } from './endpoint/wikidata-adapter';
 import { GenericAdapter } from './endpoint/generic-adapter';
-import type { Prefix } from '../../core/settings.types';
+import type { Prefix } from '../../core/services/app-config.service';
 import type { DropPayload } from './drop-payload';
 import { createCatsExample, createW3cExample, createMosquitoExample, createCancerExample } from './examples/canned-examples';
 
@@ -85,7 +84,7 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     this.prefixes = opts.prefixes ?? [];
     this.labelProvider = opts.labelProvider ?? this;
     this.retriever = opts.retriever!;
-    this.endpointAdapter = opts.endpointAdapter ?? new WikidataAdapter();
+    this.endpointAdapter = opts.endpointAdapter ?? new GenericAdapter();
   }
 
   getLabel(uri: string): string | undefined {

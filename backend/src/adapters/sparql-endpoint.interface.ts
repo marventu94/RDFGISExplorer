@@ -9,7 +9,8 @@ export interface ExecuteOptions {
 export interface SparqlEndpoint {
   execute(query: string, opts: ExecuteOptions): Promise<QueryResult>;
   getPredicates(): Promise<string[]>;
-  readonly backendName: 'wikidata' | 'millenniumdb';
+  /** Nombre del backend configurado (SPARQL_BACKEND): wikidata, graphdb, generic, millenniumdb, ... */
+  readonly backendName: string;
 }
 
 export class TimeoutError extends Error {

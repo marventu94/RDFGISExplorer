@@ -19,11 +19,11 @@ import { Parser } from 'sparqljs';
 
 import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
+import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { DashboardApiClient, type Dashboard } from '@core/services/dashboard-api.client';
-import { SEED_QUERIES, type StoredQuery } from './seed-queries';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
 import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
 import { applyMappingOverrides, VariableRole } from './mapping-overrides.util';
@@ -57,6 +57,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private readonly selectionService = inject(SelectionService);
   private readonly apiService = inject(ApiService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
@@ -75,7 +76,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
   protected readonly overridesCount = signal(0);
 
-  protected readonly seedQueries = SEED_QUERIES;
   protected readonly gisDashboards = signal<Dashboard[]>([]);
   protected readonly loadingDashboards = signal(false);
 
@@ -98,8 +98,35 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const serviceQuery = this.queryState.query();
     if (serviceQuery) {
       this.setEditorContent(serviceQuery);
+    } else {
+      this.seedDefaultPrefixes();
     }
     this.limit.set(this.queryState.limit());
+  }
+
+  /**
+   * Precarga en el editor los PREFIX configurados en el backend
+   * (GET /api/config → defaultPrefixes). Solo si el editor sigue vacío
+   * cuando llega la config, para no pisar un handoff ni un tablero cargado.
+   */
+  private seedDefaultPrefixes(): void {
+    this.appConfig.load().subscribe({
+      next: (cfg) => {
+        const block = this.buildPrefixBlock(cfg.defaultPrefixes);
+        if (block && this.sparqlText.length === 0) {
+          this.setEditorContent(block);
+        }
+      },
+      error: () => {
+        // sin config no hay prefixes: el editor queda vacío
+      },
+    });
+  }
+
+  private buildPrefixBlock(prefixes: Record<string, string> | undefined): string {
+    const entries = Object.entries(prefixes ?? {});
+    if (entries.length === 0) return '';
+    return entries.map(([prefix, uri]) => `PREFIX ${prefix}: <${uri}>`).join('\n') + '\n\n';
   }
 
   ngOnDestroy(): void {
@@ -140,7 +167,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
           basicSetup,
           sparqlLang,
           cmPlaceholder(
-            '-- Escribí tu query SPARQL acá, o usá [▼ Tableros] para cargar una predefinida',
+            '-- Escribí tu query SPARQL acá, o usá [▼ Tableros] para cargar un tablero guardado',
           ),
           updateHasContent,
           ctrlEnterKeymap,
@@ -166,7 +193,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.setEditorContent(query);
   }
 
-  public setBackend(backend: 'wikidata' | 'millenniumdb'): void {
+  public setBackend(backend: string): void {
     this.queryState.backend.set(backend);
   }
 
@@ -190,35 +217,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected loadSeedQuery(query: StoredQuery): void {
-    const current = this.sparqlText;
-    if (current.length > 0) {
-      const dialogRef = this.dialog.open(ConfirmReplaceDialogComponent, {
-        width: '360px',
-      });
-      dialogRef.afterClosed().subscribe((confirmed) => {
-        if (confirmed) {
-          this.setEditorContent(query.sparql);
-        }
-      });
-    } else {
-      this.setEditorContent(query.sparql);
-    }
-  }
-
-  protected getCategoryIcon(category: string): string {
-    switch (category) {
-      case 'geo':
-        return 'location_on';
-      case 'temporal':
-        return 'schedule';
-      case 'exploration':
-        return 'travel_explore';
-      default:
-        return 'star';
-    }
-  }
-
   protected loadDashboards(): void {
     this.loadingDashboards.set(true);
     this.dashboardApi.list().subscribe({
@@ -239,29 +237,37 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       this.persistence.load(dashboard.id).subscribe();
     };
     if (current.length > 0) {
-      const dialogRef = this.dialog.open(ConfirmReplaceDialogComponent, {
-        width: '360px',
-      });
-      dialogRef.afterClosed().subscribe((confirmed) => {
-        if (confirmed) {
-          doLoad();
-        }
+      setTimeout(() => {
+        const dialogRef = this.dialog.open(ConfirmReplaceDialogComponent, {
+          width: '360px',
+        });
+        dialogRef.afterClosed().subscribe((confirmed) => {
+          if (confirmed) {
+            doLoad();
+          }
+        });
       });
     } else {
       doLoad();
     }
   }
 
-  protected generateTestDashboard(): void {
-    this.persistence.generateTestDashboard().subscribe({
-      next: () => {
-        this.snackBar.open('Tablero de prueba "Provincias argentinas y sus capitales" creado', 'OK', { duration: 4000 });
-        this.loadDashboards();
-      },
-      error: () => {
-        this.snackBar.open('Error al crear el tablero de prueba', 'Cerrar', { duration: 5000, panelClass: 'snackbar-error' });
-      },
-    });
+  protected newDashboard(): void {
+    const ok = window.confirm(
+      '¿Crear tablero nuevo?\n\nSe perderán todos los cambios que no hayas guardado.',
+    );
+    if (ok) {
+      this.clearForNewDashboard();
+    }
+  }
+
+  private clearForNewDashboard(): void {
+    this.setEditorContent(this.buildPrefixBlock(this.appConfig.config()?.defaultPrefixes));
+    this.queryState.query.set('');
+    this.lastResult.set(null);
+    this.mappingOverrides.set({});
+    this.overridesCount.set(0);
+    this.persistence.clearCurrent();
   }
 
   public execute(): void {
@@ -389,3 +395,4 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.snackBar.open('Mapeo restaurado a detección automática', 'OK', { duration: 3000 });
   }
 }
+

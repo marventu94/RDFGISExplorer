@@ -1,5 +1,5 @@
 import { SparqlEndpoint } from './sparql-endpoint.interface';
-import { WikidataAdapter } from './wikidata.adapter';
+import { GenericSparqlAdapter } from './generic-sparql.adapter';
 import { MillenniumDBAdapter } from './millenniumdb.adapter';
 
 export function createSparqlEndpoint(): SparqlEndpoint {
@@ -7,8 +7,9 @@ export function createSparqlEndpoint(): SparqlEndpoint {
   switch (backend) {
     case 'millenniumdb':
       return new MillenniumDBAdapter();
+    case 'generic':
     case 'wikidata':
     default:
-      return new WikidataAdapter();
+      return new GenericSparqlAdapter(backend);
   }
 }

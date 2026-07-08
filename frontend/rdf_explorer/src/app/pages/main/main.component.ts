@@ -6,15 +6,13 @@ import { SearchPanelComponent } from '../../shell/search-panel/search-panel.comp
 import { CanvasPanelComponent } from '../../shell/canvas-panel/canvas-panel.component';
 import { ToolsPanelComponent } from '../../shell/tools-panel/tools-panel.component';
 import { PropertyGraphService } from '../../graph/property-graph.service';
-import { TutorialService } from '../../tutorial/tutorial.service';
-import { GettingStartedDialogService } from '../../modal/getting-started-dialog.service';
 import { WorkspacePersistenceService } from '../../core/workspace-persistence.service';
 import { Dialog } from '@angular/cdk/dialog';
 import { SaveWorkspaceDialogComponent } from '../../shell/save-workspace-dialog/save-workspace-dialog.component';
 import type { SaveWorkspaceDialogResult } from '../../shell/save-workspace-dialog/save-workspace-dialog.model';
 import { QueryHandoffService } from '../../core/query-handoff.service';
-import { SettingsService } from '../../core/settings.service';
 import { ToolService } from '../../tool/tool.service';
+import { AppConfigService } from '../../core/services/app-config.service';
 
 @Component({
   selector: 'app-main',
@@ -24,16 +22,14 @@ import { ToolService } from '../../tool/tool.service';
 })
 export class MainComponent implements OnInit {
   readonly graph = inject(PropertyGraphService);
-  readonly tutorialService = inject(TutorialService);
-  readonly dialogService = inject(GettingStartedDialogService);
   readonly workspace = inject(WorkspacePersistenceService);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
   readonly dialog = inject(Dialog);
   readonly destroyRef = inject(DestroyRef);
   readonly queryHandoff = inject(QueryHandoffService);
-  readonly settings = inject(SettingsService);
   readonly toolService = inject(ToolService);
+  readonly appConfig = inject(AppConfigService);
 
   readonly generatedSparql = computed(() => {
     void this.graph.revision();
@@ -55,14 +51,6 @@ export class MainComponent implements OnInit {
           this.loadWorkspace(workspaceId);
         }
       });
-  }
-
-  openGettingStarted(): void {
-    this.dialogService.open();
-  }
-
-  startTutorial(): void {
-    this.tutorialService.start();
   }
 
   addPanel(): void {
@@ -162,10 +150,7 @@ export class MainComponent implements OnInit {
 
     const sparql = validQueries[0].toSparql()!;
 
-    const backend: 'wikidata' | 'millenniumdb' =
-      this.settings.app().endpoint.url.includes('wikidata')
-        ? 'wikidata'
-        : 'millenniumdb';
+    const backend = this.appConfig.config()?.backend || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,

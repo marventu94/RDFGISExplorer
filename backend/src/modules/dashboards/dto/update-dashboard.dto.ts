@@ -1,9 +1,23 @@
-import { IsString, IsObject, Length, IsOptional, Validate, ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
+import {
+  IsString,
+  IsObject,
+  Length,
+  IsOptional,
+  Validate,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+} from 'class-validator';
 
 @ValidatorConstraint({ name: 'isNonEmptyObject', async: false })
 class IsNonEmptyObjectConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
-    return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length > 0;
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      Object.keys(value).length > 0
+    );
   }
 
   defaultMessage(args: ValidationArguments): string {
