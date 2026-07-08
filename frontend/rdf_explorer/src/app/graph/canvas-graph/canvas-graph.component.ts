@@ -68,7 +68,9 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       elements: this.computeElements(),
       style: CYTOSCAPE_STYLES,
       layout: { name: 'preset' },
-      wheelSensitivity: 1.0,
+      // No pasar wheelSensitivity: el default ya es 1 y Cytoscape >= 3.31
+      // normaliza el scroll por deltaMode (fix para Firefox/Linux integrado).
+      // Definir la opción, incluso en 1.0, solo dispara el warning de consola.
       autoungrabify: false,
       autounselectify: false,
     });
