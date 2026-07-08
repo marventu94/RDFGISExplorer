@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min } from 'class-validator';
 
 export class ExecuteQueryDto {
   @IsString()
@@ -7,6 +7,5 @@ export class ExecuteQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(2000)
   limit?: number;
 }

@@ -10,6 +10,6 @@ export function createSparqlEndpoint(): SparqlEndpoint {
     case 'generic':
     case 'wikidata':
     default:
-      return new GenericSparqlAdapter();
+      return new GenericSparqlAdapter(backend);
   }
 }
