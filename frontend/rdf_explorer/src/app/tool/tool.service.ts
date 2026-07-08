@@ -3,7 +3,7 @@ import { GraphInteractionService } from '../graph/canvas-graph/interaction.servi
 import { DescribeService } from '../tools/describe-panel/describe.service';
 import { PropertyGraphService } from '../graph/property-graph.service';
 
-export type ToolName = 'describe' | 'edit' | 'sparql' | 'settings' | 'log' | 'help';
+export type ToolName = 'describe' | 'edit' | 'sparql' | 'log';
 
 @Injectable({ providedIn: 'root' })
 export class ToolService {
