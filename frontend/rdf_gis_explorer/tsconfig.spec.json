@@ -8,6 +8,7 @@
     ]
   },
   "include": [
+    "src/polyfills.ts",
     "src/**/*.d.ts",
     "src/**/*.spec.ts"
   ]
