@@ -1,13 +1,14 @@
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Contexto raíz: el workspace pnpm comparte lockfile y packages/contracts
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     env_file: ${ENV_FILE:-.env}
     volumes:
-      - sqlite-data:/app/data
+      - sqlite-data:/repo/backend/data
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
@@ -17,8 +18,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend/app_shell
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/app_shell/Dockerfile
     ports:
       - "${FRONTEND_PORT:-4200}:80"
     depends_on:
@@ -27,8 +28,8 @@ services:
 
   rdf-explorer:
     build:
-      context: ./frontend/rdf_explorer
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/rdf_explorer/Dockerfile
     ports:
       - "${RDF_EXPLORER_PORT:-4201}:80"
     depends_on:
@@ -37,8 +38,8 @@ services:
 
   rdf-gis-explorer:
     build:
-      context: ./frontend/rdf_gis_explorer
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/rdf_gis_explorer/Dockerfile
     ports:
       - "${RDF_GIS_EXPLORER_PORT:-4202}:80"
     depends_on:
