@@ -1,11 +1,5 @@
-export interface Dashboard {
-  id: string;
-  kind: 'gis' | 'explorer';
-  name: string;
-  payload: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-}
+// Contrato compartido: la fuente de verdad vive en packages/contracts.
+export type { Dashboard, DashboardKind } from '@rdfgis/contracts';
 
 export function relativeDate(dateStr: string): string {
   const date = new Date(dateStr);
