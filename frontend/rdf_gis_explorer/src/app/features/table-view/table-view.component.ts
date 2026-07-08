@@ -7,6 +7,7 @@ import type {
   GridApi,
   GridReadyEvent,
   RowSelectedEvent,
+  RowSelectionOptions,
   ICellRendererParams,
 } from 'ag-grid-community';
 import { MatIconModule } from '@angular/material/icon';
@@ -64,6 +65,13 @@ export class TableViewComponent implements OnDestroy {
     filter: true,
     resizable: true,
     minWidth: 100,
+  };
+  // API objeto (AG Grid >= 32.2); equivale al legacy rowSelection: 'single'
+  // (click selecciona la fila, sin checkboxes).
+  readonly rowSelection: RowSelectionOptions = {
+    mode: 'singleRow',
+    checkboxes: false,
+    enableClickSelection: true,
   };
 
   readonly isReady = computed(() => this.gridApi !== null);
