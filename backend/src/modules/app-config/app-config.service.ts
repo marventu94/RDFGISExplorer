@@ -91,7 +91,7 @@ export class AppConfigService {
             ],
             objects: ['http://www.wikidata.org/prop/direct/P31'],
             datatype: [],
-            text: ['http://www.dbpedia.org/ontology/abstract'],
+            text: ['http://dbpedia.org/ontology/abstract'],
             image: [
               'http://www.wikidata.org/prop/direct/P18',
               'http://www.wikidata.org/prop/direct/P154',
