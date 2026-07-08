@@ -19,6 +19,7 @@ import { Parser } from 'sparqljs';
 
 import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
+import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
@@ -56,6 +57,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private readonly selectionService = inject(SelectionService);
   private readonly apiService = inject(ApiService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   protected readonly dashboardLayout = inject(DashboardLayoutService);
@@ -96,8 +98,35 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const serviceQuery = this.queryState.query();
     if (serviceQuery) {
       this.setEditorContent(serviceQuery);
+    } else {
+      this.seedDefaultPrefixes();
     }
     this.limit.set(this.queryState.limit());
+  }
+
+  /**
+   * Precarga en el editor los PREFIX configurados en el backend
+   * (GET /api/config → defaultPrefixes). Solo si el editor sigue vacío
+   * cuando llega la config, para no pisar un handoff ni un tablero cargado.
+   */
+  private seedDefaultPrefixes(): void {
+    this.appConfig.load().subscribe({
+      next: (cfg) => {
+        const block = this.buildPrefixBlock(cfg.defaultPrefixes);
+        if (block && this.sparqlText.length === 0) {
+          this.setEditorContent(block);
+        }
+      },
+      error: () => {
+        // sin config no hay prefixes: el editor queda vacío
+      },
+    });
+  }
+
+  private buildPrefixBlock(prefixes: Record<string, string> | undefined): string {
+    const entries = Object.entries(prefixes ?? {});
+    if (entries.length === 0) return '';
+    return entries.map(([prefix, uri]) => `PREFIX ${prefix}: <${uri}>`).join('\n') + '\n\n';
   }
 
   ngOnDestroy(): void {
@@ -233,7 +262,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   }
 
   private clearForNewDashboard(): void {
-    this.setEditorContent('');
+    this.setEditorContent(this.buildPrefixBlock(this.appConfig.config()?.defaultPrefixes));
     this.queryState.query.set('');
     this.lastResult.set(null);
     this.mappingOverrides.set({});
