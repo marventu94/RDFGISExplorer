@@ -231,6 +231,40 @@ describe('WorkspacePersistenceService', () => {
     });
   });
 
+  it('saves property and literal labels into workspace payload', async () => {
+    service.addPanel('Test');
+    const n = graph.addNode();
+    n.mkConst();
+    n.addUri('http://example.org/NodeA');
+    const prop = n.newProp();
+    prop.mkConst();
+    prop.addUri('http://example.org/propA');
+    service.snapshotActivePanel(graph);
+
+    mockRequest.labelCache.set(new Map([
+      ['http://example.org/NodeA', 'Node A Label'],
+      ['http://example.org/propA', 'Property A Label'],
+    ]));
+
+    const mockDashboard: Dashboard = {
+      id: 'ws-labels',
+      kind: 'explorer',
+      name: 'With Property Labels',
+      payload: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    (mockClient.create as ReturnType<typeof vi.fn>).mockReturnValue(of(mockDashboard));
+
+    await service.saveWorkspace('With Property Labels');
+
+    const callArg = (mockClient.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArg.payload.panels[0].labels).toEqual({
+      'http://example.org/NodeA': 'Node A Label',
+      'http://example.org/propA': 'Property A Label',
+    });
+  });
+
   it('injects persisted labels into cache when restoring active panel', () => {
     service.panels.set([
       {
@@ -248,6 +282,34 @@ describe('WorkspacePersistenceService', () => {
     service.restoreActivePanel(graph);
 
     expect(mockRequest.setLabel).toHaveBeenCalledWith('http://example.org/NodeA', 'Node A Label');
+  });
+
+  it('restores labels for node properties when reloading a panel', () => {
+    service.addPanel('Test');
+    const n = graph.addNode();
+    n.mkConst();
+    n.addUri('http://example.org/NodeA');
+    const prop = n.newProp();
+    prop.mkConst();
+    prop.addUri('http://example.org/propA');
+    service.snapshotActivePanel(graph);
+
+    // Simulate saved labels in panel state
+    service.panels.update(list =>
+      list.map(p =>
+        p.id === service.activePanelId()
+          ? { ...p, labels: { 'http://example.org/NodeA': 'Node A Label', 'http://example.org/propA': 'Property A Label' } }
+          : p,
+      ),
+    );
+
+    // Reset graph
+    graph.reset();
+
+    service.restoreActivePanel(graph);
+
+    expect(mockRequest.setLabel).toHaveBeenCalledWith('http://example.org/NodeA', 'Node A Label');
+    expect(mockRequest.setLabel).toHaveBeenCalledWith('http://example.org/propA', 'Property A Label');
   });
 
   it('loads workspace preserving labels in panel state', async () => {

@@ -228,6 +228,41 @@ describe('RequestService', () => {
       await promise;
     });
 
+    it('normalizes Wikidata direct-claim property URIs for label lookup', async () => {
+      const promise = service.prefetchLabels(
+        ['http://www.wikidata.org/prop/direct/P31'],
+        {
+          labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+          lang: 'en',
+          supportsWikibaseLabel: true,
+        },
+      );
+
+      const req = httpMock.expectOne('/api/query/execute');
+      const body = req.request.body;
+      expect(body.sparql).toContain(
+        'VALUES ?uri { <http://www.wikidata.org/entity/P31> }',
+      );
+
+      req.flush({
+        variables: ['uri', 'uriLabel'],
+        bindings: [
+          {
+            uri: { type: 'uri', value: 'http://www.wikidata.org/entity/P31' },
+            uriLabel: { type: 'literal', value: 'instance of' },
+          },
+        ],
+        nodes: [],
+        edges: [],
+        meta: { durationMs: 0, truncated: false, limitApplied: 0, backend: 'wikidata' },
+      });
+
+      await promise;
+      expect(
+        service.getLabel('http://www.wikidata.org/prop/direct/P31'),
+      ).toBe('instance of');
+    });
+
     it('partitions URIs into configurable batches', async () => {
       const execSpy = vi
         .spyOn(service, 'execQuery')
