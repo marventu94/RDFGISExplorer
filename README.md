@@ -258,33 +258,6 @@ Los prefixes se configuran por backend en `backend/config/prefixes.<backend>.jso
 
 ---
 
-## MCP Server para GraphDB
-
-El repo incluye una configuración opcional para usar el [MCP server de GraphDB](https://github.com/keonchennl/mcp-server-graphdb) y explorar el dataset con herramientas SPARQL desde el agente/IDE.
-
-### Setup
-
-```bash
-# 1. Clonar y compilar el server (queda en mcp-server-graphdb/, gitignoreado)
-./scripts/setup-mcp-graphdb.sh
-
-# 2. Copiar la config de ejemplo (la config real no se sube)
-cp .vscode/mcp.json.example .vscode/mcp.json
-```
-
-### Cómo funciona
-
-- `.vscode/mcp.json` apunta a `scripts/run-mcp-graphdb.mjs`.
-- El wrapper lee `.env.graphdb` y parsea `SPARQL_ENDPOINT_URL` (`http://host:7200/repositories/<repo>`) en `GRAPHDB_ENDPOINT` + `GRAPHDB_REPOSITORY`.
-- `SPARQL_USERNAME` / `SPARQL_PASSWORD` se reenvían como `GRAPHDB_USERNAME` / `GRAPHDB_PASSWORD` si están definidas.
-- El server clonado (`mcp-server-graphdb/dist/index.js`) queda **gitignoreado**.
-
-### Uso
-
-Reiniciá el workspace en VSCode / Claude Desktop para que levante el server `graphdb`. Después el agente puede ejecutar `sparqlQuery` y `listGraphs` contra tu repositorio.
-
----
-
 ## Contacto
 
 Martín M. Venturino — `marventurino@gmail.com`
