@@ -39,6 +39,31 @@ export class RequestService {
     return adapter.getPredicates();
   }
 
+  async prefetchLabels(
+    uris: string[],
+    config: {
+      labelUri: string;
+      lang: string;
+      supportsWikibaseLabel: boolean;
+    },
+    batchSize = 100,
+  ): Promise<void> {
+    const uniqueUris = [...new Set(uris.filter(u => u.trim().length > 0))];
+
+    for (let i = 0; i < uniqueUris.length; i += batchSize) {
+      const batch = uniqueUris.slice(i, i + batchSize);
+      const query = config.supportsWikibaseLabel
+        ? buildWikidataLabelQuery(batch, config.lang)
+        : buildGenericLabelQuery(batch, config.labelUri, config.lang);
+
+      try {
+        await this.execQuery(query);
+      } catch (err) {
+        console.error('[RequestService] prefetchLabels failed for batch:', err);
+      }
+    }
+  }
+
   private correlateLabels(result: SparqlJsonResult): void {
     if (!result.head?.vars || !result.results?.bindings) {
       return;
@@ -110,4 +135,31 @@ function toSparqlBinding(val: BindingValue): SparqlBinding {
   }
   const raw = (val as { raw?: string }).raw ?? String(val.value);
   return { type: 'literal', value: raw };
+}
+
+const WIKIBASE_PREFIX = 'PREFIX wikibase: <http://wikiba.se/ontology#>\nPREFIX bd: <http://www.bigdata.com/rdf#>\n';
+
+function buildWikidataLabelQuery(uris: string[], lang: string): string {
+  const values = uris.map(u => `<${u}>`).join(' ');
+  return (
+    `${WIKIBASE_PREFIX}` +
+    `SELECT ?uri ?uriLabel WHERE {\n` +
+    `  VALUES ?uri { ${values} }\n` +
+    `  SERVICE wikibase:label { bd:serviceParam wikibase:language "${escapeSparqlString(lang)}". }\n` +
+    `}`
+  );
+}
+
+function buildGenericLabelQuery(uris: string[], labelUri: string, lang: string): string {
+  const values = uris.map(u => `<${u}>`).join(' ');
+  return (
+    `SELECT ?uri ?uriLabel WHERE {\n` +
+    `  VALUES ?uri { ${values} }\n` +
+    `  OPTIONAL { ?uri <${labelUri}> ?uriLabel . FILTER(lang(?uriLabel) = "${escapeSparqlString(lang)}" || lang(?uriLabel) = "") }\n` +
+    `}`
+  );
+}
+
+function escapeSparqlString(value: string): string {
+  return value.replace(/[\\"']/g, '\\$&');
 }

@@ -18,6 +18,7 @@ export interface ExplorerPanelSnapshot {
   generatedQuery: string;
   variables?: string[];
   viewport?: { zoom: number; pan: { x: number; y: number } };
+  labels?: Record<string, string>;
 }
 
 export interface ExplorerWorkspacePayload {
