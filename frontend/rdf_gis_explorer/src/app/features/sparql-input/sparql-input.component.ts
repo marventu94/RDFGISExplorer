@@ -270,7 +270,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.persistence.clearCurrent();
   }
 
-  public execute(): void {
+  public execute(options?: { configureLayout?: boolean }): void {
     const sparql = this.sparqlText;
     if (!sparql) return;
 
@@ -300,6 +300,10 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         this.overridesCount.set(0);
 
         this.selectionService.setQueryResult(result);
+
+        if (options?.configureLayout) {
+          this.dashboardLayout.applyLayoutForResult(result);
+        }
 
         const count = result.bindings.length;
         const time = result.meta.durationMs;

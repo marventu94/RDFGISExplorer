@@ -65,7 +65,7 @@ export class DashboardComponent implements AfterViewInit {
         this.sparqlInput.setQuery(payload.query);
         this.sparqlInput.setBackend(payload.backend);
         if (getAutoRunHandoff()) {
-          setTimeout(() => this.sparqlInput.execute(), 300);
+          setTimeout(() => this.sparqlInput.execute({ configureLayout: true }), 300);
         }
       } else {
         this.snackBar.open('No se encontró la query a importar', 'Cerrar', { duration: 4000 });

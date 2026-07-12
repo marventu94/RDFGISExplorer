@@ -17,9 +17,21 @@
 
   @if (showModeOptions) {
     <div class="mode-options">
-      <mat-radio-group [ngModel]="mode()" (ngModelChange)="mode.set($event)">
-        <mat-radio-button value="overwrite">Sobreescribir existente</mat-radio-button>
-        <mat-radio-button value="copy">Guardar como copia</mat-radio-button>
+      <mat-radio-group name="saveMode">
+        <mat-radio-button
+          value="overwrite"
+          [checked]="mode() === 'overwrite'"
+          (change)="mode.set('overwrite')"
+        >
+          Sobreescribir existente
+        </mat-radio-button>
+        <mat-radio-button
+          value="copy"
+          [checked]="mode() === 'copy'"
+          (change)="mode.set('copy')"
+        >
+          Guardar como copia
+        </mat-radio-button>
       </mat-radio-group>
     </div>
   }
