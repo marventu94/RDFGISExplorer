@@ -19,6 +19,11 @@
   font-size: 16px;
   letter-spacing: -0.25px;
   color: var(--mat-sys-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+  flex-shrink: 1;
 }
 
 .navbar-actions {
