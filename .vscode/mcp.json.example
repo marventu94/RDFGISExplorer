@@ -1,0 +1,12 @@
+{
+  // Copiar a .vscode/mcp.json (gitignoreado) o renombrar directamente.
+  // No contiene credenciales: apunta al wrapper que lee .env.graphdb.
+  "servers": {
+    "graphdb": {
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/scripts/run-mcp-graphdb.mjs"
+      ]
+    }
+  }
+}
