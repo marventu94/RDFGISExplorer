@@ -57,6 +57,9 @@ export class App implements OnInit {
     if (dashboardId) {
       this.persistence.isHydrating.set(true);
       this.persistence.load(dashboardId).subscribe({
+        next: () => {
+          this.dashboardLayout.collapseEditor();
+        },
         error: () => {
           this.persistence.isHydrating.set(false);
           this.snackBar.open(
