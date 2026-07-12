@@ -26,17 +26,33 @@ Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFI
 
 ### Desarrollo local
 
+#### Requisitos previos
+
+- **nvm** (`https://github.com/nvm-sh/nvm`) — `start.sh` lo usa para leer `.nvmrc` y activar la versión correcta de Node.
+- **Node.js 24.18.0** — `start.sh` corre `nvm install` / `nvm use` automáticamente; si no usás `start.sh`, asegurate de tener Node 24 activo.
+- **corepack / pnpm** — el script habilita `pnpm` vía corepack. Si no usás `start.sh`, necesitás `pnpm` instalado globalmente.
+
+#### `start.sh`
+
+`start.sh` es el entrypoint recomendado para levantar todo el stack en modo dev con hot reload. Se encarga de:
+
+1. Leer el archivo `.env` indicado (default `.env`).
+2. Activar la versión de Node definida en `.nvmrc` mediante `nvm`.
+3. Habilitar `pnpm` vía corepack.
+4. Instalar dependencias del workspace si no están presentes.
+5. Recompilar módulos nativos (p. ej. `better-sqlite3`) si cambió la major version de Node.
+6. Arrancar backend + 3 frontends con `concurrently` (Ctrl+C detiene todo).
+
 ```bash
-# Instalar dependencias de todo el workspace (backend + 3 frontends)
-pnpm install
+# Uso básico — levanta con .env (Wikidata por defecto)
+./start.sh
 
-# Levantar todo: backend (:3000), shell (:4200), explorer (:4201) y gis (:4202)
-./start.sh                    # usa .env (Wikidata por defecto)
-./start.sh --env .env.graphdb # usa otro archivo de entorno
-
-# Alternativa sin start.sh (requiere Node 24 activo, ver .nvmrc)
-npm run dev
+# Levantar con otro archivo de entorno, por ejemplo GraphDB
+./start.sh .env.graphdb
+./start.sh --env .env.graphdb
 ```
+
+> La variable `DOTENV_CONFIG_PATH` se exporta con el path absoluto del `.env` elegido, así que backend y frontends la leen consistentemente.
 
 | Servicio | URL |
 |----------|-----|
