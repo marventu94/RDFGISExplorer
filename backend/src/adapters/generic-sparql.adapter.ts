@@ -252,7 +252,9 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
   }
 
   private parseWktPoint(raw: string): Coordinate {
-    const m = /Point\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/.exec(raw);
+    // Soporta WKT simple (Point(lng lat)) y GeoSPARQL 1.1 con CRS opcional
+    // (<http://www.opengis.net/def/crs/EPSG/0/4326> Point(lng lat)).
+    const m = /^(?:<[^>]+>\s*)?Point\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/i.exec(raw);
     if (!m) {
       throw new Error(`Invalid WKT Point literal: ${raw}`);
     }
