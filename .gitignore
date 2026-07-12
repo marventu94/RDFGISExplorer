@@ -15,7 +15,3 @@ docs/
 skills-lock.json
 .node-version-built
 backend/config/prefixes.graphdb.json
-
-# MCP Server de GraphDB (clonado localmente)
-mcp-server-graphdb/
-.vscode/mcp.json
