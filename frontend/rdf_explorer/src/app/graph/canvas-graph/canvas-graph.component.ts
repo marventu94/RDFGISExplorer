@@ -19,7 +19,7 @@ import { GraphInteractionService } from './interaction.service';
 import { CYTOSCAPE_STYLES, CHILD_HEIGHT, CHILD_PADDING, NODE_TITLE_HEIGHT } from './canvas-graph.styles';
 import { parseDropPayload } from './canvas-graph.drop';
 import { buildContextMenuConfig } from './canvas-graph.context-menus';
-import type { Node, Property, Edge, RDFResource } from '../domain';
+import { Node, Property, type Edge, type RDFResource } from '../domain';
 
 cytoscape.use(edgehandles);
 cytoscape.use(contextMenus);
@@ -297,6 +297,9 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     });
 
     this.cy.nodes('[kind = "property"], [kind = "literal"], [kind = "title-spacer"]').ungrabify();
+    if (this.drawMode) {
+      this.cy.nodes('[kind = "property"]').grabify();
+    }
     this.applySavedViewport();
     this.syncSelectionHighlight();
   }
@@ -343,10 +346,13 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     // node body the handle. Options handleNodes/handlePosition/complete are v3
     // only and are ignored in v4; edge creation is now an event (ehcomplete).
     this.ehApi = (this.cy as any).edgehandles({
-      canConnect: (sourceNode: cytoscape.NodeSingular, targetNode: cytoscape.NodeSingular) =>
-        sourceNode.data('kind') === 'node'
-        && targetNode.data('kind') === 'node'
-        && !sourceNode.same(targetNode),
+      canConnect: (sourceNode: cytoscape.NodeSingular, targetNode: cytoscape.NodeSingular) => {
+        const sourceKind = sourceNode.data('kind');
+        const targetKind = targetNode.data('kind');
+        return (sourceKind === 'node' || sourceKind === 'property')
+          && (targetKind === 'node' || targetKind === 'property')
+          && !sourceNode.same(targetNode);
+      },
       snap: false,
       hoverDelay: 150,
       noEdgeEventsInDraw: true,
@@ -354,9 +360,15 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     });
 
     this.cy.on('ehcomplete', (_evt: unknown, sourceNode: cytoscape.NodeSingular, targetNode: cytoscape.NodeSingular) => {
-      const srcDomain = sourceNode.data('domain') as Node | undefined;
-      const tgtDomain = targetNode.data('domain') as Node | undefined;
-      if (srcDomain && tgtDomain) {
+      const srcDomain = sourceNode.data('domain') as Node | Property | undefined;
+      const tgtDomain = targetNode.data('domain') as Node | Property | undefined;
+      if (!srcDomain || !tgtDomain) return;
+
+      if (srcDomain instanceof Property && tgtDomain instanceof Node) {
+        this.graph.addEdge(srcDomain, tgtDomain);
+      } else if (srcDomain instanceof Node && tgtDomain instanceof Property) {
+        this.graph.addEdge(tgtDomain, srcDomain);
+      } else if (srcDomain instanceof Node && tgtDomain instanceof Node) {
         this.graph.addEdge(srcDomain, tgtDomain);
       }
     });
@@ -547,8 +559,10 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     if (!this.ehApi) return;
     if (enabled) {
       (this.ehApi as any).enableDrawMode();
+      this.cy.nodes('[kind = "property"]').grabify();
     } else {
       (this.ehApi as any).disableDrawMode();
+      this.cy.nodes('[kind = "property"]').ungrabify();
     }
     this.drawMode = enabled;
   }
