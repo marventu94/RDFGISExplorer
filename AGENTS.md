@@ -226,4 +226,4 @@ Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa est
 
 ## Regla de git
 
-**No commitear ni pushear sin OK explícito del usuario.** `git add`, `git status`, `git diff`, `git fetch` y demás lecturas son libres; todo lo que modifique el historial/estado (`commit`, `push`, `merge`, `rebase`, `reset`, `branch -D`, `tag`, `cherry-pick`, `revert`, `--force`, etc.) requiere autorización explícita en el mismo turno ("comiteá" / "hacé commit" / "subí"). Cuando se autoriza, seguir el skill `crear-commit`: los commits se firman a nombre del usuario (config de git), nunca con Co-Authored-By de Claude.
+**No commitear ni pushear sin OK explícito del usuario.** `git add`, `git status`, `git diff`, `git fetch` y demás lecturas son libres; todo lo que modifique el historial/estado (`commit`, `push`, `merge`, `rebase`, `reset`, `branch -D`, `tag`, `cherry-pick`, `revert`, `--force`, etc.) requiere autorización explícita en el mismo turno ("comiteá" / "hacé commit" / "subí"). Cuando se autoriza, los commits se firman a nombre del usuario (config de git), nunca con Co-Authored-By de Claude.
