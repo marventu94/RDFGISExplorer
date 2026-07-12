@@ -44,8 +44,11 @@ export class SaveDashboardDialogComponent implements OnInit {
   protected readonly checking = signal(false);
 
   ngOnInit(): void {
-    if (this.data.hasCurrentDashboard && this.name()) {
-      this.checkForConflict();
+    if (this.data.hasCurrentDashboard) {
+      this.mode.set('overwrite');
+      if (this.name()) {
+        this.checkForConflict();
+      }
     }
   }
 

@@ -1,4 +1,5 @@
 import { Injectable, computed, effect, signal } from '@angular/core';
+import type { QueryResult } from '@shared/models';
 
 export type ViewType = 'table' | 'graph' | 'map' | 'timeline';
 export type LayoutPreset = 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad';
@@ -79,6 +80,32 @@ export class DashboardLayoutService {
       next[swapIndex] = previous;
     }
     this.slots.set(next);
+  }
+
+  /**
+   * Ajusta el layout a partir de un resultado SPARQL, mostrando solo las
+   * vistas que tienen datos relevantes. Usado al importar una query desde
+   * RDF Explorer (handoff) para no forzar las 4 vistas cuando no aplica.
+   */
+  applyLayoutForResult(result: QueryResult): void {
+    const hasGeo = result.nodes.some((node) => node.coordinate !== undefined);
+    const hasTemporal = result.nodes.some(
+      (node) => node.temporalEvents !== undefined && node.temporalEvents.length > 0,
+    );
+
+    if (hasGeo && hasTemporal) {
+      this.preset.set('quad');
+      this.slots.set(['table', 'graph', 'map', 'timeline']);
+    } else if (hasGeo) {
+      this.preset.set('split-h');
+      this.slots.set(['table', 'map']);
+    } else if (hasTemporal) {
+      this.preset.set('split-h');
+      this.slots.set(['table', 'timeline']);
+    } else {
+      this.preset.set('split-h');
+      this.slots.set(['table', 'graph']);
+    }
   }
 
   getPresetSnapshot(): LayoutPreset {
