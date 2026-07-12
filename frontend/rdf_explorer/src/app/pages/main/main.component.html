@@ -42,6 +42,6 @@
   </div>
 </div>
 
-@if (snackbarMessage) {
-  <div class="snackbar">{{ snackbarMessage }}</div>
+@if (snackbarMessage(); as msg) {
+  <div class="snackbar">{{ msg }}</div>
 }

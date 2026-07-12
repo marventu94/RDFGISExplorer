@@ -77,12 +77,12 @@
           <span class="input-group-text">Possible results</span>
           <input id="edit-filter-results" class="form-control" type="text" autocomplete="off"
             [ngModel]="resultFilterValue" (ngModelChange)="resultFilterValue = $event; onFilterValueChange()"
-            [disabled]="resultFilterLoading" />
-          <span class="input-group-text result-status" [class.loading]="resultFilterLoading">
-            @if (resultFilterLoading) {
+            [disabled]="resultFilterLoading()" />
+          <span class="input-group-text result-status" [class.loading]="resultFilterLoading()">
+            @if (resultFilterLoading()) {
               <span class="edit-spinner" role="status" aria-label="Loading..."></span>
             } @else {
-              @if (sel.variable.results.length === 0) {
+              @if (results().length === 0) {
                 &#9888;
               } @else {
                 &#10003;
@@ -93,16 +93,16 @@
       </div>
 
       <div class="custom-container-content active">
-        @if (loadError) {
-          <div class="alert alert-danger alert-sm mt-2 mb-1">{{ loadError }}</div>
+        @if (loadError(); as err) {
+          <div class="alert alert-danger alert-sm mt-2 mb-1">{{ err }}</div>
         }
-        @if (resultFilterLoading && sel.variable.results.length === 0) {
+        @if (resultFilterLoading() && results().length === 0) {
           <div class="result-loading-msg mt-2 mb-1">Running query...</div>
         }
-        @if (!resultFilterLoading && sel.variable.results.length === 0) {
+        @if (!resultFilterLoading() && results().length === 0) {
           <div class="alert alert-warning alert-sm mt-2 mb-1">Currently this variable has no partial results!</div>
         }
-        @for (elem of sel.variable.results; track elem.value + resultsVersion()) {
+        @for (elem of results(); track elem.value) {
           <div class="row result-row" [title]="elem.value">
             <div class="col-md-12">
               <span class="ell result-value">
@@ -113,14 +113,14 @@
           </div>
         }
         <div class="result-footer mt-1">
-          @if (sel.variable.results.length > 0) {
-            <span class="result-count">Showing {{ sel.variable.results.length }} results</span>
+          @if (results().length > 0) {
+            <span class="result-count">Showing {{ results().length }} results</span>
           }
-          @if (hasMoreResults || resultFilterLoading) {
+          @if (hasMoreResults() || resultFilterLoading()) {
             <button class="load-more-btn"
-              [disabled]="resultFilterLoading"
+              [disabled]="resultFilterLoading()"
               (click)="loadMoreResults()">
-              @if (resultFilterLoading) {
+              @if (resultFilterLoading()) {
                 <span class="edit-spinner edit-spinner-sm" role="status"></span>
                 <span class="ml-1">Loading...</span>
               } @else {

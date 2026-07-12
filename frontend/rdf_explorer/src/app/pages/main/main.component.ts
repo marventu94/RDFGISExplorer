@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, DestroyRef, computed } from '@angular/core';
+import { Component, inject, OnInit, DestroyRef, computed, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
@@ -39,7 +39,9 @@ export class MainComponent implements OnInit {
 
   readonly canHandoff = computed(() => this.generatedSparql().trim().length > 0);
 
-  snackbarMessage: string | null = null;
+  // Signal: el timeout que oculta el snackbar corre fuera de cualquier
+  // notificación de Angular (app zoneless), así que debe disparar CD él mismo.
+  readonly snackbarMessage = signal<string | null>(null);
   private snackbarTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
@@ -130,9 +132,9 @@ export class MainComponent implements OnInit {
     if (this.snackbarTimer) {
       clearTimeout(this.snackbarTimer);
     }
-    this.snackbarMessage = message;
+    this.snackbarMessage.set(message);
     this.snackbarTimer = setTimeout(() => {
-      this.snackbarMessage = null;
+      this.snackbarMessage.set(null);
     }, 3000);
   }
 
