@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
+import { signal } from '@angular/core';
 import { WorkspacePersistenceService } from './workspace-persistence.service';
 import { WorkspaceApiClient, type Dashboard } from './workspace-api.client';
 import { PropertyGraphService } from '../graph/property-graph.service';
+import { RequestService } from './request.service';
 
 function createMockClient(): WorkspaceApiClient {
   return {
@@ -15,19 +17,32 @@ function createMockClient(): WorkspaceApiClient {
   } as unknown as WorkspaceApiClient;
 }
 
+function createMockRequestService(): RequestService {
+  return {
+    labelCache: signal(new Map()),
+    getLabel: vi.fn(),
+    setLabel: vi.fn(),
+    execQuery: vi.fn(),
+    prefetchLabels: vi.fn(),
+  } as unknown as RequestService;
+}
+
 describe('WorkspacePersistenceService', () => {
   let service: WorkspacePersistenceService;
   let mockClient: WorkspaceApiClient;
+  let mockRequest: RequestService;
   let graph: PropertyGraphService;
 
   beforeEach(() => {
     TestBed.resetTestingModule();
     mockClient = createMockClient();
+    mockRequest = createMockRequestService();
     TestBed.configureTestingModule({
       providers: [
         WorkspacePersistenceService,
         PropertyGraphService,
         { provide: WorkspaceApiClient, useValue: mockClient },
+        { provide: RequestService, useValue: mockRequest },
       ],
     });
     service = TestBed.inject(WorkspacePersistenceService);
@@ -187,5 +202,86 @@ describe('WorkspacePersistenceService', () => {
 
     service.deleteWorkspace('ws-1').subscribe();
     expect(mockClient.delete).toHaveBeenCalledWith('ws-1');
+  });
+
+  it('saves labels from cache into workspace payload', async () => {
+    service.addPanel('Test');
+    const n = graph.addNode();
+    n.mkConst();
+    n.addUri('http://example.org/NodeA');
+    service.snapshotActivePanel(graph);
+
+    mockRequest.labelCache.set(new Map([['http://example.org/NodeA', 'Node A Label']]));
+
+    const mockDashboard: Dashboard = {
+      id: 'ws-labels',
+      kind: 'explorer',
+      name: 'With Labels',
+      payload: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    (mockClient.create as ReturnType<typeof vi.fn>).mockReturnValue(of(mockDashboard));
+
+    await service.saveWorkspace('With Labels');
+
+    const callArg = (mockClient.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArg.payload.panels[0].labels).toEqual({
+      'http://example.org/NodeA': 'Node A Label',
+    });
+  });
+
+  it('injects persisted labels into cache when restoring active panel', () => {
+    service.panels.set([
+      {
+        id: 'p1',
+        name: 'Test',
+        graph: { nodes: [], edges: [] },
+        generatedQuery: '',
+        variables: [],
+        dirty: false,
+        labels: { 'http://example.org/NodeA': 'Node A Label' },
+      },
+    ]);
+    service.activePanelId.set('p1');
+
+    service.restoreActivePanel(graph);
+
+    expect(mockRequest.setLabel).toHaveBeenCalledWith('http://example.org/NodeA', 'Node A Label');
+  });
+
+  it('loads workspace preserving labels in panel state', async () => {
+    const payload = {
+      panels: [
+        {
+          id: 'p1',
+          name: 'Panel A',
+          graph: { nodes: [], edges: [] },
+          generatedQuery: 'SELECT * WHERE {}',
+          variables: ['var0'],
+          labels: { 'http://example.org/NodeA': 'Node A Label' },
+        },
+      ],
+      activePanelId: 'p1',
+      settings: {
+        endpointType: 'fuseki' as const,
+        limit: 50,
+      },
+    };
+
+    const mockDashboard: Dashboard = {
+      id: 'ws-labels',
+      kind: 'explorer',
+      name: 'Loaded',
+      payload,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    (mockClient.get as ReturnType<typeof vi.fn>).mockReturnValue(of(mockDashboard));
+
+    await service.loadWorkspace('ws-labels');
+    expect(service.activePanel()?.labels).toEqual({
+      'http://example.org/NodeA': 'Node A Label',
+    });
   });
 });

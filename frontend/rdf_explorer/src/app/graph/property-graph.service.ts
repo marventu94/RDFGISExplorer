@@ -150,5 +150,47 @@ export class PropertyGraphService {
   restoreGraph(snapshot: ExplorerSerializedGraph): void {
     deserializeGraph(this.graphRef, snapshot);
     this.bump();
+    void this.prefetchLabels();
+  }
+
+  async prefetchLabels(): Promise<void> {
+    const uris = this.collectConstantUris();
+    if (uris.length === 0) return;
+
+    const cfg = this.appConfig.config();
+    if (!cfg) return;
+
+    try {
+      await this.request.prefetchLabels(uris, {
+        labelUri: cfg.labelUri,
+        lang: cfg.defaults.lang,
+        supportsWikibaseLabel: cfg.supportsWikibaseLabel,
+      });
+    } catch (err) {
+      console.error('[PropertyGraphService] prefetchLabels failed:', err);
+    } finally {
+      this.refresh();
+    }
+  }
+
+  private collectConstantUris(): string[] {
+    const uris = new Set<string>();
+    for (const node of this.graphRef.nodes) {
+      this.collectResourceUris(node, uris);
+      for (const prop of node.properties) {
+        this.collectResourceUris(prop, uris);
+        if (prop.literal) {
+          this.collectResourceUris(prop.literal, uris);
+        }
+      }
+    }
+    return [...uris];
+  }
+
+  private collectResourceUris(resource: RDFResource, target: Set<string>): void {
+    if (resource.isVariable()) return;
+    for (const uri of resource.uris) {
+      target.add(uri);
+    }
   }
 }

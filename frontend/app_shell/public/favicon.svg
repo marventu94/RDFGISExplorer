@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <style>
+    .pin {
+      fill: #0d6efd;
+    }
+    .dot {
+      fill: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      .pin {
+        fill: #60a5fa;
+      }
+      .dot {
+        fill: #0f172a;
+      }
+    }
+  </style>
+  <path class="pin" d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+  <circle class="dot" cx="12" cy="10" r="3"/>
+</svg>
