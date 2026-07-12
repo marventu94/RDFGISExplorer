@@ -1,5 +1,7 @@
 <nav class="navbar">
-  <span class="navbar-brand"></span>
+  <span class="navbar-brand" [title]="persistence.currentDashboardName() ?? 'Tablero sin guardar'">
+    {{ persistence.currentDashboardName() || 'Tablero sin guardar' }}
+  </span>
   <app-filter-badges />
 
   <div class="navbar-actions">
