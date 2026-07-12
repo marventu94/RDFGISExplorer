@@ -50,14 +50,43 @@ export class RequestService {
   ): Promise<void> {
     const uniqueUris = [...new Set(uris.filter(u => u.trim().length > 0))];
 
+    // Wikidata's label service resolves labels for entity URIs, not for direct
+    // claim predicates (e.g. http://www.wikidata.org/prop/direct/P31). Map those
+    // to their entity form for the query, then map the results back to the
+    // original URI so the graph finds the label under the URI it actually uses.
+    const wikidataOriginalUri = new Map<string, string>();
+    if (config.supportsWikibaseLabel) {
+      for (const uri of uniqueUris) {
+        const entityUri = toWikidataEntityUri(uri);
+        if (entityUri !== uri) {
+          wikidataOriginalUri.set(entityUri, uri);
+        }
+      }
+    }
+
     for (let i = 0; i < uniqueUris.length; i += batchSize) {
       const batch = uniqueUris.slice(i, i + batchSize);
       const query = config.supportsWikibaseLabel
-        ? buildWikidataLabelQuery(batch, config.lang)
+        ? buildWikidataLabelQuery(batch.map(toWikidataEntityUri), config.lang)
         : buildGenericLabelQuery(batch, config.labelUri, config.lang);
 
       try {
-        await this.execQuery(query);
+        const data = await this.execQuery(query);
+        if (config.supportsWikibaseLabel) {
+          for (const row of data.results.bindings) {
+            const uriBinding = row['uri'];
+            const labelBinding = row['uriLabel'];
+            if (
+              uriBinding?.type === 'uri' &&
+              labelBinding?.type === 'literal'
+            ) {
+              const originalUri = wikidataOriginalUri.get(uriBinding.value);
+              if (originalUri) {
+                this.setLabel(originalUri, labelBinding.value);
+              }
+            }
+          }
+        }
       } catch (err) {
         console.error('[RequestService] prefetchLabels failed for batch:', err);
       }
@@ -162,4 +191,14 @@ function buildGenericLabelQuery(uris: string[], labelUri: string, lang: string):
 
 function escapeSparqlString(value: string): string {
   return value.replace(/[\\"']/g, '\\$&');
+}
+
+const WIKIDATA_DIRECT_CLAIM = 'http://www.wikidata.org/prop/direct/';
+const WIKIDATA_ENTITY = 'http://www.wikidata.org/entity/';
+
+function toWikidataEntityUri(uri: string): string {
+  if (uri.startsWith(WIKIDATA_DIRECT_CLAIM)) {
+    return WIKIDATA_ENTITY + uri.slice(WIKIDATA_DIRECT_CLAIM.length);
+  }
+  return uri;
 }
