@@ -5,6 +5,7 @@ import type { ExplorerWorkspacePayload, ExplorerPanelSnapshot, Dashboard } from 
 import { WorkspaceApiClient } from './workspace-api.client';
 import { AppConfigService } from './services/app-config.service';
 import { PropertyGraphService } from '../graph/property-graph.service';
+import { RequestService } from './request.service';
 
 export interface PanelState {
   id: string;
@@ -15,12 +16,14 @@ export interface PanelState {
   dirty: boolean;
   sourceWorkspaceId?: string;
   viewport?: { zoom: number; pan: { x: number; y: number } };
+  labels?: Record<string, string>;
 }
 
 @Injectable({ providedIn: 'root' })
 export class WorkspacePersistenceService {
   private readonly api = inject(WorkspaceApiClient);
   private readonly appConfig = inject(AppConfigService);
+  private readonly request = inject(RequestService);
 
   readonly panels = signal<readonly PanelState[]>([
     {
@@ -139,6 +142,31 @@ export class WorkspacePersistenceService {
     return type === 'virtuoso' || type === 'fuseki' ? type : 'generic';
   }
 
+  private collectUrisFromSnapshot(graph: ExplorerSerializedGraph): Set<string> {
+    const uris = new Set<string>();
+    for (const node of graph.nodes) {
+      const data = node.data as { isVar?: boolean; uris?: string[] };
+      if (data.isVar) continue;
+      for (const uri of data.uris ?? []) {
+        uris.add(uri);
+      }
+    }
+    return uris;
+  }
+
+  private buildLabelsForSnapshot(graph: ExplorerSerializedGraph): Record<string, string> {
+    const cache = this.request.labelCache();
+    const uris = this.collectUrisFromSnapshot(graph);
+    const labels: Record<string, string> = {};
+    for (const uri of uris) {
+      const label = cache.get(uri);
+      if (label !== undefined) {
+        labels[uri] = label;
+      }
+    }
+    return labels;
+  }
+
   private toPayload(): ExplorerWorkspacePayload {
     const endpointType = this.appConfig.endpointType();
     const limit = this.appConfig.resultLimit();
@@ -149,6 +177,7 @@ export class WorkspacePersistenceService {
       generatedQuery: p.generatedQuery,
       variables: p.variables,
       viewport: p.viewport,
+      labels: this.buildLabelsForSnapshot(p.graph),
     }));
 
     return {
@@ -170,6 +199,7 @@ export class WorkspacePersistenceService {
       variables: p.variables ?? [],
       dirty: false,
       viewport: p.viewport,
+      labels: p.labels,
     }));
 
     this.panels.set(mappedPanels);
@@ -219,6 +249,7 @@ export class WorkspacePersistenceService {
         variables: p.variables ?? [],
         dirty: false,
         sourceWorkspaceId: id,
+        labels: p.labels,
       };
     });
 
@@ -260,6 +291,13 @@ export class WorkspacePersistenceService {
     const panel = this.activePanel();
     if (!panel) return;
     this.isRestoring = true;
+
+    if (panel.labels) {
+      for (const [uri, label] of Object.entries(panel.labels)) {
+        this.request.setLabel(uri, label);
+      }
+    }
+
     graph.restoreGraph(panel.graph);
     if (panel.viewport) {
       graph.viewport.set(panel.viewport);

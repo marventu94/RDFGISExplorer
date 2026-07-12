@@ -184,4 +184,92 @@ describe('RequestService', () => {
       expect(service.getLabel('http://example.org/V1')).toBe('Value One');
     });
   });
+
+  describe('prefetchLabels', () => {
+    const emptyLabelResponse = {
+      variables: ['uri', 'uriLabel'],
+      bindings: [],
+      nodes: [],
+      edges: [],
+      meta: { durationMs: 0, truncated: false, limitApplied: 0, backend: 'wikidata' },
+    };
+
+    it('builds generic OPTIONAL label query for non-Wikidata endpoints', async () => {
+      const promise = service.prefetchLabels(['http://example.org/Q1'], {
+        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'en',
+        supportsWikibaseLabel: false,
+      });
+
+      const req = httpMock.expectOne('/api/query/execute');
+      const body = req.request.body;
+      expect(body.sparql).toContain('VALUES ?uri { <http://example.org/Q1> }');
+      expect(body.sparql).toContain('OPTIONAL { ?uri <http://www.w3.org/2000/01/rdf-schema#label> ?uriLabel');
+      expect(body.sparql).toContain('FILTER(lang(?uriLabel) = "en" || lang(?uriLabel) = "")');
+
+      req.flush(emptyLabelResponse);
+      await promise;
+    });
+
+    it('builds Wikidata SERVICE label query', async () => {
+      const promise = service.prefetchLabels(['http://example.org/Q1'], {
+        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'en',
+        supportsWikibaseLabel: true,
+      });
+
+      const req = httpMock.expectOne('/api/query/execute');
+      const body = req.request.body;
+      expect(body.sparql).toContain('PREFIX wikibase:');
+      expect(body.sparql).toContain('SERVICE wikibase:label');
+      expect(body.sparql).toContain('bd:serviceParam wikibase:language "en"');
+
+      req.flush(emptyLabelResponse);
+      await promise;
+    });
+
+    it('partitions URIs into configurable batches', async () => {
+      const execSpy = vi
+        .spyOn(service, 'execQuery')
+        .mockResolvedValue({ results: { bindings: [] } } as unknown as SparqlJsonResult);
+
+      const uris = ['http://example.org/Q1', 'http://example.org/Q2'];
+      await service.prefetchLabels(uris, {
+        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'en',
+        supportsWikibaseLabel: false,
+      }, 1);
+
+      expect(execSpy).toHaveBeenCalledTimes(2);
+      const calls = execSpy.mock.calls as [string, ...unknown[]][];
+      expect(calls[0][0]).toContain('<http://example.org/Q1>');
+      expect(calls[1][0]).toContain('<http://example.org/Q2>');
+    });
+
+    it('correlates returned labels into cache', async () => {
+      const mockResponse = {
+        variables: ['uri', 'uriLabel'],
+        bindings: [
+          {
+            uri: { type: 'uri', value: 'http://example.org/Q1' },
+            uriLabel: { type: 'literal', value: 'Prefetched Label' },
+          },
+        ],
+        nodes: [],
+        edges: [],
+        meta: { durationMs: 0, truncated: false, limitApplied: 0, backend: 'wikidata' },
+      };
+
+      const promise = service.prefetchLabels(['http://example.org/Q1'], {
+        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'en',
+        supportsWikibaseLabel: false,
+      });
+
+      const req = httpMock.expectOne('/api/query/execute');
+      req.flush(mockResponse);
+      await promise;
+      expect(service.getLabel('http://example.org/Q1')).toBe('Prefetched Label');
+    });
+  });
 });
