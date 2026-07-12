@@ -1,4 +1,4 @@
-import { Component, computed, inject, NgZone, effect, signal } from '@angular/core';
+import { Component, computed, inject, effect, signal, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PropertyGraphService } from '../../graph/property-graph.service';
 import { RequestService } from '../../core/request.service';
@@ -26,10 +26,9 @@ const DEFAULT_RESULTS_PER_PAGE = 10;
   standalone: true,
   imports: [FormsModule],
 })
-export class EditPanelComponent {
+export class EditPanelComponent implements OnDestroy {
   readonly graph = inject(PropertyGraphService);
   private readonly request = inject(RequestService);
-  private readonly ngZone = inject(NgZone);
 
   readonly selected = computed(() => this.graph.selected());
 
@@ -42,12 +41,20 @@ export class EditPanelComponent {
   newValue = '';
 
   resultFilterValue = '';
-  resultFilterLoading = false;
+  // Signals: la app es zoneless, así que todo estado mutado desde callbacks
+  // asíncronos (fetch de la query) debe notificar a Angular por sí mismo.
+  readonly resultFilterLoading = signal(false);
   resultOffset = 0;
   resultsPerPage = DEFAULT_RESULTS_PER_PAGE;
-  hasMoreResults = false;
+  readonly hasMoreResults = signal(false);
   readonly resultsVersion = signal(0);
-  loadError: string | null = null;
+  readonly loadError = signal<string | null>(null);
+  // sel.variable.results es un array plano mutado por la query; resultsVersion
+  // marca cada mutación para que este computed (y el template) se enteren.
+  readonly results = computed(() => {
+    this.resultsVersion();
+    return this.selected()?.variable.results ?? [];
+  });
   private previewAbort: AbortController | null = null;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -63,7 +70,8 @@ export class EditPanelComponent {
 
   constructor() {
     effect(() => {
-      this.graph.revision();
+      // selected() already depends on graph.revision(), so reading it is enough
+      // to react to any graph mutation.
       const sel = this.selected();
       if (!sel) {
         this.lastSelected = null;
@@ -83,8 +91,8 @@ export class EditPanelComponent {
       this.resultFilterValue = '';
     }
     this.resultOffset = 0;
-    this.hasMoreResults = false;
-    this.loadError = null;
+    this.hasMoreResults.set(false);
+    this.loadError.set(null);
     this.isVariable = resource.isVariable();
     this.isConst = !this.isVariable;
     this.isLiteral = !!(resource as unknown as Record<string, unknown>)['parent'];
@@ -107,7 +115,7 @@ export class EditPanelComponent {
     this.isVariable = true;
     this.isConst = false;
     this.resultOffset = 0;
-    this.hasMoreResults = false;
+    this.hasMoreResults.set(false);
     this.loadPreview();
     this.graph.refresh();
   }
@@ -159,7 +167,7 @@ export class EditPanelComponent {
     const vctx = ctx['graphRef'] as unknown as { usedAliases: Set<string>; log: (msg: string) => void };
     sel.variable.addFilter(this.newFilterType, { ...this.newFilterData }, vctx);
     this.resultOffset = 0;
-    this.hasMoreResults = false;
+    this.hasMoreResults.set(false);
     this.loadPreview();
     this.graph.refresh();
     this.newFilterType = '';
@@ -173,7 +181,7 @@ export class EditPanelComponent {
     if (!sel) return;
     sel.variable.removeFilter(filter);
     this.resultOffset = 0;
-    this.hasMoreResults = false;
+    this.hasMoreResults.set(false);
     this.loadPreview();
     this.graph.refresh();
     this.updateExistingFilters();
@@ -194,14 +202,14 @@ export class EditPanelComponent {
     this.previewTimer = setTimeout(() => {
       if (now === this.resultFilterValue) {
         this.resultOffset = 0;
-        this.hasMoreResults = false;
+        this.hasMoreResults.set(false);
         this.loadPreview();
       }
     }, 400);
   }
 
   loadMoreResults(): void {
-    if (this.resultFilterLoading || !this.hasMoreResults) return;
+    if (this.resultFilterLoading() || !this.hasMoreResults()) return;
     this.resultOffset += this.resultsPerPage;
     this.loadPreview(true);
   }
@@ -288,25 +296,50 @@ export class EditPanelComponent {
     (filter.data as Record<string, string | number>)[field] = value;
   }
 
+  ngOnDestroy(): void {
+    if (this.previewAbort) {
+      this.previewAbort.abort();
+      this.previewAbort = null;
+    }
+    if (this.previewTimer) {
+      clearTimeout(this.previewTimer);
+      this.previewTimer = null;
+    }
+  }
+
   private loadPreview(isLoadMore = false): void {
     const sel = this.selected();
     if (!sel || !sel.isVariable()) return;
 
     if (!isLoadMore) {
       this.resultOffset = 0;
-      this.hasMoreResults = false;
+      this.hasMoreResults.set(false);
     }
 
     if (this.previewAbort) {
       this.previewAbort.abort();
       if (!isLoadMore) {
-        this.resultFilterLoading = false;
+        this.resultFilterLoading.set(false);
       }
     }
 
+    // Guard against queries that produce no triples (e.g. graph not ready yet).
+    // loadNodePreview/loadPropertyPreview silently return in that case, which
+    // would leave resultFilterLoading stuck at true.
+    const queryable = sel as unknown as {
+      createQuery?: (opts?: { limit?: number; offset?: number }) => unknown;
+      loadPreview: (c: Record<string, unknown>) => void;
+    };
+    const q = queryable.createQuery?.({ limit: this.resultsPerPage, offset: this.resultOffset });
+    if (!q) {
+      this.resultFilterLoading.set(false);
+      this.resultsVersion.update(v => v + 1);
+      return;
+    }
+
     this.previewAbort = new AbortController();
-    this.resultFilterLoading = true;
-    this.loadError = null;
+    this.resultFilterLoading.set(true);
+    this.loadError.set(null);
 
     const config: Record<string, unknown> = {
       limit: this.resultsPerPage,
@@ -314,24 +347,20 @@ export class EditPanelComponent {
       appendResults: isLoadMore && this.resultOffset > 0,
       canceller: this.previewAbort.signal,
       callback: () => {
-        this.ngZone.run(() => {
-          this.resultFilterLoading = false;
-          this.previewAbort = null;
-          const rlen = sel.variable.results.length;
-          this.hasMoreResults = rlen > 0 && rlen >= (this.resultOffset + this.resultsPerPage);
-          this.resultsVersion.update(v => v + 1);
-        });
+        this.resultFilterLoading.set(false);
+        this.previewAbort = null;
+        const rlen = sel.variable.results.length;
+        this.hasMoreResults.set(rlen > 0 && rlen >= (this.resultOffset + this.resultsPerPage));
+        this.resultsVersion.update(v => v + 1);
       },
       onError: (err: unknown) => {
-        this.ngZone.run(() => {
-          this.resultFilterLoading = false;
-          this.previewAbort = null;
-          const body = (err as Record<string, unknown>)?.['error'] as Record<string, unknown> | undefined;
-          const msg = typeof body?.['message'] === 'string' ? body['message']
-            : err instanceof Error ? err.message
-            : String(err ?? '');
-          this.loadError = msg || 'Error al ejecutar la query.';
-        });
+        this.resultFilterLoading.set(false);
+        this.previewAbort = null;
+        const body = (err as Record<string, unknown>)?.['error'] as Record<string, unknown> | undefined;
+        const msg = typeof body?.['message'] === 'string' ? body['message']
+          : err instanceof Error ? err.message
+          : String(err ?? '');
+        this.loadError.set(msg || 'Error al ejecutar la query.');
       },
     };
 
@@ -340,9 +369,6 @@ export class EditPanelComponent {
       config['varFilter'] = now;
     }
 
-    const selNode = sel as unknown as { loadPreview?: (c: Record<string, unknown>) => void };
-    if (selNode.loadPreview) {
-      selNode.loadPreview.call(sel, config);
-    }
+    queryable.loadPreview(config);
   }
 }
