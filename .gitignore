@@ -12,6 +12,8 @@ test-results/
 opencode.json
 docs/
 .agents/
+.kimi-code/
 skills-lock.json
 .node-version-built
 backend/config/prefixes.graphdb.json
+mcp-server-graphdb/
