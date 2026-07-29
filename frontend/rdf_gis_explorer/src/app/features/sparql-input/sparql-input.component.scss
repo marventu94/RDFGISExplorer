@@ -77,10 +77,35 @@
   letter-spacing: 0.5px;
 }
 
+// Angular Material capa el panel de mat-menu en max-width: 280px, que recorta los
+// nombres de tablero con "...". Se ensancha para que el nombre entre completo,
+// acotado por el viewport para no desbordar en pantallas chicas.
+// El doble selector cubre tanto que la clase caiga en el panel mismo como en un
+// ancestro, según cómo Material la propague.
+::ng-deep .library-menu.mat-mdc-menu-panel,
+::ng-deep .library-menu .mat-mdc-menu-panel {
+  max-width: min(760px, 92vw);
+}
+
 ::ng-deep .library-menu .mat-mdc-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+// El ícono conserva su tamaño; el nombre usa todo el ancho restante y sólo
+// recorta con "..." si ni así entra.
+::ng-deep .library-menu .mat-mdc-menu-item > .mat-icon {
+  flex-shrink: 0;
+}
+
+::ng-deep .library-menu .mat-mdc-menu-item > span,
+::ng-deep .library-menu .mat-mdc-menu-item .mat-mdc-menu-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 ::ng-deep .library-menu .delete-btn {
