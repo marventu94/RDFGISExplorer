@@ -53,6 +53,8 @@
         [suppressPaginationPanel]="false"
         [domLayout]="'normal'"
         [quickFilterText]="quickFilter()"
+        [tooltipShowDelay]="300"
+        [tooltipInteraction]="true"
         (gridReady)="onGridReady($event)"
         (rowSelected)="onRowSelected($event)"
       ></ag-grid-angular>
