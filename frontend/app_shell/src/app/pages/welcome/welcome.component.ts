@@ -85,6 +85,11 @@ type FilterKind = 'all' | 'gis' | 'explorer';
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+      height: 100%;
+      overflow-y: auto;
+    }
     .welcome {
       max-width: 960px;
       margin: 0 auto;

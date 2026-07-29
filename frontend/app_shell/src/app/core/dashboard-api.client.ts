@@ -9,7 +9,9 @@ export class DashboardApiClient {
   private readonly baseUrl = '/api/dashboards';
 
   getRecent(): Observable<Dashboard[]> {
-    return this.http.get<Dashboard[]>(`${this.baseUrl}/recent`);
+    // El backend clampa a 50; sin el parámetro el default es 10 y con más de
+    // 10 tableros los más viejos desaparecen de la pantalla de bienvenida.
+    return this.http.get<Dashboard[]>(`${this.baseUrl}/recent`, { params: { limit: 50 } });
   }
 
   getById(id: string): Observable<Dashboard> {
