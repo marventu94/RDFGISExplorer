@@ -22,8 +22,20 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 320px;
-  flex-shrink: 1;
+  // Ocupa todo el ancho libre de la navbar en lugar de un tope fijo.
+  // min-width: 0 es imprescindible: los flex items traen min-width: auto, que
+  // impide encogerse por debajo del contenido; sin esto un nombre largo
+  // empujaría los botones fuera de la barra en vez de recortarse con "...".
+  // El ellipsis queda sólo como último recurso; el nombre completo siempre está
+  // en el [title] del span (tooltip nativo).
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+// Los badges de filtros activos tampoco se comprimen: llevan un botón de quitar
+// y recortarlos los volvería inutilizables. El único que cede espacio es el título.
+app-filter-badges {
+  flex-shrink: 0;
 }
 
 .navbar-actions {
@@ -31,6 +43,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  // Los botones nunca se comprimen: si falta espacio, lo cede el título.
+  flex-shrink: 0;
 }
 
 .navbar-btn {

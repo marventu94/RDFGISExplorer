@@ -21,7 +21,7 @@
           </button>
         } @else {
           @for (d of gisDashboards(); track d.id) {
-            <button mat-menu-item (click)="loadDashboard(d)">
+            <button mat-menu-item [title]="d.name" (click)="loadDashboard(d)">
               <mat-icon>dashboard</mat-icon>
               <span>{{ d.name }}</span>
             </button>
