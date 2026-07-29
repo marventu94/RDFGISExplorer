@@ -14,6 +14,7 @@ import {
   ResultBinding,
   TemporalEvent,
 } from '../shared/dto/query-result.dto';
+import { extractQueryTopology, type QueryTopology } from './query-topology';
 
 const DEFAULT_SPARQL_URL = 'https://query.wikidata.org/sparql';
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -46,6 +47,13 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
     const userAgent = this.resolveUserAgent();
 
+    // La topología declarada por la consulta es la fuente de las aristas del grafo.
+    // Si hay nodos intermedios sin proyectar (los bnodes de dirección, feature o
+    // geometría que el modelo interpone entre entidades), se agregan al SELECT para
+    // poder dibujarlos; la tabla sigue mostrando sólo las columnas originales.
+    const topology = extractQueryTopology(query);
+    const upstreamQuery = topology.rewritten ?? query;
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -66,7 +74,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
       try {
         const response = await axios.post<WikidataRawResponse>(
           this.resolveEndpointUrl(),
-          new URLSearchParams({ query }),
+          new URLSearchParams({ query: upstreamQuery }),
           {
             headers: {
               'User-Agent': userAgent,
@@ -82,17 +90,29 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
 
         const rawBindings: WikidataRawBinding[] =
           response.data?.results?.bindings ?? [];
-        const variables: string[] = response.data?.head?.vars ?? [];
+        const allVars: string[] = response.data?.head?.vars ?? [];
+
+        // Columnas que ve el usuario: las que pidió, sin los intermedios agregados.
+        const exposedVars: string[] = topology.projected
+          ? topology.projected.filter((v) => allVars.includes(v))
+          : allVars;
 
         const truncated = opts.limit > 0 && rawBindings.length >= opts.limit;
-        const bindings: ResultBinding[] = rawBindings
-          .slice(0, opts.limit)
-          .map((raw) => this.normalizeRow(raw, variables));
 
-        const { nodes, edges } = this.buildGraph(bindings, variables);
+        // Filas completas (con intermedios) para armar el grafo...
+        const fullRows: ResultBinding[] = rawBindings
+          .slice(0, opts.limit)
+          .map((raw) => this.normalizeRow(raw, allVars));
+
+        // ...y filas recortadas a la proyección original para la tabla.
+        const bindings: ResultBinding[] = topology.rewritten
+          ? fullRows.map((row) => this.pickVariables(row, exposedVars))
+          : fullRows;
+
+        const { nodes, edges } = this.buildGraph(fullRows, exposedVars, topology);
 
         return {
-          variables,
+          variables: exposedVars,
           bindings,
           nodes,
           edges,
@@ -261,98 +281,83 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     return { lat: parseFloat(m[2]), lng: parseFloat(m[1]) };
   }
 
+  /**
+   * Construye el grafo de resultados a partir de las relaciones que declara la consulta.
+   *
+   * Antes se armaba una estrella: todas las URIs de una fila colgaban de la primera
+   * variable URI, con el nombre de la variable como predicado. Eso inventaba aristas
+   * inexistentes (`real_estate --[agente]--> agent_X`, cuando el triple real es
+   * `listing foaf:maker agent_X`) y aplanaba las jerarquías, que es justo lo que hace
+   * interesante a un grafo.
+   *
+   * Ahora cada arista corresponde a un patrón `?s <p> ?o` de la consulta, con su
+   * predicado y su dirección reales, y los nodos intermedios del modelo se dibujan
+   * como nodos propios.
+   */
   private buildGraph(
-    bindings: ResultBinding[],
-    variables: string[],
+    rows: ResultBinding[],
+    exposedVars: string[],
+    topology: QueryTopology,
   ): { nodes: NormalizedNode[]; edges: NormalizedEdge[] } {
     const nodeMap = new Map<string, NormalizedNode>();
     const edgeSet = new Set<string>();
     const edges: NormalizedEdge[] = [];
 
-    for (const row of bindings) {
-      const uriVars = variables.filter((v) => row[v]?.type === 'uri');
+    for (const row of rows) {
+      // Nodos de las variables que pidió el usuario y de los intermedios del modelo.
+      for (const v of exposedVars) this.ensureNode(nodeMap, row, v);
+      for (const v of topology.intermediates) this.ensureNode(nodeMap, row, v);
 
-      if (uriVars.length === 0) continue;
+      for (const link of topology.links) {
+        const source = this.ensureNode(nodeMap, row, link.subject);
+        const target = this.ensureNode(nodeMap, row, link.object);
+        if (!source || !target) continue;
 
-      const primaryVar = uriVars[0];
-      const primaryUri = row[primaryVar].value as string;
+        let predicate = link.predicate;
+        let predicateLabel = link.predicateLabel;
 
-      const labelVar = `${primaryVar}Label`;
-      const label =
-        row[labelVar]?.type === 'literal'
-          ? String(row[labelVar].value)
-          : this.uriFragment(primaryUri);
-
-      if (!nodeMap.has(primaryUri)) {
-        const node: NormalizedNode = {
-          uri: primaryUri,
-          label,
-          type: primaryVar,
-          attributes: this.collectAttributes(row, variables),
-        };
-        const coord = this.findCoordinate(row, variables);
-        if (coord) node.coordinate = coord;
-        const events = this.findTemporalEvents(row, variables);
-        if (events.length > 0) node.temporalEvents = events;
-        nodeMap.set(primaryUri, node);
-      } else {
-        const existing = nodeMap.get(primaryUri)!;
-        if (
-          !existing.label ||
-          existing.label === this.uriFragment(primaryUri)
-        ) {
-          const lbl =
-            row[labelVar]?.type === 'literal'
-              ? String(row[labelVar].value)
-              : '';
-          if (lbl) existing.label = lbl;
+        // Consultas tipo `?s ?p ?o`: el predicado real viene en los bindings.
+        if (link.predicateVar) {
+          const bound = row[link.predicateVar];
+          if (bound?.type !== 'uri') continue;
+          predicate = String(bound.value);
+          predicateLabel = this.uriFragment(predicate);
         }
-        Object.assign(
-          existing.attributes,
-          this.collectAttributes(row, variables),
-        );
-        const coord = this.findCoordinate(row, variables);
-        if (coord && !existing.coordinate) {
-          existing.coordinate = coord;
-        }
-        const events = this.findTemporalEvents(row, variables);
-        for (const ev of events) {
-          const alreadyExists = existing.temporalEvents?.some(
-            (e) => e.field === ev.field && e.isoDate === ev.isoDate,
-          );
-          if (!alreadyExists) {
-            existing.temporalEvents = [...(existing.temporalEvents ?? []), ev];
-          }
-        }
+        if (!predicate) continue;
+
+        const edgeId = `${source.uri}|${predicate}|${target.uri}`;
+        if (edgeSet.has(edgeId)) continue;
+        edgeSet.add(edgeId);
+        edges.push({
+          id: edgeId,
+          source: source.uri,
+          target: target.uri,
+          predicate,
+          ...(predicateLabel ? { predicateLabel } : {}),
+        });
       }
 
-      for (let i = 1; i < uriVars.length; i++) {
-        const targetVar = uriVars[i];
-        const targetUri = row[targetVar].value as string;
+      // Los literales, la coordenada y los eventos temporales se cuelgan del nodo
+      // ancla: la primera variable URI de la proyección original. Es a propósito:
+      // el mapa y la timeline los buscan ahí, y si se los asignáramos al sujeto
+      // inmediato del literal (el bnode de geometría, por ejemplo) el mapa dibujaría
+      // bnodes en lugar de inmuebles.
+      const anchorVar = exposedVars.find((v) => row[v]?.type === 'uri');
+      if (!anchorVar) continue;
+      const anchor = this.ensureNode(nodeMap, row, anchorVar);
+      if (!anchor) continue;
 
-        if (!nodeMap.has(targetUri)) {
-          const targetLabelVar = `${targetVar}Label`;
-          const targetLabel =
-            row[targetLabelVar]?.type === 'literal'
-              ? String(row[targetLabelVar].value)
-              : this.uriFragment(targetUri);
-          nodeMap.set(targetUri, {
-            uri: targetUri,
-            label: targetLabel,
-            type: targetVar,
-            attributes: {},
-          });
-        }
+      Object.assign(anchor.attributes, this.collectAttributes(row, exposedVars));
 
-        const edgeId = `${primaryUri}|${targetVar}|${targetUri}`;
-        if (!edgeSet.has(edgeId)) {
-          edgeSet.add(edgeId);
-          edges.push({
-            id: edgeId,
-            source: primaryUri,
-            target: targetUri,
-            predicate: targetVar,
-          });
+      const coord = this.findCoordinate(row, exposedVars);
+      if (coord && !anchor.coordinate) anchor.coordinate = coord;
+
+      for (const ev of this.findTemporalEvents(row, exposedVars)) {
+        const already = anchor.temporalEvents?.some(
+          (e) => e.field === ev.field && e.isoDate === ev.isoDate,
+        );
+        if (!already) {
+          anchor.temporalEvents = [...(anchor.temporalEvents ?? []), ev];
         }
       }
     }
@@ -360,9 +365,62 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     return { nodes: [...nodeMap.values()], edges };
   }
 
+  /**
+   * Devuelve (creando si hace falta) el nodo de una variable en una fila.
+   * Sólo las URIs y los bnodes son nodos; un literal no lo es.
+   */
+  private ensureNode(
+    nodeMap: Map<string, NormalizedNode>,
+    row: ResultBinding,
+    varName: string,
+  ): NormalizedNode | null {
+    const cell = row[varName];
+    if (!cell) return null;
+    if (cell.type !== 'uri' && cell.type !== 'bnode') return null;
+
+    const value = String(cell.value);
+    // Los bnodes se prefijan para no colisionar con una URI y para que en la vista se
+    // lean como lo que son: nodos anónimos del modelo.
+    const id = cell.type === 'bnode' ? `_:${value}` : value;
+
+    const labelCell = row[`${varName}Label`];
+    const labelFromRow =
+      labelCell?.type === 'literal' ? String(labelCell.value) : '';
+
+    const existing = nodeMap.get(id);
+    if (existing) {
+      // Si la etiqueta aparece en una fila posterior, se aprovecha.
+      if (labelFromRow && existing.label === this.uriFragment(id)) {
+        existing.label = labelFromRow;
+      }
+      return existing;
+    }
+
+    const node: NormalizedNode = {
+      uri: id,
+      label:
+        labelFromRow ||
+        (cell.type === 'bnode' ? varName : this.uriFragment(value)),
+      type: varName,
+      attributes: {},
+    };
+    nodeMap.set(id, node);
+    return node;
+  }
+
+  private pickVariables(row: ResultBinding, vars: string[]): ResultBinding {
+    const out: ResultBinding = {};
+    for (const v of vars) {
+      if (row[v]) out[v] = row[v];
+    }
+    return out;
+  }
+
   private uriFragment(uri: string): string {
-    const idx = uri.lastIndexOf('/');
-    return idx >= 0 ? uri.slice(idx + 1) : uri;
+    // Se corta por '#' o por '/', el que esté más a la derecha: las ontologías del OVS
+    // usan URIs con '#' y cortando sólo por '/' quedaba "inmontology#real_estate_...".
+    const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
+    return idx >= 0 && idx < uri.length - 1 ? uri.slice(idx + 1) : uri;
   }
 
   private findCoordinate(

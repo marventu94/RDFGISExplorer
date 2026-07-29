@@ -371,72 +371,158 @@ describe('GenericSparqlAdapter', () => {
       });
     });
 
-    it('creates edges between URI pairs in same row', async () => {
-      const fixture = {
-        head: { vars: ['person', 'city'] },
-        results: {
-          bindings: [
-            {
-              person: {
-                type: 'uri',
-                value: 'http://www.wikidata.org/entity/Q123',
-              },
-              city: {
-                type: 'uri',
-                value: 'http://www.wikidata.org/entity/Q1486',
-              },
-            },
-          ],
-        },
-      };
-      mockWikidata(fixture);
-      const result = await adapter.execute(
-        'SELECT * WHERE { ?s ?p ?o }',
-        defaultOpts,
-      );
-      expect(result.edges.length).toBe(1);
-      expect(result.edges[0].source).toBe(
-        'http://www.wikidata.org/entity/Q123',
-      );
-      expect(result.edges[0].target).toBe(
-        'http://www.wikidata.org/entity/Q1486',
-      );
-    });
+    const P31 = 'http://www.wikidata.org/prop/direct/P31';
+    const Q123 = 'http://www.wikidata.org/entity/Q123';
+    const Q1486 = 'http://www.wikidata.org/entity/Q1486';
 
-    it('deduplicates edges with same source/predicate/target', async () => {
-      const fixture = {
-        head: { vars: ['person', 'city'] },
-        results: {
-          bindings: [
-            {
-              person: {
-                type: 'uri',
-                value: 'http://www.wikidata.org/entity/Q123',
-              },
-              city: {
-                type: 'uri',
-                value: 'http://www.wikidata.org/entity/Q1486',
-              },
-            },
-            {
-              person: {
-                type: 'uri',
-                value: 'http://www.wikidata.org/entity/Q123',
-              },
-              city: {
-                type: 'uri',
-                value: 'http://www.wikidata.org/entity/Q1486',
-              },
-            },
-          ],
-        },
+    function personCityFixture(rows = 1): object {
+      const row = {
+        person: { type: 'uri', value: Q123 },
+        city: { type: 'uri', value: Q1486 },
       };
-      mockWikidata(fixture);
+      return {
+        head: { vars: ['person', 'city'] },
+        results: { bindings: Array.from({ length: rows }, () => row) },
+      };
+    }
+
+    it('crea la arista con el predicado y la direccion que declara la consulta', async () => {
+      mockWikidata(personCityFixture());
       const result = await adapter.execute(
-        'SELECT * WHERE { ?s ?p ?o }',
+        `SELECT ?person ?city WHERE { ?person <${P31}> ?city }`,
         defaultOpts,
       );
       expect(result.edges).toHaveLength(1);
+      expect(result.edges[0]).toMatchObject({
+        source: Q123,
+        target: Q1486,
+        predicate: P31,
+        predicateLabel: 'P31',
+      });
+    });
+
+    it('respeta un path inverso dando vuelta la arista', async () => {
+      mockWikidata(personCityFixture());
+      const result = await adapter.execute(
+        `SELECT ?person ?city WHERE { ?person ^<${P31}> ?city }`,
+        defaultOpts,
+      );
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0]).toMatchObject({ source: Q1486, target: Q123 });
+    });
+
+    it('no inventa aristas entre variables que la consulta no relaciona', async () => {
+      mockWikidata(personCityFixture());
+      // Las dos variables se proyectan pero no hay ningun patron que las una.
+      const result = await adapter.execute(
+        `SELECT ?person ?city WHERE { ?person <${P31}> ?otro . ?city <${P31}> ?otro2 }`,
+        defaultOpts,
+      );
+      const entreAmbas = result.edges.filter(
+        (e) =>
+          (e.source === Q123 && e.target === Q1486) ||
+          (e.source === Q1486 && e.target === Q123),
+      );
+      expect(entreAmbas).toHaveLength(0);
+    });
+
+    it('deduplicates edges with same source/predicate/target', async () => {
+      mockWikidata(personCityFixture(2));
+      const result = await adapter.execute(
+        `SELECT ?person ?city WHERE { ?person <${P31}> ?city }`,
+        defaultOpts,
+      );
+      expect(result.edges).toHaveLength(1);
+    });
+
+    it('resuelve el predicado por fila cuando la consulta usa ?s ?p ?o', async () => {
+      mockWikidata({
+        head: { vars: ['s', 'p', 'o'] },
+        results: {
+          bindings: [
+            {
+              s: { type: 'uri', value: Q123 },
+              p: { type: 'uri', value: P31 },
+              o: { type: 'uri', value: Q1486 },
+            },
+          ],
+        },
+      });
+      const result = await adapter.execute('SELECT * WHERE { ?s ?p ?o }', defaultOpts);
+      expect(result.edges).toHaveLength(1);
+      expect(result.edges[0]).toMatchObject({
+        source: Q123,
+        target: Q1486,
+        predicate: P31,
+      });
+    });
+
+    it('dibuja los nodos intermedios y no los agrega a la tabla', async () => {
+      // El endpoint devuelve el intermedio porque el adapter lo agrego al SELECT.
+      // nock parsea el body urlencoded a objeto, asi que la query viene en body.query.
+      const scope = nock(WIKIDATA_BASE)
+        .post(WIKIDATA_PATH, (body: unknown) => {
+          const enviada =
+            typeof body === 'string'
+              ? body
+              : ((body as { query?: string })?.query ?? '');
+          return /\?medio/.test(enviada);
+        })
+        .reply(200, {
+          head: { vars: ['person', 'city', 'medio'] },
+          results: {
+            bindings: [
+              {
+                person: { type: 'uri', value: Q123 },
+                city: { type: 'uri', value: Q1486 },
+                medio: { type: 'bnode', value: 'b0' },
+              },
+            ],
+          },
+        });
+
+      const result = await adapter.execute(
+        `SELECT ?person ?city WHERE { ?person <${P31}> ?medio . ?medio <${P31}> ?city }`,
+        defaultOpts,
+      );
+
+      expect(scope.isDone()).toBe(true);
+      // La tabla no ve la columna intermedia...
+      expect(result.variables).toEqual(['person', 'city']);
+      expect(Object.keys(result.bindings[0])).toEqual(['person', 'city']);
+      // ...pero el grafo si tiene el nodo, encadenado en dos aristas.
+      expect(result.nodes.map((n) => n.uri)).toContain('_:b0');
+      expect(result.edges).toHaveLength(2);
+      expect(result.edges.map((e) => `${e.source}->${e.target}`)).toEqual([
+        `${Q123}->_:b0`,
+        `_:b0->${Q1486}`,
+      ]);
+    });
+
+    it('cuelga coordenada y fechas del nodo ancla, no del intermedio', async () => {
+      nock(WIKIDATA_BASE)
+        .post(WIKIDATA_PATH)
+        .reply(200, {
+          head: { vars: ['person', 'city', 'medio'] },
+          results: {
+            bindings: [
+              {
+                person: { type: 'uri', value: Q123 },
+                city: { type: 'uri', value: Q1486 },
+                medio: { type: 'bnode', value: 'b0' },
+              },
+            ],
+          },
+        });
+
+      const result = await adapter.execute(
+        `SELECT ?person ?city WHERE { ?person <${P31}> ?medio . ?medio <${P31}> ?city }`,
+        defaultOpts,
+      );
+
+      const intermedio = result.nodes.find((n) => n.uri === '_:b0');
+      expect(intermedio?.attributes).toEqual({});
+      expect(intermedio?.coordinate).toBeUndefined();
     });
   });
 
