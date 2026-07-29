@@ -220,6 +220,34 @@ describe('GenericSparqlAdapter', () => {
       });
     });
 
+    it('degrades invalid WKT (e.g. POINT(None None)) to plain literal instead of throwing', async () => {
+      const fixtureInvalidWkt = {
+        head: { vars: ['loc'] },
+        results: {
+          bindings: [
+            {
+              loc: {
+                type: 'literal',
+                datatype: 'http://www.opengis.net/ont/geosparql#wktLiteral',
+                value:
+                  '<http://www.opengis.net/def/crs/EPSG/0/4326> POINT(None None)',
+              },
+            },
+          ],
+        },
+      };
+      mockWikidata(fixtureInvalidWkt);
+      const result = await adapter.execute(
+        'SELECT * WHERE { ?s ?p ?o }',
+        defaultOpts,
+      );
+      expect(result.bindings[0]['loc']).toEqual({
+        type: 'literal',
+        value: '<http://www.opengis.net/def/crs/EPSG/0/4326> POINT(None None)',
+        datatype: 'http://www.opengis.net/ont/geosparql#wktLiteral',
+      });
+    });
+
     it('normalizes xsd:date to date type with ISO 8601 value', async () => {
       mockWikidata(FIXTURE);
       const result = await adapter.execute(
