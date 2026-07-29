@@ -261,7 +261,16 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
 
     if (dt === GEOSPARQL_WKT || raw.value.startsWith('Point(')) {
       const coord = this.parseWktPoint(raw.value);
-      return { type: 'coordinate', value: coord, raw: raw.value };
+      if (coord) {
+        return { type: 'coordinate', value: coord, raw: raw.value };
+      }
+      // WKT inválido (p.ej. datos sucios como "POINT(None None)"): se degrada
+      // a literal plano en vez de abortar toda la query.
+      return {
+        type: 'literal',
+        value: raw.value,
+        ...(dt ? { datatype: dt } : {}),
+      };
     }
 
     return {
@@ -271,12 +280,12 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     };
   }
 
-  private parseWktPoint(raw: string): Coordinate {
+  private parseWktPoint(raw: string): Coordinate | null {
     // Soporta WKT simple (Point(lng lat)) y GeoSPARQL 1.1 con CRS opcional
     // (<http://www.opengis.net/def/crs/EPSG/0/4326> Point(lng lat)).
     const m = /^(?:<[^>]+>\s*)?Point\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/i.exec(raw);
     if (!m) {
-      throw new Error(`Invalid WKT Point literal: ${raw}`);
+      return null;
     }
     return { lat: parseFloat(m[2]), lng: parseFloat(m[1]) };
   }
