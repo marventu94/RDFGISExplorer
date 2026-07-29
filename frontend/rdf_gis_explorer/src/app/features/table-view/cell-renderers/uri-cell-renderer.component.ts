@@ -9,7 +9,10 @@ import type { BindingValue } from '@shared/models';
   selector: 'app-uri-cell-renderer',
   standalone: true,
   imports: [MatIconModule, MatButtonModule],
-  template: ` <span class="uri-cell" [title]="fullUri">{{ displayValue }}</span> `,
+  // Sin [title]: el tooltip lo maneja AG Grid vía tooltipValueGetter de la columna.
+  // Con ambos aparecían dos tooltips superpuestos (el nativo del navegador y el de
+  // la grilla), y sólo el de la grilla permite seleccionar y copiar el texto.
+  template: ` <span class="uri-cell">{{ displayValue }}</span> `,
   styles: [
     `
       :host {

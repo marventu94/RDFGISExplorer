@@ -24,6 +24,21 @@ import { TILE_LAYERS } from './tile-layers';
 
 type QueryState = 'no-query' | 'no-coords' | 'filtered-zero' | 'normal';
 
+// Estilo base de un marcador: el color lo aporta EntityColorService según el tipo.
+const MARKER_RADIUS = 8;
+const MARKER_WEIGHT = 2;
+const MARKER_FILL_OPACITY = 0.8;
+
+// Estilo del marcador seleccionado. Se usa el mismo azul que el anillo de pulso
+// (.pulse-ring en el SCSS) para que el resalte transitorio y el permanente sean el
+// mismo lenguaje visual. El color es lo único que distingue al seleccionado: contra
+// GraphDB `classColors` llega vacío, así que todos los marcadores comparten el gris
+// por defecto de EntityColorService y no hay diferencia de tono entre tipos.
+const SELECTED_FILL = '#2196f3';
+const SELECTED_STROKE = '#ffffff';
+const SELECTED_RADIUS = 12;
+const SELECTED_WEIGHT = 3;
+
 @Component({
   selector: 'app-map-view',
   standalone: true,
@@ -49,6 +64,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
   @HostBinding('class.is-active-view') isActiveView = false;
 
   private currentNodes: NormalizedNode[] = [];
+  /** URI del nodo seleccionado, para poder repintar el resalte tras un re-render. */
+  private selectedUri: string | null = null;
   private suppressViewportEmit = false;
   private readonly viewportChange$ = new Subject<void>();
 
@@ -286,10 +303,51 @@ export class MapViewComponent implements OnInit, OnDestroy {
         filter((sel: Selection) => sel.source !== 'map'),
       )
       .subscribe((sel: Selection) => {
+        // El resalte se aplica siempre, incluso si el nodo no tiene coordenada o si
+        // la selección se limpió (node === null): así se apaga el marcador anterior.
+        this.applySelectionStyle(sel.node?.uri ?? null);
+
         if (sel.node?.coordinate) {
           this.flyToNode(sel.node);
         }
       });
+  }
+
+  /**
+   * Pinta el marcador seleccionado con un estilo distinto y devuelve los demás a su
+   * estilo base. Hasta ahora la selección desde otra vista sólo movía el mapa y
+   * disparaba un anillo de pulso de 2,4 s: pasado ese tiempo nada indicaba qué nodo
+   * estaba seleccionado.
+   */
+  private applySelectionStyle(uri: string | null): void {
+    this.selectedUri = uri;
+    if (!this.clusterGroup) return;
+
+    this.clusterGroup.eachLayer((layer: L.Layer) => {
+      const marker = layer as L.CircleMarker & { _node?: NormalizedNode };
+      if (!marker._node || typeof marker.setStyle !== 'function') return;
+
+      if (uri && marker._node.uri === uri) {
+        marker.setStyle({
+          color: SELECTED_STROKE,
+          weight: SELECTED_WEIGHT,
+          fillColor: SELECTED_FILL,
+          fillOpacity: 1,
+        });
+        marker.setRadius(SELECTED_RADIUS);
+        // Sin esto queda tapado por los marcadores vecinos en zonas densas.
+        marker.bringToFront();
+      } else {
+        const baseColor = this.colorService.colorForType(marker._node.type);
+        marker.setStyle({
+          color: baseColor,
+          weight: MARKER_WEIGHT,
+          fillColor: baseColor,
+          fillOpacity: MARKER_FILL_OPACITY,
+        });
+        marker.setRadius(MARKER_RADIUS);
+      }
+    });
   }
 
   private renderMarkers(result: QueryResult): void {
@@ -300,11 +358,11 @@ export class MapViewComponent implements OnInit, OnDestroy {
 
       const color = this.colorService.colorForType(node.type);
       const marker = L.circleMarker([node.coordinate.lat, node.coordinate.lng], {
-        radius: 8,
+        radius: MARKER_RADIUS,
         color,
         fillColor: color,
-        fillOpacity: 0.8,
-        weight: 2,
+        fillOpacity: MARKER_FILL_OPACITY,
+        weight: MARKER_WEIGHT,
       });
 
       (marker as unknown as Record<string, unknown>)['_node'] = node;
@@ -313,9 +371,18 @@ export class MapViewComponent implements OnInit, OnDestroy {
         this.ngZone.run(() => {
           this.selectionService.select(node, 'map');
         });
+        // La suscripción a selectedNode$ descarta las selecciones propias
+        // (source === 'map'), así que el resalte de un click en el mapa se aplica acá.
+        this.applySelectionStyle(node.uri);
       });
 
       this.clusterGroup?.addLayer(marker);
+    }
+
+    // Los marcadores se recrean en cada render (p. ej. al aplicar un filtro), así que
+    // hay que volver a pintar el resalte del nodo que siga seleccionado.
+    if (this.selectedUri) {
+      this.applySelectionStyle(this.selectedUri);
     }
   }
 
