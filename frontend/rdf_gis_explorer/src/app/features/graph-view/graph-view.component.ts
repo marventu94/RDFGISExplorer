@@ -479,6 +479,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const node = this.cy.getElementById(uri);
     if (node.empty()) return;
 
+    this.revealNode(node);
+
     const pos = node.position();
     const extent = this.cy.extent();
     const isVisible =
@@ -497,6 +499,26 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         this.suppressViewportEmit = false;
       }, 800);
     }
+  }
+
+  /**
+   * Equivalente en el grafo al problema de paginación de la tabla: el nodo existe pero
+   * no está renderizado, así que centrar la vista en él no muestra nada.
+   *
+   * `collapseHighDegreeNodes` esconde con `display: none` a los vecinos de todo nodo
+   * con grado > COLLAPSE_DEGREE. Si la selección llega desde el mapa, la tabla o la
+   * timeline apuntando a uno de esos vecinos, había que expandir el hub a mano para
+   * verlo. Acá se expande solo.
+   */
+  private revealNode(node: cytoscape.NodeSingular): void {
+    if (node.style('display') !== 'none') return;
+
+    const collapsedHubs = node
+      .connectedEdges()
+      .connectedNodes()
+      .filter((n) => n.id() !== node.id() && n.data('collapsed') === true);
+
+    collapsedHubs.forEach((hub) => this.expandNode(hub.id()));
   }
 
   private collapseHighDegreeNodes(): void {
