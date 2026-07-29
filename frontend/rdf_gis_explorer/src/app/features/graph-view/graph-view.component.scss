@@ -87,12 +87,14 @@
     color: #1565C0;
     border: 1px solid #90CAF9;
   }
+}
 
-  &--warning {
-    background: #FFF3E0;
-    color: #E65100;
-    border: 1px solid #FFCC80;
-  }
+app-coverage-chip {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
 }
 
 .graph-toolbar {
