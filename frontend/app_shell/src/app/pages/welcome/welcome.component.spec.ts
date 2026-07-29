@@ -33,7 +33,7 @@ describe('WelcomePageComponent', () => {
   function createComponent() {
     const fixture = TestBed.createComponent(WelcomePageComponent);
     fixture.detectChanges();
-    httpMock.expectOne('/api/dashboards/recent').flush(mockDashboards);
+    httpMock.expectOne('/api/dashboards/recent?limit=50').flush(mockDashboards);
     fixture.detectChanges();
     return fixture;
   }
@@ -41,7 +41,7 @@ describe('WelcomePageComponent', () => {
   it('shows empty state when no dashboards exist', () => {
     const fixture = TestBed.createComponent(WelcomePageComponent);
     fixture.detectChanges();
-    httpMock.expectOne('/api/dashboards/recent').flush([]);
+    httpMock.expectOne('/api/dashboards/recent?limit=50').flush([]);
     fixture.detectChanges();
 
     const emptyText = fixture.nativeElement.querySelector('.welcome__empty-text');
