@@ -115,10 +115,6 @@ describe('SparqlInputComponent', () => {
     expect(asAny().hasContent()).toBe(false);
   });
 
-  it('should initialize limit to 500', () => {
-    expect(asAny().limit()).toBe(500);
-  });
-
   it('should render the tableros button', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const buttons = compiled.querySelectorAll('button');
@@ -198,7 +194,7 @@ describe('SparqlInputComponent', () => {
       expect(apiServiceMock.executeQuery).toHaveBeenCalled();
       const callArgs = apiServiceMock.executeQuery.mock.calls[0][0];
       expect(callArgs.sparql).toContain('SELECT');
-      expect(callArgs.limit).toBe(500);
+      expect(callArgs.limit).toBeUndefined();
     });
 
     it('should set executing to false after request completes', () => {
@@ -285,13 +281,6 @@ describe('SparqlInputComponent', () => {
         'Cerrar',
         expect.any(Object),
       );
-    });
-  });
-
-  describe('onLimitChange', () => {
-    it('should update limit for valid values', () => {
-      asAny().onLimitChange(1000);
-      expect(asAny().limit()).toBe(1000);
     });
   });
 });

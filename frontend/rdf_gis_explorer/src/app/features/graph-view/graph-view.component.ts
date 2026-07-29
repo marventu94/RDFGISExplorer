@@ -19,6 +19,7 @@ import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection } from '@shared/models';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
+import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
 import { createGraphStyle } from './graph-style';
 import { LAYOUT_CONFIGS } from './graph-layouts';
 import { EntityColorService } from '@core/services/entity-color.service';
@@ -27,12 +28,12 @@ cytoscape.use(cola);
 cytoscape.use(dagre);
 
 type GraphLayout = 'cola' | 'dagre' | 'circle' | 'grid';
-type QueryState = 'no-query' | 'no-edges' | 'filtered-zero' | 'truncated' | 'normal';
+type QueryState = 'no-query' | 'no-edges' | 'filtered-zero' | 'normal';
 
 @Component({
   selector: 'app-graph-view',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, CoverageChipComponent],
   templateUrl: './graph-view.component.html',
   styleUrls: ['./graph-view.component.scss'],
 })
@@ -49,7 +50,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   ];
 
   queryState: QueryState = 'no-query';
-  truncatedCount = 0;
+  /** Texto del chip de cobertura; vacío cuando el grafo muestra todos los nodos. */
+  coverageLabel = '';
   originalNodeCount = 0;
   filteredNodeCount = 0;
   activeFilterCount = 0;
@@ -84,15 +86,17 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     combineLatest([
       this.selectionService.queryResult$,
-      this.selectionService.filteredQueryResult$,
+      this.selectionService.visibleQueryResult$,
       this.selectionService.activeFilters$,
+      this.selectionService.lotState$,
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([original, filtered, filters]) => {
+      .subscribe(([original, visible, filters, lotState]) => {
         this.originalResult = original;
         this.activeFilterCount = filters.length;
+        this.coverageLabel = '';
 
-        if (!filtered || filtered.nodes.length === 0) {
+        if (!visible || visible.nodes.length === 0) {
           if (!original || original.nodes.length === 0) {
             this.queryState = 'no-query';
           } else if (filters.length > 0) {
@@ -107,23 +111,25 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           return;
         }
 
-        this.filteredNodeCount = filtered.nodes.length;
-        this.originalNodeCount = original?.nodes.length ?? filtered.nodes.length;
+        this.filteredNodeCount = visible.nodes.length;
+        this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
 
-        if (filtered.edges.length === 0) {
+        if (visible.edges.length === 0) {
           this.queryState = 'no-edges';
-        } else if (
-          this.originalNodeCount > this.MAX_NODES ||
-          filtered.nodes.length > this.MAX_NODES
-        ) {
-          this.queryState = 'truncated';
-          this.truncatedCount =
-            this.originalNodeCount > this.MAX_NODES ? this.originalNodeCount - this.MAX_NODES : 0;
         } else {
           this.queryState = 'normal';
         }
 
-        this.renderGraph(filtered);
+        // Red de seguridad: los lotes paginan filas, no nodos, así que un lote
+        // puede referenciar más de MAX_NODES entidades; en ese caso el grafo
+        // corta al top por grado (ver buildElements) y el chip lo avisa.
+        if (visible.nodes.length > this.MAX_NODES) {
+          this.coverageLabel = `Mostrando ${this.MAX_NODES} de ${visible.nodes.length} nodos (top por conexiones)`;
+        } else if (lotState.lotCount > 1) {
+          this.coverageLabel = `Lote ${lotState.currentLot} de ${lotState.lotCount} · ${visible.bindings.length} filas`;
+        }
+
+        this.renderGraph(visible);
         this.cdr.markForCheck();
       });
 

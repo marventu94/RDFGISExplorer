@@ -61,7 +61,7 @@ describe('TableViewComponent', () => {
   let component: TableViewComponent;
   let fixture: ComponentFixture<TableViewComponent>;
   let selectionServiceMock: {
-    filteredQueryResult$: BehaviorSubject<QueryResult | null>;
+    visibleQueryResult$: BehaviorSubject<QueryResult | null>;
     queryResult$: BehaviorSubject<QueryResult | null>;
     selectedNode$: BehaviorSubject<Selection>;
     activeFilters$: BehaviorSubject<unknown[]>;
@@ -73,7 +73,7 @@ describe('TableViewComponent', () => {
   };
   beforeEach(async () => {
     selectionServiceMock = {
-      filteredQueryResult$: new BehaviorSubject<QueryResult | null>(null),
+      visibleQueryResult$: new BehaviorSubject<QueryResult | null>(null),
       queryResult$: new BehaviorSubject<QueryResult | null>(null),
       selectedNode$: new BehaviorSubject<Selection>({
         node: null,
@@ -112,7 +112,7 @@ describe('TableViewComponent', () => {
   });
 
   it('should build column defs when query result arrives', () => {
-    selectionServiceMock.filteredQueryResult$.next(mockQueryResult);
+    selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
     fixture.detectChanges();
 
     const defs = component.columnDefs();
@@ -124,18 +124,18 @@ describe('TableViewComponent', () => {
   });
 
   it('should clear columns and rows when result is null', () => {
-    selectionServiceMock.filteredQueryResult$.next(mockQueryResult);
+    selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
     fixture.detectChanges();
     expect(component.columnDefs().length).toBe(4);
 
-    selectionServiceMock.filteredQueryResult$.next(null);
+    selectionServiceMock.visibleQueryResult$.next(null);
     fixture.detectChanges();
     expect(component.columnDefs().length).toBe(0);
     expect(component.rowData().length).toBe(0);
   });
 
   it('should emit selection on row click', () => {
-    selectionServiceMock.filteredQueryResult$.next(mockQueryResult);
+    selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
     fixture.detectChanges();
 
     const rowData = mockQueryResult.bindings[0] as Record<string, BindingValue>;

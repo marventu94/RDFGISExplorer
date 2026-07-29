@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, of } from 'rxjs';
 import { GraphViewComponent } from './graph-view.component';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type LotState } from '@core/services/selection.service';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { AppConfigService } from '@core/services/app-config.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
@@ -116,17 +116,25 @@ describe('GraphViewComponent', () => {
   let fixture: ComponentFixture<GraphViewComponent>;
   let component: GraphViewComponent;
   let queryResultSubject: BehaviorSubject<QueryResult | null>;
-  let filteredQueryResultSubject: BehaviorSubject<QueryResult | null>;
+  let visibleQueryResultSubject: BehaviorSubject<QueryResult | null>;
   let activeFiltersSubject: BehaviorSubject<Filter[]>;
   let selectedNodeSubject: BehaviorSubject<Selection>;
+  let lotStateSubject: BehaviorSubject<LotState>;
 
   beforeEach(async () => {
     queryResultSubject = new BehaviorSubject<QueryResult | null>(null);
-    filteredQueryResultSubject = new BehaviorSubject<QueryResult | null>(null);
+    visibleQueryResultSubject = new BehaviorSubject<QueryResult | null>(null);
     activeFiltersSubject = new BehaviorSubject<Filter[]>([]);
     selectedNodeSubject = new BehaviorSubject<Selection>({
       node: null,
       source: 'external',
+    });
+    lotStateSubject = new BehaviorSubject<LotState>({
+      lotSize: 300,
+      currentLot: 1,
+      lotCount: 1,
+      totalRows: 0,
+      visibleNodes: 0,
     });
 
     const focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
@@ -137,9 +145,10 @@ describe('GraphViewComponent', () => {
 
     const mockSelectionService = {
       queryResult$: queryResultSubject.asObservable(),
-      filteredQueryResult$: filteredQueryResultSubject.asObservable(),
+      visibleQueryResult$: visibleQueryResultSubject.asObservable(),
       activeFilters$: activeFiltersSubject.asObservable(),
       selectedNode$: selectedNodeSubject.asObservable(),
+      lotState$: lotStateSubject.asObservable(),
       focus$: focusSubject.asObservable(),
       activeView$: activeViewSubject.asObservable(),
       coordinatedViewEnabled$: of(true),
@@ -217,7 +226,7 @@ describe('GraphViewComponent', () => {
   it('should detect no-edges state when nodes exist but no edges', () => {
     const result = createMockQueryResult([mockNode, mockNode2], []);
     queryResultSubject.next(result);
-    filteredQueryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
     fixture.detectChanges();
     fixture.detectChanges();
 
@@ -227,7 +236,7 @@ describe('GraphViewComponent', () => {
   it('should detect filtered-zero state', () => {
     const resultWithNodes = createMockQueryResult([mockNode, mockNode2], [mockEdge]);
     queryResultSubject.next(resultWithNodes);
-    filteredQueryResultSubject.next(createMockQueryResult([], []));
+    visibleQueryResultSubject.next(createMockQueryResult([], []));
     activeFiltersSubject.next([
       { id: 'f1', kind: 'geo', polygon: {} as GeoJSON.Polygon, label: 'Test area' },
     ]);
@@ -237,16 +246,68 @@ describe('GraphViewComponent', () => {
     expect(component.queryState).toBe('filtered-zero');
   });
 
+  it('should show coverage chip when nodes exceed MAX_NODES', () => {
+    const manyNodes: NormalizedNode[] = Array.from({ length: 301 }, (_, i) => ({
+      uri: `http://www.wikidata.org/entity/Q${i + 1}`,
+      label: `Nodo ${i + 1}`,
+      attributes: {},
+    }));
+    const result = createMockQueryResult(manyNodes, [mockEdge]);
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(component.coverageLabel).toBe('Mostrando 300 de 301 nodos (top por conexiones)');
+    const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+    expect(chip?.textContent?.trim()).toBe('Mostrando 300 de 301 nodos (top por conexiones)');
+  });
+
+  it('should hide the coverage chip when all nodes fit in the graph', () => {
+    const result = createMockQueryResult([mockNode, mockNode2], [mockEdge]);
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(component.coverageLabel).toBe('');
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('.coverage-chip')).toBeNull();
+  });
+
+  it('should show lot context in the coverage chip when there are several lots', () => {
+    const result = createMockQueryResult([mockNode, mockNode2], [mockEdge]);
+    result.bindings = [
+      { person: { type: 'uri', value: mockNode.uri } },
+      { person: { type: 'uri', value: mockNode2.uri } },
+    ];
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    lotStateSubject.next({
+      lotSize: 300,
+      currentLot: 2,
+      lotCount: 7,
+      totalRows: 1903,
+      visibleNodes: 2,
+    });
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(component.coverageLabel).toBe('Lote 2 de 7 · 2 filas');
+    const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+    expect(chip?.textContent?.trim()).toBe('Lote 2 de 7 · 2 filas');
+  });
+
   it('should transition back to no-query when result becomes null', () => {
     const result = createMockQueryResult([mockNode], [mockEdge]);
     queryResultSubject.next(result);
-    filteredQueryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
     fixture.detectChanges();
     fixture.detectChanges();
     expect(component.queryState).toBe('normal');
 
     queryResultSubject.next(null);
-    filteredQueryResultSubject.next(null);
+    visibleQueryResultSubject.next(null);
     fixture.detectChanges();
     fixture.detectChanges();
     expect(component.queryState).toBe('no-query');
