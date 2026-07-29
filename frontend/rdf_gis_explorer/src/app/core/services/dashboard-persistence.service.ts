@@ -123,7 +123,6 @@ export class DashboardPersistenceService {
     return this.apiService
       .executeQuery({
         sparql: payload.query,
-        limit: this.queryState.limit(),
       })
       .pipe(
         tap((result) => {

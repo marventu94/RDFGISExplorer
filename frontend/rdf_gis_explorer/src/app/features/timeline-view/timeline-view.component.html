@@ -17,6 +17,14 @@
     </div>
   }
 
+  @if (queryState === 'no-dates-lot') {
+    <div class="empty-state">
+      <div class="banner banner--info">
+        Este lote no tiene nodos con fecha — las fechas están en otro lote.
+      </div>
+    </div>
+  }
+
   @if (queryState === 'filtered-zero') {
     <div class="empty-state">
       <div class="chip">
@@ -39,6 +47,9 @@
         <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Week)">Semana</button>
         <button class="toolbar-btn" type="button" (click)="zoomTo(ZoomLevel.Day)">Día</button>
       </div>
+      @if (coverageLabel) {
+        <app-coverage-chip [text]="coverageLabel" />
+      }
       <button
         class="toolbar-btn toolbar-btn--apply"
         type="button"

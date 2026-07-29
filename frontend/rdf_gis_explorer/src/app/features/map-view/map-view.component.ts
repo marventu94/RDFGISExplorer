@@ -20,6 +20,8 @@ import 'leaflet-draw';
 import * as GeocoderControl from 'leaflet-control-geocoder';
 import type { QueryResult, NormalizedNode, Selection, Filter, GeoFilter } from '@shared/models';
 import { EntityColorService } from '@core/services/entity-color.service';
+import { computeCoverageStats } from '@shared/stats/coverage-stats';
+import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
 import { TILE_LAYERS } from './tile-layers';
 
 type QueryState = 'no-query' | 'no-coords' | 'filtered-zero' | 'normal';
@@ -42,7 +44,7 @@ const SELECTED_WEIGHT = 3;
 @Component({
   selector: 'app-map-view',
   standalone: true,
-  imports: [],
+  imports: [CoverageChipComponent],
   templateUrl: './map-view.component.html',
   styleUrl: './map-view.component.scss',
 })
@@ -60,6 +62,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
   originalNodeCount = 0;
   filteredNodeCount = 0;
   activeFilterCount = 0;
+  /** Texto del chip de cobertura; vacío cuando el mapa muestra todos los nodos. */
+  coverageLabel = '';
 
   @HostBinding('class.is-active-view') isActiveView = false;
 
@@ -234,12 +238,14 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private setupSubscriptions(): void {
     combineLatest([
       this.selectionService.queryResult$,
-      this.selectionService.filteredQueryResult$,
+      this.selectionService.visibleQueryResult$,
       this.selectionService.activeFilters$,
+      this.selectionService.lotState$,
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([original, filtered, activeFilters]) => {
+      .subscribe(([original, visible, activeFilters, lotState]) => {
         this.activeFilterCount = activeFilters.length;
+        this.coverageLabel = '';
 
         if (!original || original.nodes.length === 0) {
           this.queryState = 'no-query';
@@ -249,7 +255,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
         }
 
         this.originalNodeCount = original.nodes.length;
-        this.filteredNodeCount = filtered?.nodes.length ?? 0;
+        this.filteredNodeCount = visible?.nodes.length ?? 0;
 
         const originalHasCoords = original.nodes.some((n) => n.coordinate);
 
@@ -260,7 +266,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
           return;
         }
 
-        if (!filtered || filtered.nodes.length === 0) {
+        if (!visible || visible.nodes.length === 0) {
           this.queryState = activeFilters.length > 0 ? 'filtered-zero' : 'no-query';
           this.clearMarkers();
           this.syncDrawnItems(activeFilters);
@@ -269,8 +275,17 @@ export class MapViewComponent implements OnInit, OnDestroy {
         }
 
         this.queryState = 'normal';
-        this.currentNodes = filtered.nodes;
-        this.renderMarkers(filtered);
+        this.currentNodes = visible.nodes;
+        const stats = computeCoverageStats(visible);
+        if (stats.primaryWithoutCoordinate > 0) {
+          const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
+          this.coverageLabel =
+            `Mostrando ${stats.primaryWithCoordinate} de ${stats.primary} entidades${lotSuffix} · ` +
+            `${stats.primaryWithoutCoordinate} sin coordenada${stats.primaryWithoutCoordinate !== 1 ? 's' : ''}`;
+        } else {
+          this.coverageLabel = '';
+        }
+        this.renderMarkers(visible);
         this.syncDrawnItems(activeFilters);
         this.cdr.markForCheck();
       });

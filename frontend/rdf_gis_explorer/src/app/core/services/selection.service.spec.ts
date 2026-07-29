@@ -709,4 +709,141 @@ describe('SelectionService', () => {
       expect(result).toBe(true);
     });
   });
+
+  describe('lotes (visibleQueryResult$ / lotState$)', () => {
+    function makeLotResult(rowCount: number): QueryResult {
+      const nodes = Array.from({ length: rowCount }, (_, i) =>
+        makeNode({ uri: `urn:n${i}`, label: `N${i}` }),
+      );
+      // Cada fila referencia su nodo ancla; los lotes cortan estas filas en el
+      // orden original de la query.
+      const bindings = nodes.map((n) => ({
+        s: { type: 'uri' as const, value: n.uri },
+      }));
+      return makeQueryResult({ nodes, edges: [], bindings });
+    }
+
+    it('should default to lotSize 300, lot 1 and equal filtered result when one lot', () => {
+      const qr = makeLotResult(5);
+      service.setQueryResult(qr);
+
+      let visible: QueryResult | null | undefined;
+      service.visibleQueryResult$.subscribe((r) => (visible = r));
+      let lotState:
+        | { lotSize: number; currentLot: number; lotCount: number; totalRows: number }
+        | undefined;
+      service.lotState$.subscribe((s) => (lotState = s));
+
+      expect(visible).toBe(qr);
+      expect(lotState).toMatchObject({ lotSize: 300, currentLot: 1, lotCount: 1, totalRows: 5 });
+    });
+
+    it('should slice the filtered result into lots by rows, in query order', () => {
+      // 10 filas, lotSize 4 → 3 lotes. El lote 1 son las primeras 4 filas tal
+      // cual; los nodos visibles son sus URIs más los vecinos a 1 salto.
+      const qr = makeLotResult(10);
+      qr.edges = [
+        { id: 'e0x', source: 'urn:n0', target: 'urn:mid', predicate: 'p' },
+      ];
+      qr.nodes = [...qr.nodes, makeNode({ uri: 'urn:mid', label: 'Intermedio' })];
+      service.setQueryResult(qr);
+      service.setLotSize(4);
+
+      let visible: QueryResult | null | undefined;
+      service.visibleQueryResult$.subscribe((r) => (visible = r));
+      let lotState:
+        | { lotCount: number; totalRows: number; visibleNodes: number }
+        | undefined;
+      service.lotState$.subscribe((s) => (lotState = s));
+
+      expect(lotState).toMatchObject({ lotCount: 3, totalRows: 10 });
+      expect(visible?.bindings.map((b) => b['s']?.value)).toEqual([
+        'urn:n0',
+        'urn:n1',
+        'urn:n2',
+        'urn:n3',
+      ]);
+      // urn:mid no está en los bindings: entra como vecino de urn:n0.
+      expect(visible?.nodes.map((n) => n.uri)).toContain('urn:mid');
+      expect(visible?.nodes.map((n) => n.uri)).not.toContain('urn:n4');
+
+      service.setCurrentLot(3);
+      expect(visible?.bindings.length).toBe(2);
+      expect(visible?.bindings.map((b) => b['s']?.value)).toEqual(['urn:n8', 'urn:n9']);
+    });
+
+    it('should navigate lots with nextLot/previousLot and clamp at the edges', () => {
+      service.setQueryResult(makeLotResult(10));
+      service.setLotSize(4);
+
+      service.previousLot();
+      expect(service.getCurrentLotSnapshot()).toBe(1);
+      service.nextLot();
+      service.nextLot();
+      expect(service.getCurrentLotSnapshot()).toBe(3);
+      service.nextLot();
+      expect(service.getCurrentLotSnapshot()).toBe(3);
+    });
+
+    it('should reset to lot 1 on a new query', () => {
+      service.setQueryResult(makeLotResult(10));
+      service.setLotSize(4);
+      service.setCurrentLot(3);
+      expect(service.getCurrentLotSnapshot()).toBe(3);
+
+      service.setQueryResult(makeLotResult(10));
+      expect(service.getCurrentLotSnapshot()).toBe(1);
+    });
+
+    it('should clamp the current lot when filters reduce lotCount', () => {
+      // Filtro temporal que solo pasan 2 nodos (n0 y n1) → las filas visibles
+      // quedan por debajo del tamaño de lote y lotCount baja a 1.
+      const dated = ['urn:n0', 'urn:n1'];
+      const qr = makeLotResult(10);
+      qr.nodes = qr.nodes.map((n) =>
+        dated.includes(n.uri)
+          ? { ...n, temporalEvents: [{ field: 'date', isoDate: '2020-06-01T00:00:00.000Z' }] }
+          : n,
+      );
+      service.setQueryResult(qr);
+      service.setLotSize(4);
+      service.setCurrentLot(2);
+      expect(service.getCurrentLotSnapshot()).toBe(2);
+
+      service.addFilter(makeTemporalFilter());
+      expect(service.getCurrentLotSnapshot()).toBe(1);
+    });
+
+    it('should inject the selected node into the visible lot (pinning)', () => {
+      // n9 no está referenciado por las filas del lote 1 ni es vecino de sus URIs.
+      const qr = makeLotResult(10);
+      qr.edges = [{ id: 'e89', source: 'urn:n8', target: 'urn:n9', predicate: 'p' }];
+      service.setQueryResult(qr);
+      service.setLotSize(4);
+
+      let visible: QueryResult | null | undefined;
+      service.visibleQueryResult$.subscribe((r) => (visible = r));
+      expect(visible?.nodes.map((n) => n.uri)).not.toContain('urn:n9');
+
+      service.select(makeNode({ uri: 'urn:n9', label: 'N9' }), 'table');
+      expect(visible?.nodes.map((n) => n.uri)).toContain('urn:n9');
+      // La edge e89 no entra: urn:n8 no es visible en el lote 1.
+      expect(visible?.edges.map((e) => e.id)).not.toContain('e89');
+      // El pinning no agrega filas al lote.
+      expect(visible?.bindings.length).toBe(4);
+
+      // Al deseleccionar, el nodo pineado deja de inyectarse.
+      service.clearSelection();
+      expect(visible?.nodes.map((n) => n.uri)).not.toContain('urn:n9');
+    });
+
+    it('should ignore invalid lot sizes', () => {
+      service.setLotSize(0);
+      service.setLotSize(-5);
+      service.setLotSize(2.5);
+      expect(service.getLotSizeSnapshot()).toBe(300);
+      service.setLotSize(500);
+      expect(service.getLotSizeSnapshot()).toBe(500);
+    });
+  });
 });

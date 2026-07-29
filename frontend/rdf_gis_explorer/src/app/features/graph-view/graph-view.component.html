@@ -20,10 +20,8 @@
     </div>
   }
 
-  @if (queryState === 'truncated' && truncatedCount > 0) {
-    <div class="banner banner--warning">
-      Mostrando {{ MAX_NODES }} de {{ originalNodeCount }} nodos (top por conexiones)
-    </div>
+  @if (coverageLabel) {
+    <app-coverage-chip [text]="coverageLabel" />
   }
 
   @if (cy) {

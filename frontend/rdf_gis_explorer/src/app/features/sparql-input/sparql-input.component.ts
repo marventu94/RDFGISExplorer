@@ -8,7 +8,6 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatBadgeModule } from '@angular/material/badge';
 import { HttpErrorResponse } from '@angular/common/http';
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
@@ -29,9 +28,6 @@ import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.componen
 import { applyMappingOverrides, VariableRole } from './mapping-overrides.util';
 import type { QueryResult } from '@shared/models';
 
-const DEFAULT_LIMIT = 500;
-const LIMIT_OPTIONS = [500, 1000, 2000];
-
 @Component({
   selector: 'app-sparql-input',
   standalone: true,
@@ -45,7 +41,6 @@ const LIMIT_OPTIONS = [500, 1000, 2000];
     MatSnackBarModule,
     MatProgressSpinnerModule,
     MatDividerModule,
-    MatBadgeModule,
     FieldMappingPanelComponent,
   ],
   templateUrl: './sparql-input.component.html',
@@ -69,8 +64,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private fallbackContent = '';
 
   protected readonly executing = signal(false);
-  protected readonly limit = signal<number>(DEFAULT_LIMIT);
-  protected readonly limitOptions = LIMIT_OPTIONS;
   protected readonly hasContent = signal(false);
   protected readonly lastResult = signal<QueryResult | null>(null);
   protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
@@ -86,9 +79,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         this.setEditorContent(query);
       }
     });
-    effect(() => {
-      this.limit.set(this.queryState.limit());
-    });
   }
 
   ngOnInit(): void {
@@ -101,7 +91,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     } else {
       this.seedDefaultPrefixes();
     }
-    this.limit.set(this.queryState.limit());
   }
 
   /**
@@ -285,12 +274,10 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const currentLimit = this.limit();
     this.queryState.query.set(sparql);
-    this.queryState.limit.set(currentLimit);
     this.executing.set(true);
 
-    this.apiService.executeQuery({ sparql, limit: currentLimit }).subscribe({
+    this.apiService.executeQuery({ sparql }).subscribe({
       next: (result) => {
         this.executing.set(false);
         this.dashboardLayout.collapseEditor();
@@ -359,21 +346,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
 
     return `Error del servidor (${err.status}). ${body?.message ?? ''}`;
-  }
-
-  protected onLimitChange(newLimit: number): void {
-    if (newLimit === 2000 && this.limit() !== 2000) {
-      const confirmed = window.confirm(
-        'Queries más grandes pueden ser lentas o devolver más datos de los que las vistas manejan bien.',
-      );
-      if (!confirmed) return;
-    }
-    this.limit.set(newLimit);
-    this.queryState.limit.set(newLimit);
-  }
-
-  protected limitLabel(value: number): string {
-    return `LIMIT ${value}`;
   }
 
   protected onApplyMapping(overrides: Record<string, VariableRole>): void {

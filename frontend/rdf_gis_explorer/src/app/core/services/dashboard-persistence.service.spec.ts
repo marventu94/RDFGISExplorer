@@ -62,6 +62,11 @@ describe('DashboardPersistenceService', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
+  // ApiService consulta el maxLimit del backend (/api/config) antes de ejecutar.
+  function flushConfig(): void {
+    httpMock.expectOne('/api/config').flush({ maxLimit: 2000 });
+  }
+
   afterEach(() => {
     httpMock.verify();
   });
@@ -155,8 +160,9 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
+      flushConfig();
       const req = httpMock.expectOne('/api/query/execute');
-      expect(req.request.body).toEqual({ sparql: payload.query, limit: 500 });
+      expect(req.request.body).toEqual({ sparql: payload.query, limit: 2000 });
       req.flush(mockResult);
 
       expect(completed).toBe(true);
@@ -184,6 +190,7 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
+      flushConfig();
       httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
 
       expect(completed).toBe(true);
@@ -213,6 +220,7 @@ describe('DashboardPersistenceService', () => {
         completed = true;
       });
 
+      flushConfig();
       httpMock.expectOne('/api/query/execute').flush(mockResult);
 
       expect(completed).toBe(true);
@@ -236,6 +244,7 @@ describe('DashboardPersistenceService', () => {
       });
 
       expect(service.isHydrating()).toBe(true);
+      flushConfig();
       httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
 
       expect(completed).toBe(true);
@@ -257,6 +266,7 @@ describe('DashboardPersistenceService', () => {
         },
       });
 
+      flushConfig();
       httpMock.expectOne('/api/query/execute').flush(
         { message: 'Bad Request' },
         { status: 400, statusText: 'Bad Request' },
@@ -294,6 +304,7 @@ describe('DashboardPersistenceService', () => {
       service.deserialize(first).subscribe(() => {
         completed = true;
       });
+      flushConfig();
       httpMock.expectOne('/api/query/execute').flush(mockResult);
 
       expect(completed).toBe(true);
@@ -415,6 +426,7 @@ describe('DashboardPersistenceService', () => {
         updatedAt: new Date().toISOString(),
       });
 
+      flushConfig();
       httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
 
       expect(completed).toBe(true);

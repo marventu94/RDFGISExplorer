@@ -26,4 +26,8 @@
   }
 
   <div #mapContainer id="map-container"></div>
+
+  @if (queryState === 'normal' && coverageLabel) {
+    <app-coverage-chip [text]="coverageLabel" />
+  }
 </div>

@@ -41,23 +41,6 @@
       }
 
       <button
-        mat-button
-        [matMenuTriggerFor]="limitMenu"
-        [matBadge]="null"
-        class="limit-btn"
-      >
-        {{ limitLabel(limit()) }}
-        <mat-icon>arrow_drop_down</mat-icon>
-      </button>
-      <mat-menu #limitMenu="matMenu">
-        @for (opt of limitOptions; track opt) {
-          <button mat-menu-item (click)="onLimitChange(opt)">
-            <span [class.active-option]="limit() === opt">LIMIT {{ opt }}</span>
-          </button>
-        }
-      </mat-menu>
-
-      <button
         mat-flat-button
         color="primary"
         [disabled]="!hasContent() || executing()"

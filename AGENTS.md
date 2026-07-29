@@ -153,12 +153,16 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 |-------|----------|-----------|-------|
 | Table | AG Grid 35 (`rowSelection` con la API objeto ≥32.2) | Quick filter | select, focus |
 | Map | Leaflet 1.9 + markercluster + draw | GeoFilter (polygon) | select, focus |
-| Graph | Cytoscape 3.34 (cola+dagre) | Máx 300 nodos | select, focus |
+| Graph | Cytoscape 3.34 (cola+dagre) | Máx 300 nodos (red de seguridad) | select, focus |
 | Timeline | vis-timeline 8.x | TemporalFilter (rango) | select, focus |
 
 **Coordinated View:** cada vista emite `setFocus(uris)` al hacer pan/zoom. Las demás ajustan su viewport. Toggle global en navbar.
 
-**SelectionService:** fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal).
+**SelectionService:** fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal), `visibleQueryResult$` (lo que consumen las 4 vistas: el resultado filtrado restringido al lote actual + pinning), `lotState$`, `lotSize$`, `currentLot$`. Métodos de lotes: `setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
+
+**Lotes globales con pinning:** cuando el resultado filtrado supera `lotSize` **filas** (default 300; opciones 100/300/500), las 4 vistas muestran **el mismo lote**. La lógica pura vive en `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`): el lote pagina `bindings` en el **orden original de la query** (nunca se reordena). Los nodos visibles son los URIs/bnodes de las filas del lote **más sus vecinos a 1 salto** por `edges` (así se recuperan los nodos intermedios que el backend recorta del SELECT con `pickVariables`), y las edges visibles son las que conectan nodos visibles. El nodo seleccionado se **inyecta** en el lote visible aunque no esté referenciado por las filas del lote (con sus edges hacia nodos visibles); al deseleccionar deja de inyectarse. Query nueva → lote 1; al filtrar se conserva el lote si sigue válido y se clampea si `lotCount` se reduce. Con un solo lote `visibleQueryResult$` es idéntico a `filteredQueryResult$` (sin overhead). El navbar tiene el navegador de lotes ("Lote X de N · T filas", anterior/siguiente, selector de tamaño, icono de warning si el backend truncó; tooltip con el aviso de volumen) — solo visible cuando N > 1.
+
+**Chips de cobertura:** helper puro `shared/stats/coverage-stats.ts` (`computeCoverageStats`) + componente `shared/components/coverage-chip`. Los conteos de alerta usan solo **entidades principales** (nodos con atributos, coordenada o eventos temporales propios); los nodos estructurales del modelo (features, direcciones, geometrías) no cuentan como "sin coordenada/fecha". Mapa ("Mostrando X de N entidades[ del lote] · Y sin coordenada"), timeline (ídem "sin fecha") y grafo ("Lote X de N · M filas", o "Mostrando 300 de N nodos (top por conexiones)" si el lote visible excede `MAX_NODES`). Computan sobre el lote visible; el chip se oculta cuando no hay alerta.
 
 ## Persistencia
 
@@ -221,7 +225,8 @@ Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa est
 - **APP_INITIALIZER del remote GIS** (`rdf_gis_explorer/app.config.ts`) solo corre standalone; cargado como remote, la config se carga async (`App.ngOnInit` / `AppConfigService.load()` con `shareReplay`). No asumir config disponible sincrónicamente en componentes del GIS.
 - **El backend NO usa ORM.** Queries SQL directas con `better-sqlite3`.
 - **`sparqljs`** se usa en backend (validación) y en GIS (validación en el frontend).
-- **Límites acoplados:** `@Max(2000)` en `execute-query.dto.ts` está hardcodeado; si se sube `SPARQL_MAX_LIMIT` por env, hay que subir también el DTO.
+- **Límites acoplados:** `@Max(2000)` en `execute-query.dto.ts` está hardcodeado; si se sube `SPARQL_MAX_LIMIT` por env, hay que subir también el DTO. El GIS **no manda límite propio**: `ApiService.executeQuery` sin `limit` explícito pide el `maxLimit` que publica el backend en `/api/config` (el volumen se pagina en cliente con los lotes).
+- **WKT inválido no aborta la query:** si un literal `wktLiteral` no parsea como Point (datos sucios, p.ej. `POINT(None None)`), el adaptador lo degrada a literal plano en vez de lanzar error (`generic-sparql.adapter.ts` `normalizeValue`).
 - **Fases futuras:** MillenniumDB adapter, curation records, duplicate detection (tablas en `db/migrations.sql`, hoy sin uso).
 
 ## Regla de git

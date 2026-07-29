@@ -2,6 +2,13 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest, map } from 'rxjs';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import type { NormalizedNode, QueryResult, Selection, Filter } from '@shared/models';
+import {
+  DEFAULT_LOT_SIZE,
+  LOT_SIZE_OPTIONS,
+  computeLotCount,
+  restrictResultToUris,
+  sliceLot,
+} from '@shared/stats/lots';
 
 export type FocusSource = 'map' | 'graph' | 'timeline' | null;
 
@@ -9,6 +16,20 @@ export interface FocusState {
   uris: ReadonlySet<string>;
   source: FocusSource;
 }
+
+/** Estado del paginado en lotes del resultado filtrado (ver shared/stats/lots). */
+export interface LotState {
+  lotSize: number;
+  /** Lote actual, 1-based, ya clampeado al rango válido. */
+  currentLot: number;
+  lotCount: number;
+  /** Filas del resultado filtrado (antes de cortar en lotes). */
+  totalRows: number;
+  /** Nodos del lote visible, incluidos los pineados por selección. */
+  visibleNodes: number;
+}
+
+export { DEFAULT_LOT_SIZE, LOT_SIZE_OPTIONS };
 
 @Injectable({ providedIn: 'root' })
 export class SelectionService {
@@ -26,6 +47,8 @@ export class SelectionService {
   private activeViewTimer?: ReturnType<typeof setTimeout>;
   private readonly ACTIVE_VIEW_TTL_MS = 2000;
   private readonly _coordinatedViewEnabled$ = new BehaviorSubject<boolean>(true);
+  private readonly _lotSize$ = new BehaviorSubject<number>(DEFAULT_LOT_SIZE);
+  private readonly _currentLot$ = new BehaviorSubject<number>(1);
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
   readonly activeFilters$: Observable<Filter[]> = this._activeFilters$.asObservable();
@@ -34,11 +57,64 @@ export class SelectionService {
   readonly activeView$: Observable<FocusSource> = this._activeView$.asObservable();
   readonly coordinatedViewEnabled$: Observable<boolean> =
     this._coordinatedViewEnabled$.asObservable();
+  readonly lotSize$: Observable<number> = this._lotSize$.asObservable();
+  readonly currentLot$: Observable<number> = this._currentLot$.asObservable();
 
   readonly filteredQueryResult$: Observable<QueryResult | null> = combineLatest([
     this._queryResult$,
     this._activeFilters$,
   ]).pipe(map(([result, filters]) => this.applyFilters(result, filters)));
+
+  /**
+   * Resultado que consumen las 4 vistas: `filteredQueryResult$` restringido al
+   * lote actual, más el nodo seleccionado inyectado (pinning) aunque pertenezca
+   * a otro lote. Con un solo lote equivale a `filteredQueryResult$`.
+   */
+  readonly visibleQueryResult$: Observable<QueryResult | null> = combineLatest([
+    this.filteredQueryResult$,
+    this._lotSize$,
+    this._currentLot$,
+    this._selectedNode$,
+  ]).pipe(
+    map(([filtered, lotSize, currentLot, selection]) => {
+      if (!filtered) return null;
+      const pinned = selection.node ? [selection.node.uri] : [];
+      return sliceLot(filtered, lotSize, currentLot, pinned).result;
+    }),
+  );
+
+  readonly lotState$: Observable<LotState> = combineLatest([
+    this.filteredQueryResult$,
+    this._lotSize$,
+    this._currentLot$,
+    this._selectedNode$,
+  ]).pipe(
+    map(([filtered, lotSize, currentLot, selection]) => {
+      if (!filtered) {
+        return { lotSize, currentLot: 1, lotCount: 1, totalRows: 0, visibleNodes: 0 };
+      }
+      const pinned = selection.node ? [selection.node.uri] : [];
+      const slice = sliceLot(filtered, lotSize, currentLot, pinned);
+      return {
+        lotSize,
+        currentLot: slice.currentLot,
+        lotCount: slice.lotCount,
+        totalRows: filtered.bindings.length,
+        visibleNodes: slice.result.nodes.length,
+      };
+    }),
+  );
+
+  constructor() {
+    // Si los filtros o el tamaño de lote reducen lotCount por debajo del lote
+    // actual, el estado canónico se clampea (el lote se conserva si sigue válido).
+    combineLatest([this.filteredQueryResult$, this._lotSize$]).subscribe(([result, lotSize]) => {
+      const lotCount = computeLotCount(result, lotSize);
+      if (this._currentLot$.getValue() > lotCount) {
+        this._currentLot$.next(lotCount);
+      }
+    });
+  }
 
   select(node: NormalizedNode | null, source: Selection['source'] = 'external'): void {
     this._selectedNode$.next({ node, source });
@@ -74,6 +150,40 @@ export class SelectionService {
     this._selectedNode$.next({ node: null, source: 'external' });
     this._activeFilters$.next([]);
     this._focus$.next({ uris: new Set<string>(), source: null });
+    // Query nueva: se vuelve siempre al primer lote.
+    this._currentLot$.next(1);
+  }
+
+  setLotSize(size: number): void {
+    // LOT_SIZE_OPTIONS es la oferta de la UI; el servicio acepta cualquier
+    // entero positivo para no acoplar el estado a la presentación.
+    if (!Number.isInteger(size) || size < 1) return;
+    this._lotSize$.next(size);
+  }
+
+  /** Lote 1-based; se clampea al rango válido del resultado actual. */
+  setCurrentLot(lot: number): void {
+    const lotCount = computeLotCount(
+      this.applyFilters(this._queryResult$.getValue(), this._activeFilters$.getValue()),
+      this._lotSize$.getValue(),
+    );
+    this._currentLot$.next(Math.min(Math.max(1, Math.floor(lot)), lotCount));
+  }
+
+  nextLot(): void {
+    this.setCurrentLot(this._currentLot$.getValue() + 1);
+  }
+
+  previousLot(): void {
+    this.setCurrentLot(this._currentLot$.getValue() - 1);
+  }
+
+  getLotSizeSnapshot(): number {
+    return this._lotSize$.getValue();
+  }
+
+  getCurrentLotSnapshot(): number {
+    return this._currentLot$.getValue();
   }
 
   setFocus(uris: Iterable<string>, source: Exclude<FocusSource, null>): void {
@@ -151,16 +261,7 @@ export class SelectionService {
     }
 
     const displayUris = new Set([...passingUris, ...neighborUris]);
-    const displayNodes = result.nodes.filter((n) => displayUris.has(n.uri));
-
-    const edges = result.edges.filter(
-      (e) => displayUris.has(e.source) && displayUris.has(e.target),
-    );
-    const bindings = result.bindings.filter((row) =>
-      Object.values(row).some((v) => v?.type === 'uri' && displayUris.has(v.value)),
-    );
-
-    return { ...result, nodes: displayNodes, edges, bindings };
+    return restrictResultToUris(result, displayUris);
   }
 
   private nodePassesFilter(node: NormalizedNode, filter: Filter): boolean {

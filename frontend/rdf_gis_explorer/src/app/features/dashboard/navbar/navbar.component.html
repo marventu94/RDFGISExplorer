@@ -4,6 +4,48 @@
   </span>
   <app-filter-badges />
 
+  @if (lotState(); as lot) {
+    @if (lot.lotCount > 1) {
+      <div class="lot-navigator">
+        <button
+          type="button"
+          class="navbar-btn lot-nav-btn"
+          [disabled]="lot.currentLot <= 1"
+          (click)="previousLot()"
+          aria-label="Lote anterior"
+        >
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <span class="lot-label" [title]="lotNotice(lot)">
+          Lote {{ lot.currentLot }} de {{ lot.lotCount }} · {{ lot.totalRows }} filas
+        </span>
+        <button
+          type="button"
+          class="navbar-btn lot-nav-btn"
+          [disabled]="lot.currentLot >= lot.lotCount"
+          (click)="nextLot()"
+          aria-label="Lote siguiente"
+        >
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        <select
+          class="lot-size-select"
+          [ngModel]="lot.lotSize"
+          (ngModelChange)="onLotSizeChange($event)"
+          title="Filas por lote"
+          aria-label="Filas por lote"
+        >
+          @for (size of lotSizeOptions; track size) {
+            <option [value]="size">{{ size }}</option>
+          }
+        </select>
+        @if (truncatedLimit() !== null) {
+          <mat-icon class="lot-warning" [title]="truncatedNotice()">warning</mat-icon>
+        }
+      </div>
+    }
+  }
+
   <div class="navbar-actions">
     <button type="button" class="navbar-btn" (click)="toggleEditor()">
       <mat-icon>{{ layout.editorCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>

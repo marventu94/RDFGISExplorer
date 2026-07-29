@@ -59,6 +59,8 @@ export class TableViewComponent implements OnDestroy {
   private originalNodes: NormalizedNode[] = [];
 
   readonly queryResult = signal<QueryResult | null>(null);
+  /** Resultado crudo (sin lotes): el banner de truncamiento habla del total. */
+  private readonly rawQueryResult = signal<QueryResult | null>(null);
   readonly pageSize = signal(50);
   readonly pageSizeOptions = [50, 100, 200];
   readonly quickFilter = signal('');
@@ -81,9 +83,9 @@ export class TableViewComponent implements OnDestroy {
 
   readonly isReady = computed(() => this.gridApi !== null);
   readonly hasData = computed(() => this.rowData().length > 0);
-  readonly isTruncated = computed(() => this.queryResult()?.meta?.truncated ?? false);
+  readonly isTruncated = computed(() => this.rawQueryResult()?.meta?.truncated ?? false);
   readonly truncatedMessage = computed(() => {
-    const qr = this.queryResult();
+    const qr = this.rawQueryResult();
     if (!qr?.meta?.truncated) return '';
     return `Mostrando ${qr.bindings.length} de ${qr.meta.limitApplied} resultados (truncado)`;
   });
@@ -100,10 +102,11 @@ export class TableViewComponent implements OnDestroy {
     this.selectionService.queryResult$
       .pipe(takeUntil(this.destroy$))
       .subscribe((result) => {
+        this.rawQueryResult.set(result);
         this.originalNodes = result?.nodes ?? [];
       });
 
-    this.selectionService.filteredQueryResult$
+    this.selectionService.visibleQueryResult$
       .pipe(takeUntil(this.destroy$))
       .subscribe((result) => {
         this.queryResult.set(result);

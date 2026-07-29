@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, of } from 'rxjs';
 import { MapViewComponent } from './map-view.component';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type LotState } from '@core/services/selection.service';
 import type { QueryResult, NormalizedNode, Selection, Filter, Coordinate } from '@shared/models';
 
 const mockCoord: Coordinate = { lat: -34.6, lng: -58.4 };
@@ -29,6 +29,14 @@ const mockNodeNoCoord: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q36180',
   label: 'Borges',
   type: 'http://www.wikidata.org/entity/Q5',
+  attributes: { occupationLabel: { type: 'literal', value: 'escritor' } },
+};
+
+// Nodo estructural (sin datos propios): nunca tiene coordenada y no debe
+// disparar el chip de cobertura.
+const mockStructuralNode: NormalizedNode = {
+  uri: 'http://www.wikidata.org/entity/QSTRUCT',
+  label: 'Feature',
   attributes: {},
 };
 
@@ -140,6 +148,7 @@ describe('MapViewComponent', () => {
   let filteredSubject: BehaviorSubject<QueryResult | null>;
   let activeFiltersSubject: BehaviorSubject<Filter[]>;
   let selectedNodeSubject: BehaviorSubject<Selection>;
+  let lotStateSubject: BehaviorSubject<LotState>;
   let selectSpy: ReturnType<typeof vi.fn>;
   let addFilterSpy: ReturnType<typeof vi.fn>;
 
@@ -150,6 +159,13 @@ describe('MapViewComponent', () => {
     selectedNodeSubject = new BehaviorSubject<Selection>({
       node: null,
       source: 'external',
+    });
+    lotStateSubject = new BehaviorSubject<LotState>({
+      lotSize: 300,
+      currentLot: 1,
+      lotCount: 1,
+      totalRows: 0,
+      visibleNodes: 0,
     });
     selectSpy = vi.fn();
     addFilterSpy = vi.fn();
@@ -164,9 +180,10 @@ describe('MapViewComponent', () => {
 
     const mockSelectionService = {
       queryResult$: queryResultSubject.asObservable(),
-      filteredQueryResult$: filteredSubject.asObservable(),
+      visibleQueryResult$: filteredSubject.asObservable(),
       activeFilters$: activeFiltersSubject.asObservable(),
       selectedNode$: selectedNodeSubject.asObservable(),
+      lotState$: lotStateSubject.asObservable(),
       focus$: focusSubject.asObservable(),
       activeView$: activeViewSubject.asObservable(),
       coordinatedViewEnabled$: of(true),
@@ -303,6 +320,79 @@ describe('MapViewComponent', () => {
 
         expect(component.queryState).toBe('normal');
         expect(component.originalNodeCount).toBe(2);
+      });
+
+      it('should show coverage chip when some nodes have no coordinate', () => {
+        const mixedResult = createMockQueryResult([mockNode, mockNodeNoCoord]);
+        queryResultSubject.next(mixedResult);
+        filteredSubject.next(mixedResult);
+        fixture.detectChanges();
+
+        const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+        expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 2 entidades · 1 sin coordenada');
+      });
+
+      it('should pluralize the coverage chip when several nodes have no coordinate', () => {
+        const anotherNoCoord: NormalizedNode = { ...mockNodeNoCoord, uri: 'http://x/Q2', label: 'Otro' };
+        const mixedResult = createMockQueryResult([mockNode, mockNodeNoCoord, anotherNoCoord]);
+        queryResultSubject.next(mixedResult);
+        filteredSubject.next(mixedResult);
+        fixture.detectChanges();
+
+        const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+        expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 3 entidades · 2 sin coordenadas');
+      });
+
+      it('should hide the coverage chip when all nodes have a coordinate', () => {
+        const result = createMockQueryResult([mockNode, mockNode2]);
+        queryResultSubject.next(result);
+        filteredSubject.next(result);
+        fixture.detectChanges();
+
+        expect(component.coverageLabel).toBe('');
+        const compiled = fixture.nativeElement as HTMLElement;
+        expect(compiled.querySelector('.coverage-chip')).toBeNull();
+      });
+
+      it('should hide the coverage chip when the nodes without coordinate are structural (no own data)', () => {
+        const result = createMockQueryResult([mockNode, mockStructuralNode]);
+        queryResultSubject.next(result);
+        filteredSubject.next(result);
+        fixture.detectChanges();
+
+        expect(component.coverageLabel).toBe('');
+        const compiled = fixture.nativeElement as HTMLElement;
+        expect(compiled.querySelector('.coverage-chip')).toBeNull();
+      });
+
+      it('should base the coverage chip on the filtered result', () => {
+        const original = createMockQueryResult([mockNode, mockNode2, mockNodeNoCoord]);
+        const filtered = createMockQueryResult([mockNode, mockNodeNoCoord]);
+        queryResultSubject.next(original);
+        filteredSubject.next(filtered);
+        fixture.detectChanges();
+
+        const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+        expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 2 entidades · 1 sin coordenada');
+      });
+
+      it('should clarify the coverage chip counts nodes of the current lot', () => {
+        const mixedResult = createMockQueryResult([mockNode, mockNodeNoCoord]);
+        queryResultSubject.next(mixedResult);
+        filteredSubject.next(mixedResult);
+        lotStateSubject.next({
+          lotSize: 300,
+          currentLot: 2,
+          lotCount: 7,
+          totalRows: 1903,
+          visibleNodes: 2,
+        });
+        fixture.detectChanges();
+
+        const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+        expect(chip?.textContent?.trim()).toBe(
+          'Mostrando 1 de 2 entidades del lote · 1 sin coordenada',
+        );
       });
     });
 

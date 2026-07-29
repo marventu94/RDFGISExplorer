@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { BehaviorSubject, of } from 'rxjs';
 import { TimelineViewComponent } from './timeline-view.component';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type LotState } from '@core/services/selection.service';
 import type {
   QueryResult,
   NormalizedNode,
@@ -35,7 +35,7 @@ const nodeWithoutDates: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q155',
   label: 'Brasil',
   type: 'http://www.wikidata.org/entity/Q515',
-  attributes: {},
+  attributes: { capitalLabel: { type: 'literal', value: 'Brasilia' } },
   temporalEvents: [],
 };
 
@@ -174,6 +174,7 @@ describe('TimelineViewComponent', () => {
   let filteredQueryResultSubject: BehaviorSubject<QueryResult | null>;
   let activeFiltersSubject: BehaviorSubject<Filter[]>;
   let selectedNodeSubject: BehaviorSubject<Selection>;
+  let lotStateSubject: BehaviorSubject<LotState>;
 
   beforeEach(async () => {
     timelineMock.instance = timelineMock.createMockTimeline();
@@ -186,6 +187,13 @@ describe('TimelineViewComponent', () => {
       node: null,
       source: 'external',
     });
+    lotStateSubject = new BehaviorSubject<LotState>({
+      lotSize: 300,
+      currentLot: 1,
+      lotCount: 1,
+      totalRows: 0,
+      visibleNodes: 0,
+    });
 
     const focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
       uris: new Set(),
@@ -195,9 +203,10 @@ describe('TimelineViewComponent', () => {
 
     const mockSelectionService = {
       queryResult$: queryResultSubject.asObservable(),
-      filteredQueryResult$: filteredQueryResultSubject.asObservable(),
+      visibleQueryResult$: filteredQueryResultSubject.asObservable(),
       activeFilters$: activeFiltersSubject.asObservable(),
       selectedNode$: selectedNodeSubject.asObservable(),
+      lotState$: lotStateSubject.asObservable(),
       focus$: focusSubject.asObservable(),
       activeView$: activeViewSubject.asObservable(),
       coordinatedViewEnabled$: of(true),
@@ -269,6 +278,44 @@ describe('TimelineViewComponent', () => {
       const linkBtn = el.querySelector('.link-btn');
       expect(linkBtn).toBeTruthy();
       expect(linkBtn?.textContent).toContain('Mapeo de Variables');
+    });
+
+    it('should show the lot message when the full result has dates but the visible lot does not', () => {
+      queryResultSubject.next(createMockQueryResult([nodeWithDates, nodeWithoutDates]));
+      filteredQueryResultSubject.next(createMockQueryResult([nodeWithoutDates]));
+      lotStateSubject.next({
+        lotSize: 300,
+        currentLot: 2,
+        lotCount: 3,
+        totalRows: 900,
+        visibleNodes: 1,
+      });
+      fixture.detectChanges();
+
+      expect(component.queryState).toBe('no-dates-lot');
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.banner--info')?.textContent).toContain(
+        'las fechas están en otro lote',
+      );
+    });
+
+    it('should keep the query-level message when the full result has no dates either', () => {
+      queryResultSubject.next(createMockQueryResult([nodeWithoutDates]));
+      filteredQueryResultSubject.next(createMockQueryResult([nodeWithoutDates]));
+      lotStateSubject.next({
+        lotSize: 300,
+        currentLot: 2,
+        lotCount: 3,
+        totalRows: 900,
+        visibleNodes: 1,
+      });
+      fixture.detectChanges();
+
+      expect(component.queryState).toBe('no-dates');
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.banner--info')?.textContent).toContain(
+        'Esta query no devolvió fechas',
+      );
     });
 
     it('should detect filtered-zero state when filters remove all nodes', () => {
@@ -343,6 +390,55 @@ describe('TimelineViewComponent', () => {
 
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('.price-chart-area')).toBeTruthy();
+    });
+
+    it('should show coverage chip when some nodes have no dates', () => {
+      const result = createMockQueryResult([nodeWithDates, nodeWithoutDates]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+      expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 2 entidades · 1 sin fecha');
+    });
+
+    it('should pluralize the coverage chip when several nodes have no dates', () => {
+      const anotherWithoutDates: NormalizedNode = { ...nodeWithoutDates, uri: 'http://x/Q9', label: 'Chile' };
+      const result = createMockQueryResult([nodeWithDates, nodeWithoutDates, anotherWithoutDates]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+      expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 3 entidades · 2 sin fechas');
+    });
+
+    it('should hide the coverage chip when all nodes have dates', () => {
+      const result = createMockQueryResult([nodeWithDates, nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      expect(component.coverageLabel).toBe('');
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.coverage-chip')).toBeNull();
+    });
+
+    it('should clarify the coverage chip counts nodes of the current lot', () => {
+      const result = createMockQueryResult([nodeWithDates, nodeWithoutDates]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      lotStateSubject.next({
+        lotSize: 300,
+        currentLot: 3,
+        lotCount: 5,
+        totalRows: 1200,
+        visibleNodes: 2,
+      });
+      fixture.detectChanges();
+
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
+      expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 2 entidades del lote · 1 sin fecha');
     });
 
     it('should have apply range button disabled initially', () => {

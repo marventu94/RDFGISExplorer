@@ -19,9 +19,11 @@ import { DataSet } from 'vis-data';
 import type { QueryResult, NormalizedNode, Selection, TemporalFilter } from '@shared/models';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
+import { computeCoverageStats } from '@shared/stats/coverage-stats';
+import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
 import { PriceChartComponent } from './price-chart.component';
 
-type QueryState = 'no-query' | 'no-dates' | 'filtered-zero' | 'normal';
+type QueryState = 'no-query' | 'no-dates' | 'no-dates-lot' | 'filtered-zero' | 'normal';
 
 enum ZoomLevel {
   TenYears = 'ten-years',
@@ -35,7 +37,7 @@ enum ZoomLevel {
 @Component({
   selector: 'app-timeline-view',
   standalone: true,
-  imports: [PriceChartComponent],
+  imports: [PriceChartComponent, CoverageChipComponent],
   templateUrl: './timeline-view.component.html',
   styleUrls: ['./timeline-view.component.scss'],
 })
@@ -51,6 +53,8 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   canApplyRange = false;
   activeFilterCount = 0;
   selectedNode: NormalizedNode | null = null;
+  /** Texto del chip de cobertura; vacío cuando la timeline muestra todos los nodos. */
+  coverageLabel = '';
 
   @HostBinding('class.is-active-view') isActiveView = false;
 
@@ -78,17 +82,19 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
     combineLatest([
       this.selectionService.queryResult$,
-      this.selectionService.filteredQueryResult$,
+      this.selectionService.visibleQueryResult$,
       this.selectionService.activeFilters$,
+      this.selectionService.lotState$,
     ])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([original, filtered, filters]) => {
+      .subscribe(([original, visible, filters, lotState]) => {
         this.activeFilterCount = filters.length;
+        this.coverageLabel = '';
 
         const temporalFilter = filters.find((f): f is TemporalFilter => f.kind === 'temporal');
         this.activeFilterLabel = temporalFilter?.label ?? '';
 
-        if (!filtered || filtered.nodes.length === 0) {
+        if (!visible || visible.nodes.length === 0) {
           if (!original || original.nodes.length === 0) {
             this.queryState = 'no-query';
           } else if (filters.length > 0) {
@@ -107,14 +113,21 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
           return;
         }
 
-        this.originalNodeCount = original?.nodes.length ?? filtered.nodes.length;
-        this.filteredNodeCount = filtered.nodes.length;
-        this.allNodes = filtered.nodes;
+        this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
+        this.filteredNodeCount = visible.nodes.length;
+        this.allNodes = visible.nodes;
 
-        const nodesWithDates = filtered.nodes.filter((n) => (n.temporalEvents?.length ?? 0) > 0);
+        const nodesWithDates = visible.nodes.filter((n) => (n.temporalEvents?.length ?? 0) > 0);
 
         if (nodesWithDates.length === 0) {
-          this.queryState = 'no-dates';
+          // Si el resultado completo tampoco tiene fechas, la query no las
+          // devuelve; si el completo sí tiene y el lote visible no, las fechas
+          // quedaron en otro lote (o fuera por un filtro si hay uno solo).
+          const originalHasDates = (original?.nodes ?? []).some(
+            (n) => (n.temporalEvents?.length ?? 0) > 0,
+          );
+          this.queryState =
+            originalHasDates && lotState.lotCount > 1 ? 'no-dates-lot' : 'no-dates';
           this.items.clear();
           this.groups.clear();
           this.timeline?.setItems(this.items);
@@ -124,7 +137,16 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         }
 
         this.queryState = 'normal';
-        this.renderItems(filtered);
+        const stats = computeCoverageStats(visible);
+        if (stats.primaryWithoutTemporalEvents > 0) {
+          const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
+          this.coverageLabel =
+            `Mostrando ${stats.primaryWithTemporalEvents} de ${stats.primary} entidades${lotSuffix} · ` +
+            `${stats.primaryWithoutTemporalEvents} sin fecha${stats.primaryWithoutTemporalEvents !== 1 ? 's' : ''}`;
+        } else {
+          this.coverageLabel = '';
+        }
+        this.renderItems(visible);
         this.cdr.markForCheck();
       });
 
