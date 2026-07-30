@@ -1,4 +1,9 @@
-import { Injectable, Inject, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { SPARQL_ENDPOINT } from '../../adapters/sparql-endpoint.interface';
@@ -94,7 +99,8 @@ export class SuggestionsService {
       origin: '*',
     });
 
-    const userAgent = this.config.get<string>('SPARQL_USER') || DEFAULT_USER_AGENT;
+    const userAgent =
+      this.config.get<string>('SPARQL_USER') || DEFAULT_USER_AGENT;
     const url = `https://www.wikidata.org/w/api.php?${params.toString()}`;
     this.log.debug(`[wikidataSearch] GET ${url}`);
 
@@ -140,9 +146,7 @@ export class SuggestionsService {
     // query sin validarlas (una URI con espacios o `>` corta el VALUES).
     const safeCandidates = candidates.filter((c) => isValidUri(c.uri));
     if (safeCandidates.length === 0) return candidates;
-    const values = safeCandidates
-      .map((c) => `<${c.uri}>`)
-      .join(' ');
+    const values = safeCandidates.map((c) => `<${c.uri}>`).join(' ');
     const query = `SELECT ?uri WHERE {
   VALUES ?uri { ${values} }
   ?uri <http://www.wikidata.org/prop/direct/P31> <${classUri}> .
@@ -162,7 +166,9 @@ export class SuggestionsService {
         auth: username && password ? { username, password } : undefined,
       });
       const matching = new Set(
-        response.data.results.bindings.map((b) => b['uri']?.value).filter(Boolean),
+        response.data.results.bindings
+          .map((b) => b['uri']?.value)
+          .filter(Boolean),
       );
       this.log.debug(
         `[filterByClass] SPARQL returned ${matching.size} matches for ${classUri}`,
