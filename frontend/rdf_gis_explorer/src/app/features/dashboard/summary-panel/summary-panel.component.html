@@ -1,0 +1,57 @@
+@if (resolved(); as r) {
+  <div class="summary-panel">
+    <button type="button" class="summary-header" (click)="toggleCollapsed()">
+      <mat-icon>query_stats</mat-icon>
+      <span class="summary-title">Resumen del resultado</span>
+      @if (loading()) {
+        <mat-spinner diameter="16" />
+      } @else {
+        <span class="summary-total">
+          {{ r.summary.totalRows === null ? '—' : r.summary.totalRows }} filas
+        </span>
+      }
+      <mat-icon class="summary-toggle">{{ collapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+    </button>
+
+    @if (!collapsed()) {
+      <div class="summary-body">
+        <p class="summary-scope">{{ scopeLabel(r.summary) }}</p>
+
+        @if (failedLabel(r.summary); as failed) {
+          <p class="summary-failed">{{ failed }}</p>
+        }
+
+        <div class="summary-grid">
+          @for (n of r.summary.numeric; track n.variable) {
+            <div class="summary-card">
+              <span class="summary-var">{{ n.variable }}</span>
+              <span class="summary-values">
+                avg {{ formatNumber(n.avg) }} · min {{ formatNumber(n.min) }} · max {{ formatNumber(n.max) }}
+              </span>
+              <span class="summary-hint">{{ n.count }} valores</span>
+            </div>
+          }
+          @for (t of r.summary.temporal; track t.variable) {
+            <div class="summary-card">
+              <span class="summary-var">{{ t.variable }}</span>
+              <span class="summary-values">{{ formatDate(t.min) }} → {{ formatDate(t.max) }}</span>
+            </div>
+          }
+          @for (c of r.summary.categorical; track c.variable) {
+            <div class="summary-card">
+              <span class="summary-var">{{ c.variable }}</span>
+              <ul class="summary-top">
+                @for (v of c.values; track v.value) {
+                  <li [title]="v.value">
+                    <span class="summary-top-value">{{ v.value }}</span>
+                    <span class="summary-top-count">{{ v.count }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+}

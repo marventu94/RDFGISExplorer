@@ -1,6 +1,6 @@
 // Contrato compartido: la fuente de verdad vive en packages/contracts.
+// Re-export type-only: no emite JS ni agrega dependencia de runtime.
 export type {
-  QueryResult,
   SummaryRequest,
   NumericSummary,
   TemporalSummary,
@@ -9,9 +9,3 @@ export type {
   SummaryFailure,
   QuerySummary,
 } from '@rdfgis/contracts';
-
-// Tipo propio de esta app (request del editor SPARQL hacia el backend).
-export interface SparqlRequest {
-  sparql: string;
-  limit?: number;
-}

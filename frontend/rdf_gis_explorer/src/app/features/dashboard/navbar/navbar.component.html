@@ -35,7 +35,7 @@
           title="Filas por lote"
           aria-label="Filas por lote"
         >
-          @for (size of lotSizeOptions; track size) {
+          @for (size of lotSizeOptions(); track size) {
             <option [value]="size">{{ size }}</option>
           }
         </select>
@@ -76,9 +76,21 @@
       <span>Coordinada</span>
     </button>
 
+    <button
+      type="button"
+      class="navbar-btn"
+      [disabled]="!hasResult()"
+      (click)="exportFullCsv()"
+      title="Exportar TODAS las filas del resultado completo a CSV (no solo el lote visible)"
+    >
+      <mat-icon>file_download</mat-icon>
+      <span>Exportar CSV</span>
+    </button>
+
     <button type="button" class="navbar-btn" (click)="openSaveDialog()">
       <mat-icon>save</mat-icon>
       <span>Guardar tablero</span>
     </button>
   </div>
 </nav>
+<app-summary-panel />
