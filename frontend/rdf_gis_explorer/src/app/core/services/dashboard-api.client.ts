@@ -21,7 +21,12 @@ export interface GisDashboardPayload {
     };
     timeline?: { rangeStart?: string; rangeEnd?: string };
     map?: { center: [number, number]; zoom: number; activeLayers?: string[] };
-    graph?: { layout: string };
+    graph?: {
+      layout: string;
+      pan?: { x: number; y: number };
+      zoom?: number;
+      manualPositions?: Record<string, { x: number; y: number }>;
+    };
   };
   selection?: { selectedIds: string[]; pinnedId?: string };
 }

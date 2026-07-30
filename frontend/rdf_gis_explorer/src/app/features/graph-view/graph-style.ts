@@ -43,6 +43,47 @@ export function createGraphStyle(
         'line-color': () => (isDark() ? '#475569' : '#B0BEC5'),
         'target-arrow-color': () => (isDark() ? '#475569' : '#B0BEC5'),
         'target-arrow-shape': 'triangle',
+        // El backend emite una arista por predicado (el edgeId incluye el
+        // predicado), así que dos entidades pueden tener varias entre sí. Bezier
+        // las abanica solo; el default de 40 las deja muy juntas en un cuadrante.
+        'control-point-step-size': 55,
+      },
+    },
+    {
+      // Sin esto todos los self-loops de un nodo usan el mismo -45deg/-90deg por
+      // default y quedan exactamente encimados.
+      selector: 'edge:loop',
+      style: {
+        'curve-style': 'bezier',
+        'loop-direction': '-45deg',
+        'loop-sweep': '-30deg',
+        'control-point-step-size': 35,
+      },
+    },
+    // Estado visual por clases en vez de mutar opacity inline: se revierte con un
+    // removeClass sobre toda la colección y no se pisa con re-estilados.
+    {
+      selector: 'node.is-selected',
+      style: {
+        'border-width': 4,
+        'border-color': '#1565C0',
+        'text-outline-width': 3,
+        'font-weight': 'bold',
+      } as cytoscape.Css.Node,
+    },
+    {
+      selector: '.is-dimmed',
+      style: {
+        opacity: 0.15,
+      },
+    },
+    {
+      selector: 'edge.is-focus-edge',
+      style: {
+        width: 2.5,
+        'line-color': '#1565C0',
+        'target-arrow-color': '#1565C0',
+        opacity: 1,
       },
     },
   ];
