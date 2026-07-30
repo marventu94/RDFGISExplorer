@@ -10,7 +10,6 @@ coverage/
 package-lock.json
 test-results/
 opencode.json
-docs/
 .agents/
 .kimi-code/
 skills-lock.json
