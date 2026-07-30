@@ -29,7 +29,11 @@ export class SuggestionsController {
       `[controller] parsed q=${JSON.stringify(q)} limit=${limit} classUri=${classUri ?? '(none)'}`,
     );
     try {
-      const entities = await this.suggestionsService.searchEntities(q, limit, classUri);
+      const entities = await this.suggestionsService.searchEntities(
+        q,
+        limit,
+        classUri,
+      );
       this.log.log(`[controller] returning ${entities.length} entities`);
       return { entities };
     } catch (err) {

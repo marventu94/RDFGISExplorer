@@ -76,7 +76,9 @@ function isNamedNode(t: unknown): t is Term & { value: string } {
 }
 
 function isPath(t: unknown): t is PathNode {
-  return (t as PathNode)?.type === 'path' && Array.isArray((t as PathNode).items);
+  return (
+    (t as PathNode)?.type === 'path' && Array.isArray((t as PathNode).items)
+  );
 }
 
 /** Serializa un predicado (IRI o property path) usando IRIs completas. */
@@ -110,7 +112,8 @@ function predicateToLabel(p: unknown): string | null {
  * analistas del OVS usan mucho `^sioc:about`.
  */
 function asPureInverse(p: unknown): unknown | null {
-  if (isPath(p) && p.pathType === '^' && p.items.length === 1) return p.items[0];
+  if (isPath(p) && p.pathType === '^' && p.items.length === 1)
+    return p.items[0];
   return null;
 }
 
@@ -121,9 +124,17 @@ interface RawTriple {
 }
 
 /** Recorre el WHERE juntando todos los patrones de triples, incluidos los anidados. */
-function collectTriples(patterns: unknown[] | undefined, out: RawTriple[] = []): RawTriple[] {
+function collectTriples(
+  patterns: unknown[] | undefined,
+  out: RawTriple[] = [],
+): RawTriple[] {
   for (const p of patterns ?? []) {
-    const pattern = p as { type?: string; triples?: RawTriple[]; patterns?: unknown[]; where?: unknown[] };
+    const pattern = p as {
+      type?: string;
+      triples?: RawTriple[];
+      patterns?: unknown[];
+      where?: unknown[];
+    };
     if (pattern.type === 'bgp' && Array.isArray(pattern.triples)) {
       out.push(...pattern.triples);
     }
@@ -168,11 +179,12 @@ export function extractQueryTopology(sparql: string): QueryTopology {
 
   const variables = ast['variables'] as unknown[] | undefined;
   const isWildcard =
-    !Array.isArray(variables) || variables.some((v) => (v as Term)?.termType === 'Wildcard');
+    !Array.isArray(variables) ||
+    variables.some((v) => (v as Term)?.termType === 'Wildcard');
 
   const projected = isWildcard
     ? null
-    : (variables as unknown[]).filter(isVariable).map((v) => v.value);
+    : variables.filter(isVariable).map((v) => v.value);
 
   const triples = collectTriples(ast['where'] as unknown[] | undefined);
 
@@ -228,7 +240,7 @@ export function extractQueryTopology(sparql: string): QueryTopology {
 
   const topology: QueryTopology = { links, projected, intermediates };
 
-  if (intermediates.length > 0 && canProjectIntermediates(ast as never)) {
+  if (intermediates.length > 0 && canProjectIntermediates(ast)) {
     try {
       const extended = {
         ...ast,
