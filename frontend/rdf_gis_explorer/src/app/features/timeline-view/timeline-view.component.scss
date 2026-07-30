@@ -3,7 +3,10 @@
   width: 100%;
   height: 100%;
   position: relative;
-  overflow-y: auto;
+  // El panel no scrollea: la timeline se clava al alto del cuadrante y vis pone
+  // su propia barra interna para los items. Antes un overflow-y: auto acá
+  // arrastraba también la toolbar fuera de vista.
+  overflow: hidden;
 }
 
 :host::after {
@@ -27,36 +30,36 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  height: 48px;
+  gap: 6px;
+  padding: 3px 6px;
+  height: 34px;
   flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
   background: var(--mat-sys-surface-container-low, #f5f5f5);
   border-bottom: 1px solid var(--mat-sys-outline-variant, #e0e0e0);
 }
 
+// Un solo elemento reclama el espacio libre. Antes lo pedían el chip de
+// cobertura y el botón Aplicar a la vez, así que el botón cambiaba de posición
+// según hubiera chip o no.
 .zoom-group {
   display: flex;
   gap: 4px;
-}
-
-app-coverage-chip {
-  margin-left: auto;
-}
-
-.toolbar-btn--apply {
-  margin-left: auto;
+  margin-right: auto;
 }
 
 .toolbar-btn {
-  padding: 4px 12px;
+  padding: 3px 9px;
   font-size: 12px;
+  white-space: nowrap;
   border: 1px solid #b0bec5;
   border-radius: 4px;
   background: #fff;
@@ -86,7 +89,11 @@ app-coverage-chip {
 .tl-container {
   width: 100%;
   flex: 1;
-  min-height: 200px;
+  // Sin piso de alto: forzaba a la timeline a desbordar el cuadrante, que es lo
+  // que dejaba el eje de fechas fuera de vista.
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
 
   &--hidden {
     visibility: hidden;
@@ -97,10 +104,21 @@ app-coverage-chip {
   }
 }
 
-.price-chart-area {
-  width: 100%;
-  flex-shrink: 0;
-  background: var(--mat-sys-surface, #fff);
+// vis-timeline auto-inyecta su CSS global desde el bundle standalone. Acá solo
+// se aprieta la densidad para que entren más filas en un cuadrante.
+:host ::ng-deep {
+  .vis-time-axis .vis-text {
+    font-size: 10px;
+  }
+
+  .vis-labelset .vis-label {
+    font-size: 11px;
+  }
+
+  .vis-item .vis-item-content {
+    padding: 2px 4px;
+    font-size: 11px;
+  }
 }
 
 .empty-state {
