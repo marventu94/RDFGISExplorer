@@ -15,4 +15,3 @@ opencode.json
 skills-lock.json
 .node-version-built
 backend/config/prefixes.graphdb.json
-mcp-server-graphdb/
