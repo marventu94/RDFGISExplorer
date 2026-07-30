@@ -31,15 +31,21 @@ class PayloadSizeConstraint implements ValidatorConstraintInterface {
     if (typeof value !== 'object' || value === null) return true;
     try {
       const serialized = JSON.stringify(value);
-      return serialized.length <= 1024 * 1024;
+      return serialized.length <= maxPayloadBytes();
     } catch {
       return false;
     }
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return `${args.property} serialized size must not exceed 1 MB`;
+    return `${args.property} serialized size must not exceed ${maxPayloadBytes()} bytes`;
   }
+}
+
+/** Tope del payload serializado: env DASHBOARD_MAX_PAYLOAD_BYTES (default 1 MB). */
+export function maxPayloadBytes(): number {
+  const parsed = parseInt(process.env['DASHBOARD_MAX_PAYLOAD_BYTES'] ?? '', 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1024 * 1024;
 }
 
 export class CreateDashboardDto {

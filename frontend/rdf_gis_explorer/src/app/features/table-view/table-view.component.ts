@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -20,6 +20,7 @@ import { FormsModule } from '@angular/forms';
 
 import { SelectionService } from '@core/services/selection.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
+import { LimitsService } from '@core/services/limits.service';
 import type {
   QueryResult,
   ResultBinding,
@@ -49,6 +50,7 @@ import { PluginCellRendererComponent } from './cell-renderers/plugin-cell-render
 export class TableViewComponent implements OnDestroy {
   private readonly selectionService = inject(SelectionService);
   private readonly viewState = inject(DashboardViewStateService);
+  private readonly limits = inject(LimitsService);
   private readonly destroy$ = new Subject<void>();
 
   readonly agThemeClass = 'ag-theme-alpine';
@@ -62,7 +64,8 @@ export class TableViewComponent implements OnDestroy {
   /** Resultado crudo (sin lotes): el banner de truncamiento habla del total. */
   private readonly rawQueryResult = signal<QueryResult | null>(null);
   readonly pageSize = signal(50);
-  readonly pageSizeOptions = [50, 100, 200];
+  /** Opciones de paginación: config-driven (limits.tablePageSizeOptions). */
+  readonly pageSizeOptions = computed(() => this.limits.limits().tablePageSizeOptions);
   readonly quickFilter = signal('');
 
   readonly columnDefs = signal<ColDef[]>([]);
@@ -98,6 +101,15 @@ export class TableViewComponent implements OnDestroy {
     if (storedTable?.quickFilter !== undefined) {
       this.quickFilter.set(storedTable.quickFilter);
     }
+
+    // Si la config trae opciones de paginación que no incluyen la actual
+    // (p.ej. restaurada de un tablero guardado), se clampea a la primera.
+    effect(() => {
+      const options = this.limits.limits().tablePageSizeOptions;
+      if (options.length > 0 && !options.includes(this.pageSize())) {
+        this.pageSize.set(options[0]);
+      }
+    });
 
     this.selectionService.queryResult$
       .pipe(takeUntil(this.destroy$))

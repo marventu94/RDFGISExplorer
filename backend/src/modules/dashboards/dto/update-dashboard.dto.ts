@@ -8,6 +8,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
+import { maxPayloadBytes } from './create-dashboard.dto';
 
 @ValidatorConstraint({ name: 'isNonEmptyObject', async: false })
 class IsNonEmptyObjectConstraint implements ValidatorConstraintInterface {
@@ -31,14 +32,14 @@ class PayloadSizeConstraint implements ValidatorConstraintInterface {
     if (typeof value !== 'object' || value === null) return true;
     try {
       const serialized = JSON.stringify(value);
-      return serialized.length <= 1024 * 1024;
+      return serialized.length <= maxPayloadBytes();
     } catch {
       return false;
     }
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return `${args.property} serialized size must not exceed 1 MB`;
+    return `${args.property} serialized size must not exceed ${maxPayloadBytes()} bytes`;
   }
 }
 

@@ -8,6 +8,7 @@ import {
   HostBinding,
   NgZone,
   ChangeDetectorRef,
+  effect,
   inject,
 } from '@angular/core';
 import { SelectionService } from '@core/services/selection.service';
@@ -22,6 +23,7 @@ import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage
 import { createGraphStyle } from './graph-style';
 import { LAYOUT_CONFIGS } from './graph-layouts';
 import { EntityColorService } from '@core/services/entity-color.service';
+import { LimitsService } from '@core/services/limits.service';
 
 cytoscape.use(cola);
 cytoscape.use(dagre);
@@ -97,16 +99,28 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   /** Nodos que el usuario acomodó a mano; el layout deja de ubicarlos. */
   private readonly manualPositions = new Map<string, { x: number; y: number }>();
 
-  readonly MAX_NODES = 300;
+  /**
+   * Cap de nodos dibujados (red de seguridad). Viene de /api/config
+   * (limits.graphMaxNodes) vía LimitsService; queda como campo mutable para
+   * que los specs lo pisen por reflection.
+   */
+  MAX_NODES = 300;
 
   private readonly viewState = inject(DashboardViewStateService);
   private readonly colorService = inject(EntityColorService);
+  private readonly limitsService = inject(LimitsService);
 
   constructor(
     private selectionService: SelectionService,
     private ngZone: NgZone,
     private cdr: ChangeDetectorRef,
-  ) {}
+  ) {
+    // Cuando llega la config se aplica el cap configurado (en tests el
+    // LimitsService queda con defaults y el spec pisa MAX_NODES después).
+    effect(() => {
+      this.MAX_NODES = this.limitsService.limits().graphMaxNodes;
+    });
+  }
 
   ngOnInit(): void {
     this.initResizeObserver();
@@ -330,7 +344,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private topologyKey(elements: cytoscape.ElementDefinition[]): string {
     const ids = elements.map((e) => String((e.data as { id?: unknown })?.id ?? ''));
     ids.sort();
-    return ids.join(' ');
+    return ids.join('\u0000');
   }
 
   private updateElementData(elements: cytoscape.ElementDefinition[]): void {
