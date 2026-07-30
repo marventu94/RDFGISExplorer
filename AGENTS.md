@@ -13,7 +13,8 @@ AppShell (host, :4200)
 └── /**             → redirect a /
 
 Backend NestJS (:3000)
-├── /api/query/execute      → Ejecuta SPARQL vía adaptador
+├── /api/query/execute      → Ejecuta SPARQL vía adaptador (opción `raw`: solo bindings, sin grafo — la usa el export)
+├── /api/query/summary      → Agregados del resultado completo (COUNT/AVG/MIN/MAX, top valores)
 ├── /api/dashboards (CRUD)  → SQLite (better-sqlite3)
 ├── /api/suggestions        → Autocompletado predicados + búsqueda de entidades
 ├── /api/config             → Configuración runtime (env + prefixes) para los frontends
@@ -83,7 +84,7 @@ cd frontend/<app> && pnpm test     # unit tests (Vitest vía ng test)
 | Módulo | Path | Responsabilidad |
 |--------|------|-----------------|
 | `SparqlModule` | `modules/sparql/` | `@Global()`. Provee token `SPARQL_ENDPOINT` vía factory según `SPARQL_BACKEND` |
-| `QueryModule` | `modules/query/` | Ejecuta SPARQL. Valida con `sparqljs.Parser`. Aplica límites y timeout |
+| `QueryModule` | `modules/query/` | Ejecuta SPARQL. Valida con `sparqljs.Parser`. Aplica límites y timeout. `POST /api/query/summary`: envuelve la query del usuario como subquery y agrega sobre el resultado completo |
 | `DashboardsModule` | `modules/dashboards/` | CRUD dashboards en SQLite. Payload JSON opaco (máx 1MB). `kind` ∈ {gis, explorer} |
 | `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados + búsqueda de entidades |
 | `HealthModule` | `modules/health/` | `/api/health` (usado por Docker) + `/api/health/sparql` (chequea el endpoint upstream) |
@@ -110,7 +111,7 @@ consumidores. Los defaults que necesita el Explorer viajan en `/api/config`.)
 ## Contratos Front↔Back: `@rdfgis/contracts`
 
 La fuente de verdad única es **`packages/contracts/src/`** (`query-result.ts`,
-`app-config.ts`, `dashboard.ts`). Los archivos históricos
+`query-summary.ts`, `app-config.ts`, `dashboard.ts`). Los archivos históricos
 (`backend/src/shared/dto/query-result.dto.ts`, `frontend/rdf_gis_explorer/src/app/shared/models/*`,
 `frontend/rdf_explorer/src/app/core/endpoint-adapter.ts`, etc.) son re-exports
 type-only — **los cambios de contrato se hacen SOLO en el paquete** y tsc los
@@ -153,16 +154,20 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 |-------|----------|-----------|-------|
 | Table | AG Grid 35 (`rowSelection` con la API objeto ≥32.2) | Quick filter | select, focus |
 | Map | Leaflet 1.9 + markercluster + draw | GeoFilter (polygon) | select, focus |
-| Graph | Cytoscape 3.34 (cola+dagre) | Máx 300 nodos (red de seguridad) | select, focus |
+| Graph | Cytoscape 3.34 (cola+dagre) | Cap de nodos config-driven (`limits.graphMaxNodes`, default 300) | select, focus |
 | Timeline | vis-timeline 8.x | TemporalFilter (rango) | select, focus |
 
 **Coordinated View:** cada vista emite `setFocus(uris)` al hacer pan/zoom. Las demás ajustan su viewport. Toggle global en navbar.
 
 **SelectionService:** fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal), `visibleQueryResult$` (lo que consumen las 4 vistas: el resultado filtrado restringido al lote actual + pinning), `lotState$`, `lotSize$`, `currentLot$`. Métodos de lotes: `setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
 
-**Lotes globales con pinning:** cuando el resultado filtrado supera `lotSize` **filas** (default 300; opciones 100/300/500), las 4 vistas muestran **el mismo lote**. La lógica pura vive en `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`): el lote pagina `bindings` en el **orden original de la query** (nunca se reordena). Los nodos visibles son los URIs/bnodes de las filas del lote **más sus vecinos a 1 salto** por `edges` (así se recuperan los nodos intermedios que el backend recorta del SELECT con `pickVariables`), y las edges visibles son las que conectan nodos visibles. El nodo seleccionado se **inyecta** en el lote visible aunque no esté referenciado por las filas del lote (con sus edges hacia nodos visibles); al deseleccionar deja de inyectarse. Query nueva → lote 1; al filtrar se conserva el lote si sigue válido y se clampea si `lotCount` se reduce. Con un solo lote `visibleQueryResult$` es idéntico a `filteredQueryResult$` (sin overhead). El navbar tiene el navegador de lotes ("Lote X de N · T filas", anterior/siguiente, selector de tamaño, icono de warning si el backend truncó; tooltip con el aviso de volumen) — solo visible cuando N > 1.
+**Lotes globales con pinning:** cuando el resultado filtrado supera `lotSize` **filas** (default 300, config-driven vía `limits.lotDefaultSize`/`lotSizeOptions`), las 4 vistas muestran **el mismo lote**. La lógica pura vive en `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`): el lote pagina `bindings` en el **orden original de la query** (nunca se reordena). Los nodos visibles son los URIs/bnodes de las filas del lote **más sus vecinos a 1 salto** por `edges` (así se recuperan los nodos intermedios que el backend recorta del SELECT con `pickVariables`), y las edges visibles son las que conectan nodos visibles. El nodo seleccionado se **inyecta** en el lote visible aunque no esté referenciado por las filas del lote (con sus edges hacia nodos visibles); al deseleccionar deja de inyectarse. Query nueva → lote 1; al filtrar se conserva el lote si sigue válido y se clampea si `lotCount` se reduce. Con un solo lote `visibleQueryResult$` es idéntico a `filteredQueryResult$` (sin overhead). El navbar tiene el navegador de lotes ("Lote X de N · T filas", anterior/siguiente, selector de tamaño, icono de warning si el backend truncó; tooltip con el aviso de volumen) — solo visible cuando N > 1.
 
 **Chips de cobertura:** helper puro `shared/stats/coverage-stats.ts` (`computeCoverageStats`) + componente `shared/components/coverage-chip`. Los conteos de alerta usan solo **entidades principales** (nodos con atributos, coordenada o eventos temporales propios); los nodos estructurales del modelo (features, direcciones, geometrías) no cuentan como "sin coordenada/fecha". Mapa ("Mostrando X de N entidades[ del lote] · Y sin coordenada"), timeline (ídem "sin fecha") y grafo ("Lote X de N · M filas", o "Mostrando 300 de N nodos (top por conexiones)" si el lote visible excede `MAX_NODES`). Computan sobre el lote visible; el chip se oculta cuando no hay alerta.
+
+**Panel de resumen:** componente `features/dashboard/summary-panel` (colapsable, bajo el navbar) + helpers puros `shared/stats/result-summary.ts` (`classifyVariables`, `computeLocalSummary`). Muestra agregados (total de filas, avg/min/max por var numérica, rango por temporal, top 12 valores por categórica) computados sobre **el resultado completo de la query** — distinto de los chips de cobertura, que describen el lote visible. Los filtros de las vistas no lo afectan. La clasificación de variables es heurística y domain-agnostic (numérica si ≥90% de los valores no nulos son literales numéricos, temporal si el tipo normalizado es `date`, categórica si ≤20 valores distintos; caps 3/2/3). Si el resultado **no** está truncado se computa localmente; si está truncado se llama a `POST /api/query/summary`, que envuelve la query como subquery (PREFIX al nivel externo, alias `?__agg_*`, degradación por sección vía `failed`). Se recalcula solo con query nueva (`queryResult$`), no al cambiar de lote ni al filtrar. Publica el último `QuerySummary` en `SummaryStateService` (el export usa su COUNT para el progreso real).
+
+**Export completo a CSV:** botón "Exportar CSV" del navbar (distinto del botón de la tabla, que exporta solo el lote visible). Lógica pura en `shared/export/` (`export-query.ts`, `result-exporter.ts`, `csv.ts`) + glue Angular en `ResultExportService`. Envuelve la query del usuario como subquery con `ORDER BY` sobre TODAS las variables proyectadas (orden total → paginación OFFSET/LIMIT determinista; si la query ya trae ORDER BY se respeta) y recorre el **resultado completo** página a página (página = `maxLimit` del config) llamando a `/api/query/execute` con `raw: true` (sin grafo ni proyección de intermedios). Timeout de página → reintento con página mitad (2000→1000→500, mínimo 250). Tope 50.000 filas → diálogo (exportar parcial marcado PARCIAL / copiar query / cancelar). Progreso real con el COUNT del summary si está disponible. Si el resultado **no** está truncado exporta directo desde el cliente (sin paginar). Misma semántica que el summary: no exporta el lote visible ni aplica los filtros de las vistas. El CSV lleva encabezado de proveniencia en líneas `#` (backend, query, timestamp ISO, filas, marca PARCIAL), URIs completas y bnodes opacos por fila.
 
 ## Persistencia
 
@@ -194,9 +199,14 @@ AppConfig {
   labelUri,     // rdfs:label por default
   describe,     // UI hints: { exclude, objects, datatype, text, image, external }
   classColors,  // colores por clase (solo poblado para wikidata)
-  defaults      // defaults que consume el Explorer (lang, resultLimit, labelUri, searchClass, endpointType)
+  defaults,     // defaults que consume el Explorer (lang, resultLimit, labelUri, searchClass, endpointType)
+  limits,       // límites unificados (env del backend): { graphMaxNodes, lotDefaultSize,
+                //   lotSizeOptions[], tablePageSizeOptions[], exportMaxRows,
+                //   exportMinPageSize, summaryTopCategorical }
 }
 ```
+
+**Canal de límites:** todos los límites de queries y visualización viven en env vars del backend (ver tabla del README) y viajan en `AppConfig.limits`. El GIS los consume con `LimitsService` (signal con defaults equivalentes hasta que la config llega; `App` lo actualiza en `ngOnInit`): grafo (`graphMaxNodes`), lotes (`lotDefaultSize`/`lotSizeOptions`, con clamp del tamaño actual si queda fuera de la nueva oferta), tabla (`tablePageSizeOptions`) y export (`exportMaxRows`/`exportMinPageSize`).
 
 Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, classColors, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros.
 
@@ -225,7 +235,7 @@ Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa est
 - **APP_INITIALIZER del remote GIS** (`rdf_gis_explorer/app.config.ts`) solo corre standalone; cargado como remote, la config se carga async (`App.ngOnInit` / `AppConfigService.load()` con `shareReplay`). No asumir config disponible sincrónicamente en componentes del GIS.
 - **El backend NO usa ORM.** Queries SQL directas con `better-sqlite3`.
 - **`sparqljs`** se usa en backend (validación) y en GIS (validación en el frontend).
-- **Límites acoplados:** `@Max(2000)` en `execute-query.dto.ts` está hardcodeado; si se sube `SPARQL_MAX_LIMIT` por env, hay que subir también el DTO. El GIS **no manda límite propio**: `ApiService.executeQuery` sin `limit` explícito pide el `maxLimit` que publica el backend en `/api/config` (el volumen se pagina en cliente con los lotes).
+- **Límites unificados (resuelto el acoplamiento histórico):** ya no hay `@Max(2000)` hardcodeado en el DTO ni caps fijos en front/back: todos los límites son env del backend y llegan a los frontends vía `AppConfig.limits` (ver "Canal de límites" en la sección de `/api/config`). El GIS **no manda límite propio**: `ApiService.executeQuery` sin `limit` explícito pide el `maxLimit` que publica el backend (el volumen se pagina en cliente con los lotes).
 - **WKT inválido no aborta la query:** si un literal `wktLiteral` no parsea como Point (datos sucios, p.ej. `POINT(None None)`), el adaptador lo degrada a literal plano en vez de lanzar error (`generic-sparql.adapter.ts` `normalizeValue`).
 - **Fases futuras:** MillenniumDB adapter, curation records, duplicate detection (tablas en `db/migrations.sql`, hoy sin uso).
 
