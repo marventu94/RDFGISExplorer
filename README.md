@@ -8,6 +8,17 @@ Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFI
 
 ---
 
+## Documentación de diseño
+
+El **por qué** de la arquitectura y de cada decisión (vistas coordinadas,
+alcance exploración/análisis, panel de resumen, export, límites, Adapter
+domain-agnostic, Native Federation) está en [`docs/`](./docs/README.md):
+derivadas del paper DECISIONING 2026 y enmarcadas en DSRM
+([`docs/design-decisions.md`](./docs/design-decisions.md) ·
+[`docs/dsrm.md`](./docs/dsrm.md)).
+
+---
+
 ## Stack
 
 - **Frontend:** Angular 21 (Native Federation vía `@angular-architects/native-federation`)
