@@ -50,8 +50,16 @@ describe('extractQueryTopology', () => {
 
     expect(t.links).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ subject: 'barrio', object: 'distrito', predicateLabel: 'locatedIn' }),
-        expect.objectContaining({ subject: 'dir', object: 'barrio', predicateLabel: 'neighborhood' }),
+        expect.objectContaining({
+          subject: 'barrio',
+          object: 'distrito',
+          predicateLabel: 'locatedIn',
+        }),
+        expect.objectContaining({
+          subject: 'dir',
+          object: 'barrio',
+          predicateLabel: 'neighborhood',
+        }),
         expect.objectContaining({
           subject: 'realEstate',
           object: 'dir',
@@ -88,7 +96,10 @@ describe('extractQueryTopology', () => {
 
     // Sólo sobrevive sioc:about: una clase o un literal no son nodos del resultado.
     expect(t.links).toHaveLength(1);
-    expect(t.links[0]).toMatchObject({ subject: 'listing', object: 'realEstate' });
+    expect(t.links[0]).toMatchObject({
+      subject: 'listing',
+      object: 'realEstate',
+    });
   });
 
   it('sí produce arista cuando la clase es una variable', () => {
@@ -109,7 +120,11 @@ describe('extractQueryTopology', () => {
   it('marca el predicado como variable cuando la consulta lo deja abierto', () => {
     const t = extractQueryTopology('SELECT * WHERE { ?s ?p ?o }');
     expect(t.links).toHaveLength(1);
-    expect(t.links[0]).toMatchObject({ subject: 's', object: 'o', predicateVar: 'p' });
+    expect(t.links[0]).toMatchObject({
+      subject: 's',
+      object: 'o',
+      predicateVar: 'p',
+    });
     expect(t.projected).toBeNull();
   });
 
