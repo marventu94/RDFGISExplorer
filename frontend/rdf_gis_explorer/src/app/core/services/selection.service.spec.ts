@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Subscription } from 'rxjs';
 import { SelectionService } from './selection.service';
+import { DEFAULT_LIMITS, LimitsService } from './limits.service';
 import type {
   NormalizedNode,
   QueryResult,
@@ -844,6 +845,42 @@ describe('SelectionService', () => {
       expect(service.getLotSizeSnapshot()).toBe(300);
       service.setLotSize(500);
       expect(service.getLotSizeSnapshot()).toBe(500);
+    });
+  });
+
+  describe('límites config-driven (LimitsService)', () => {
+    it('emite las opciones de lote por defecto hasta que llega la config', () => {
+      let options: readonly number[] | undefined;
+      service.lotSizeOptions$.subscribe((o) => (options = o));
+      expect(options).toEqual([100, 300, 500]);
+    });
+
+    it('aplica las nuevas opciones cuando llega la config', () => {
+      const limits = TestBed.inject(LimitsService);
+      limits.apply({ ...DEFAULT_LIMITS, lotDefaultSize: 200, lotSizeOptions: [200, 400] });
+      TestBed.tick();
+
+      let options: readonly number[] | undefined;
+      service.lotSizeOptions$.subscribe((o) => (options = o));
+      expect(options).toEqual([200, 400]);
+    });
+
+    it('clampea el lotSize actual si quedó fuera de la nueva oferta', () => {
+      service.setLotSize(500);
+      const limits = TestBed.inject(LimitsService);
+      limits.apply({ ...DEFAULT_LIMITS, lotDefaultSize: 200, lotSizeOptions: [200, 400] });
+      TestBed.tick();
+
+      expect(service.getLotSizeSnapshot()).toBe(200);
+    });
+
+    it('conserva el lotSize si sigue siendo una opción válida', () => {
+      service.setLotSize(300);
+      const limits = TestBed.inject(LimitsService);
+      limits.apply({ ...DEFAULT_LIMITS, lotDefaultSize: 100 });
+      TestBed.tick();
+
+      expect(service.getLotSizeSnapshot()).toBe(300);
     });
   });
 });

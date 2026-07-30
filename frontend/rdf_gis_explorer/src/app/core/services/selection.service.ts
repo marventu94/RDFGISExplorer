@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 import { BehaviorSubject, Observable, combineLatest, map } from 'rxjs';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import type { NormalizedNode, QueryResult, Selection, Filter } from '@shared/models';
@@ -9,6 +9,7 @@ import {
   restrictResultToUris,
   sliceLot,
 } from '@shared/stats/lots';
+import { LimitsService } from './limits.service';
 
 export type FocusSource = 'map' | 'graph' | 'timeline' | null;
 
@@ -47,7 +48,14 @@ export class SelectionService {
   private activeViewTimer?: ReturnType<typeof setTimeout>;
   private readonly ACTIVE_VIEW_TTL_MS = 2000;
   private readonly _coordinatedViewEnabled$ = new BehaviorSubject<boolean>(true);
-  private readonly _lotSize$ = new BehaviorSubject<number>(DEFAULT_LOT_SIZE);
+  private readonly limitsService = inject(LimitsService);
+  private readonly _lotSize$ = new BehaviorSubject<number>(
+    this.limitsService.limits().lotDefaultSize,
+  );
+  /** Opciones del selector de tamaño de lote (config-driven vía LimitsService). */
+  private readonly _lotSizeOptions$ = new BehaviorSubject<readonly number[]>(
+    this.limitsService.limits().lotSizeOptions,
+  );
   private readonly _currentLot$ = new BehaviorSubject<number>(1);
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
@@ -58,6 +66,8 @@ export class SelectionService {
   readonly coordinatedViewEnabled$: Observable<boolean> =
     this._coordinatedViewEnabled$.asObservable();
   readonly lotSize$: Observable<number> = this._lotSize$.asObservable();
+  readonly lotSizeOptions$: Observable<readonly number[]> =
+    this._lotSizeOptions$.asObservable();
   readonly currentLot$: Observable<number> = this._currentLot$.asObservable();
 
   readonly filteredQueryResult$: Observable<QueryResult | null> = combineLatest([
@@ -114,7 +124,24 @@ export class SelectionService {
         this._currentLot$.next(lotCount);
       }
     });
+
+    // Cuando llega la config (/api/config → LimitsService) se actualizan las
+    // opciones de lote; si el tamaño actual quedó fuera de la nueva oferta se
+    // clampea al default configurado. Solo aplica cuando los límites CAMBIAN:
+    // el servicio sigue aceptando cualquier entero positivo vía setLotSize.
+    effect(() => {
+      const limits = this.limitsService.limits();
+      if (limits === this.appliedLimits) return;
+      this.appliedLimits = limits;
+      this._lotSizeOptions$.next(limits.lotSizeOptions);
+      if (!limits.lotSizeOptions.includes(this._lotSize$.getValue())) {
+        this._lotSize$.next(limits.lotDefaultSize);
+      }
+    });
   }
+
+  /** Última config de límites aplicada a los lotes (identidad por referencia). */
+  private appliedLimits = this.limitsService.limits();
 
   select(node: NormalizedNode | null, source: Selection['source'] = 'external'): void {
     this._selectedNode$.next({ node, source });

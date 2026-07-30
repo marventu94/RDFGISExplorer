@@ -8,6 +8,7 @@ import { SelectionService, type LotState } from '@core/services/selection.servic
 import { EntityColorService } from '@core/services/entity-color.service';
 import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
+import { DEFAULT_LIMITS, LimitsService } from '@core/services/limits.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
 
 const mockNode: NormalizedNode = {
@@ -358,6 +359,14 @@ describe('GraphViewComponent', () => {
 
   it('should create the component', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('takes MAX_NODES from LimitsService when config-driven limits arrive', () => {
+    expect(component.MAX_NODES).toBe(300);
+    const limits = TestBed.inject(LimitsService);
+    limits.apply({ ...DEFAULT_LIMITS, graphMaxNodes: 42 });
+    fixture.detectChanges();
+    expect(component.MAX_NODES).toBe(42);
   });
 
   it('should show empty state when no query result', () => {

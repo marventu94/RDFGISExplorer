@@ -5,6 +5,7 @@ import { NavbarComponent } from '@features/dashboard/navbar/navbar.component';
 import { DetailPanelComponent } from '@features/detail-panel/detail-panel.component';
 import { SelectionService } from '@core/services/selection.service';
 import { AppConfigService } from '@core/services/app-config.service';
+import { LimitsService } from '@core/services/limits.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
@@ -30,6 +31,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export class App implements OnInit {
   private readonly selectionService = inject(SelectionService);
   private readonly appConfig = inject(AppConfigService);
+  private readonly limits = inject(LimitsService);
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly dashboardLayout = inject(DashboardLayoutService);
   protected readonly persistence = inject(DashboardPersistenceService);
@@ -49,6 +51,15 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     this.cleanLegacyLocalStorage();
+
+    // Límites config-driven (/api/config → LimitsService): las vistas los
+    // consumen reactivamente; hasta que llega la config valen los defaults.
+    this.appConfig.load().subscribe({
+      next: (cfg) => this.limits.apply(cfg.limits),
+      error: () => {
+        // sin config: quedan los defaults de LimitsService
+      },
+    });
 
     const params = new URLSearchParams(window.location.search);
     const dashboardId = params.get('dashboardId');

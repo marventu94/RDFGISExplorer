@@ -161,4 +161,65 @@ describe('AppConfigService', () => {
       expect(service.getConfig().hasBasicAuth).toBe(false);
     });
   });
+
+  describe('limits', () => {
+    it('exposes current defaults when the env vars are not set', () => {
+      const service = new AppConfigService(
+        createConfigMock({}) as unknown as ConfigService,
+      );
+      expect(service.getConfig().limits).toEqual({
+        graphMaxNodes: 300,
+        lotDefaultSize: 300,
+        lotSizeOptions: [100, 300, 500],
+        tablePageSizeOptions: [50, 100, 200],
+        exportMaxRows: 50_000,
+        exportMinPageSize: 250,
+        summaryTopCategorical: 12,
+      });
+    });
+
+    it('reads integer limits from env', () => {
+      const service = new AppConfigService(
+        createConfigMock({
+          GIS_GRAPH_MAX_NODES: '150',
+          GIS_LOT_DEFAULT_SIZE: '100',
+          EXPORT_MAX_ROWS: '10000',
+          EXPORT_MIN_PAGE_SIZE: '125',
+          SUMMARY_TOP_CATEGORICAL_LIMIT: '7',
+        }) as unknown as ConfigService,
+      );
+      const limits = service.getConfig().limits;
+      expect(limits.graphMaxNodes).toBe(150);
+      expect(limits.lotDefaultSize).toBe(100);
+      expect(limits.exportMaxRows).toBe(10000);
+      expect(limits.exportMinPageSize).toBe(125);
+      expect(limits.summaryTopCategorical).toBe(7);
+    });
+
+    it('parses CSV list options from env', () => {
+      const service = new AppConfigService(
+        createConfigMock({
+          GIS_LOT_SIZE_OPTIONS: '200, 400 ,800',
+          GIS_TABLE_PAGE_SIZE_OPTIONS: '25,75',
+        }) as unknown as ConfigService,
+      );
+      const limits = service.getConfig().limits;
+      expect(limits.lotSizeOptions).toEqual([200, 400, 800]);
+      expect(limits.tablePageSizeOptions).toEqual([25, 75]);
+    });
+
+    it('falls back to defaults on malformed env values', () => {
+      const service = new AppConfigService(
+        createConfigMock({
+          GIS_GRAPH_MAX_NODES: 'abc',
+          GIS_LOT_SIZE_OPTIONS: 'x,,y',
+          EXPORT_MAX_ROWS: '-5',
+        }) as unknown as ConfigService,
+      );
+      const limits = service.getConfig().limits;
+      expect(limits.graphMaxNodes).toBe(300);
+      expect(limits.lotSizeOptions).toEqual([100, 300, 500]);
+      expect(limits.exportMaxRows).toBe(50_000);
+    });
+  });
 });

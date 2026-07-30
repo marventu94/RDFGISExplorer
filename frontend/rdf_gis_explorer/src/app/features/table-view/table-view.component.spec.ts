@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { TableViewComponent } from './table-view.component';
 import { SelectionService } from '@core/services/selection.service';
+import { DEFAULT_LIMITS, LimitsService } from '@core/services/limits.service';
 import type {
   QueryResult,
   ResultBinding,
@@ -103,6 +104,17 @@ describe('TableViewComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('takes pageSizeOptions from LimitsService and clamps a pageSize out of range', () => {
+    expect(component.pageSizeOptions()).toEqual([50, 100, 200]);
+    const limits = TestBed.inject(LimitsService);
+    limits.apply({ ...DEFAULT_LIMITS, tablePageSizeOptions: [25, 75] });
+    fixture.detectChanges();
+
+    expect(component.pageSizeOptions()).toEqual([25, 75]);
+    // pageSize 50 quedó fuera de la nueva oferta: se clampea a la primera.
+    expect(component.pageSize()).toBe(25);
   });
 
   it('should show empty state when no query result', () => {

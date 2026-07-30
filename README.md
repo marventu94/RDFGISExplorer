@@ -196,6 +196,15 @@ cd frontend/rdf_gis_explorer && pnpm test
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout de consultas (ms) |
 | `SPARQL_DEFAULT_LIMIT` | `500` | Límite por defecto |
 | `SPARQL_MAX_LIMIT` | `2000` | Límite máximo |
+| `SPARQL_PREDICATE_CACHE_TTL_MS` | `3600000` | TTL del cache de predicados del adaptador (ms) |
+| `SUMMARY_TOP_CATEGORICAL_LIMIT` | `12` | Tope de valores en el top categórico de `/api/query/summary` |
+| `DASHBOARD_MAX_PAYLOAD_BYTES` | `1048576` | Tope del payload serializado de dashboards (bytes) |
+| `GIS_GRAPH_MAX_NODES` | `300` | Cap de nodos de la vista de grafo del GIS (vía `/api/config` → `limits`) |
+| `GIS_LOT_DEFAULT_SIZE` | `300` | Tamaño de lote por defecto de las vistas coordinadas (`limits`) |
+| `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Opciones del selector de tamaño de lote, CSV (`limits`) |
+| `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Opciones de paginación de la tabla, CSV (`limits`) |
+| `EXPORT_MAX_ROWS` | `50000` | Tope de filas del export completo a CSV (`limits`) |
+| `EXPORT_MIN_PAGE_SIZE` | `250` | Piso del reintento adaptativo de página del export (`limits`) |
 | `SPARQL_PREFIXES_PATH` | `backend/config/prefixes.${SPARQL_BACKEND}.json` | Archivo JSON `{ prefix: uri }` con los prefixes del backend |
 | `BACKEND_PORT` | `3000` | Puerto del backend |
 | `FRONTEND_PORT` / `RDF_EXPLORER_PORT` / `RDF_GIS_EXPLORER_PORT` | `4200` / `4201` / `4202` | Puertos de los frontends (Docker/Podman) |
