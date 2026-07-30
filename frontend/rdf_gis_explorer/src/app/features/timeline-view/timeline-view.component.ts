@@ -21,9 +21,15 @@ import { EntityColorService } from '@core/services/entity-color.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { computeCoverageStats } from '@shared/stats/coverage-stats';
 import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
-import { PriceChartComponent } from './price-chart.component';
 
 type QueryState = 'no-query' | 'no-dates' | 'no-dates-lot' | 'filtered-zero' | 'normal';
+
+/** Padding a cada lado del encuadre inicial, para que los items no queden pegados al borde. */
+const WINDOW_PAD_RATIO = 0.05;
+/** Piso del padding (y semi-ancho de la ventana cuando todos los items caen en la misma fecha). */
+const WINDOW_PAD_MIN_MS = 1000 * 60 * 60 * 24 * 30;
+/** Tope de atributos numéricos en el tooltip; más que esto no entra en un cuadrante. */
+const TOOLTIP_MAX_ATTRS = 6;
 
 enum ZoomLevel {
   TenYears = 'ten-years',
@@ -37,7 +43,7 @@ enum ZoomLevel {
 @Component({
   selector: 'app-timeline-view',
   standalone: true,
-  imports: [PriceChartComponent, CoverageChipComponent],
+  imports: [CoverageChipComponent],
   templateUrl: './timeline-view.component.html',
   styleUrls: ['./timeline-view.component.scss'],
 })
@@ -52,7 +58,6 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   filteredNodeCount = 0;
   canApplyRange = false;
   activeFilterCount = 0;
-  selectedNode: NormalizedNode | null = null;
   /** Texto del chip de cobertura; vacío cuando la timeline muestra todos los nodos. */
   coverageLabel = '';
 
@@ -67,6 +72,8 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private allNodes: NormalizedNode[] = [];
   private suppressViewportEmit = false;
   private readonly viewportChange$ = new Subject<{ start: Date; end: Date }>();
+  private markActiveListener?: () => void;
+  private redrawHandle?: number;
 
   private readonly viewState = inject(DashboardViewStateService);
 
@@ -78,6 +85,11 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // La timeline se crea ANTES de suscribirse: los BehaviorSubject de
+    // SelectionService emiten sincrónicamente al suscribirse, así que con un
+    // queryResult ya presente (dashboard hidratado / handoff) renderItems()
+    // correría con this.timeline undefined y se perdería el encuadre inicial.
+    this.initTimeline();
     this.initResizeObserver();
 
     combineLatest([
@@ -156,7 +168,6 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         filter((sel: Selection) => sel.source !== 'timeline'),
       )
       .subscribe((sel: Selection) => {
-        this.selectedNode = sel.node;
         this.cdr.markForCheck();
 
         if (sel.node && sel.node.temporalEvents?.length && this.timeline) {
@@ -199,8 +210,6 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         ),
       )
       .subscribe((f) => this.applyExternalFocus(f.uris));
-
-    this.initTimeline();
   }
 
   private emitFocusFromViewport(range: { start: Date; end: Date }): void {
@@ -262,7 +271,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     }
 
     const span = winMax - winMin;
-    const pad = Math.max(span * 0.2, 1000 * 60 * 60 * 24 * 30);
+    const pad = Math.max(span * 0.2, WINDOW_PAD_MIN_MS);
 
     const targetStart = winMin - pad;
     const targetEnd = winMax + pad;
@@ -291,6 +300,15 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     this.resizeObserver?.disconnect();
+    if (this.redrawHandle !== undefined) {
+      cancelAnimationFrame(this.redrawHandle);
+    }
+    const container = this.tlContainer?.nativeElement;
+    if (container && this.markActiveListener) {
+      container.removeEventListener('pointerdown', this.markActiveListener, { capture: true });
+      container.removeEventListener('wheel', this.markActiveListener, { capture: true });
+      this.markActiveListener = undefined;
+    }
     this.timeline?.destroy();
   }
 
@@ -369,8 +387,19 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private initTimeline(): void {
     const options: TimelineOptions = {
       stack: true,
-      horizontalScroll: true,
-      zoomKey: 'ctrlKey',
+      // La timeline queda clavada al alto del cuadrante en vez de crecer con el
+      // apilado: vis relee dom.root.offsetHeight después de aplicar la altura y
+      // deriva de ahí el alto del área central, así que el eje inferior (que es
+      // hermano de esa área, no hijo) queda siempre visible.
+      height: '100%',
+      // Barra de scroll interna para los items, en lugar de scrollear el panel
+      // entero con la toolbar incluida.
+      verticalScroll: true,
+      // preferZoom + zoomKey ausente = la rueda hace zoom temporal (igual que el
+      // mapa). No agregar zoomKey: haría que la rueda vuelva a scrollear.
+      preferZoom: true,
+      horizontalScroll: false,
+      tooltip: { followMouse: true, overflowMethod: 'flip' },
       selectable: true,
       multiselect: false,
       showCurrentTime: false,
@@ -385,6 +414,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
     const container = this.tlContainer.nativeElement;
     const markActive = () => this.selectionService.markActiveView('timeline');
+    this.markActiveListener = markActive;
     container.addEventListener('pointerdown', markActive, { capture: true });
     container.addEventListener('wheel', markActive, { passive: true, capture: true });
 
@@ -394,7 +424,6 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       const node = this.allNodes.find((n) => n.uri === nodeUri);
       if (node) {
         this.ngZone.run(() => {
-          this.selectedNode = node;
           this.selectionService.select(node, 'timeline');
         });
       }
@@ -432,7 +461,12 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private initResizeObserver(): void {
     if (typeof ResizeObserver === 'undefined') return;
     this.resizeObserver = new ResizeObserver(() => {
-      this.timeline?.redraw();
+      // Coalescido en un frame: redraw() reescribe el DOM que estamos observando.
+      if (this.redrawHandle !== undefined) return;
+      this.redrawHandle = requestAnimationFrame(() => {
+        this.redrawHandle = undefined;
+        this.timeline?.redraw();
+      });
     });
     const containerEl = this.tlContainer?.nativeElement;
     if (containerEl) {
@@ -444,51 +478,132 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.items.clear();
     this.groups.clear();
 
-    const typeGroups = new Map<string, DataGroup>();
+    const groupCounts = new Map<string, number>();
+    let minMs = Infinity;
+    let maxMs = -Infinity;
 
     for (const node of result.nodes) {
       if (!node.temporalEvents?.length) continue;
 
       const type = node.type ?? 'unknown';
-      if (!typeGroups.has(type)) {
-        typeGroups.set(type, {
-          id: type,
-          content: type,
-        });
-      }
+      groupCounts.set(type, (groupCounts.get(type) ?? 0) + 1);
 
       const mostRecent = node.temporalEvents.reduce((a, b) => (a.isoDate > b.isoDate ? a : b));
+      const start = new Date(mostRecent.isoDate);
+      const ms = start.getTime();
+      if (!isNaN(ms)) {
+        if (ms < minMs) minMs = ms;
+        if (ms > maxMs) maxMs = ms;
+      }
 
       const color = this.colorService.colorForType(node.type);
 
       this.items.add({
         id: node.uri,
         group: type,
-        start: new Date(mostRecent.isoDate),
+        start,
         content: node.label,
+        title: this.buildItemTooltip(node, start),
         style: `color: ${color}; border-color: ${color};`,
       } as DataItem);
     }
 
-    this.groups.add(Array.from(typeGroups.values()));
+    // El conteo se conoce recién al terminar el recorrido, así que los grupos se
+    // arman al final.
+    const groups: DataGroup[] = Array.from(groupCounts, ([type, count]) => ({
+      id: type,
+      // vis inserta el content del grupo como HTML; el type sale de datos RDF.
+      content: `${this.escapeHtml(this.humanizeLabel(type))} (${count})`,
+    }));
+
+    this.groups.add(groups);
     this.timeline?.setItems(this.items);
     this.timeline?.setGroups(this.groups);
 
-    if (this.timeline && this.items.length > 0) {
-      let minDate: Date | null = null;
-      let maxDate: Date | null = null;
-
-      this.items.forEach((item) => {
-        if (item.start) {
-          const d = item.start instanceof Date ? item.start : new Date(item.start as string);
-          if (!minDate || d < minDate) minDate = d;
-          if (!maxDate || d > maxDate) maxDate = d;
-        }
-      });
-
-      if (minDate && maxDate) {
-        this.timeline.setWindow(minDate, maxDate, { animation: false });
-      }
+    if (this.timeline && isFinite(minMs) && isFinite(maxMs)) {
+      // Padding para que los items de los extremos no queden pegados al borde;
+      // con todas las fechas iguales el span es 0 y el piso abre la ventana.
+      const pad = Math.max((maxMs - minMs) * WINDOW_PAD_RATIO, WINDOW_PAD_MIN_MS);
+      this.timeline.setWindow(new Date(minMs - pad), new Date(maxMs + pad), { animation: false });
     }
+  }
+
+  /**
+   * El `type` de un nodo es el nombre de la variable SPARQL que lo ancló o una
+   * URI completa, según el productor. Devuelve algo legible en ambos casos.
+   */
+  private humanizeLabel(type: string): string {
+    if (type === 'unknown') return 'Sin tipo';
+
+    let label = type;
+    if (label.includes('://')) {
+      const fragment = label.split('#').pop() ?? label;
+      label = fragment.split('/').filter(Boolean).pop() ?? label;
+    }
+
+    label = label
+      .replace(/[_-]+/g, ' ')
+      .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+      .trim();
+
+    if (!label) return type;
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  /**
+   * Tooltip con lo que la timeline no puede mostrar en el item: la fecha
+   * formateada, cuántos eventos tiene el nodo (solo se dibuja el más reciente) y
+   * las magnitudes numéricas que traiga la query — m2, precio o lo que sea.
+   */
+  private buildItemTooltip(node: NormalizedNode, start: Date): string {
+    const lines = [`<strong>${this.escapeHtml(node.label)}</strong>`];
+
+    if (!isNaN(start.getTime())) {
+      const formatted = start.toLocaleDateString('es-AR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      const eventCount = node.temporalEvents?.length ?? 0;
+      const suffix = eventCount > 1 ? ` · ${eventCount} fechas` : '';
+      lines.push(this.escapeHtml(formatted + suffix));
+    }
+
+    for (const [field, value] of this.collectNumericAttributes(node)) {
+      lines.push(
+        `${this.escapeHtml(this.humanizeLabel(field))}: ${this.escapeHtml(
+          value.toLocaleString('es-AR'),
+        )}`,
+      );
+    }
+
+    return lines.join('<br>');
+  }
+
+  /** Atributos literales cuyo valor parsea como número finito. */
+  private collectNumericAttributes(node: NormalizedNode): [string, number][] {
+    const found: [string, number][] = [];
+
+    for (const [field, binding] of Object.entries(node.attributes ?? {})) {
+      if (found.length >= TOOLTIP_MAX_ATTRS) break;
+      if (binding?.type !== 'literal') continue;
+      const raw = binding.value.trim();
+      if (!raw) continue;
+      const parsed = Number(raw);
+      if (!isFinite(parsed)) continue;
+      found.push([field, parsed]);
+    }
+
+    return found;
+  }
+
+  /** Los valores vienen de datos RDF arbitrarios y el tooltip se inyecta como HTML. */
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }

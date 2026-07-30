@@ -66,10 +66,4 @@
     class="tl-container"
     [class.tl-container--hidden]="queryState !== 'normal'"
   ></div>
-
-  @if (queryState === 'normal') {
-    <div class="price-chart-area">
-      <app-price-chart [node]="selectedNode" />
-    </div>
-  }
 </div>

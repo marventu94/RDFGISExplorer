@@ -39,16 +39,19 @@ const nodeWithoutDates: NormalizedNode = {
   temporalEvents: [],
 };
 
-const nodeWithPriceHistory: NormalizedNode = {
+/** Magnitudes numéricas mezcladas con literales de texto, como las devuelve una query real. */
+const nodeWithNumericAttrs: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q123',
-  label: 'Propiedad Ejemplo',
-  type: 'http://www.wikidata.org/entity/Q33506',
-  attributes: {},
+  label: 'Depósito Norte',
+  type: 'superficie_lote',
+  attributes: {
+    metrosCuadrados: { type: 'literal', value: '1250' },
+    precio: { type: 'literal', value: '340000.5' },
+    barrio: { type: 'literal', value: 'Villa Crespo' },
+  },
   temporalEvents: [
-    { field: 'price', isoDate: '2020-01-01T00:00:00Z', numericValue: 50000 },
-    { field: 'price', isoDate: '2021-01-01T00:00:00Z', numericValue: 55000 },
-    { field: 'price', isoDate: '2022-01-01T00:00:00Z', numericValue: 60000 },
-    { field: 'price', isoDate: '2023-01-01T00:00:00Z', numericValue: 65000 },
+    { field: 'fechaMedicion', isoDate: '2024-03-14T00:00:00Z' },
+    { field: 'fechaMedicion', isoDate: '2023-01-10T00:00:00Z' },
   ],
 };
 
@@ -106,30 +109,23 @@ const timelineMock = vi.hoisted(() => {
   return {
     createMockTimeline,
     instance: undefined as unknown as ReturnType<typeof createMockTimeline>,
-  };
-});
-
-vi.mock('chart.js/auto', () => {
-  const ChartMock = Object.assign(
-    vi.fn(function () {
-      return { destroy: vi.fn() };
-    }),
-    { register: vi.fn() },
-  );
-  return {
-    Chart: ChartMock,
-    registerables: [],
+    options: undefined as Record<string, unknown> | undefined,
+    items: undefined as unknown,
+    groups: undefined as unknown,
   };
 });
 
 vi.mock('vis-timeline/standalone', () => ({
   Timeline: vi.fn(function (
     _container: HTMLElement,
-    _items: unknown,
-    _groups: unknown,
-    _options: unknown,
+    items: unknown,
+    groups: unknown,
+    options: Record<string, unknown>,
   ) {
     timelineMock.instance = timelineMock.createMockTimeline();
+    timelineMock.options = options;
+    timelineMock.items = items;
+    timelineMock.groups = groups;
     return timelineMock.instance;
   }),
 }));
@@ -138,8 +134,13 @@ vi.mock('vis-data', () => ({
   DataSet: vi.fn(function (initial?: unknown[]) {
     const data = initial ? [...initial] : [];
     return {
+      // El DataSet real acepta un item o un array; los grupos se agregan en lote.
       add: vi.fn((item: unknown) => {
-        data.push(item);
+        if (Array.isArray(item)) {
+          data.push(...item);
+        } else {
+          data.push(item);
+        }
       }),
       clear: vi.fn(() => {
         data.length = 0;
@@ -382,16 +383,6 @@ describe('TimelineViewComponent', () => {
       expect(el.querySelector('.zoom-group')).toBeTruthy();
     });
 
-    it('should show price chart area in normal state', () => {
-      const result = createMockQueryResult([nodeWithDates]);
-      queryResultSubject.next(result);
-      filteredQueryResultSubject.next(result);
-      fixture.detectChanges();
-
-      const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.price-chart-area')).toBeTruthy();
-    });
-
     it('should show coverage chip when some nodes have no dates', () => {
       const result = createMockQueryResult([nodeWithDates, nodeWithoutDates]);
       queryResultSubject.next(result);
@@ -549,17 +540,6 @@ describe('TimelineViewComponent', () => {
       );
     });
 
-    it('should update selectedNode when internal selection happens', () => {
-      const result = createMockQueryResult([nodeWithDates]);
-      queryResultSubject.next(result);
-      filteredQueryResultSubject.next(result);
-      fixture.detectChanges();
-
-      expect(component.selectedNode).toBeNull();
-
-      timelineMock.instance.simulateSelect([nodeWithDates.uri]);
-      expect(component.selectedNode).toBe(nodeWithDates);
-    });
   });
 
   describe('temporal filter', () => {
@@ -685,23 +665,6 @@ describe('TimelineViewComponent', () => {
     });
   });
 
-  describe('price chart selection sync', () => {
-    it('should pass selectedNode to price-chart when external selection arrives', () => {
-      const result = createMockQueryResult([nodeWithPriceHistory, nodeWithOneDate]);
-      queryResultSubject.next(result);
-      filteredQueryResultSubject.next(result);
-      fixture.detectChanges();
-
-      selectedNodeSubject.next({
-        node: nodeWithPriceHistory,
-        source: 'table',
-      });
-      fixture.detectChanges();
-
-      expect(component.selectedNode).toBe(nodeWithPriceHistory);
-    });
-  });
-
   describe('data reactivity', () => {
     it('should transition from no-dates to normal when dates become available', () => {
       const resultNoDates = createMockQueryResult([nodeWithoutDates]);
@@ -728,6 +691,151 @@ describe('TimelineViewComponent', () => {
       filteredQueryResultSubject.next(null);
       fixture.detectChanges();
       expect(component.queryState).toBe('no-query');
+    });
+  });
+
+  describe('vis options', () => {
+    it('should pin the timeline to the container so the date axis stays visible', () => {
+      expect(timelineMock.options).toMatchObject({
+        height: '100%',
+        verticalScroll: true,
+        horizontalScroll: false,
+      });
+    });
+
+    // La rueda hace zoom solo con preferZoom Y sin zoomKey: con zoomKey presente
+    // el handler del Core vuelve a scrollear en vez de dejar zoomear al Range.
+    it('should make the mouse wheel zoom instead of panning horizontally', () => {
+      expect(timelineMock.options?.['preferZoom']).toBe(true);
+      expect(timelineMock.options).not.toHaveProperty('zoomKey');
+    });
+
+    it('should keep tooltips inside the quadrant', () => {
+      expect(timelineMock.options?.['tooltip']).toEqual({
+        followMouse: true,
+        overflowMethod: 'flip',
+      });
+    });
+  });
+
+  describe('item tooltips', () => {
+    function renderedItems(): Record<string, unknown>[] {
+      const items = timelineMock.items as { get: () => Record<string, unknown>[] };
+      return items.get();
+    }
+
+    it('should include label, formatted date and numeric attributes', () => {
+      const result = createMockQueryResult([nodeWithNumericAttrs]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      const title = renderedItems()[0]['title'] as string;
+      expect(title).toContain('Depósito Norte');
+      expect(title).toContain('2024');
+      expect(title).toContain('Metros Cuadrados');
+      expect(title).toContain('1.250');
+      expect(title).toContain('Precio');
+    });
+
+    it('should report how many dates a node has, since only the most recent is drawn', () => {
+      const result = createMockQueryResult([nodeWithNumericAttrs]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      expect(renderedItems()[0]['title']).toContain('2 fechas');
+    });
+
+    it('should leave out non-numeric literals', () => {
+      const result = createMockQueryResult([nodeWithNumericAttrs]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      expect(renderedItems()[0]['title']).not.toContain('Villa Crespo');
+    });
+
+    it('should escape values coming from RDF data', () => {
+      const hostile: NormalizedNode = {
+        ...nodeWithNumericAttrs,
+        uri: 'http://x/Q999',
+        label: '<img src=x onerror="alert(1)">',
+      };
+      const result = createMockQueryResult([hostile]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      const title = renderedItems()[0]['title'] as string;
+      expect(title).not.toContain('<img');
+      expect(title).toContain('&lt;img');
+    });
+  });
+
+  describe('group labels', () => {
+    function renderedGroups(): Record<string, unknown>[] {
+      const groups = timelineMock.groups as { get: () => Record<string, unknown>[] };
+      return groups.get();
+    }
+
+    it('should humanize a SPARQL variable name and add the count', () => {
+      const result = createMockQueryResult([nodeWithNumericAttrs]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      expect(renderedGroups()[0]['content']).toBe('Superficie lote (1)');
+    });
+
+    it('should reduce a URI type to its last segment', () => {
+      // nodeWithDates y nodeWithOneDate traen URIs completas de Wikidata.
+      const result = createMockQueryResult([nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      expect(renderedGroups()[0]['content']).toBe('Q515 (1)');
+    });
+
+    it('should count every node sharing a type', () => {
+      const sibling: NormalizedNode = { ...nodeWithOneDate, uri: 'http://x/Q10', label: 'Perú' };
+      const result = createMockQueryResult([nodeWithOneDate, sibling]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      expect(renderedGroups()).toHaveLength(1);
+      expect(renderedGroups()[0]['content']).toBe('Q515 (2)');
+    });
+  });
+
+  describe('initial framing', () => {
+    // La timeline se construye antes de suscribirse justamente por esto: los
+    // BehaviorSubject emiten sincrónicamente y antes se perdía el encuadre.
+    it('should frame the data when a result is already present before ngOnInit', async () => {
+      const result = createMockQueryResult([nodeWithDates]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+
+      const freshFixture = TestBed.createComponent(TimelineViewComponent);
+      freshFixture.detectChanges();
+
+      expect(timelineMock.instance.setWindow).toHaveBeenCalled();
+      freshFixture.destroy();
+    });
+
+    it('should pad the window so edge items are not flush against the border', () => {
+      const result = createMockQueryResult([nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      const [start, end] = timelineMock.instance.setWindow.mock.calls.at(-1) as [Date, Date];
+      const eventMs = new Date(nodeWithOneDate.temporalEvents![0].isoDate).getTime();
+      // Una sola fecha: el span es 0, así que el piso del padding abre la ventana.
+      expect(start.getTime()).toBeLessThan(eventMs);
+      expect(end.getTime()).toBeGreaterThan(eventMs);
     });
   });
 });
