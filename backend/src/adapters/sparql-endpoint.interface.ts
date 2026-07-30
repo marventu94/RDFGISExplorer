@@ -3,6 +3,12 @@ import { QueryResult } from '../shared/dto/query-result.dto';
 export interface ExecuteOptions {
   timeoutMs: number;
   limit: number;
+  /**
+   * Modo crudo (export/paginación): saltea la proyección de intermedios y la
+   * construcción del grafo; devuelve solo `bindings` con todas las variables
+   * (nodes/edges vacíos).
+   */
+  raw?: boolean;
   signal?: AbortSignal;
 }
 

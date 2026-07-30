@@ -21,7 +21,7 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 export const DEFAULT_USER_AGENT =
   'rdf-gis-explorer/0.1 (https://github.com/marventu94/RDFGISExplorer; mailto:mar_venturino@hotmail.com)';
 const RETRY_DELAYS_MS = [500, 1500, 4500];
-const PREDICATE_CACHE_TTL_MS = 3_600_000;
+const DEFAULT_PREDICATE_CACHE_TTL_MS = 3_600_000;
 const XSD_DATE = 'http://www.w3.org/2001/XMLSchema#date';
 const XSD_DATE_TIME = 'http://www.w3.org/2001/XMLSchema#dateTime';
 const GEOSPARQL_WKT = 'http://www.opengis.net/ont/geosparql#wktLiteral';
@@ -51,7 +51,11 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     // Si hay nodos intermedios sin proyectar (los bnodes de dirección, feature o
     // geometría que el modelo interpone entre entidades), se agregan al SELECT para
     // poder dibujarlos; la tabla sigue mostrando sólo las columnas originales.
-    const topology = extractQueryTopology(query);
+    // En modo raw (export paginado) no hace falta grafo ni reescritura: se ejecuta
+    // la query tal cual y se devuelven solo los bindings.
+    const topology = opts.raw
+      ? { links: [], projected: null, intermediates: [] }
+      : extractQueryTopology(query);
     const upstreamQuery = topology.rewritten ?? query;
 
     const controller = new AbortController();
@@ -109,7 +113,9 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
           ? fullRows.map((row) => this.pickVariables(row, exposedVars))
           : fullRows;
 
-        const { nodes, edges } = this.buildGraph(fullRows, exposedVars, topology);
+        const { nodes, edges } = opts.raw
+          ? { nodes: [], edges: [] }
+          : this.buildGraph(fullRows, exposedVars, topology);
 
         return {
           variables: exposedVars,
@@ -143,12 +149,21 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
         }
         const upstreamBody = JSON.stringify(err.response?.data ?? {});
         if (status === 429) {
-          throw new UpstreamError(429, `Retries exhausted (body: ${upstreamBody})`);
+          throw new UpstreamError(
+            429,
+            `Retries exhausted (body: ${upstreamBody})`,
+          );
         }
         if (status >= 500) {
-          throw new UpstreamError(status, `${err.message} (body: ${upstreamBody})`);
+          throw new UpstreamError(
+            status,
+            `${err.message} (body: ${upstreamBody})`,
+          );
         }
-        throw new UpstreamError(status, `${err.message} (body: ${upstreamBody})`);
+        throw new UpstreamError(
+          status,
+          `${err.message} (body: ${upstreamBody})`,
+        );
       }
     }
 
@@ -162,7 +177,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     const now = Date.now();
     if (
       this.predicateCache &&
-      now - this.predicateCacheAt < PREDICATE_CACHE_TTL_MS
+      now - this.predicateCacheAt < this.predicateCacheTtlMs()
     ) {
       return this.predicateCache;
     }
@@ -220,6 +235,17 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
       return DEFAULT_USER_AGENT;
     }
     return ua;
+  }
+
+  /** TTL del cache de predicados: env SPARQL_PREDICATE_CACHE_TTL_MS (default 1h). */
+  private predicateCacheTtlMs(): number {
+    const parsed = parseInt(
+      process.env['SPARQL_PREDICATE_CACHE_TTL_MS'] ?? '',
+      10,
+    );
+    return Number.isInteger(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_PREDICATE_CACHE_TTL_MS;
   }
 
   private normalizeRow(
@@ -283,7 +309,9 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
   private parseWktPoint(raw: string): Coordinate | null {
     // Soporta WKT simple (Point(lng lat)) y GeoSPARQL 1.1 con CRS opcional
     // (<http://www.opengis.net/def/crs/EPSG/0/4326> Point(lng lat)).
-    const m = /^(?:<[^>]+>\s*)?Point\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/i.exec(raw);
+    const m = /^(?:<[^>]+>\s*)?Point\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)/i.exec(
+      raw,
+    );
     if (!m) {
       return null;
     }
@@ -356,7 +384,10 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
       const anchor = this.ensureNode(nodeMap, row, anchorVar);
       if (!anchor) continue;
 
-      Object.assign(anchor.attributes, this.collectAttributes(row, exposedVars));
+      Object.assign(
+        anchor.attributes,
+        this.collectAttributes(row, exposedVars),
+      );
 
       const coord = this.findCoordinate(row, exposedVars);
       if (coord && !anchor.coordinate) anchor.coordinate = coord;
