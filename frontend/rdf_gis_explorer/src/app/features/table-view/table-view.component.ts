@@ -160,7 +160,7 @@ export class TableViewComponent implements OnDestroy {
    * `coordinate` calculados por el adapter. La timeline sólo reacciona a una
    * selección si el nodo tiene `temporalEvents` (ver su handler de selectedNode$),
    * así que un nodo fabricado sin ese campo movía el mapa pero dejaba la timeline
-   * quieta. Se usan los nodos SIN filtrar, igual que graph-view con `originalResult`.
+   * quieta. Se usan los nodos SIN filtrar, igual que graph-view con su `nodeIndex`.
    */
   private resolveNodeForRow(rowData: Record<string, BindingValue>): NormalizedNode | null {
     const uri = this.extractUri(rowData);

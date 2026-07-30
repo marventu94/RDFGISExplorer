@@ -13,6 +13,14 @@ export interface TimelineViewState {
 
 export interface GraphViewState {
   layout: string;
+  /** Cámara del grafo, para que el zoom/pan sobreviva a un remonte del slot. */
+  pan?: { x: number; y: number };
+  zoom?: number;
+  /**
+   * Posiciones de los nodos que el usuario acomodó a mano, por URI. Solo esos:
+   * el resto lo sigue ubicando el layout.
+   */
+  manualPositions?: Record<string, { x: number; y: number }>;
 }
 
 export interface TableViewState {
