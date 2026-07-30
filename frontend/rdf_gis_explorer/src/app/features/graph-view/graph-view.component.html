@@ -26,15 +26,6 @@
 
   @if (cy) {
     <div class="graph-toolbar">
-      <select
-        class="layout-dropdown"
-        [ngModel]="currentLayout"
-        (ngModelChange)="setLayout($event)"
-      >
-        @for (opt of layoutOptions; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
       <button class="toolbar-btn" (click)="fit()">fit</button>
       <button class="toolbar-btn" (click)="resetZoom()">reset zoom</button>
     </div>

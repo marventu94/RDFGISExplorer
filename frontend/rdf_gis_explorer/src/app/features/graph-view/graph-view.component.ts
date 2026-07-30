@@ -10,7 +10,6 @@ import {
   ChangeDetectorRef,
   inject,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { SelectionService } from '@core/services/selection.service';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
@@ -47,7 +46,7 @@ interface BuiltGraph {
 @Component({
   selector: 'app-graph-view',
   standalone: true,
-  imports: [FormsModule, CoverageChipComponent],
+  imports: [CoverageChipComponent],
   templateUrl: './graph-view.component.html',
   styleUrls: ['./graph-view.component.scss'],
 })
