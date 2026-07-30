@@ -29,13 +29,18 @@
       <div class="page-size-selector">
         <span>Filas:</span>
         <select [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
-          @for (size of pageSizeOptions; track size) {
+          @for (size of pageSizeOptions(); track size) {
             <option [value]="size">{{ size }}</option>
           }
         </select>
       </div>
 
-      <button mat-icon-button (click)="exportCsv()" title="Exportar CSV" aria-label="Exportar CSV">
+      <button
+        mat-icon-button
+        (click)="exportCsv()"
+        title="Exportar el lote visible a CSV (para el resultado completo usá el botón del navbar)"
+        aria-label="Exportar lote visible a CSV"
+      >
         <mat-icon>download</mat-icon>
       </button>
     </div>
