@@ -37,9 +37,10 @@ paper identifica como necesario para el campo.
 
 ## Referencia
 
-- [Peffers et al. 2006] Peffers, K., Tuunanen, T., Rothenberger, M.,
-  Chatterjee, S. "A Design Science Research Methodology for Information
-  Systems Research." JMIS 24(3).
+- [Peffers et al. 2006] Peffers, K., Tuunanen, T., Gengler, C. E., Rossi, M.,
+  Hui, W., Virtanen, V., & Bragge, J. "The Design Science Research Process: A
+  Model for Producing and Presenting Information Systems Research."
+  Proceedings of DESRIST 2006, 83–106.
 - [Venturino et al. 2026] Paper DECISIONING 2026 — ver
   [design-decisions.md](./design-decisions.md) §Referencias.
 - [Vargas et al. 2019] "RDF Explorer: A Visual SPARQL Query Builder."
