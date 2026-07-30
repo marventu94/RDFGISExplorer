@@ -131,6 +131,41 @@ describe('GenericSparqlAdapter', () => {
     });
   });
 
+  describe('raw mode (export)', () => {
+    it('sends the query verbatim and returns only bindings (no graph)', async () => {
+      const bodies: string[] = [];
+      nock(WIKIDATA_BASE)
+        .post(WIKIDATA_PATH)
+        .reply(200, function (_uri, requestBody) {
+          const raw =
+            typeof requestBody === 'string'
+              ? requestBody
+              : new URLSearchParams(
+                  requestBody as Record<string, string>,
+                ).toString();
+          bodies.push(raw);
+          return FIXTURE;
+        });
+
+      // Query con intermedios no proyectados: en modo normal el adaptador la
+      // reescribiría agregándolos al SELECT y construiría el grafo.
+      const query =
+        'SELECT ?city WHERE { ?city <http://www.wikidata.org/prop/direct/P17> ?country }';
+      const result = await adapter.execute(query, {
+        timeoutMs: 10_000,
+        limit: 50,
+        raw: true,
+      });
+
+      expect(bodies).toHaveLength(1);
+      const sent = new URLSearchParams(bodies[0]).get('query');
+      expect(sent).toBe(query);
+      expect(result.bindings.length).toBeGreaterThan(0);
+      expect(result.nodes).toEqual([]);
+      expect(result.edges).toEqual([]);
+    });
+  });
+
   describe('normalization of binding types', () => {
     it('normalizes URIs correctly', async () => {
       mockWikidata(FIXTURE);
@@ -476,7 +511,10 @@ describe('GenericSparqlAdapter', () => {
           ],
         },
       });
-      const result = await adapter.execute('SELECT * WHERE { ?s ?p ?o }', defaultOpts);
+      const result = await adapter.execute(
+        'SELECT * WHERE { ?s ?p ?o }',
+        defaultOpts,
+      );
       expect(result.edges).toHaveLength(1);
       expect(result.edges[0]).toMatchObject({
         source: Q123,

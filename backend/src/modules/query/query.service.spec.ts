@@ -70,6 +70,14 @@ describe('QueryService', () => {
     );
   });
 
+  it('should propagate the raw flag to the endpoint', async () => {
+    await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 500, true);
+    expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
+      'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
+      expect.objectContaining({ limit: 500, raw: true }),
+    );
+  });
+
   it('should throw 400 INVALID_SPARQL for invalid SPARQL syntax', async () => {
     try {
       await service.execute('NOT VALID SPARQL');

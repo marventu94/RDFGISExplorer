@@ -22,6 +22,9 @@ export type {
   HandoffPayloadInput,
 } from './query-handoff.service';
 export { QueryHandoffService } from './query-handoff.service';
+export { DEFAULT_LIMITS, LimitsService } from './limits.service';
+export { ResultExportService } from './result-export.service';
 export type { FocusSource, FocusState } from './selection.service';
 export { SelectionService } from './selection.service';
 export { SparqlQueryStateService } from './sparql-query-state.service';
+export { SummaryStateService } from './summary-state.service';

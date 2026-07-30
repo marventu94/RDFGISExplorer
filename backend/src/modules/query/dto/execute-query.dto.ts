@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, Min } from 'class-validator';
 
 export class ExecuteQueryDto {
   @IsString()
@@ -8,4 +8,9 @@ export class ExecuteQueryDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  /** Modo crudo (export): sin proyección de intermedios ni grafo, solo bindings. */
+  @IsOptional()
+  @IsBoolean()
+  raw?: boolean;
 }
