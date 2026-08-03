@@ -1,19 +1,20 @@
 # Decisiones de diseño
 
-> Por qué RDFGISExplorer es como es. Cada decisión se deriva del estado del
-> arte relevado en el paper DECISIONING 2026 [Venturino et al. 2026] —una
-> rapid review de 30 trabajos sobre visualización de grafos de conocimiento
-> (KG) con dimensiones geo-espacial (S) y temporal (T)— y se complementa con
-> notas propias de ingeniería. El objetivo es que cada elección sea
-> defendible en una frase: qué muestra la literatura que la motiva y qué parte
-> es decisión nuestra.
+> Este documento registra y fundamenta las decisiones de diseño de
+> RDFGISExplorer. Cada decisión se deriva del estado del arte relevado en el
+> paper DECISIONING 2026 [Venturino et al. 2026] —una *rapid review* de 30
+> trabajos sobre visualización de grafos de conocimiento (KG) con dimensiones
+> geo-espacial (S) y temporal (T)— y, cuando corresponde, se complementa con
+> criterios propios de ingeniería, explicitados como tales. El objetivo es
+> que cada elección resulte defendible: qué evidencia de la literatura la
+> motiva y qué parte constituye un aporte propio.
 
-**El problema que enmarca todo:** el paper muestra que solo 7 de 30 trabajos
-integran grafo + espacio + tiempo (G+S+T), que cada uno lo hizo para un
-dominio específico sin generalizar, y que el ecosistema de herramientas es
-frágil (§3.2, §4.3, §5). De ahí salen los dos ejes del diseño: **integrar las
-tres dimensiones en una interfaz** y **no atarse a un dominio ni a
-componentes irreemplazables**.
+**El problema que enmarca el diseño:** el paper evidencia que solo 7 de 30
+trabajos integran grafo + espacio + tiempo (G+S+T), que cada uno lo hizo para
+un dominio específico sin generalizar, y que el ecosistema de herramientas es
+frágil (§3.2, §4.3, §5). De este diagnóstico se derivan los dos ejes del
+diseño: **integrar las tres dimensiones en una única interfaz** y **no
+atarse a un dominio ni a componentes irreemplazables**.
 
 ---
 
@@ -26,25 +27,29 @@ together"*. Además, §4.2 señala que las vistas 2D requieren estrategias de
 view-linking. Hadlak et al. [2015] formalizan el patrón: facetas balanceadas
 se componen por juxtaposition en vistas coordinadas con linking & brushing.
 
-**Nota propia.** Cuatro y no tres: sin la tabla se pierde la verificación de
-valores exactos y la exportación (ver §3). Cuatro y no cinco: una vista de
-agregaciones convertiría la herramienta en analítica, lo que excede el
-alcance declarado (ver §2).
+**Decisión.** El conjunto de vistas se fija en cuatro. Prescindir de la
+tabla implicaría perder la verificación de valores exactos y el soporte de
+la exportación (ver §3); incorporar una quinta vista de agregaciones, en
+cambio, desplazaría la herramienta hacia el análisis y excedería el alcance
+declarado (ver §2).
 
 ## 2. Alcance: exploración con estadística descriptiva (no análisis)
 
-**Fundamento.** El propio paper muestra que el filtrado multidimensional
-G+S+T *"remains a technical challenge"* (§4.2): resolver bien el lado
-exploratorio ya es una contribución. Para la frontera usamos la taxonomía de
-tareas de Andrienko et al. [2003]: las **tareas elementales** (inspeccionar
-individuos) se responden con vistas; las **tareas generales** (preguntas
-sobre el conjunto) requieren *data aggregation tools*.
+**Fundamento.** El paper evidencia que el filtrado multidimensional G+S+T
+*"remains a technical challenge"* (§4.2), por lo que resolver
+satisfactoriamente el aspecto exploratorio constituye ya una contribución en
+sí misma. La delimitación del alcance se apoya en la taxonomía de tareas de
+Andrienko et al. [2003]: las **tareas elementales** (inspección de
+individuos) se atienden con vistas, mientras que las **tareas generales**
+(preguntas sobre el conjunto) requieren *data aggregation tools*.
 
-**Decisión.** Las vistas filtran e inspeccionan; el panel de resumen computa
-agregados sobre el resultado completo; el análisis profundo se delega al
-export. Regla de honestidad asociada: **ningún número presentado como "del
-resultado" se computa sobre la muestra visible** — o es sobre el total, o se
-etiqueta como lote.
+**Decisión.** La herramienta cubre exploración con estadística descriptiva,
+no análisis: las vistas filtran e inspeccionan, el panel de resumen computa
+agregados sobre el resultado completo y el análisis en profundidad se delega
+a la exportación. De esta delimitación se desprende una regla de honestidad:
+**ningún valor presentado como "del resultado" se computa sobre la muestra
+visible** — o se computa sobre el total, o se etiqueta explícitamente como
+lote.
 
 | Componente | Rol | ¿Filtra? | ¿Computa sobre el total? |
 |------------|-----|----------|--------------------------|
@@ -83,15 +88,25 @@ estados animados.
 **Fundamento.** El paper identifica el clutter visual como barrera recurrente
 que exige folding/fisheye (§4.1) y el focusing parcial es legítimo cuando el
 linking lo compensa [Andrienko et al. 2003]. La paginación por porciones
-acotadas es el *time chopping* de Bach et al. [2014], y dirigir qué se ve con
-sorting + pinning viene de Schulz et al. [2013].
+acotadas es el *time chopping* de Bach et al. [2014]. Quién decide qué entra
+en cada porción lo responde Schulz et al. [2013]: ante un conjunto demasiado
+grande para mostrar completo, el usuario declara su interés de dos formas —
+*relativa*, mediante un orden de las tuplas (sorting: la navegación empieza
+por lo más relevante), y *absoluta*, fijando instancias concretas de interés
+(pinning).
 
 **Nota propia.** El cap de 300 nodos es decisión nuestra dentro del rango
 empírico del corpus (los layouts se degradan ~100 nodos, el cómputo se
 dispara ~110, el near-real-time se mantiene <800). Las 4 vistas comparten el
 mismo lote de filas —la consistencia del linking se garantiza por
-construcción— y el `ORDER BY` de la query del usuario dirige qué entra en
-cada lote.
+construcción—. El sorting se implementa como el `ORDER BY` de la query del
+usuario: el lote se corta sobre las filas en su orden original, nunca
+reordenado en cliente, así que es el usuario quien dirige qué entra en cada
+lote. El pinning se adapta como inyección: donde Schulz et al. lo usan como
+filtro que recorta las tuplas a las que contienen la instancia fijada, acá el
+nodo seleccionado se agrega al lote visible aunque ninguna fila del lote lo
+referencie — la idea subyacente es la misma: la instancia de interés
+permanece fija mientras la porción visible cambia.
 
 ## 6. Panel de resumen (agregación sobre el resultado completo)
 
