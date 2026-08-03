@@ -4,17 +4,17 @@ Plataforma unificada para exploración visual de grafos de conocimiento (KG) con
 
 El backend actúa como proxy configurable hacia **cualquier endpoint SPARQL 1.1**: se valida hoy contra Wikidata y una instancia de GraphDB, y se adapta a otros endpoints configurando la URL, credenciales y prefixes por variables de entorno (ver [Configuración de backends SPARQL](#configuración-de-backends-sparql)).
 
-Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFIA / UNLP, 2025.
+Tesis de Maestría en Ingeniería de Software — Venturino, Martín M., 2025.
 
 ---
 
 ## Documentación de diseño
 
-El **por qué** de la arquitectura y de cada decisión (vistas coordinadas,
+Las decisiones de arquitectura y diseño de la plataforma (vistas coordinadas,
 alcance exploración/análisis, panel de resumen, export, límites, Adapter
-domain-agnostic, Native Federation) está en
-[`docs/design-decisions.md`](./docs/design-decisions.md), derivadas del paper
-DECISIONING 2026.
+domain-agnostic, Native Federation) están documentadas y fundamentadas en
+[`docs/design-decisions.md`](./docs/design-decisions.md), cada una derivada
+de los hallazgos del paper DECISIONING 2026.
 
 ---
 
