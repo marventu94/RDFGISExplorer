@@ -58,7 +58,7 @@ lote.
 | Grafo | Estructura relacional del foco | Top por conexiones | No |
 | Timeline | Distribución temporal | Rango (brush) | Agregación visual |
 | Panel de resumen | Estadística descriptiva | No | **Sí** (COUNT, AVG, MIN/MAX, top valores) |
-| Export CSV | Materia prima para análisis externo | No | Sí (todas las filas) |
+| Export Excel | Materia prima para análisis externo | No | Sí (todas las filas) |
 
 ## 3. La tabla como vista (y no solo vistas visuales)
 
@@ -122,7 +122,7 @@ heurísticamente del resultado tipado (numéricas, temporales, categóricas de
 baja cardinalidad): cero asunciones de dominio. Sin mediana — SPARQL 1.1 no
 la incluye.
 
-## 7. Export completo a CSV
+## 7. Export completo a Excel
 
 **Fundamento.** Es la contracara de la frontera de §2: si el análisis
 profundo se delega al export, exportar solo el lote visible sería entregar
@@ -131,9 +131,11 @@ una muestra arbitraria.
 **Decisión (propia).** Paginación determinista del lado del endpoint: la
 query se envuelve con un orden total sobre todas las variables proyectadas
 (respetando el `ORDER BY` del usuario si existe) y se descarga por páginas
-OFFSET/LIMIT hasta agotar el resultado. El CSV lleva encabezado de
-proveniencia (endpoint, query, timestamp, filas) y marca PARCIAL si se aplicó
-el tope configurable. SPARQL 1.1 estándar: funciona en cualquier endpoint.
+OFFSET/LIMIT hasta agotar el resultado. El archivo XLSX lleva una hoja de
+datos con celdas tipadas (números y fechas como valores, listos para operar
+en Excel) y una hoja de proveniencia (endpoint, query, timestamp, filas) con
+marca PARCIAL si se aplicó el tope configurable. SPARQL 1.1 estándar:
+funciona en cualquier endpoint.
 
 ## 8. Límites configurables por entorno
 

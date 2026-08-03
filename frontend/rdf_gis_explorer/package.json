@@ -34,6 +34,7 @@
     "cytoscape-cola": "^2.5.1",
     "cytoscape-dagre": "^3.0.0",
     "es-module-shims": "^1.5.12",
+    "exceljs": "^4.4.0",
     "leaflet": "^1.9.4",
     "leaflet-control-geocoder": "^3.3.1",
     "leaflet-draw": "^1.0.4",

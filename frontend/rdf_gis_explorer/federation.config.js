@@ -41,6 +41,7 @@ module.exports = withNativeFederation({
     'leaflet-control-geocoder',
     'leaflet-draw',
     'leaflet.markercluster',
+    'exceljs',
     // AG Grid es privativo de este remote: no compartir via federation.
     // Si se comparte con shareAll+singleton, el host (que no lo tiene en sus deps)
     // omite el @nf-internal/chunk-* en su import-map (ignoreUnusedDeps) y el
