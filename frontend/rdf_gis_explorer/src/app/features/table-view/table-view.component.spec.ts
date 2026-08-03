@@ -128,17 +128,16 @@ describe('TableViewComponent', () => {
     fixture.detectChanges();
 
     const defs = component.columnDefs();
-    expect(defs.length).toBe(4);
+    expect(defs.length).toBe(3);
     expect(defs[0].field).toBe('city');
     expect(defs[1].field).toBe('cityLabel');
     expect(defs[2].field).toBe('coord');
-    expect(defs[3].colId).toBe('plugin');
   });
 
   it('should clear columns and rows when result is null', () => {
     selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
     fixture.detectChanges();
-    expect(component.columnDefs().length).toBe(4);
+    expect(component.columnDefs().length).toBe(3);
 
     selectionServiceMock.visibleQueryResult$.next(null);
     fixture.detectChanges();
