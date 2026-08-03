@@ -52,14 +52,23 @@
       <span>Editor</span>
     </button>
 
+    @let currentLayout = currentLayoutOption();
     <button type="button" class="navbar-btn" [matMenuTriggerFor]="layoutMenu">
-      <mat-icon>{{ currentLayoutIcon() }}</mat-icon>
+      @if (currentLayout.svgIcon) {
+        <mat-icon [svgIcon]="currentLayout.svgIcon"></mat-icon>
+      } @else {
+        <mat-icon>{{ currentLayout.icon }}</mat-icon>
+      }
       <span>Layout</span>
     </button>
     <mat-menu #layoutMenu="matMenu">
       @for (opt of layoutOptions; track opt.preset) {
         <button mat-menu-item (click)="setLayoutPreset(opt.preset)">
-          <mat-icon>{{ opt.icon }}</mat-icon>
+          @if (opt.svgIcon) {
+            <mat-icon [svgIcon]="opt.svgIcon"></mat-icon>
+          } @else {
+            <mat-icon>{{ opt.icon }}</mat-icon>
+          }
           <span>{{ opt.label }}</span>
         </button>
       }
