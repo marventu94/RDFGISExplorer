@@ -89,11 +89,11 @@
       type="button"
       class="navbar-btn"
       [disabled]="!hasResult()"
-      (click)="exportFullCsv()"
-      title="Exportar TODAS las filas del resultado completo a CSV (no solo el lote visible)"
+      (click)="exportFullXlsx()"
+      title="Exportar TODAS las filas del resultado completo a Excel (no solo el lote visible)"
     >
       <mat-icon>file_download</mat-icon>
-      <span>Exportar CSV</span>
+      <span>Exportar Excel</span>
     </button>
 
     <button type="button" class="navbar-btn" (click)="openSaveDialog()">

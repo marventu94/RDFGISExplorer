@@ -7,15 +7,15 @@ import {
   type ExportProgress,
   type PaginatedExportResult,
 } from '@shared/export/result-exporter';
-import { buildCsv, type CsvProvenance } from '@shared/export/csv';
+import { buildXlsx, type XlsxProvenance } from '@shared/export/xlsx';
 import type { ResultBinding } from '@shared/models';
 
 /**
- * Export completo del resultado a CSV: recorre TODAS las filas de la query
+ * Export completo del resultado a XLSX: recorre TODAS las filas de la query
  * paginando del lado del endpoint (ver shared/export/result-exporter) y las
- * descarga como archivo con encabezado de proveniencia. Es la semántica del
- * summary (resultado completo), no la de los lotes ni la de los filtros de
- * las vistas.
+ * descarga como workbook Excel (hoja "Resultado" con formato + hoja
+ * "Proveniencia"). Es la semántica del summary (resultado completo), no la
+ * de los lotes ni la de los filtros de las vistas.
  */
 @Injectable({ providedIn: 'root' })
 export class ResultExportService {
@@ -42,27 +42,26 @@ export class ResultExportService {
     );
   }
 
-  /** Genera el CSV (con proveniencia) y dispara la descarga del archivo. */
-  downloadCsv(params: {
+  /** Genera el XLSX (con hoja de proveniencia) y dispara la descarga del archivo. */
+  async downloadXlsx(params: {
     rows: ResultBinding[];
     variables: string[];
     backend: string;
     query: string;
     partial: boolean;
-  }): void {
-    const provenance: CsvProvenance = {
+  }): Promise<void> {
+    const provenance: XlsxProvenance = {
       backend: params.backend,
       query: params.query,
       exportedAt: new Date().toISOString(),
       rowCount: params.rows.length,
       partial: params.partial,
     };
-    const csv = buildCsv(params.variables, params.rows, provenance);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const blob = await buildXlsx(params.variables, params.rows, provenance);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `query-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `query-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
