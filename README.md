@@ -211,7 +211,7 @@ cd frontend/rdf_gis_explorer && pnpm test
 | `GIS_LOT_DEFAULT_SIZE` | `300` | Tamaño de lote por defecto de las vistas coordinadas (`limits`) |
 | `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Opciones del selector de tamaño de lote, CSV (`limits`) |
 | `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Opciones de paginación de la tabla, CSV (`limits`) |
-| `EXPORT_MAX_ROWS` | `50000` | Tope de filas del export completo a CSV (`limits`) |
+| `EXPORT_MAX_ROWS` | `50000` | Tope de filas del export completo a Excel (`limits`) |
 | `EXPORT_MIN_PAGE_SIZE` | `250` | Piso del reintento adaptativo de página del export (`limits`) |
 | `SPARQL_PREFIXES_PATH` | `backend/config/prefixes.${SPARQL_BACKEND}.json` | Archivo JSON `{ prefix: uri }` con los prefixes del backend |
 | `BACKEND_PORT` | `3000` | Puerto del backend |

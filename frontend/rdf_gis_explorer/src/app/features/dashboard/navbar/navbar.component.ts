@@ -190,12 +190,12 @@ export class NavbarComponent {
   }
 
   /**
-   * Export completo del resultado a CSV: TODAS las filas de la query, no el
+   * Export completo del resultado a XLSX: TODAS las filas de la query, no el
    * lote visible (eso ya lo hace el botón de la tabla). Si el resultado no
    * está truncado ya está todo en el cliente; si está truncado se pagina del
    * lado del endpoint (ver ResultExportService).
    */
-  protected async exportFullCsv(): Promise<void> {
+  protected async exportFullXlsx(): Promise<void> {
     const result = this.selectionService.getQueryResultSnapshot();
     if (!result) return;
     const query = this.queryState.query();
@@ -203,7 +203,7 @@ export class NavbarComponent {
 
     // Sin truncamiento: el resultado completo ya está en el cliente.
     if (!result.meta.truncated) {
-      this.exportService.downloadCsv({
+      await this.exportService.downloadXlsx({
         rows: result.bindings,
         variables: result.variables,
         backend,
@@ -239,7 +239,7 @@ export class NavbarComponent {
 
     switch (outcome.status) {
       case 'complete':
-        this.exportService.downloadCsv({
+        await this.exportService.downloadXlsx({
           rows: outcome.rows,
           variables: outcome.variables,
           backend,
@@ -259,7 +259,7 @@ export class NavbarComponent {
         });
         capRef.afterClosed().subscribe((action: ExportCapAction | undefined) => {
           if (action === 'partial') {
-            this.exportService.downloadCsv({
+            void this.exportService.downloadXlsx({
               rows: outcome.rows,
               variables: outcome.variables,
               backend,
