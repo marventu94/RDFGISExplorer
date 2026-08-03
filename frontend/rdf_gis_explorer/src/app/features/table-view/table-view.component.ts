@@ -31,7 +31,6 @@ import type {
 } from '@shared/models';
 import { UriCellRendererComponent } from './cell-renderers/uri-cell-renderer.component';
 import { CoordCellRendererComponent } from './cell-renderers/coord-cell-renderer.component';
-import { PluginCellRendererComponent } from './cell-renderers/plugin-cell-renderer.component';
 
 @Component({
   selector: 'app-table-view',
@@ -184,14 +183,6 @@ export class TableViewComponent implements OnDestroy {
     return this.buildNodeFromRow(rowData);
   }
 
-  exportCsv(): void {
-    if (this.gridApi) {
-      this.gridApi.exportDataAsCsv({
-        fileName: `query-results-${new Date().toISOString().slice(0, 10)}.csv`,
-      });
-    }
-  }
-
   onPageSizeChange(size: number): void {
     this.pageSize.set(size);
     this.viewState.tableState.set({
@@ -243,17 +234,6 @@ export class TableViewComponent implements OnDestroy {
         },
       };
       return colDef;
-    });
-
-    defs.push({
-      colId: 'plugin',
-      headerName: 'Plugin',
-      sortable: false,
-      filter: false,
-      resizable: false,
-      suppressMovable: true,
-      width: 80,
-      cellRenderer: PluginCellRendererComponent,
     });
 
     this.columnDefs.set(defs);
