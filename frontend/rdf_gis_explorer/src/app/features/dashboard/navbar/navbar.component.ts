@@ -1,6 +1,7 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatIconModule } from '@angular/material/icon';
+import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
+import { DomSanitizer } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -33,6 +34,23 @@ import {
   type SaveDashboardDialogData,
   type SaveDashboardDialogResult,
 } from '../save-dashboard-dialog.component';
+
+/**
+ * Íconos propios para los presets de 3 y 4 vistas, dibujados en estilo
+ * "línea" (marco + divisores) para que el menú sea visualmente uniforme:
+ * la fuente Material Icons no tiene glifos de "3 paneles" con la geometría
+ * real de los layouts (1 ancho arriba + 2 abajo, y su inversa), y el glifo
+ * de 4 paneles (`grid_view`) es relleno, distinto de `crop_square` y
+ * `splitscreen`. Se registran como svgIcon.
+ */
+const LAYOUT_SVG_ICONS: Record<string, string> = {
+  'layout-triple':
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="12" x2="12" y2="20"/></svg>',
+  'layout-triple-inv':
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="12"/><line x1="4" y1="12" x2="20" y2="12"/></svg>',
+  'layout-quad':
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
+};
 
 @Component({
   selector: 'app-navbar',
@@ -75,6 +93,11 @@ export class NavbarComponent {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const iconRegistry = inject(MatIconRegistry);
+    const sanitizer = inject(DomSanitizer);
+    for (const [name, svg] of Object.entries(LAYOUT_SVG_ICONS)) {
+      iconRegistry.addSvgIconLiteral(name, sanitizer.bypassSecurityTrustHtml(svg));
+    }
     this.selectionService.coordinatedViewEnabled$
       .pipe(takeUntilDestroyed(destroyRef))
       .subscribe((v) => this._coordinatedViewEnabled.set(v));
@@ -92,17 +115,22 @@ export class NavbarComponent {
       });
   }
 
-  protected readonly layoutOptions: { preset: LayoutPreset; label: string; icon: string }[] = [
+  protected readonly layoutOptions: {
+    preset: LayoutPreset;
+    label: string;
+    icon?: string;
+    svgIcon?: string;
+  }[] = [
     { preset: 'single', label: '1 vista', icon: 'crop_square' },
-    { preset: 'split-h', label: '2 vistas', icon: 'view_column' },
-    { preset: 'triple', label: '3 vistas (1 arriba)', icon: 'view_quilt' },
-    { preset: 'triple-inv', label: '3 vistas (2 arriba)', icon: 'vertical_split' },
-    { preset: 'quad', label: '4 vistas', icon: 'grid_view' },
+    { preset: 'split-h', label: '2 vistas', icon: 'splitscreen' },
+    { preset: 'triple', label: '3 vistas (1 arriba)', svgIcon: 'layout-triple' },
+    { preset: 'triple-inv', label: '3 vistas (2 arriba)', svgIcon: 'layout-triple-inv' },
+    { preset: 'quad', label: '4 vistas', svgIcon: 'layout-quad' },
   ];
 
-  protected currentLayoutIcon(): string {
+  protected currentLayoutOption(): { icon?: string; svgIcon?: string } {
     const p = this.layout.preset();
-    return this.layoutOptions.find((o) => o.preset === p)?.icon ?? 'grid_view';
+    return this.layoutOptions.find((o) => o.preset === p) ?? { svgIcon: 'layout-quad' };
   }
 
   protected setLayoutPreset(preset: LayoutPreset): void {
