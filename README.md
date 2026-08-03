@@ -12,10 +12,9 @@ Tesis de Maestría en Ingeniería de Software — Venturino, Martín M. — LIFI
 
 El **por qué** de la arquitectura y de cada decisión (vistas coordinadas,
 alcance exploración/análisis, panel de resumen, export, límites, Adapter
-domain-agnostic, Native Federation) está en [`docs/`](./docs/README.md):
-derivadas del paper DECISIONING 2026 y enmarcadas en DSRM
-([`docs/design-decisions.md`](./docs/design-decisions.md) ·
-[`docs/dsrm.md`](./docs/dsrm.md)).
+domain-agnostic, Native Federation) está en
+[`docs/design-decisions.md`](./docs/design-decisions.md), derivadas del paper
+DECISIONING 2026.
 
 ---
 
@@ -34,6 +33,12 @@ derivadas del paper DECISIONING 2026 y enmarcadas en DSRM
 ---
 
 ## Cómo levantar el proyecto
+
+La configuración por defecto (`.env`) apunta al endpoint público de
+**Wikidata**, que no requiere credenciales: el proyecto está pensado para
+levantarse de inmediato y hacer pruebas sin configuración adicional. Para
+apuntar a otro endpoint ver
+[Configuración de backends SPARQL](#configuración-de-backends-sparql).
 
 ### Desarrollo local
 
@@ -86,14 +91,6 @@ cp .env.graphdb.example .env.graphdb
 # editá .env.graphdb con tus credenciales
 ENV_FILE=.env.graphdb docker compose up
 ```
-
-| Archivo | Trackeado en git | Contenido |
-|---------|------------------|-----------|
-| `.env` | Sí | Configuración por defecto (Wikidata) |
-| `.env.graphdb` | **No** | Configuración local con credenciales de GraphDB |
-| `.env.graphdb.example` | Sí | Template para GraphDB (sin credenciales reales) |
-
-> `.env.graphdb` está en `.gitignore` para no subir credenciales. Cada desarrollador debe crear el suyo a partir de `.env.graphdb.example`.
 
 ---
 
@@ -189,9 +186,9 @@ cd frontend/rdf_explorer && pnpm test
 cd frontend/rdf_gis_explorer && pnpm test
 ```
 
-> El builder `unit-test` de Angular usa el target `esbuild:development` como
-> `buildTarget` (configurado en cada `angular.json`) porque el target `build`
-> de native-federation no sirve para compilar tests.
+> El builder `unit-test` de Angular se configura en cada `angular.json` con
+> `esbuild:development` como `buildTarget`: el target `build` provisto por
+> Native Federation no es apto para la compilación de tests.
 
 ---
 
