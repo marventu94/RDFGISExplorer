@@ -24,13 +24,9 @@
   white-space: nowrap;
 }
 
-mat-tab-group {
-  height: calc(100% - 56px);
-}
-
-.data-tab-container {
+.data-container {
   width: 100%;
-  height: 100%;
+  height: calc(100% - 56px);
   display: flex;
   flex-direction: column;
 }
@@ -93,22 +89,4 @@ table {
   font-size: 14px;
   padding: 24px;
   text-align: center;
-}
-
-.plugin-tab-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 200px;
-  color: rgba(0, 0, 0, 0.35);
-  font-size: 13px;
-
-  mat-icon {
-    font-size: 32px;
-    width: 32px;
-    height: 32px;
-    opacity: 0.4;
-  }
 }

@@ -2,7 +2,6 @@ import { Component, inject, signal, OnDestroy, output } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -23,7 +22,6 @@ interface AttributeRow {
   imports: [
     MatIconModule,
     MatButtonModule,
-    MatTabsModule,
     MatTableModule,
     MatFormFieldModule,
     MatInputModule,
