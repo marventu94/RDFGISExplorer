@@ -7,6 +7,27 @@ import { DashboardCardComponent } from './dashboard-card.component';
 
 type FilterKind = 'all' | 'gis' | 'explorer';
 
+// Filtro persistido en sessionStorage: sobrevive a la navegación
+// (entrar a un tablero y volver con "Inicio") pero no al cierre de la pestaña.
+const FILTER_STORAGE_KEY = 'app-shell:welcome-filter';
+
+function readStoredFilter(): FilterKind {
+  try {
+    const v = sessionStorage.getItem(FILTER_STORAGE_KEY);
+    return v === 'all' || v === 'explorer' || v === 'gis' ? v : 'all';
+  } catch {
+    return 'all';
+  }
+}
+
+function storeFilter(filter: FilterKind): void {
+  try {
+    sessionStorage.setItem(FILTER_STORAGE_KEY, filter);
+  } catch {
+    // sessionStorage no disponible (modo privado, etc.): el filtro es efímero.
+  }
+}
+
 @Component({
   selector: 'app-welcome',
   standalone: true,
@@ -232,12 +253,12 @@ export class WelcomePageComponent implements OnInit {
 
   readonly filters = [
     { label: 'Todos', value: 'all' as const },
-    { label: 'GIS', value: 'gis' as const },
     { label: 'Explorer', value: 'explorer' as const },
+    { label: 'GIS', value: 'gis' as const },
   ];
 
-  private readonly filterSubject = new BehaviorSubject<FilterKind>('all');
-  activeFilter: FilterKind = 'all';
+  private readonly filterSubject = new BehaviorSubject<FilterKind>(readStoredFilter());
+  activeFilter: FilterKind = readStoredFilter();
 
   readonly filteredDashboards$ = combineLatest([
     this.store.recent$,
@@ -255,6 +276,7 @@ export class WelcomePageComponent implements OnInit {
 
   setFilter(filter: FilterKind): void {
     this.activeFilter = filter;
+    storeFilter(filter);
     this.filterSubject.next(filter);
   }
 }
