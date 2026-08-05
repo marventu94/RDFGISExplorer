@@ -141,7 +141,7 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 
 - **`PropertyGraph`**: contenedor de nodes, edges. Mutaciones, query building (BFS → SPARQL), drop handling.
 - **`RDFResource`** (abstract) → `Node`, `Property`, `Literal`. Cada uno tiene `Variable` (alias, filtros).
-- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label. Los filtros de fecha (`datefrom`/`dateto`) serializan `^^xsd:dateTime`; `toSparql()` declara `PREFIX xsd:` automáticamente cuando aparece (sparqljs lo exige al validar).
+- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label. Los filtros de fecha (`datefrom`/`dateto`) serializan `^^xsd:dateTime`; `toSparql()` declara `PREFIX xsd:` automáticamente cuando aparece (sparqljs lo exige al validar). `toSparqlFullProjection()` proyecta TODAS las variables (selectAll + recorte de `?<literal>Label` vacíos, sin mutar el estado): es la que usa el **handoff al GIS** (`main.component.handoffToGis`, `sparql-panel.handoffQuery`) — con la proyección mínima de `toSparql()` el GIS queda sin coordenadas, fechas ni aristas. El seed de dashboards demo usa el mismo método para la query GIS, así que handoff runtime y tablero sembrado producen la misma query.
 - **`Filter`**: 9 tipos (text, lang, regex, leq, geq, isuri, isliteral, datefrom, dateto).
 - **`GraphSerializer`**: serializa/deserializa PropertyGraph ↔ JSON para persistencia.
 - **`PropertyGraphService`**: wrapper Angular con signals. `revision` counter para reactividad.
@@ -173,7 +173,7 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 ## Persistencia
 
 - **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + selección → `/api/dashboards` (`kind: 'gis'`).
-- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`).
+- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`). Nombres: el tablero y las pestañas tienen nombres independientes, pero se sincronizan para workspaces de **un solo panel** — al guardar, el diálogo renombra el panel activo con el nombre del workspace (`main.component.openSaveDialog`); al cargar (`loadWorkspaceAsTabs`), la pestaña única toma el `name` del dashboard (así los tableros sembrados/legados con panel corto, p.ej. "Batallas WWII", muestran el nombre del tablero). Workspaces multi-panel conservan los nombres de cada pestaña.
 - **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro.
 - **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) para la preferencia de auto-ejecución.
 

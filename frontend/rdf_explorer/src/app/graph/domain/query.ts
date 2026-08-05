@@ -276,6 +276,30 @@ export class Query {
     this.cache = null;
   }
 
+  /**
+   * SPARQL con proyección completa (todas las variables del componente),
+   * pensado para el handoff al GIS: si solo se proyecta la semilla, el
+   * backend no puede adjuntar coordenadas, eventos temporales ni aristas
+   * al grafo normalizado (mapa/timeline vacíos, grafo sin edges).
+   * No muta el estado: restaura `select` e invalida el cache al salir.
+   * Las columnas `?<literal>Label` (siempre vacías, son literales) se
+   * eliminan del SELECT, igual que hace el seed de dashboards demo.
+   */
+  toSparqlFullProjection(): string | null {
+    const prevSelect = this.select;
+    this.selectAll();
+    let q = this.toSparql();
+    this.select = prevSelect;
+    this.cache = null;
+    if (!q) return null;
+    for (const r of this.dep) {
+      if (r instanceof Literal) {
+        q = q.replaceAll(` ?${r.variable.getName()}Label`, '');
+      }
+    }
+    return q;
+  }
+
   retrieve(config: QueryRetrieveConfig): void {
     const ctx = this.ctx as GraphContext & { retriever: QueryRetriever };
     const retriever = ctx.retriever;
