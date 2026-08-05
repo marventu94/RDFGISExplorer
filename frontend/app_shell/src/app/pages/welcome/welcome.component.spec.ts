@@ -15,6 +15,7 @@ describe('WelcomePageComponent', () => {
   ];
 
   beforeEach(async () => {
+    sessionStorage.clear();
     await TestBed.configureTestingModule({
       imports: [WelcomePageComponent],
       providers: [
@@ -63,7 +64,7 @@ describe('WelcomePageComponent', () => {
   it('filters by GIS', () => {
     const fixture = createComponent();
     const filterBtns = fixture.nativeElement.querySelectorAll('.welcome__filter');
-    filterBtns[1].click();
+    filterBtns[2].click();
     fixture.detectChanges();
 
     const cards = fixture.nativeElement.querySelectorAll('app-dashboard-card');
@@ -74,7 +75,7 @@ describe('WelcomePageComponent', () => {
     const fixture = createComponent();
     const filterBtns = fixture.nativeElement.querySelectorAll('.welcome__filter');
 
-    filterBtns[2].click();
+    filterBtns[1].click();
     fixture.detectChanges();
 
     const cards = fixture.nativeElement.querySelectorAll('app-dashboard-card');
@@ -85,7 +86,7 @@ describe('WelcomePageComponent', () => {
     const fixture = createComponent();
     const filterBtns = fixture.nativeElement.querySelectorAll('.welcome__filter');
 
-    filterBtns[1].click();
+    filterBtns[2].click();
     fixture.detectChanges();
     let cards = fixture.nativeElement.querySelectorAll('app-dashboard-card');
     expect(cards.length).toBe(2);
@@ -94,5 +95,18 @@ describe('WelcomePageComponent', () => {
     fixture.detectChanges();
     cards = fixture.nativeElement.querySelectorAll('app-dashboard-card');
     expect(cards.length).toBe(3);
+  });
+
+  it('persists the selected filter across component recreation (sessionStorage)', () => {
+    const first = createComponent();
+    const filterBtns = first.nativeElement.querySelectorAll('.welcome__filter');
+    filterBtns[1].click(); // Explorer
+    first.destroy();
+
+    const second = createComponent();
+    const cards = second.nativeElement.querySelectorAll('app-dashboard-card');
+    expect(cards.length).toBe(1);
+    const activeBtn = second.nativeElement.querySelector('.welcome__filter--active');
+    expect(activeBtn?.textContent).toContain('Explorer');
   });
 });
