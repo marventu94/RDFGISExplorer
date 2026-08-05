@@ -182,6 +182,58 @@ describe('WorkspacePersistenceService', () => {
     expect(service.activePanel()?.generatedQuery).toBe('SELECT * WHERE {}');
   });
 
+  it('loadWorkspaceAsTabs: single-panel workspace tab takes the dashboard name', async () => {
+    const mockDashboard: Dashboard = {
+      id: 'ws-4',
+      kind: 'explorer',
+      name: 'Batallas de la Segunda Guerra Mundial',
+      payload: {
+        panels: [
+          {
+            id: 'panel-0',
+            name: 'Batallas WWII',
+            graph: { nodes: [], edges: [] },
+            generatedQuery: 'SELECT * WHERE {}',
+            variables: ['battle'],
+          },
+        ],
+        activePanelId: 'panel-0',
+        settings: { endpointType: 'generic' as const, limit: 500 },
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    (mockClient.get as ReturnType<typeof vi.fn>).mockReturnValue(of(mockDashboard));
+
+    const loaded = await service.loadWorkspaceAsTabs('ws-4');
+    expect(loaded).toBe(true);
+    expect(service.panels().length).toBe(1);
+    expect(service.activePanel()?.name).toBe('Batallas de la Segunda Guerra Mundial');
+  });
+
+  it('loadWorkspaceAsTabs: multi-panel workspace keeps panel names', async () => {
+    const mockDashboard: Dashboard = {
+      id: 'ws-5',
+      kind: 'explorer',
+      name: 'Workspace Multi',
+      payload: {
+        panels: [
+          { id: 'p1', name: 'Panel A', graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [] },
+          { id: 'p2', name: 'Panel B', graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [] },
+        ],
+        activePanelId: 'p2',
+        settings: { endpointType: 'generic' as const, limit: 500 },
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    (mockClient.get as ReturnType<typeof vi.fn>).mockReturnValue(of(mockDashboard));
+
+    await service.loadWorkspaceAsTabs('ws-5');
+    expect(service.panels().map(p => p.name)).toEqual(['Panel A', 'Panel B']);
+    expect(service.activePanel()?.name).toBe('Panel B');
+  });
+
   it('throws when loading a non-explorer dashboard', async () => {
     const mockDashboard: Dashboard = {
       id: 'ws-3',

@@ -160,8 +160,6 @@ interface TopicBuild {
   seedAlias: string;
   coordAlias: string;
   dateAliases: string[];
-  /** Aliases de literales: su `?xLabel` se elimina del SELECT de la query GIS. */
-  literalAliases: string[];
 }
 
 interface FallbackExtent {
@@ -219,7 +217,6 @@ const TOPICS: TopicDef[] = [
         seedAlias: 'battle',
         coordAlias: 'coords',
         dateAliases: ['date'],
-        literalAliases: ['coords', 'date'],
       };
     },
   },
@@ -249,7 +246,6 @@ const TOPICS: TopicDef[] = [
         seedAlias: 'earthquake',
         coordAlias: 'coords',
         dateAliases: ['date'],
-        literalAliases: ['coords', 'date', 'magnitude'],
       };
     },
   },
@@ -283,7 +279,6 @@ const TOPICS: TopicDef[] = [
         seedAlias: 'laureate',
         coordAlias: 'coords',
         dateAliases: ['birthdate'],
-        literalAliases: ['birthdate', 'coords'],
       };
     },
   },
@@ -313,7 +308,6 @@ const TOPICS: TopicDef[] = [
         seedAlias: 'flight',
         coordAlias: 'coords',
         dateAliases: ['launchDate'],
-        literalAliases: ['launchDate', 'coords'],
       };
     },
   },
@@ -342,7 +336,6 @@ const TOPICS: TopicDef[] = [
         seedAlias: 'museum',
         coordAlias: 'coords',
         dateAliases: ['inception'],
-        literalAliases: ['coords', 'inception'],
       };
     },
   },
@@ -381,13 +374,10 @@ function buildQueries(def: TopicDef): TopicArtifacts {
   );
 
   // Equivalente GIS: el mismo grafo con TODAS las variables proyectadas.
+  // Usa el mismo método que el handoff runtime del Explorer (proyección
+  // completa + recorte de columnas ?<literal>Label vacías).
   const gisQueries = graph.getQueriesForGraph().queries;
-  gisQueries[0].selectAll();
-  let gisQuery = gisQueries[0].toSparql() ?? '';
-  for (const alias of built.literalAliases) {
-    // Las columnas ?<literal>Label quedan vacías (son literales): se eliminan.
-    gisQuery = gisQuery.replaceAll(` ?${alias}Label`, '');
-  }
+  const gisQuery = gisQueries[0].toSparqlFullProjection() ?? '';
 
   const snapshot = serializeGraph(graph);
 
@@ -656,7 +646,7 @@ function explorerPayload(
     panels: [
       {
         id: 'panel-0',
-        name: art.def.panelName,
+        name: art.def.explorerName,
         graph: art.snapshot,
         generatedQuery: art.explorerQuery,
         variables: art.variables,
