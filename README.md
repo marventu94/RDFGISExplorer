@@ -192,6 +192,26 @@ cd frontend/rdf_gis_explorer && pnpm test
 
 ---
 
+## Tableros demo (seed)
+
+El repo incluye `backend/data/wikidata.sqlite` con tableros de ejemplo (5
+workspaces del RDF Explorer + sus 5 equivalentes GIS, validados contra
+Wikidata). Para regenerarlos:
+
+```bash
+cd backend && pnpm run seed:demo-dashboards              # construye, valida y escribe data/<backend>.sqlite
+pnpm run seed:demo-dashboards -- --dry-run               # solo construye y valida, no escribe
+pnpm run seed:demo-dashboards -- --no-validate           # escribe sin consultar el endpoint
+```
+
+El script (`backend/scripts/seed-demo-dashboards.ts`) construye los grafos con
+las clases reales del dominio del Explorer, valida volumen y cobertura
+espaciotemporal contra el endpoint configurado y escribe en el SQLite del
+backend activo (idempotente: reemplaza por nombre). Como `data/` está en
+`.gitignore`, para versionar el archivo se usa `git add -f`.
+
+---
+
 ## Variables de entorno
 
 | Variable | Default | Uso |

@@ -213,6 +213,12 @@ export class Query {
     for (const p of prefixes) {
       h += 'PREFIX ' + p.prefix + ': <' + p.uri + '>\n';
     }
+    // Los filtros de fecha serializan `^^xsd:dateTime` sin pasar por
+    // curieLocal, así que el prefix xsd nunca entra al set: sin declararlo,
+    // sparqljs (backend y GIS) rechaza la query con "Unknown prefix: xsd".
+    if (q.includes('xsd:')) {
+      h = 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n' + h;
+    }
     q = h + q;
     this.cache = q;
     return q;

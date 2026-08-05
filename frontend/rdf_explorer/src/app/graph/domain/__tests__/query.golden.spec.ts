@@ -116,4 +116,19 @@ describe('Query.toSparql() golden tests', () => {
     expect(q).not.toBeNull();
     expect(q!.toSparql()!.trim()).toBe(FIXTURES['cancer'].trim());
   });
+
+  it('date filters — declares PREFIX xsd (^^xsd:dateTime bypasses curieLocal)', () => {
+    const seed = createCatsExample(graph, 0, 0);
+    seed.variable.addFilter('datefrom', { date: '2000', granularity: 'year' }, graph);
+    seed.variable.addFilter('dateto', { date: '2010', granularity: 'year' }, graph);
+    const sparql = seed.createQuery()!.toSparql()!;
+    expect(sparql).toContain('^^xsd:dateTime');
+    expect(sparql.startsWith('PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n')).toBe(true);
+  });
+
+  it('no date filters — no PREFIX xsd', () => {
+    const seed = createCatsExample(graph, 0, 0);
+    const sparql = seed.createQuery()!.toSparql()!;
+    expect(sparql).not.toContain('xsd:');
+  });
 });
