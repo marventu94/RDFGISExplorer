@@ -46,6 +46,7 @@ npm run dev                    # igual, sin el bootstrap de nvm/corepack
 cd backend && pnpm run start:dev   # backend solo
 cd backend && pnpm test            # unit tests (Jest)
 cd backend && pnpm run lint        # ESLint
+cd backend && pnpm run seed:demo-dashboards   # tableros demo (5 Explorer + 5 GIS) en data/<backend>.sqlite
 
 cd frontend/<app> && pnpm test     # unit tests (Vitest vía ng test)
 ```
@@ -140,7 +141,7 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 
 - **`PropertyGraph`**: contenedor de nodes, edges. Mutaciones, query building (BFS → SPARQL), drop handling.
 - **`RDFResource`** (abstract) → `Node`, `Property`, `Literal`. Cada uno tiene `Variable` (alias, filtros).
-- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label.
+- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label. Los filtros de fecha (`datefrom`/`dateto`) serializan `^^xsd:dateTime`; `toSparql()` declara `PREFIX xsd:` automáticamente cuando aparece (sparqljs lo exige al validar).
 - **`Filter`**: 9 tipos (text, lang, regex, leq, geq, isuri, isliteral, datefrom, dateto).
 - **`GraphSerializer`**: serializa/deserializa PropertyGraph ↔ JSON para persistencia.
 - **`PropertyGraphService`**: wrapper Angular con signals. `revision` counter para reactividad.
