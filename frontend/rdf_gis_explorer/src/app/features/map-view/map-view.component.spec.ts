@@ -12,7 +12,7 @@ const mockCoord2: Coordinate = { lat: -31.4, lng: -64.2 };
 const mockNode: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q1486',
   label: 'Buenos Aires',
-  type: 'http://www.wikidata.org/entity/Q515',
+  classes: ['http://www.wikidata.org/entity/Q515'],
   attributes: { populationLabel: { type: 'literal', value: '2890151' } },
   coordinate: mockCoord,
 };
@@ -20,7 +20,7 @@ const mockNode: NormalizedNode = {
 const mockNode2: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q442',
   label: 'Córdoba',
-  type: 'http://www.wikidata.org/entity/Q515',
+  classes: ['http://www.wikidata.org/entity/Q515'],
   attributes: {},
   coordinate: mockCoord2,
 };
@@ -28,7 +28,7 @@ const mockNode2: NormalizedNode = {
 const mockNodeNoCoord: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q36180',
   label: 'Borges',
-  type: 'http://www.wikidata.org/entity/Q5',
+  classes: ['http://www.wikidata.org/entity/Q5'],
   attributes: { occupationLabel: { type: 'literal', value: 'escritor' } },
 };
 

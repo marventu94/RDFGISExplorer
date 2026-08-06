@@ -150,7 +150,9 @@ export class MainComponent implements OnInit {
       return;
     }
 
-    const sparql = validQueries[0].toSparql()!;
+    // Proyección completa: el GIS necesita coords/fechas/intermedios
+    // proyectados para alimentar mapa, timeline y grafo.
+    const sparql = validQueries[0].toSparqlFullProjection()!;
 
     const backend = this.appConfig.config()?.backend || 'generic';
 

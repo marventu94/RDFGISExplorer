@@ -592,6 +592,190 @@ describe('GenericSparqlAdapter', () => {
     });
   });
 
+  describe('clasificación de nodos y atribución multi-entidad', () => {
+    const Q_PERSONA = 'http://example.org/persona/1';
+    const Q_CIUDAD = 'http://example.org/ciudad/1';
+    const XSD_DT = 'http://www.w3.org/2001/XMLSchema#date';
+
+    it('el nodo lleva queryVariable con la variable de origen y no existe el campo type', async () => {
+      mockWikidata({
+        head: { vars: ['persona'] },
+        results: {
+          bindings: [{ persona: { type: 'uri', value: Q_PERSONA } }],
+        },
+      });
+      const result = await adapter.execute(
+        'SELECT ?persona WHERE { ?persona <http://example.org/p> "lit" }',
+        defaultOpts,
+      );
+      const node = result.nodes.find((n) => n.uri === Q_PERSONA);
+      expect(node).toBeDefined();
+      expect(node!.queryVariable).toBe('persona');
+      expect(node).not.toHaveProperty('type');
+    });
+
+    it('?x a <Clase> → classes contiene la URI y classification.source es rdf-type', async () => {
+      mockWikidata({
+        head: { vars: ['persona'] },
+        results: {
+          bindings: [{ persona: { type: 'uri', value: Q_PERSONA } }],
+        },
+      });
+      const result = await adapter.execute(
+        'SELECT ?persona WHERE { ?persona a <http://schema.org/Person> }',
+        defaultOpts,
+      );
+      const node = result.nodes.find((n) => n.uri === Q_PERSONA);
+      expect(node!.classes).toEqual(['http://schema.org/Person']);
+      expect(node!.classification).toEqual({
+        source: 'rdf-type',
+        inferred: false,
+      });
+    });
+
+    it('entidad sin afirmación de clase → classification.source es query-variable', async () => {
+      mockWikidata({
+        head: { vars: ['persona'] },
+        results: {
+          bindings: [{ persona: { type: 'uri', value: Q_PERSONA } }],
+        },
+      });
+      const result = await adapter.execute(
+        'SELECT ?persona WHERE { ?persona <http://example.org/p> "lit" }',
+        defaultOpts,
+      );
+      const node = result.nodes.find((n) => n.uri === Q_PERSONA);
+      expect(node!.classes).toBeUndefined();
+      expect(node!.classification).toEqual({
+        source: 'query-variable',
+        inferred: false,
+      });
+    });
+
+    it('multi-tipo: dos `a` para la misma variable → ambas clases', async () => {
+      mockWikidata({
+        head: { vars: ['persona'] },
+        results: {
+          bindings: [{ persona: { type: 'uri', value: Q_PERSONA } }],
+        },
+      });
+      const result = await adapter.execute(
+        `SELECT ?persona WHERE {
+          ?persona a <http://schema.org/Person> .
+          ?persona a <http://xmlns.com/foaf/0.1/Agent> .
+        }`,
+        defaultOpts,
+      );
+      const node = result.nodes.find((n) => n.uri === Q_PERSONA);
+      expect(node!.classes).toEqual([
+        'http://schema.org/Person',
+        'http://xmlns.com/foaf/0.1/Agent',
+      ]);
+      expect(node!.classification?.source).toBe('rdf-type');
+    });
+
+    it('fila multi-entidad: cada fecha cuelga de su entidad según los links', async () => {
+      mockWikidata({
+        head: { vars: ['persona', 'ciudad', 'fechaNac', 'fundacion'] },
+        results: {
+          bindings: [
+            {
+              persona: { type: 'uri', value: Q_PERSONA },
+              ciudad: { type: 'uri', value: Q_CIUDAD },
+              fechaNac: {
+                type: 'literal',
+                datatype: XSD_DT,
+                value: '1980-01-01',
+              },
+              fundacion: {
+                type: 'literal',
+                datatype: XSD_DT,
+                value: '1536-02-02',
+              },
+            },
+          ],
+        },
+      });
+      const result = await adapter.execute(
+        `SELECT ?persona ?ciudad ?fechaNac ?fundacion WHERE {
+          ?persona <http://example.org/nacimiento> ?fechaNac .
+          ?ciudad <http://example.org/fundacion> ?fundacion .
+        }`,
+        defaultOpts,
+      );
+
+      const persona = result.nodes.find((n) => n.uri === Q_PERSONA);
+      const ciudad = result.nodes.find((n) => n.uri === Q_CIUDAD);
+      expect(persona!.temporalEvents?.map((e) => e.field)).toEqual([
+        'fechaNac',
+      ]);
+      expect(ciudad!.temporalEvents?.map((e) => e.field)).toEqual([
+        'fundacion',
+      ]);
+      // Los atributos siguen la misma regla.
+      expect(persona!.attributes['fechaNac']).toBeDefined();
+      expect(persona!.attributes['fundacion']).toBeUndefined();
+      expect(ciudad!.attributes['fundacion']).toBeDefined();
+      expect(ciudad!.attributes['fechaNac']).toBeUndefined();
+    });
+
+    it('caso estructural OVS: fecha y coordenada colgadas de un intermedio siguen yendo al ancla', async () => {
+      mockWikidata({
+        head: { vars: ['inmueble', 'wkt', 'fecha', 'f'] },
+        results: {
+          bindings: [
+            {
+              inmueble: { type: 'uri', value: 'http://example.org/inmueble/1' },
+              f: { type: 'bnode', value: 'b0' },
+              wkt: {
+                type: 'literal',
+                datatype: 'http://www.opengis.net/ont/geosparql#wktLiteral',
+                value: 'Point(-58.3816 -34.6037)',
+              },
+              fecha: { type: 'literal', datatype: XSD_DT, value: '2020-05-01' },
+            },
+          ],
+        },
+      });
+      const result = await adapter.execute(
+        `SELECT ?inmueble ?wkt ?fecha WHERE {
+          ?inmueble <http://example.org/hasFeature> ?f .
+          ?f <http://example.org/asWKT> ?wkt .
+          ?f <http://example.org/fechaAlta> ?fecha .
+        }`,
+        defaultOpts,
+      );
+
+      const inmueble = result.nodes.find(
+        (n) => n.uri === 'http://example.org/inmueble/1',
+      );
+      const intermedio = result.nodes.find((n) => n.uri === '_:b0');
+      // El sujeto del link (?f) es un intermedio no proyectado: wkt y fecha caen al ancla.
+      expect(inmueble!.coordinate).toEqual({ lat: -34.6037, lng: -58.3816 });
+      expect(inmueble!.temporalEvents?.map((e) => e.field)).toEqual(['fecha']);
+      expect(inmueble!.attributes['wkt']).toBeDefined();
+      expect(inmueble!.attributes['fecha']).toBeDefined();
+      expect(intermedio!.coordinate).toBeUndefined();
+      expect(intermedio!.temporalEvents).toBeUndefined();
+      expect(intermedio!.attributes).toEqual({});
+    });
+
+    it('un bnode con label ya prefijado no queda doblemente prefijado', async () => {
+      mockWikidata({
+        head: { vars: ['x'] },
+        results: {
+          bindings: [{ x: { type: 'bnode', value: '_:b0' } }],
+        },
+      });
+      const result = await adapter.execute(
+        'SELECT ?x WHERE { ?x <http://example.org/p> "lit" }',
+        defaultOpts,
+      );
+      expect(result.nodes.map((n) => n.uri)).toContain('_:b0');
+      expect(result.nodes.map((n) => n.uri)).not.toContain('_:_:b0');
+    });
+  });
+
   describe('error handling', () => {
     it('throws TimeoutError when request exceeds timeout', async () => {
       nock(WIKIDATA_BASE)

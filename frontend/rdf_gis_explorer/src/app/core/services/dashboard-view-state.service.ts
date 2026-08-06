@@ -21,6 +21,8 @@ export interface GraphViewState {
    * el resto lo sigue ubicando el layout.
    */
   manualPositions?: Record<string, { x: number; y: number }>;
+  detailLevel?: 'summary' | 'exploration' | 'detail';
+  expandedSuperEdgeIds?: string[];
 }
 
 export interface TableViewState {

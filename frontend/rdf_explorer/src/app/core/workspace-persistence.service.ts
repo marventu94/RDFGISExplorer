@@ -239,11 +239,16 @@ export class WorkspacePersistenceService {
 
     const activePanelIndex = payload.panels.findIndex(p => p.id === payload.activePanelId);
 
+    // Workspace de un solo panel: la pestaña muestra el nombre del tablero
+    // (el diálogo de guardado ya sincroniza panel activo ↔ nombre del
+    // workspace; esto cubre tableros sembrados o legados con otro nombre).
+    const singlePanel = payload.panels.length === 1;
+
     const newPanels: PanelState[] = payload.panels.map((p) => {
       this.panelCounter += 1;
       return {
         id: `panel-${this.panelCounter}`,
-        name: p.name,
+        name: singlePanel ? dashboard.name : p.name,
         graph: p.graph,
         generatedQuery: p.generatedQuery,
         variables: p.variables ?? [],

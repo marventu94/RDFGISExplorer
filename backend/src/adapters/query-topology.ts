@@ -47,6 +47,12 @@ export interface QueryTopology {
    */
   intermediates: string[];
   /**
+   * Clases RDF afirmadas por la consulta (patrones `?x a <ClaseURI>` con objeto
+   * constante): variable → URIs de clase, deduplicadas y en orden de aparición.
+   * `?x a ?tipoVariable` NO es una afirmación: sigue siendo un link normal.
+   */
+  classAssertions: ReadonlyMap<string, readonly string[]>;
+  /**
    * Consulta reescrita agregando los intermedios al SELECT. Ausente cuando no hace
    * falta o cuando reescribir no es seguro (ver `canProjectIntermediates`).
    */
@@ -57,6 +63,7 @@ const EMPTY: QueryTopology = {
   links: [],
   projected: null,
   intermediates: [],
+  classAssertions: new Map(),
 };
 
 function localName(iri: string): string {
@@ -106,12 +113,14 @@ function predicateToLabel(p: unknown): string | null {
   return null;
 }
 
+const RDF_TYPE_IRI = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+
 /**
  * Detecta un path que es sólo un inverso (`^p`). Ese caso se normaliza dando vuelta
  * sujeto y objeto, porque `?a ^p ?b` es exactamente `?b p ?a`. Las consultas de los
  * analistas del OVS usan mucho `^sioc:about`.
  */
-function asPureInverse(p: unknown): unknown | null {
+function asPureInverse(p: unknown): unknown {
   if (isPath(p) && p.pathType === '^' && p.items.length === 1)
     return p.items[0];
   return null;
@@ -190,8 +199,23 @@ export function extractQueryTopology(sparql: string): QueryTopology {
 
   const links: TopologyLink[] = [];
   const seen = new Set<string>();
+  const classAssertions = new Map<string, string[]>();
 
   for (const t of triples) {
+    // Afirmaciones de clase: `?x a <ClaseURI>` (sparqljs parsea `a` como el NamedNode
+    // rdf:type). El objeto debe ser una IRI constante; `?x a ?tipoVariable` es un
+    // triple real del grafo y sigue siendo un link, no una afirmación.
+    if (
+      isVariable(t.subject) &&
+      isNamedNode(t.predicate) &&
+      t.predicate.value === RDF_TYPE_IRI &&
+      isNamedNode(t.object)
+    ) {
+      const list = classAssertions.get(t.subject.value) ?? [];
+      if (!list.includes(t.object.value)) list.push(t.object.value);
+      classAssertions.set(t.subject.value, list);
+    }
+
     // Sólo las relaciones entre dos variables llegan al grafo. Eso descarta solo
     // los patrones tipo `?x a <Clase>` o `?x rdfs:label "..."`, donde el objeto es
     // una constante y por lo tanto no es un nodo del resultado. En cambio
@@ -238,7 +262,12 @@ export function extractQueryTopology(sparql: string): QueryTopology {
     }
   }
 
-  const topology: QueryTopology = { links, projected, intermediates };
+  const topology: QueryTopology = {
+    links,
+    projected,
+    intermediates,
+    classAssertions,
+  };
 
   if (intermediates.length > 0 && canProjectIntermediates(ast)) {
     try {

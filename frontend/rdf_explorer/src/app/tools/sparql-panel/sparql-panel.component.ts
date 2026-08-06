@@ -58,7 +58,9 @@ export class SparqlPanelComponent {
   }
 
   handoffQuery(query: Query): void {
-    const sparql = query.toSparql();
+    // Proyección completa: el GIS necesita coords/fechas/intermedios
+    // proyectados para alimentar mapa, timeline y grafo.
+    const sparql = query.toSparqlFullProjection();
     if (!sparql?.trim()) return;
 
     const backend = this.appConfig.config()?.backend || 'generic';

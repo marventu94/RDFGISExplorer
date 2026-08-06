@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PropertyGraph } from '../graph';
 import { GenericAdapter } from '../endpoint/generic-adapter';
+import { WikidataAdapter } from '../endpoint/wikidata-adapter';
 import { createCatsExample, createW3cExample, createMosquitoExample, createCancerExample } from '../examples/canned-examples';
 
 const PREFIXES = [
@@ -115,5 +116,69 @@ describe('Query.toSparql() golden tests', () => {
     const q = seed.createQuery();
     expect(q).not.toBeNull();
     expect(q!.toSparql()!.trim()).toBe(FIXTURES['cancer'].trim());
+  });
+
+  it('date filters — declares PREFIX xsd (^^xsd:dateTime bypasses curieLocal)', () => {
+    const seed = createCatsExample(graph, 0, 0);
+    seed.variable.addFilter('datefrom', { date: '2000', granularity: 'year' }, graph);
+    seed.variable.addFilter('dateto', { date: '2010', granularity: 'year' }, graph);
+    const sparql = seed.createQuery()!.toSparql()!;
+    expect(sparql).toContain('^^xsd:dateTime');
+    expect(sparql.startsWith('PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n')).toBe(true);
+  });
+
+  it('no date filters — no PREFIX xsd', () => {
+    const seed = createCatsExample(graph, 0, 0);
+    const sparql = seed.createQuery()!.toSparql()!;
+    expect(sparql).not.toContain('xsd:');
+  });
+});
+
+describe('Query.toSparqlFullProjection()', () => {
+  function createWikidataGraph(): PropertyGraph {
+    return new PropertyGraph({
+      labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+      lang: 'en',
+      prefixes: PREFIXES,
+      endpointAdapter: new WikidataAdapter(),
+    });
+  }
+
+  function selectLine(sparql: string): string {
+    return sparql.split('\n').find(l => l.startsWith('SELECT'))!;
+  }
+
+  it('proyecta todas las variables y recorta los ?<literal>Label vacíos', () => {
+    const graph = createWikidataGraph();
+    const seed = createMosquitoExample(graph, 0, 0);
+    const q = seed.createQuery()!;
+    const sparql = q.toSparqlFullProjection()!;
+    const select = selectLine(sparql);
+    expect(select).toContain('?mosquito');
+    expect(select).toContain('?taxon_name');
+    expect(select).toContain('?mosquitoLabel');
+    expect(select).not.toContain('?taxon_nameLabel');
+    expect(sparql).toContain('SERVICE wikibase:label');
+  });
+
+  it('no muta la proyección original de la query', () => {
+    const graph = createWikidataGraph();
+    const seed = createMosquitoExample(graph, 0, 0);
+    const q = seed.createQuery()!;
+    const original = q.toSparql();
+    q.toSparqlFullProjection();
+    expect(q.toSparql()).toBe(original);
+    expect(q.select.length).toBe(1);
+  });
+
+  it('respeta las variables ocultas (hide)', () => {
+    const graph = createWikidataGraph();
+    const seed = createCancerExample(graph, 0, 0);
+    const q = seed.createQuery()!;
+    const select = selectLine(q.toSparqlFullProjection()!);
+    expect(select).not.toContain('gene_product');
+    expect(select).toContain('?gene');
+    expect(select).toContain('?disease');
+    expect(select).toContain('?biological_process');
   });
 });

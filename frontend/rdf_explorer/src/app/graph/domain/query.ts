@@ -213,6 +213,12 @@ export class Query {
     for (const p of prefixes) {
       h += 'PREFIX ' + p.prefix + ': <' + p.uri + '>\n';
     }
+    // Los filtros de fecha serializan `^^xsd:dateTime` sin pasar por
+    // curieLocal, así que el prefix xsd nunca entra al set: sin declararlo,
+    // sparqljs (backend y GIS) rechaza la query con "Unknown prefix: xsd".
+    if (q.includes('xsd:')) {
+      h = 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n' + h;
+    }
     q = h + q;
     this.cache = q;
     return q;
@@ -268,6 +274,30 @@ export class Query {
   selectAll(): void {
     this.select = Array.from(this.dep);
     this.cache = null;
+  }
+
+  /**
+   * SPARQL con proyección completa (todas las variables del componente),
+   * pensado para el handoff al GIS: si solo se proyecta la semilla, el
+   * backend no puede adjuntar coordenadas, eventos temporales ni aristas
+   * al grafo normalizado (mapa/timeline vacíos, grafo sin edges).
+   * No muta el estado: restaura `select` e invalida el cache al salir.
+   * Las columnas `?<literal>Label` (siempre vacías, son literales) se
+   * eliminan del SELECT, igual que hace el seed de dashboards demo.
+   */
+  toSparqlFullProjection(): string | null {
+    const prevSelect = this.select;
+    this.selectAll();
+    let q = this.toSparql();
+    this.select = prevSelect;
+    this.cache = null;
+    if (!q) return null;
+    for (const r of this.dep) {
+      if (r instanceof Literal) {
+        q = q.replaceAll(` ?${r.variable.getName()}Label`, '');
+      }
+    }
+    return q;
   }
 
   retrieve(config: QueryRetrieveConfig): void {

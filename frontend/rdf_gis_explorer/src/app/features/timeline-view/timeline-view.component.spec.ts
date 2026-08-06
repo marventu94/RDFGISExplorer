@@ -13,7 +13,7 @@ import type {
 const nodeWithDates: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q7742',
   label: 'Juan Domingo Perón',
-  type: 'http://www.wikidata.org/entity/Q207313',
+  classes: ['http://www.wikidata.org/entity/Q207313'],
   attributes: {},
   temporalEvents: [
     { field: 'inception', isoDate: '1946-06-04T00:00:00Z', numericValue: 100 },
@@ -24,7 +24,7 @@ const nodeWithDates: NormalizedNode = {
 const nodeWithOneDate: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q41404',
   label: 'Argentina',
-  type: 'http://www.wikidata.org/entity/Q515',
+  classes: ['http://www.wikidata.org/entity/Q515'],
   attributes: {},
   temporalEvents: [
     { field: 'inception', isoDate: '1816-07-09T00:00:00Z' },
@@ -34,7 +34,7 @@ const nodeWithOneDate: NormalizedNode = {
 const nodeWithoutDates: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q155',
   label: 'Brasil',
-  type: 'http://www.wikidata.org/entity/Q515',
+  classes: ['http://www.wikidata.org/entity/Q515'],
   attributes: { capitalLabel: { type: 'literal', value: 'Brasilia' } },
   temporalEvents: [],
 };
@@ -43,7 +43,7 @@ const nodeWithoutDates: NormalizedNode = {
 const nodeWithNumericAttrs: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q123',
   label: 'Depósito Norte',
-  type: 'superficie_lote',
+  queryVariable: 'superficie_lote',
   attributes: {
     metrosCuadrados: { type: 'literal', value: '1250' },
     precio: { type: 'literal', value: '340000.5' },

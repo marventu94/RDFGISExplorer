@@ -11,8 +11,9 @@ export class EntityColorService {
     return this.appConfig.config()?.classColors ?? {};
   });
 
-  colorForType(type: string | undefined): string {
-    if (!type) return DEFAULT_COLOR;
-    return this.effective()[type] ?? DEFAULT_COLOR;
+  /** Color por URI de clase RDF (`classColors` viene keyed por URI de clase). */
+  colorForClass(classUri: string | undefined): string {
+    if (!classUri) return DEFAULT_COLOR;
+    return this.effective()[classUri] ?? DEFAULT_COLOR;
   }
 }

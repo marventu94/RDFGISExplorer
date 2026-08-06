@@ -33,9 +33,9 @@ const MARKER_FILL_OPACITY = 0.8;
 
 // Estilo del marcador seleccionado. Se usa el mismo azul que el anillo de pulso
 // (.pulse-ring en el SCSS) para que el resalte transitorio y el permanente sean el
-// mismo lenguaje visual. El color es lo único que distingue al seleccionado: contra
-// GraphDB `classColors` llega vacío, así que todos los marcadores comparten el gris
-// por defecto de EntityColorService y no hay diferencia de tono entre tipos.
+// mismo lenguaje visual. El color es lo único que distingue al seleccionado: si el
+// backend no trae classColors configurados (config/class-colors.${SPARQL_BACKEND}.json),
+// todos los marcadores comparten el gris por defecto de EntityColorService.
 const SELECTED_FILL = '#2196f3';
 const SELECTED_STROKE = '#ffffff';
 const SELECTED_RADIUS = 12;
@@ -353,7 +353,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
         // Sin esto queda tapado por los marcadores vecinos en zonas densas.
         marker.bringToFront();
       } else {
-        const baseColor = this.colorService.colorForType(marker._node.type);
+        const baseColor = this.colorService.colorForClass(marker._node.classes?.[0]);
         marker.setStyle({
           color: baseColor,
           weight: MARKER_WEIGHT,
@@ -371,7 +371,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
     for (const node of result.nodes) {
       if (!node.coordinate) continue;
 
-      const color = this.colorService.colorForType(node.type);
+      const color = this.colorService.colorForClass(node.classes?.[0]);
       const marker = L.circleMarker([node.coordinate.lat, node.coordinate.lng], {
         radius: MARKER_RADIUS,
         color,
@@ -404,8 +404,9 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private popupHtml(node: NormalizedNode): string {
     let html = `<strong>${this.escapeHtml(node.label)}</strong>`;
 
-    if (node.type) {
-      html += `<br><span class="tooltip-label">Tipo:</span> ${this.escapeHtml(node.type)}`;
+    const typeLabel = node.classes?.[0] ?? node.queryVariable;
+    if (typeLabel) {
+      html += `<br><span class="tooltip-label">Tipo:</span> ${this.escapeHtml(typeLabel)}`;
     }
 
     const attrKeys = Object.keys(node.attributes).slice(0, 3);
