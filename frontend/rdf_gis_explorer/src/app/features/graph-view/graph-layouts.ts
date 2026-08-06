@@ -1,4 +1,7 @@
 import type cytoscape from 'cytoscape';
+import type { QueryResult } from '@shared/models';
+
+export type GraphLayout = 'cola' | 'dagre' | 'grid';
 
 export interface LayoutConfig {
   name: string;
@@ -55,17 +58,6 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
       rankSep: 60,
     } as cytoscape.LayoutOptions,
   },
-  circle: {
-    name: 'circle',
-    animationDuration: 500,
-    options: {
-      name: 'circle',
-      animate: true,
-      animationDuration: 500,
-      fit: false,
-      padding: 50,
-    } as cytoscape.LayoutOptions,
-  },
   grid: {
     name: 'grid',
     animationDuration: 500,
@@ -78,3 +70,28 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
     } as cytoscape.LayoutOptions,
   },
 };
+
+export function chooseGraphLayout(result: Pick<QueryResult, 'nodes' | 'edges'>): GraphLayout {
+  if (result.edges.length === 0) return 'grid';
+  const outgoing = new Map<string, string[]>();
+  for (const node of result.nodes) outgoing.set(node.uri, []);
+  for (const edge of result.edges) {
+    if (edge.source === edge.target) return 'cola';
+    outgoing.get(edge.source)?.push(edge.target);
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const hasCycle = (uri: string): boolean => {
+    if (visiting.has(uri)) return true;
+    if (visited.has(uri)) return false;
+    visiting.add(uri);
+    for (const target of outgoing.get(uri) ?? []) {
+      if (hasCycle(target)) return true;
+    }
+    visiting.delete(uri);
+    visited.add(uri);
+    return false;
+  };
+  return [...outgoing.keys()].some(hasCycle) ? 'cola' : 'dagre';
+}

@@ -485,7 +485,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     for (const node of result.nodes) {
       if (!node.temporalEvents?.length) continue;
 
-      const type = node.type ?? 'unknown';
+      const type = node.classes?.[0] ?? node.queryVariable ?? 'unknown';
       groupCounts.set(type, (groupCounts.get(type) ?? 0) + 1);
 
       const mostRecent = node.temporalEvents.reduce((a, b) => (a.isoDate > b.isoDate ? a : b));
@@ -496,7 +496,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         if (ms > maxMs) maxMs = ms;
       }
 
-      const color = this.colorService.colorForType(node.type);
+      const color = this.colorService.colorForClass(node.classes?.[0]);
 
       this.items.add({
         id: node.uri,

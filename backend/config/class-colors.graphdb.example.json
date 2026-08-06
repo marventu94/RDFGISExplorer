@@ -1,0 +1,7 @@
+{
+  "https://w3id.org/rec#RealEstate": "#2196F3",
+  "https://w3id.org/rec#Building": "#9C27B0",
+  "http://www.opengis.net/ont/geosparql#Feature": "#FF9800",
+  "http://www.opengis.net/ont/geosparql#Geometry": "#4CAF50",
+  "http://www.w3.org/2006/time#Instant": "#03A9F4"
+}

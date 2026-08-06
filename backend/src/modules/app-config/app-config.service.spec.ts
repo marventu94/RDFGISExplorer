@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppConfigService } from './app-config.service';
 import { ConfigService } from '@nestjs/config';
+import { existsSync, rmSync, writeFileSync } from 'fs';
 
 function createConfigMock(values: Record<string, string | undefined>) {
   return {
@@ -129,6 +130,50 @@ describe('AppConfigService', () => {
     it('returns empty classColors for generic backend', () => {
       const config = service.getConfig();
       expect(config.classColors).toEqual({});
+    });
+  });
+
+  describe('classColors via JSON', () => {
+    const overridePath = 'config/class-colors.test-override.json';
+    const invalidPath = 'config/class-colors.test-invalid.json';
+
+    afterEach(() => {
+      for (const p of [overridePath, invalidPath]) {
+        if (existsSync(p)) rmSync(p);
+      }
+    });
+
+    async function buildService(values: Record<string, string | undefined>) {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AppConfigService,
+          { provide: ConfigService, useValue: createConfigMock(values) },
+        ],
+      }).compile();
+      return module.get<AppConfigService>(AppConfigService);
+    }
+
+    it('loads class colors from CLASS_COLORS_PATH override', async () => {
+      writeFileSync(
+        overridePath,
+        JSON.stringify({ 'http://example.org/Clase': '#112233' }),
+      );
+      const service = await buildService({
+        SPARQL_BACKEND: 'graphdb',
+        CLASS_COLORS_PATH: overridePath,
+      });
+      expect(service.getConfig().classColors).toEqual({
+        'http://example.org/Clase': '#112233',
+      });
+    });
+
+    it('returns empty classColors when the JSON file is invalid', async () => {
+      writeFileSync(invalidPath, '{ not json');
+      const service = await buildService({
+        SPARQL_BACKEND: 'graphdb',
+        CLASS_COLORS_PATH: invalidPath,
+      });
+      expect(service.getConfig().classColors).toEqual({});
     });
   });
 

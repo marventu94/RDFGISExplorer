@@ -96,15 +96,51 @@ describe('sliceLot', () => {
     expect(slice.result.bindings).toContainEqual({ s: { type: 'literal', value: 'sin uri' } });
   });
 
-  it('includes bnodes referenced by the lot rows', () => {
+  it('includes bnodes referenced by the lot rows (raw id in rows, _:id in nodes)', () => {
+    // Los bindings traen el bnode crudo ('b0') pero los nodos/edges usan '_:b0':
+    // sin normalizar, el bnode se caía del lote visible.
     const rows: QueryResult['bindings'] = [
       { s: { type: 'bnode', value: 'b0' } },
       ...Array.from({ length: 5 }, (_, i) => makeRow(`n${i}`)),
     ];
-    const allNodes = [makeNode('b0'), ...nodes];
+    const allNodes = [makeNode('_:b0'), ...nodes];
     const result = makeResult(allNodes, [], rows);
     const slice = sliceLot(result, 2, 1);
-    expect(slice.result.nodes.map((n) => n.uri)).toContain('b0');
+    expect(slice.result.nodes.map((n) => n.uri)).toContain('_:b0');
+  });
+
+  it('a projected bnode belongs to the correct lot, with its edges', () => {
+    // Resultado multi-lote: las filas del lote 2 referencian el bnode crudo 'b0';
+    // el nodo '_:b0' y sus aristas solo deben aparecer en ese lote.
+    const rows: QueryResult['bindings'] = [
+      makeRow('n0'),
+      makeRow('n1'),
+      { s: { type: 'bnode', value: 'b0' } },
+      makeRow('n3'),
+    ];
+    const allNodes = [makeNode('_:b0'), ...nodes];
+    // La arista conecta el bnode con n3 (fila del lote 2): ningún extremo toca
+    // las filas del lote 1, así que el bnode no entra por expansión de vecinos.
+    const edges = [makeEdge('_:b0', 'n3')];
+    const result = makeResult(allNodes, edges, rows);
+
+    const lot1 = sliceLot(result, 2, 1);
+    expect(lot1.result.nodes.map((n) => n.uri)).not.toContain('_:b0');
+    expect(lot1.result.edges).toEqual([]);
+
+    const lot2 = sliceLot(result, 2, 2);
+    expect(lot2.result.nodes.map((n) => n.uri)).toContain('_:b0');
+    expect(lot2.result.edges.map((e) => e.id)).toEqual(['_:b0->n3']);
+  });
+
+  it('keeps bindings that only mention a visible bnode (restrictResultToUris)', () => {
+    const result = makeResult(
+      [makeNode('_:b0'), makeNode('n0')],
+      [],
+      [{ s: { type: 'bnode', value: 'b0' } }, makeRow('n1')],
+    );
+    const restricted = restrictResultToUris(result, new Set(['_:b0']));
+    expect(restricted.bindings).toEqual([{ s: { type: 'bnode', value: 'b0' } }]);
   });
 
   it('adds 1-hop neighbors of the row URIs (intermediate nodes not in bindings)', () => {
