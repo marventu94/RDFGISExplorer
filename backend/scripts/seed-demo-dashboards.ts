@@ -179,7 +179,7 @@ interface TopicDef {
   minDateCoverage: number;
   /** Layout del grafo GIS: para topologías estrella (muchas entidades → pocos
    *  hubs) `dagre` queda más legible que `cola`. */
-  gisGraphLayout?: 'cola' | 'dagre' | 'circle' | 'grid';
+  gisGraphLayout?: 'cola' | 'dagre' | 'grid';
   /** Extent usado si se corre con --no-validate. */
   fallback: FallbackExtent;
 }
@@ -192,7 +192,7 @@ const TOPICS: TopicDef[] = [
     minRows: 400,
     minCoordCoverage: 0.95,
     minDateCoverage: 0.9,
-    gisGraphLayout: 'circle',
+    gisGraphLayout: 'dagre',
     fallback: {
       center: [42, 20],
       zoom: 2,
@@ -256,7 +256,7 @@ const TOPICS: TopicDef[] = [
     minRows: 450,
     minCoordCoverage: 0.9,
     minDateCoverage: 0.95,
-    gisGraphLayout: 'circle',
+    gisGraphLayout: 'dagre',
     fallback: {
       center: [42, 5],
       zoom: 3,
@@ -289,7 +289,7 @@ const TOPICS: TopicDef[] = [
     minRows: 250,
     minCoordCoverage: 0.9,
     minDateCoverage: 0.9,
-    gisGraphLayout: 'circle',
+    gisGraphLayout: 'dagre',
     fallback: {
       center: [35, -50],
       zoom: 2,

@@ -183,15 +183,28 @@ export class AppConfigService {
 
   private getClassColors(): Record<string, string> {
     const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
-    if (backend === 'wikidata') {
-      return {
-        'http://www.wikidata.org/entity/Q515': '#2196F3',
-        'http://www.wikidata.org/entity/Q5': '#9C27B0',
-        'http://www.wikidata.org/entity/Q4022': '#03A9F4',
-        'http://www.wikidata.org/entity/Q33506': '#FF9800',
-        'http://www.wikidata.org/entity/Q3918': '#4CAF50',
-        'http://www.wikidata.org/entity/Q207313': '#E91E63',
-      };
+    const customPath = this.config.get<string>('CLASS_COLORS_PATH');
+    const defaultPath = resolve(
+      process.cwd(),
+      'config',
+      `class-colors.${backend}.json`,
+    );
+    const filePath = customPath
+      ? resolve(process.cwd(), customPath)
+      : defaultPath;
+
+    // Sin archivo es un estado válido (backend sin colores configurados):
+    // todo cae en el color default del frontend. Solo se avisa si el
+    // archivo existe pero no parsea.
+    if (existsSync(filePath)) {
+      try {
+        return JSON.parse(readFileSync(filePath, 'utf-8')) as Record<
+          string,
+          string
+        >;
+      } catch {
+        console.warn(`Failed to parse ${filePath}`);
+      }
     }
     return {};
   }

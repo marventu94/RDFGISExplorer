@@ -23,10 +23,34 @@ export interface ResultBinding {
   [variableName: string]: BindingValue;
 }
 
+/**
+ * Origen de la clasificación de un nodo:
+ * - `rdf-type`: la query afirma la clase con un patrón `?x a <Clase>`.
+ * - `query-variable`: no hay afirmación de clase; se usa la variable SPARQL de origen.
+ * - `property-signature`: reservado para inferencia por propiedades (fase futura).
+ * - `unknown`: no se pudo clasificar.
+ */
+export type NodeClassificationSource =
+  | 'rdf-type'
+  | 'query-variable'
+  | 'property-signature'
+  | 'unknown';
+
 export interface NormalizedNode {
   uri: string;
   label: string;
-  type?: string;
+  /** Variable SPARQL que originó el nodo (primera fila que lo creó). No es una clase RDF. */
+  queryVariable?: string;
+  /**
+   * URIs de clase RDF afirmadas en la query (patrones `?x a <Clase>`).
+   * Vacío/ausente si no hay.
+   */
+  classes?: string[];
+  /** Origen explícito de la clasificación del nodo. */
+  classification?: {
+    source: NodeClassificationSource;
+    inferred: boolean;
+  };
   attributes: Record<string, BindingValue>;
   coordinate?: Coordinate;
   temporalEvents?: TemporalEvent[];

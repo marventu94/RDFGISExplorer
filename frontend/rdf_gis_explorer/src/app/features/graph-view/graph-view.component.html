@@ -26,8 +26,28 @@
 
   @if (cy) {
     <div class="graph-toolbar">
+      <label class="toolbar-label" for="graph-layout">Layout</label>
+      <select id="graph-layout" class="toolbar-select" [value]="currentLayout" (change)="setLayout($any($event.target).value)">
+        @for (option of layoutOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+      <label class="toolbar-label" for="graph-detail">Detalle</label>
+      <select id="graph-detail" class="toolbar-select" [value]="detailLevel" (change)="setDetailLevel($any($event.target).value)">
+        @for (option of detailLevels; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
       <button class="toolbar-btn" (click)="fit()">fit</button>
       <button class="toolbar-btn" (click)="resetZoom()">reset zoom</button>
+    </div>
+  }
+
+  @if (cy) {
+    <div class="graph-legend">
+      <span><i class="legend-dot legend-dot--node"></i>Entidad</span>
+      <span><i class="legend-dot legend-dot--aggregate"></i>Super-arista</span>
+      <span><i class="legend-line"></i>Relación RDF</span>
     </div>
   }
 

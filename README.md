@@ -234,6 +234,7 @@ backend activo (idempotente: reemplaza por nombre). Como `data/` está en
 | `EXPORT_MAX_ROWS` | `50000` | Tope de filas del export completo a Excel (`limits`) |
 | `EXPORT_MIN_PAGE_SIZE` | `250` | Piso del reintento adaptativo de página del export (`limits`) |
 | `SPARQL_PREFIXES_PATH` | `backend/config/prefixes.${SPARQL_BACKEND}.json` | Archivo JSON `{ prefix: uri }` con los prefixes del backend |
+| `CLASS_COLORS_PATH` | `backend/config/class-colors.${SPARQL_BACKEND}.json` | Archivo JSON `{ "uriDeClase": "#color" }` con los colores por clase RDF |
 | `BACKEND_PORT` | `3000` | Puerto del backend |
 | `FRONTEND_PORT` / `RDF_EXPLORER_PORT` / `RDF_GIS_EXPLORER_PORT` | `4200` / `4201` / `4202` | Puertos de los frontends (Docker/Podman) |
 | `CORS_ORIGINS` | `http://localhost:4200` | Orígenes CORS (separados por coma) |

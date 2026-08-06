@@ -17,33 +17,26 @@ import { debounceTime, filter } from 'rxjs/operators';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
-import type { QueryResult, NormalizedNode, NormalizedEdge, Selection } from '@shared/models';
+import type { QueryResult, NormalizedNode, Selection } from '@shared/models';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
 import { createGraphStyle } from './graph-style';
-import { LAYOUT_CONFIGS } from './graph-layouts';
+import { chooseGraphLayout, LAYOUT_CONFIGS } from './graph-layouts';
+import { buildGraphElements, type BuiltGraph } from './graph-elements';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { LimitsService } from '@core/services/limits.service';
 
 cytoscape.use(cola);
 cytoscape.use(dagre);
 
-type GraphLayout = 'cola' | 'dagre' | 'circle' | 'grid';
+type GraphLayout = 'cola' | 'dagre' | 'grid';
+type GraphDetailLevel = 'summary' | 'exploration' | 'detail';
 type QueryState = 'no-query' | 'no-edges' | 'filtered-zero' | 'normal';
 
 /** Cuánto se separa un nodo nuevo del vecino que se usa para ubicarlo. */
 const NEW_NODE_OFFSET = 40;
 /** Ventana en la que se ignoran los eventos de viewport propios (animaciones). */
 const SUPPRESS_VIEWPORT_MS = 800;
-
-/** Resultado de `buildElements`: los elementos y qué quedó afuera del dibujo. */
-interface BuiltGraph {
-  elements: cytoscape.ElementDefinition[];
-  drawnNodes: number;
-  totalNodes: number;
-  /** Aristas cuyos dos extremos existen en el resultado pero no sobrevivieron al corte. */
-  edgesHiddenByTruncation: number;
-}
 
 @Component({
   selector: 'app-graph-view',
@@ -57,10 +50,16 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   cy?: cytoscape.Core;
   currentLayout: GraphLayout = 'cola';
+  detailLevel: GraphDetailLevel = 'exploration';
+  private expandedSuperEdgeIds = new Set<string>();
+  readonly detailLevels = [
+    { value: 'summary' as const, label: 'Resumen' },
+    { value: 'exploration' as const, label: 'Exploración' },
+    { value: 'detail' as const, label: 'Detalle' },
+  ];
   readonly layoutOptions = [
     { value: 'cola' as const, label: 'cola' },
     { value: 'dagre' as const, label: 'dagre' },
-    { value: 'circle' as const, label: 'circle' },
     { value: 'grid' as const, label: 'grid' },
   ];
 
@@ -106,6 +105,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    */
   MAX_NODES = 300;
 
+  /** Último resultado visible dibujado; lo usa el rebuild por cambio de límite. */
+  private lastVisibleResult: QueryResult | null = null;
+  private lastLotState: { lotCount: number; currentLot: number } = { lotCount: 1, currentLot: 1 };
+
   private readonly viewState = inject(DashboardViewStateService);
   private readonly colorService = inject(EntityColorService);
   private readonly limitsService = inject(LimitsService);
@@ -118,11 +121,20 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     // Cuando llega la config se aplica el cap configurado (en tests el
     // LimitsService queda con defaults y el spec pisa MAX_NODES después).
     effect(() => {
-      this.MAX_NODES = this.limitsService.limits().graphMaxNodes;
+      const maxNodes = this.limitsService.limits().graphMaxNodes;
+      const changed = maxNodes !== this.MAX_NODES;
+      this.MAX_NODES = maxNodes;
+      // El cap nuevo solo aplicaba a la próxima emisión; si ya hay grafo
+      // dibujado se reconstruye una sola vez con los mismos datos. Sin cambio
+      // de valor (primer run incluido) no se toca nada.
+      if (changed) this.rebuildGraphForLimitChange();
     });
   }
 
   ngOnInit(): void {
+    const storedGraphState = this.viewState.graphState();
+    this.detailLevel = storedGraphState?.detailLevel ?? 'exploration';
+    this.expandedSuperEdgeIds = new Set(storedGraphState?.expandedSuperEdgeIds ?? []);
     this.initResizeObserver();
     this.bindContainerListeners();
 
@@ -155,6 +167,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         this.filteredNodeCount = visible.nodes.length;
         this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
         this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
+        this.lastVisibleResult = visible;
+        this.lastLotState = { lotCount: lotState.lotCount, currentLot: lotState.currentLot };
 
         const built = this.buildElements(visible);
         this.coverageLabel = this.buildCoverageLabel(built, visible, lotState.lotCount, lotState.currentLot);
@@ -168,10 +182,16 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         filter((sel: Selection) => sel.source !== 'graph'),
       )
       .subscribe((sel: Selection) => {
-        if (sel.node && this.cy) {
-          this.panToNode(sel.node.uri);
-          this.applyFocusContext(sel.node.uri);
+        if (!this.cy) return;
+        if (!sel.node) {
+          // Un clear externo (p. ej. desde otra vista) también limpia el
+          // resalte; antes solo se actuaba cuando había nodo y las clases
+          // is-selected/is-dimmed quedaban pintadas.
+          this.clearFocusClasses();
+          return;
         }
+        this.panToNode(sel.node.uri);
+        this.applyFocusContext(sel.node.uri);
       });
 
     this.viewportChange$
@@ -193,11 +213,18 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           (f) =>
             f.source !== null &&
             f.source !== 'graph' &&
-            f.uris.size > 0 &&
             this.selectionService.getActiveView() !== 'graph',
         ),
       )
-      .subscribe((f) => this.applyExternalFocus(f.uris));
+      .subscribe((f) => {
+        // Foco externo vacío (otra vista dejó de tener nada en viewport):
+        // se limpia el dimming en vez de dejarlo congelado.
+        if (f.uris.size === 0) {
+          this.clearFocusClasses();
+          return;
+        }
+        this.applyExternalFocus(f.uris);
+      });
   }
 
   ngOnDestroy(): void {
@@ -278,14 +305,19 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private createGraph(elements: cytoscape.ElementDefinition[]): void {
     const stored = this.viewState.graphState();
     const defaultLayout: GraphLayout = elements.some((e) => 'source' in (e.data ?? {}))
-      ? 'cola'
+      ? chooseGraphLayout(this.lastVisibleResult ?? { nodes: [], edges: [] })
       : 'grid';
-    this.currentLayout = (stored?.layout as GraphLayout) ?? defaultLayout;
+    const storedLayout = stored?.layout;
+    this.currentLayout = storedLayout && storedLayout in LAYOUT_CONFIGS
+      ? (storedLayout as GraphLayout)
+      : defaultLayout;
+    this.detailLevel = stored?.detailLevel ?? 'exploration';
+    this.expandedSuperEdgeIds = new Set(stored?.expandedSuperEdgeIds ?? []);
 
     this.cy = cytoscape({
       container: this.container.nativeElement,
       elements,
-      style: createGraphStyle(this.colorService, () => false),
+       style: createGraphStyle(this.colorService, () => false, () => this.detailLevel),
       // Antes acá iba `defaultLayout` mientras currentLayout venía del estado
       // guardado: el dropdown decía una cosa y el grafo dibujaba otra.
       layout: this.getLayoutOptions(this.currentLayout),
@@ -334,6 +366,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   private destroyGraph(): void {
+    this.liveLayout?.stop();
+    this.liveLayout = undefined;
+    this.lockedForDrag?.unlock();
+    this.lockedForDrag = undefined;
     this.cy?.destroy();
     this.cy = undefined;
     this.lastTopologyKey = null;
@@ -495,73 +531,46 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Wrapper fino sobre `buildGraphElements` (pura, en graph-elements.ts): le
+   * inyecta el cap vigente y el nodo seleccionado como pinned, para que lo
+   * seleccionado nunca quede fuera del dibujo aunque tenga grado bajo.
+   */
   private buildElements(result: QueryResult): BuiltGraph {
-    const totalDegree = new Map<string, number>();
-    for (const edge of result.edges) {
-      totalDegree.set(edge.source, (totalDegree.get(edge.source) ?? 0) + 1);
-      totalDegree.set(edge.target, (totalDegree.get(edge.target) ?? 0) + 1);
-    }
+    const selected = this.selectionService.getSelectedNodeSnapshot().node;
+    return buildGraphElements(result, {
+      maxNodes: this.MAX_NODES,
+      pinnedUris: selected ? [selected.uri] : [],
+      expandedSuperEdgeIds: [...this.expandedSuperEdgeIds],
+    });
+  }
 
-    const allUris = new Set(result.nodes.map((n) => n.uri));
+  setDetailLevel(level: GraphDetailLevel): void {
+    this.detailLevel = level;
+    this.persistGraphState();
+    this.cy?.style().update();
+    this.cdr.markForCheck();
+  }
 
-    let visibleNodes = result.nodes;
-    if (result.nodes.length > this.MAX_NODES) {
-      visibleNodes = [...result.nodes]
-        .sort((a, b) => (totalDegree.get(b.uri) ?? 0) - (totalDegree.get(a.uri) ?? 0))
-        .slice(0, this.MAX_NODES);
-    }
-
-    const visibleUris = new Set(visibleNodes.map((n) => n.uri));
-
-    // El grado dibujado es el que manda el tamaño del nodo: con el grado total un
-    // hub recortado se veía gordo pero con pocas aristas.
-    const drawnEdges: NormalizedEdge[] = [];
-    const drawnDegree = new Map<string, number>();
-    let edgesHiddenByTruncation = 0;
-
-    for (const edge of result.edges) {
-      if (visibleUris.has(edge.source) && visibleUris.has(edge.target)) {
-        drawnEdges.push(edge);
-        drawnDegree.set(edge.source, (drawnDegree.get(edge.source) ?? 0) + 1);
-        drawnDegree.set(edge.target, (drawnDegree.get(edge.target) ?? 0) + 1);
-      } else if (allUris.has(edge.source) && allUris.has(edge.target)) {
-        // Los dos extremos venían en el resultado: se perdió por el truncado.
-        edgesHiddenByTruncation++;
-      }
-    }
-
-    const elements: cytoscape.ElementDefinition[] = [];
-
-    for (const node of visibleNodes) {
-      elements.push({
-        data: {
-          id: node.uri,
-          label: node.label,
-          type: node.type ?? '',
-          degree: drawnDegree.get(node.uri) ?? 0,
-          totalDegree: totalDegree.get(node.uri) ?? 0,
-        },
-      });
-    }
-
-    for (const edge of drawnEdges) {
-      elements.push({
-        data: {
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          predicate: edge.predicate,
-          predicateLabel: edge.predicateLabel ?? '',
-        },
-      });
-    }
-
-    return {
-      elements,
-      drawnNodes: visibleNodes.length,
-      totalNodes: result.nodes.length,
-      edgesHiddenByTruncation,
-    };
+  /**
+   * Aplica un cambio runtime de `limits.graphMaxNodes` (la config llega async):
+   * destruye la instancia y la recrea con los mismos datos, porque el recorte
+   * top-N cambia con el cap nuevo y un patch incremental no alcanza. No-op si
+   * no hay grafo dibujado.
+   */
+  private rebuildGraphForLimitChange(): void {
+    if (!this.cy || !this.lastVisibleResult) return;
+    const visible = this.lastVisibleResult;
+    const built = this.buildElements(visible);
+    this.coverageLabel = this.buildCoverageLabel(
+      built,
+      visible,
+      this.lastLotState.lotCount,
+      this.lastLotState.currentLot,
+    );
+    this.destroyGraph();
+    this.syncGraph(built);
+    this.cdr.markForCheck();
   }
 
   /**
@@ -582,7 +591,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     }
 
     if (built.totalNodes > built.drawnNodes) {
-      parts.push(`${built.drawnNodes} de ${built.totalNodes} nodos (los más conectados)`);
+      const prioritized =
+        built.inclusionReasons.selected + built.inclusionReasons['query-entity'];
+      parts.push(
+        `${built.drawnNodes} de ${built.totalNodes} nodos visibles` +
+          (prioritized ? ` · ${prioritized} priorizados por la query` : ''),
+      );
       if (built.edgesHiddenByTruncation > 0) {
         const n = built.edgesHiddenByTruncation;
         parts.push(`${n} arista${n === 1 ? '' : 's'} oculta${n === 1 ? '' : 's'}`);
@@ -610,6 +624,17 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.applyFocusContext(nodeUri);
     });
 
+    this.cy.on('tap', 'edge', (evt) => {
+      const edge = evt.target;
+      const id = (edge.data('superEdgeId') as string | undefined) ??
+        (edge.data('aggregate') ? edge.id() : undefined);
+      if (!id) return;
+      if (this.expandedSuperEdgeIds.has(id)) this.expandedSuperEdgeIds.delete(id);
+      else this.expandedSuperEdgeIds.add(id);
+      this.persistGraphState();
+      if (this.lastVisibleResult) this.syncGraph(this.buildElements(this.lastVisibleResult));
+    });
+
     this.cy.on('tap', (evt) => {
       if (
         evt.target === this.cy &&
@@ -628,6 +653,14 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     this.cy.on('mouseover', 'edge', (evt) => {
       const edge = evt.target;
+      const multiplicity = (edge.data('multiplicity') as number) ?? 1;
+      const predicates = (edge.data('predicates') as string[] | undefined) ?? [];
+      if (multiplicity > 1) {
+        this.showTooltip(
+          `${multiplicity} relaciones: ${predicates.join(', ')} · click para expandir`,
+        );
+        return;
+      }
       this.showTooltip(
         (edge.data('predicateLabel') as string) || (edge.data('predicate') as string) || '',
       );
@@ -677,7 +710,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * posiciones simuladas salteando el nodo agarrado (`if (!node.grabbed())`), así
    * que ese va exacto donde lo sueltes y solo los vecinos se acomodan, elásticos.
    *
-   * Solo aplica con `cola`: dagre/circle/grid son layouts estructurales y una
+   * Solo aplica con `cola`: dagre/grid son layouts estructurales y una
    * relajación por física les desarmaría el orden.
    */
   private startLiveDrag(node: cytoscape.NodeSingular, solo: boolean): void {
@@ -757,8 +790,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const total = (node.data('totalDegree') as number) ?? drawn;
     const connections =
       total === drawn ? `${total} conexiones` : `${total} conexiones (${drawn} dibujadas)`;
-    const type = node.data('type') as string;
-    return type ? `${label} · ${type} · ${connections}` : `${label} · ${connections}`;
+    const variable = node.data('queryVariable') as string;
+    return variable ? `${label} · ${variable} · ${connections}` : `${label} · ${connections}`;
   }
 
   private applyFocusContext(focusUri: string | null): void {
@@ -869,6 +902,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       pan: { x: pan.x, y: pan.y },
       zoom: this.cy.zoom(),
       ...(Object.keys(manual).length > 0 ? { manualPositions: manual } : {}),
+      detailLevel: this.detailLevel,
+      ...(this.expandedSuperEdgeIds.size > 0
+        ? { expandedSuperEdgeIds: [...this.expandedSuperEdgeIds] }
+        : {}),
     });
   }
 

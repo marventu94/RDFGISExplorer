@@ -92,9 +92,16 @@
 app-coverage-chip {
   position: absolute;
   top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 8px;
+  right: 300px;
   z-index: 10;
+}
+
+@media (max-width: 760px) {
+  app-coverage-chip {
+    top: 48px;
+    right: 8px;
+  }
 }
 
 .graph-toolbar {
@@ -105,6 +112,21 @@ app-coverage-chip {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar-label {
+  font-size: 11px;
+  color: #607d8b;
+}
+
+.toolbar-select {
+  padding: 4px 6px;
+  border: 1px solid #b0bec5;
+  border-radius: 4px;
+  background: #fff;
+  color: #37474f;
+  font-size: 12px;
 }
 
 .toolbar-btn {
@@ -131,4 +153,43 @@ app-coverage-chip {
   pointer-events: none;
   white-space: nowrap;
   z-index: 100;
+}
+
+.graph-legend {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 11;
+  display: flex;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(176, 190, 197, 0.8);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #546e7a;
+  font-size: 11px;
+}
+
+.legend-dot,
+.legend-line {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #90a4ae;
+}
+
+.legend-dot--aggregate {
+  border-radius: 2px;
+  background: #607d8b;
+}
+
+.legend-line {
+  width: 14px;
+  border-top: 2px solid #90a4ae;
 }
