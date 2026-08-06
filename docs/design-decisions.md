@@ -8,6 +8,10 @@
 > criterios propios de ingeniería, explicitados como tales. El objetivo es
 > que cada elección resulte defendible: qué evidencia de la literatura la
 > motiva y qué parte constituye un aporte propio.
+>
+> Las decisiones técnicas de la vista de grafo (selección, agregación,
+> layout, codificación visual) se registran por separado en
+> `graph-rendering-decisions.md`.
 
 **El problema que enmarca el diseño:** el paper evidencia que solo 7 de 30
 trabajos integran grafo + espacio + tiempo (G+S+T), que cada uno lo hizo para
@@ -59,6 +63,11 @@ lote.
 | Timeline | Distribución temporal | Rango (brush) | Agregación visual |
 | Panel de resumen | Estadística descriptiva | No | **Sí** (COUNT, AVG, MIN/MAX, top valores) |
 | Export Excel | Materia prima para análisis externo | No | Sí (todas las filas) |
+
+La fila Grafo describe la estrategia vigente (*top por conexiones*). Su
+reemplazo planificado —un presupuesto visual query-aware con agregación
+reversible— está fundamentado y registrado en `graph-rendering-decisions.md`
+(§2 y §3) y se ejecuta de forma incremental por milestones.
 
 ## 3. La tabla como vista (y no solo vistas visuales)
 

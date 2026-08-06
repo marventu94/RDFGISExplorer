@@ -180,7 +180,7 @@ describe('DashboardPersistenceService', () => {
         filters: {
           map: { center: [-34.6, -58.4], zoom: 12 },
           timeline: { rangeStart: '2021-01-01', rangeEnd: '2021-12-31' },
-          graph: { layout: 'circle' },
+          graph: { layout: 'dagre' },
           table: { quickFilter: 'filter', pageSize: 200 },
         },
       };
@@ -196,7 +196,7 @@ describe('DashboardPersistenceService', () => {
       expect(completed).toBe(true);
       expect(viewState.mapState()).toEqual({ center: [-34.6, -58.4], zoom: 12 });
       expect(viewState.timelineState()).toEqual({ rangeStart: '2021-01-01', rangeEnd: '2021-12-31' });
-      expect(viewState.graphState()).toEqual({ layout: 'circle' });
+      expect(viewState.graphState()).toEqual({ layout: 'dagre' });
       expect(viewState.tableState()).toEqual({ quickFilter: 'filter', pageSize: 200 });
     });
 
