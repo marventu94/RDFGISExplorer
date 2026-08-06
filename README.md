@@ -192,6 +192,26 @@ cd frontend/rdf_gis_explorer && pnpm test
 
 ---
 
+## Tableros demo (seed)
+
+El repo incluye `backend/data/wikidata.sqlite` con tableros de ejemplo (5
+workspaces del RDF Explorer + sus 5 equivalentes GIS, validados contra
+Wikidata). Para regenerarlos:
+
+```bash
+cd backend && pnpm run seed:demo-dashboards              # construye, valida y escribe data/<backend>.sqlite
+pnpm run seed:demo-dashboards -- --dry-run               # solo construye y valida, no escribe
+pnpm run seed:demo-dashboards -- --no-validate           # escribe sin consultar el endpoint
+```
+
+El script (`backend/scripts/seed-demo-dashboards.ts`) construye los grafos con
+las clases reales del dominio del Explorer, valida volumen y cobertura
+espaciotemporal contra el endpoint configurado y escribe en el SQLite del
+backend activo (idempotente: reemplaza por nombre). Como `data/` está en
+`.gitignore`, para versionar el archivo se usa `git add -f`.
+
+---
+
 ## Variables de entorno
 
 | Variable | Default | Uso |
@@ -214,6 +234,7 @@ cd frontend/rdf_gis_explorer && pnpm test
 | `EXPORT_MAX_ROWS` | `50000` | Tope de filas del export completo a Excel (`limits`) |
 | `EXPORT_MIN_PAGE_SIZE` | `250` | Piso del reintento adaptativo de página del export (`limits`) |
 | `SPARQL_PREFIXES_PATH` | `backend/config/prefixes.${SPARQL_BACKEND}.json` | Archivo JSON `{ prefix: uri }` con los prefixes del backend |
+| `CLASS_COLORS_PATH` | `backend/config/class-colors.${SPARQL_BACKEND}.json` | Archivo JSON `{ "uriDeClase": "#color" }` con los colores por clase RDF |
 | `BACKEND_PORT` | `3000` | Puerto del backend |
 | `FRONTEND_PORT` / `RDF_EXPLORER_PORT` / `RDF_GIS_EXPLORER_PORT` | `4200` / `4201` / `4202` | Puertos de los frontends (Docker/Podman) |
 | `CORS_ORIGINS` | `http://localhost:4200` | Orígenes CORS (separados por coma) |

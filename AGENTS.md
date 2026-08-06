@@ -46,6 +46,7 @@ npm run dev                    # igual, sin el bootstrap de nvm/corepack
 cd backend && pnpm run start:dev   # backend solo
 cd backend && pnpm test            # unit tests (Jest)
 cd backend && pnpm run lint        # ESLint
+cd backend && pnpm run seed:demo-dashboards   # tableros demo (5 Explorer + 5 GIS) en data/<backend>.sqlite
 
 cd frontend/<app> && pnpm test     # unit tests (Vitest vía ng test)
 ```
@@ -130,7 +131,7 @@ QueryResult {
 
 BindingValue = { type: 'uri' } | { type: 'literal' } | { type: 'bnode' } | { type: 'coordinate' } | { type: 'date' }
 
-NormalizedNode { uri, label, type?, attributes, coordinate?, temporalEvents?, flags? }
+NormalizedNode { uri, label, queryVariable?, classes?, classification?, attributes, coordinate?, temporalEvents?, flags? }
 NormalizedEdge { id, source, target, predicate, predicateLabel? }
 ```
 
@@ -140,7 +141,7 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 
 - **`PropertyGraph`**: contenedor de nodes, edges. Mutaciones, query building (BFS → SPARQL), drop handling.
 - **`RDFResource`** (abstract) → `Node`, `Property`, `Literal`. Cada uno tiene `Variable` (alias, filtros).
-- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label.
+- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label. Los filtros de fecha (`datefrom`/`dateto`) serializan `^^xsd:dateTime`; `toSparql()` declara `PREFIX xsd:` automáticamente cuando aparece (sparqljs lo exige al validar). `toSparqlFullProjection()` proyecta TODAS las variables (selectAll + recorte de `?<literal>Label` vacíos, sin mutar el estado): es la que usa el **handoff al GIS** (`main.component.handoffToGis`, `sparql-panel.handoffQuery`) — con la proyección mínima de `toSparql()` el GIS queda sin coordenadas, fechas ni aristas. El seed de dashboards demo usa el mismo método para la query GIS, así que handoff runtime y tablero sembrado producen la misma query.
 - **`Filter`**: 9 tipos (text, lang, regex, leq, geq, isuri, isliteral, datefrom, dateto).
 - **`GraphSerializer`**: serializa/deserializa PropertyGraph ↔ JSON para persistencia.
 - **`PropertyGraphService`**: wrapper Angular con signals. `revision` counter para reactividad.
@@ -154,14 +155,14 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 |-------|----------|-----------|-------|
 | Table | AG Grid 35 (`rowSelection` con la API objeto ≥32.2) | Quick filter | select, focus |
 | Map | Leaflet 1.9 + markercluster + draw | GeoFilter (polygon) | select, focus |
-| Graph | Cytoscape 3.34 (cola+dagre) | Cap de nodos config-driven (`limits.graphMaxNodes`, default 300) | select, focus |
+| Graph | Cytoscape 3.34 (cola+dagre) | Cap de nodos config-driven (`limits.graphMaxNodes`, default 300; el nodo seleccionado entra siempre al presupuesto y un cambio runtime del cap reconstruye la vista una vez). Recorte top-N + coloreo por clase en `graph-view/graph-elements.ts` (puro) | select, focus |
 | Timeline | vis-timeline 8.x | TemporalFilter (rango) | select, focus |
 
 **Coordinated View:** cada vista emite `setFocus(uris)` al hacer pan/zoom. Las demás ajustan su viewport. Toggle global en navbar.
 
 **SelectionService:** fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal), `visibleQueryResult$` (lo que consumen las 4 vistas: el resultado filtrado restringido al lote actual + pinning), `lotState$`, `lotSize$`, `currentLot$`. Métodos de lotes: `setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
 
-**Lotes globales con pinning:** cuando el resultado filtrado supera `lotSize` **filas** (default 300, config-driven vía `limits.lotDefaultSize`/`lotSizeOptions`), las 4 vistas muestran **el mismo lote**. La lógica pura vive en `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`): el lote pagina `bindings` en el **orden original de la query** (nunca se reordena). Los nodos visibles son los URIs/bnodes de las filas del lote **más sus vecinos a 1 salto** por `edges` (así se recuperan los nodos intermedios que el backend recorta del SELECT con `pickVariables`), y las edges visibles son las que conectan nodos visibles. El nodo seleccionado se **inyecta** en el lote visible aunque no esté referenciado por las filas del lote (con sus edges hacia nodos visibles); al deseleccionar deja de inyectarse. Query nueva → lote 1; al filtrar se conserva el lote si sigue válido y se clampea si `lotCount` se reduce. Con un solo lote `visibleQueryResult$` es idéntico a `filteredQueryResult$` (sin overhead). El navbar tiene el navegador de lotes ("Lote X de N · T filas", anterior/siguiente, selector de tamaño, icono de warning si el backend truncó; tooltip con el aviso de volumen) — solo visible cuando N > 1.
+**Lotes globales con pinning:** cuando el resultado filtrado supera `lotSize` **filas** (default 300, config-driven vía `limits.lotDefaultSize`/`lotSizeOptions`), las 4 vistas muestran **el mismo lote**. La lógica pura vive en `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`): el lote pagina `bindings` en el **orden original de la query** (nunca se reordena). Los nodos visibles son los URIs/bnodes de las filas del lote **más sus vecinos a 1 salto** por `edges` (así se recuperan los nodos intermedios que el backend recorta del SELECT con `pickVariables`), y las edges visibles son las que conectan nodos visibles. Los bnodes se normalizan con `bindingGraphId` (las filas traen `b0` crudo, los nodos/edges usan `_:b0`). El nodo seleccionado se **inyecta** en el lote visible aunque no esté referenciado por las filas del lote (con sus edges hacia nodos visibles); al deseleccionar deja de inyectarse. Query nueva → lote 1; al filtrar se conserva el lote si sigue válido y se clampea si `lotCount` se reduce. Con un solo lote `visibleQueryResult$` es idéntico a `filteredQueryResult$` (sin overhead). El navbar tiene el navegador de lotes ("Lote X de N · T filas", anterior/siguiente, selector de tamaño, icono de warning si el backend truncó; tooltip con el aviso de volumen) — solo visible cuando N > 1.
 
 **Chips de cobertura:** helper puro `shared/stats/coverage-stats.ts` (`computeCoverageStats`) + componente `shared/components/coverage-chip`. Los conteos de alerta usan solo **entidades principales** (nodos con atributos, coordenada o eventos temporales propios); los nodos estructurales del modelo (features, direcciones, geometrías) no cuentan como "sin coordenada/fecha". Mapa ("Mostrando X de N entidades[ del lote] · Y sin coordenada"), timeline (ídem "sin fecha") y grafo ("Lote X de N · M filas", o "Mostrando 300 de N nodos (top por conexiones)" si el lote visible excede `MAX_NODES`). Computan sobre el lote visible; el chip se oculta cuando no hay alerta.
 
@@ -172,7 +173,7 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 ## Persistencia
 
 - **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + selección → `/api/dashboards` (`kind: 'gis'`).
-- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`).
+- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`). Nombres: el tablero y las pestañas tienen nombres independientes, pero se sincronizan para workspaces de **un solo panel** — al guardar, el diálogo renombra el panel activo con el nombre del workspace (`main.component.openSaveDialog`); al cargar (`loadWorkspaceAsTabs`), la pestaña única toma el `name` del dashboard (así los tableros sembrados/legados con panel corto, p.ej. "Batallas WWII", muestran el nombre del tablero). Workspaces multi-panel conservan los nombres de cada pestaña.
 - **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro.
 - **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) para la preferencia de auto-ejecución.
 
@@ -198,7 +199,7 @@ AppConfig {
   capabilities, supportsWikibaseLabel, defaultPrefixes, search,
   labelUri,     // rdfs:label por default
   describe,     // UI hints: { exclude, objects, datatype, text, image, external }
-  classColors,  // colores por clase (solo poblado para wikidata)
+  classColors,  // colores por clase (config/class-colors.${SPARQL_BACKEND}.json; {} si no existe)
   defaults,     // defaults que consume el Explorer (lang, resultLimit, labelUri, searchClass, endpointType)
   limits,       // límites unificados (env del backend): { graphMaxNodes, lotDefaultSize,
                 //   lotSizeOptions[], tablePageSizeOptions[], exportMaxRows,
@@ -208,7 +209,7 @@ AppConfig {
 
 **Canal de límites:** todos los límites de queries y visualización viven en env vars del backend (ver tabla del README) y viajan en `AppConfig.limits`. El GIS los consume con `LimitsService` (signal con defaults equivalentes hasta que la config llega; `App` lo actualiza en `ngOnInit`): grafo (`graphMaxNodes`), lotes (`lotDefaultSize`/`lotSizeOptions`, con clamp del tamaño actual si queda fuera de la nueva oferta), tabla (`tablePageSizeOptions`) y export (`exportMaxRows`/`exportMinPageSize`).
 
-Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, classColors, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros.
+Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros. Los colores por clase se cargan desde `backend/config/class-colors.${SPARQL_BACKEND}.json` (override: `CLASS_COLORS_PATH`) y quedan vacíos si el archivo no existe — el repo trae `class-colors.wikidata.json` y `class-colors.graphdb.example.json`; `class-colors.graphdb.json` real está gitignoreado.
 
 ## Variables de Entorno
 

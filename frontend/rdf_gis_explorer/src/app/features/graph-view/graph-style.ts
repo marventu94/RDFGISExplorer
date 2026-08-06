@@ -4,15 +4,16 @@ import type { EntityColorService } from '@core/services/entity-color.service';
 export function createGraphStyle(
   colorService: EntityColorService,
   isDark: () => boolean,
+  detailLevel: () => 'summary' | 'exploration' | 'detail' = () => 'exploration',
 ): cytoscape.StylesheetStyle[] {
   return [
     {
       selector: 'node',
       style: {
         'background-color': (ele: cytoscape.NodeSingular) =>
-          colorService.colorForType(ele.data('type') as string | undefined),
+          colorService.colorForClass(ele.data('classUri') as string | undefined),
         'border-color': (ele: cytoscape.NodeSingular) => {
-          const c = colorService.colorForType(ele.data('type') as string | undefined);
+          const c = colorService.colorForClass(ele.data('classUri') as string | undefined);
           return isDark() ? shade(c, -0.3) : shade(c, -0.4);
         },
         'border-width': 1.5,
@@ -25,7 +26,8 @@ export function createGraphStyle(
           return Math.max(20, Math.min(80, 20 + deg * 3));
         },
         color: () => (isDark() ? '#f1f5f9' : '#212529'),
-        label: 'data(label)',
+        label: (ele: cytoscape.NodeSingular) =>
+          detailLevel() === 'summary' ? '' : (ele.data('label') as string),
         'font-size': '11px',
         'text-valign': 'bottom',
         'text-margin-y': 5,
@@ -36,10 +38,21 @@ export function createGraphStyle(
       } as cytoscape.Css.Node,
     },
     {
+      selector: 'node[aggregate = true]',
+      style: {
+        shape: 'round-rectangle',
+        'border-width': 3,
+        'font-weight': 'bold',
+      } as cytoscape.Css.Node,
+    },
+    {
       selector: 'edge',
       style: {
         'curve-style': 'bezier',
-        width: 1.5,
+        width: (ele: cytoscape.EdgeSingular) =>
+          detailLevel() === 'summary'
+            ? 1
+            : Math.min(5, 1.5 + (((ele.data('multiplicity') as number) ?? 1) - 1) * 0.75),
         'line-color': () => (isDark() ? '#475569' : '#B0BEC5'),
         'target-arrow-color': () => (isDark() ? '#475569' : '#B0BEC5'),
         'target-arrow-shape': 'triangle',
@@ -48,6 +61,23 @@ export function createGraphStyle(
         // las abanica solo; el default de 40 las deja muy juntas en un cuadrante.
         'control-point-step-size': 55,
       },
+    },
+    {
+      selector: 'edge[aggregate = true]',
+      style: {
+        'line-style': 'dashed',
+        label: (ele: cytoscape.EdgeSingular) =>
+          detailLevel() === 'detail' ? (ele.data('predicateLabel') as string) : '',
+        'text-rotation': 'autorotate',
+      } as cytoscape.Css.Edge,
+    },
+    {
+      selector: 'edge:not([aggregate = true])',
+      style: {
+        label: (ele: cytoscape.EdgeSingular) =>
+          detailLevel() === 'detail' ? (ele.data('predicateLabel') as string) : '',
+        'text-rotation': 'autorotate',
+      } as cytoscape.Css.Edge,
     },
     {
       // Sin esto todos los self-loops de un nodo usan el mismo -45deg/-90deg por

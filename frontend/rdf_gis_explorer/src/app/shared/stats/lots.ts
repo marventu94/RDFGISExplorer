@@ -1,4 +1,4 @@
-import type { QueryResult } from '@shared/models';
+import type { BindingValue, QueryResult } from '@shared/models';
 
 /**
  * Lotes globales: cuando el resultado filtrado supera `lotSize` filas, las 4
@@ -16,6 +16,18 @@ import type { QueryResult } from '@shared/models';
 
 export const DEFAULT_LOT_SIZE = 300;
 export const LOT_SIZE_OPTIONS: readonly number[] = [100, 300, 500];
+
+/**
+ * Id de grafo de un valor de binding: los nodos y aristas identifican a los
+ * bnodes como `_:b0`, pero las filas de bindings los traen crudos (`b0`).
+ * Sin esta normalización los bnodes se caían del lote visible (y de los
+ * filtros geo/temporales, que reusan `restrictResultToUris`).
+ */
+export function bindingGraphId(value: BindingValue | undefined): string | null {
+  if (value?.type === 'uri') return value.value;
+  if (value?.type === 'bnode') return value.value.startsWith('_:') ? value.value : `_:${value.value}`;
+  return null;
+}
 
 export interface LotSlice {
   /** Resultado restringido al lote actual más los URIs pineados. */
@@ -43,18 +55,20 @@ export function restrictResultToUris(
   const nodes = result.nodes.filter((n) => uris.has(n.uri));
   const edges = result.edges.filter((e) => uris.has(e.source) && uris.has(e.target));
   const bindings = result.bindings.filter((row) =>
-    Object.values(row).some((v) => v?.type === 'uri' && uris.has(v.value)),
+    Object.values(row).some((v) => {
+      const id = bindingGraphId(v);
+      return id !== null && uris.has(id);
+    }),
   );
   return { ...result, nodes, edges, bindings };
 }
 
-/** URIs/bnodes referenciados por una fila de bindings. */
+/** URIs/bnodes referenciados por una fila de bindings (bnodes normalizados a `_:bN`). */
 function rowUris(row: QueryResult['bindings'][number]): string[] {
   const uris: string[] = [];
   for (const value of Object.values(row)) {
-    if (value?.type === 'uri' || value?.type === 'bnode') {
-      uris.push(value.value);
-    }
+    const id = bindingGraphId(value);
+    if (id !== null) uris.push(id);
   }
   return uris;
 }

@@ -14,14 +14,14 @@ import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } f
 const mockNode: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q7742',
   label: 'Juan Domingo Perón',
-  type: 'http://www.wikidata.org/entity/Q5',
+  classes: ['http://www.wikidata.org/entity/Q5'],
   attributes: {},
 };
 
 const mockNode2: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q41404',
   label: 'Argentina',
-  type: 'http://www.wikidata.org/entity/Q515',
+  classes: ['http://www.wikidata.org/entity/Q515'],
   attributes: {},
 };
 
@@ -304,6 +304,7 @@ describe('GraphViewComponent', () => {
   let activeFiltersSubject: BehaviorSubject<Filter[]>;
   let selectedNodeSubject: BehaviorSubject<Selection>;
   let lotStateSubject: BehaviorSubject<LotState>;
+  let focusSubject: BehaviorSubject<{ uris: Set<string>; source: string | null }>;
 
   beforeEach(async () => {
     cyRegistry.instances = [];
@@ -322,7 +323,7 @@ describe('GraphViewComponent', () => {
       visibleNodes: 0,
     });
 
-    const focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
+    focusSubject = new BehaviorSubject<{ uris: Set<string>; source: string | null }>({
       uris: new Set(),
       source: null,
     });
@@ -341,6 +342,7 @@ describe('GraphViewComponent', () => {
       clearSelection: vi.fn(),
       markActiveView: vi.fn(),
       getActiveView: vi.fn(() => null),
+      getSelectedNodeSnapshot: vi.fn(() => selectedNodeSubject.getValue()),
     };
 
     await TestBed.configureTestingModule({
@@ -375,7 +377,7 @@ describe('GraphViewComponent', () => {
   });
 
   it('should switch to cola layout', () => {
-    component.currentLayout = 'circle';
+    component.currentLayout = 'dagre';
     component.setLayout('cola');
     expect(component.currentLayout).toBe('cola');
   });
@@ -406,10 +408,10 @@ describe('GraphViewComponent', () => {
     component.ngOnDestroy();
   });
 
-  it('should have four layout options', () => {
-    expect(component.layoutOptions.length).toBe(4);
+  it('should have three layout options', () => {
+    expect(component.layoutOptions.length).toBe(3);
     const values = component.layoutOptions.map((o) => o.value);
-    expect(values).toEqual(['cola', 'dagre', 'circle', 'grid']);
+    expect(values).toEqual(['cola', 'dagre', 'grid']);
   });
 
   it('should have cola as default layout', () => {
@@ -451,9 +453,9 @@ describe('GraphViewComponent', () => {
     fixture.detectChanges();
     fixture.detectChanges();
 
-    expect(component.coverageLabel).toBe('300 de 301 nodos (los más conectados)');
+    expect(component.coverageLabel).toBe('300 de 301 nodos visibles');
     const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
-    expect(chip?.textContent?.trim()).toBe('300 de 301 nodos (los más conectados)');
+    expect(chip?.textContent?.trim()).toBe('300 de 301 nodos visibles');
   });
 
   it('should hide the coverage chip when all nodes fit in the graph', () => {
@@ -671,6 +673,79 @@ describe('GraphViewComponent', () => {
     });
   });
 
+  describe('clear externo y foco vacío', () => {
+    it('un clearSelection externo limpia is-selected e is-dimmed', () => {
+      const lonely: NormalizedNode = {
+        uri: 'http://www.wikidata.org/entity/Q888',
+        label: 'Aislado',
+        attributes: {},
+      };
+      emitResult([mockNode, mockNode2, lonely], [mockEdge]);
+      const cy = lastCy();
+
+      // Selección propia: pinta is-selected en el nodo e is-dimmed en el aislado.
+      cy._emit('tap', 'node', { target: cy.getElementById(mockNode.uri) });
+      expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
+      expect(cy._classesOf(lonely.uri)).toContain('is-dimmed');
+
+      // Clear desde otra vista (source externo, sin nodo).
+      selectedNodeSubject.next({ node: null, source: 'external' });
+      fixture.detectChanges();
+
+      expect(cy._classesOf(mockNode.uri)).toEqual([]);
+      expect(cy._classesOf(lonely.uri)).toEqual([]);
+    });
+
+    it('un foco externo vacío limpia el dimming y las is-focus-edge', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+
+      focusSubject.next({ uris: new Set([mockNode.uri]), source: 'map' });
+      fixture.detectChanges();
+      expect(cy._classesOf(mockEdge.id)).toContain('is-focus-edge');
+
+      focusSubject.next({ uris: new Set(), source: 'map' });
+      fixture.detectChanges();
+
+      expect(cy._classesOf(mockEdge.id)).toEqual([]);
+      expect(cy._classesOf(mockNode.uri)).toEqual([]);
+      expect(cy._classesOf(mockNode2.uri)).toEqual([]);
+    });
+  });
+
+  describe('límite reactivo', () => {
+    it('un cambio runtime de graphMaxNodes reconstruye la vista una sola vez', () => {
+      const nodes: NormalizedNode[] = Array.from({ length: 5 }, (_, i) => ({
+        uri: `Q${i}`,
+        label: `N${i}`,
+        attributes: {},
+      }));
+      emitResult(nodes, []);
+      expect(cyRegistry.instances.length).toBe(1);
+
+      const limits = TestBed.inject(LimitsService);
+      limits.apply({ ...DEFAULT_LIMITS, graphMaxNodes: 3 });
+      fixture.detectChanges();
+
+      expect(cyRegistry.instances.length).toBe(2);
+      expect(lastCy()._ids()).toHaveLength(3);
+
+      // Re-aplicar el mismo valor no reconstruye de nuevo.
+      limits.apply({ ...DEFAULT_LIMITS, graphMaxNodes: 3 });
+      fixture.detectChanges();
+      expect(cyRegistry.instances.length).toBe(2);
+    });
+
+    it('sin grafo dibujado solo actualiza MAX_NODES, sin instanciar cytoscape', () => {
+      const limits = TestBed.inject(LimitsService);
+      limits.apply({ ...DEFAULT_LIMITS, graphMaxNodes: 42 });
+      fixture.detectChanges();
+
+      expect(component.MAX_NODES).toBe(42);
+      expect(cyRegistry.instances.length).toBe(0);
+    });
+  });
+
   describe('buildElements', () => {
     function build(result: QueryResult) {
       return (
@@ -796,7 +871,7 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
 
       expect(component.coverageLabel).toBe(
-        'Lote 2 de 3 · 1 filas · 300 de 301 nodos (los más conectados)',
+        'Lote 2 de 3 · 1 filas · 300 de 301 nodos visibles · 1 priorizados por la query',
       );
     });
 
@@ -814,7 +889,7 @@ describe('GraphViewComponent', () => {
 
       emitResult(nodes, edges);
 
-      expect(component.coverageLabel).toBe('2 de 3 nodos (los más conectados) · 1 arista oculta');
+      expect(component.coverageLabel).toBe('2 de 3 nodos visibles · 1 arista oculta');
     });
   });
 
@@ -856,7 +931,9 @@ describe('GraphViewComponent', () => {
 
   describe('arrastre suave', () => {
     /** Cadena A—B—C. */
-    function chain(): ReturnType<typeof lastCy> {
+    function chain(layout: 'cola' | 'dagre' = 'cola'): ReturnType<typeof lastCy> {
+      const state = TestBed.inject(DashboardViewStateService).graphState();
+      TestBed.inject(DashboardViewStateService).graphState.set({ ...state, layout });
       const nodes: NormalizedNode[] = ['A', 'B', 'C'].map((id) => ({
         uri: id,
         label: id,
@@ -927,7 +1004,7 @@ describe('GraphViewComponent', () => {
     it('no la enciende con un layout estructural como dagre', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({ layout: 'dagre' });
-      const cy = chain();
+      const cy = chain('dagre');
 
       cy._emit('grab', 'node', { target: cy.getElementById('A'), originalEvent: {} });
 
@@ -1018,20 +1095,20 @@ describe('EntityColorService', () => {
     return TestBed.inject(EntityColorService);
   }
 
-  it('returns default color for undefined type', () => {
+  it('returns default color for undefined class', () => {
     const service = buildService();
-    expect(service.colorForType(undefined)).toBe(defaultColor);
+    expect(service.colorForClass(undefined)).toBe(defaultColor);
   });
 
-  it('returns default color for unknown type', () => {
+  it('returns default color for unknown class', () => {
     const service = buildService();
-    expect(service.colorForType('http://unknown')).toBe(defaultColor);
+    expect(service.colorForClass('http://unknown')).toBe(defaultColor);
   });
 
   it('uses classColors from app config', () => {
     const service = buildService(
       { 'http://www.wikidata.org/entity/Q5': '#000000' },
     );
-    expect(service.colorForType('http://www.wikidata.org/entity/Q5')).toBe('#000000');
+    expect(service.colorForClass('http://www.wikidata.org/entity/Q5')).toBe('#000000');
   });
 });

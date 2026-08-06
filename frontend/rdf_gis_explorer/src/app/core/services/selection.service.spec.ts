@@ -339,6 +339,37 @@ describe('SelectionService', () => {
         service.addFilter(makeGeoFilter({ polygon: polygonFar }));
         expect(received!.nodes.length).toBe(0);
       });
+
+      it('should keep bnode neighbors and the rows that reference them (raw ids in bindings)', () => {
+        // Los bindings traen el bnode crudo ('b0') pero nodes/edges usan '_:b0':
+        // sin normalizar, el filtrado dejaba las filas del bnode afuera.
+        const nodeInside = makeNode({
+          uri: 'urn:inside',
+          label: 'Inside',
+          coordinate: { lat: 0, lng: 0 },
+        });
+        const bnode = makeNode({ uri: '_:b0', label: '_:b0' });
+        const qr = makeQueryResult({
+          nodes: [nodeInside, bnode],
+          edges: [{ id: 'e1', source: 'urn:inside', target: '_:b0', predicate: 'p' }],
+          bindings: [
+            {
+              s: { type: 'uri', value: 'urn:inside' },
+              stmt: { type: 'bnode', value: 'b0' },
+            },
+            { s: { type: 'bnode', value: 'b0' } },
+          ],
+        });
+        service.setQueryResult(qr);
+
+        let received: QueryResult | null | undefined;
+        service.filteredQueryResult$.subscribe((r) => (received = r));
+        service.addFilter(makeGeoFilter({ polygon: polygonInside }));
+
+        expect(received!.nodes.map((n) => n.uri)).toContain('_:b0');
+        expect(received!.edges).toHaveLength(1);
+        expect(received!.bindings).toHaveLength(2);
+      });
     });
 
     describe('temporal filter', () => {

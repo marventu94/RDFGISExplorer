@@ -54,7 +54,12 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     // En modo raw (export paginado) no hace falta grafo ni reescritura: se ejecuta
     // la query tal cual y se devuelven solo los bindings.
     const topology = opts.raw
-      ? { links: [], projected: null, intermediates: [] }
+      ? {
+          links: [],
+          projected: null,
+          intermediates: [],
+          classAssertions: new Map<string, readonly string[]>(),
+        }
       : extractQueryTopology(query);
     const upstreamQuery = topology.rewritten ?? query;
 
@@ -342,12 +347,24 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
 
     for (const row of rows) {
       // Nodos de las variables que pidió el usuario y de los intermedios del modelo.
-      for (const v of exposedVars) this.ensureNode(nodeMap, row, v);
-      for (const v of topology.intermediates) this.ensureNode(nodeMap, row, v);
+      for (const v of exposedVars)
+        this.ensureNode(nodeMap, row, v, topology.classAssertions);
+      for (const v of topology.intermediates)
+        this.ensureNode(nodeMap, row, v, topology.classAssertions);
 
       for (const link of topology.links) {
-        const source = this.ensureNode(nodeMap, row, link.subject);
-        const target = this.ensureNode(nodeMap, row, link.object);
+        const source = this.ensureNode(
+          nodeMap,
+          row,
+          link.subject,
+          topology.classAssertions,
+        );
+        const target = this.ensureNode(
+          nodeMap,
+          row,
+          link.object,
+          topology.classAssertions,
+        );
         if (!source || !target) continue;
 
         let predicate = link.predicate;
@@ -374,30 +391,64 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
         });
       }
 
-      // Los literales, la coordenada y los eventos temporales se cuelgan del nodo
-      // ancla: la primera variable URI de la proyección original. Es a propósito:
-      // el mapa y la timeline los buscan ahí, y si se los asignáramos al sujeto
-      // inmediato del literal (el bnode de geometría, por ejemplo) el mapa dibujaría
-      // bnodes en lugar de inmuebles.
+      // Atribución de literales, coordenadas y eventos temporales. Regla:
+      // - Si la variable es el objeto de un link cuyo sujeto es una variable
+      //   proyectada con valor URI en esta fila, cuelga del nodo de ese sujeto
+      //   (la entidad correcta en filas multi-entidad:
+      //   `?ciudad <fundacion> ?fundacionCiudad` → la fecha va a la ciudad).
+      // - Si no hay tal link (literal suelto, o sujeto bnode/intermedio no
+      //   proyectado), cae al nodo ancla: la primera variable URI de la proyección.
+      //   Así el caso estructural del OVS (`?inmueble hasFeature ?f . ?f asWKT ?wkt`,
+      //   con intermedios/bnodes) sigue llevando coordenada y fechas al inmueble,
+      //   que es donde el mapa y la timeline las buscan.
       const anchorVar = exposedVars.find((v) => row[v]?.type === 'uri');
       if (!anchorVar) continue;
-      const anchor = this.ensureNode(nodeMap, row, anchorVar);
+      const anchor = this.ensureNode(
+        nodeMap,
+        row,
+        anchorVar,
+        topology.classAssertions,
+      );
       if (!anchor) continue;
 
-      Object.assign(
-        anchor.attributes,
-        this.collectAttributes(row, exposedVars),
+      const projectedUris = new Set(
+        exposedVars.filter((v) => row[v]?.type === 'uri'),
       );
 
-      const coord = this.findCoordinate(row, exposedVars);
-      if (coord && !anchor.coordinate) anchor.coordinate = coord;
+      for (const v of exposedVars) {
+        const val = row[v];
+        if (!val || val.type === 'uri') continue;
 
-      for (const ev of this.findTemporalEvents(row, exposedVars)) {
-        const already = anchor.temporalEvents?.some(
-          (e) => e.field === ev.field && e.isoDate === ev.isoDate,
+        const owner = this.resolveOwnerNode(
+          nodeMap,
+          row,
+          topology,
+          v,
+          projectedUris,
+          anchor,
         );
-        if (!already) {
-          anchor.temporalEvents = [...(anchor.temporalEvents ?? []), ev];
+
+        // Merge entre filas: si dos filas traen la misma variable para el mismo
+        // nodo, la última gana (Object.assign sobre la misma clave).
+        owner.attributes[v] = val;
+
+        if (val.type === 'coordinate' && !owner.coordinate) {
+          owner.coordinate = val.value;
+        }
+
+        if (val.type === 'date') {
+          const d = new Date(val.value);
+          const ev: TemporalEvent = {
+            field: v,
+            isoDate: val.value,
+            numericValue: isNaN(d.getTime()) ? undefined : d.getFullYear(),
+          };
+          const already = owner.temporalEvents?.some(
+            (e) => e.field === ev.field && e.isoDate === ev.isoDate,
+          );
+          if (!already) {
+            owner.temporalEvents = [...(owner.temporalEvents ?? []), ev];
+          }
         }
       }
     }
@@ -406,13 +457,47 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
   }
 
   /**
+   * Resuelve a qué nodo se atribuye una variable no-URI de la fila: el sujeto de un
+   * link `?sujeto <p> ?variable` cuando ese sujeto es una variable proyectada con
+   * valor URI en la fila; si no, el ancla. Toma el primer link que cumple.
+   */
+  private resolveOwnerNode(
+    nodeMap: Map<string, NormalizedNode>,
+    row: ResultBinding,
+    topology: QueryTopology,
+    varName: string,
+    projectedUris: ReadonlySet<string>,
+    anchor: NormalizedNode,
+  ): NormalizedNode {
+    for (const link of topology.links) {
+      if (link.object !== varName) continue;
+      if (!projectedUris.has(link.subject)) continue;
+      const owner = this.ensureNode(
+        nodeMap,
+        row,
+        link.subject,
+        topology.classAssertions,
+      );
+      if (owner) return owner;
+    }
+    return anchor;
+  }
+
+  /**
    * Devuelve (creando si hace falta) el nodo de una variable en una fila.
    * Sólo las URIs y los bnodes son nodos; un literal no lo es.
+   *
+   * La primera fila que crea el nodo define su `queryVariable`: cuando la misma
+   * entidad aparece bajo varias variables, queda la de la primera aparición.
+   * `classes` sale de las afirmaciones `?x a <Clase>` que la topología extrajo
+   * para esa variable; si hay, la clasificación es `rdf-type`, si no, es
+   * `query-variable` (la variable es un alias, no una clase RDF).
    */
   private ensureNode(
     nodeMap: Map<string, NormalizedNode>,
     row: ResultBinding,
     varName: string,
+    classAssertions: ReadonlyMap<string, readonly string[]>,
   ): NormalizedNode | null {
     const cell = row[varName];
     if (!cell) return null;
@@ -420,8 +505,10 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
 
     const value = String(cell.value);
     // Los bnodes se prefijan para no colisionar con una URI y para que en la vista se
-    // lean como lo que son: nodos anónimos del modelo.
-    const id = cell.type === 'bnode' ? `_:${value}` : value;
+    // lean como lo que son: nodos anónimos del modelo. Si el endpoint ya devuelve el
+    // label prefijado (`_:b0`), no se duplica el prefijo.
+    const id =
+      cell.type === 'bnode' && !value.startsWith('_:') ? `_:${value}` : value;
 
     const labelCell = row[`${varName}Label`];
     const labelFromRow =
@@ -436,12 +523,18 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
       return existing;
     }
 
+    const classes = [...(classAssertions.get(varName) ?? [])];
     const node: NormalizedNode = {
       uri: id,
       label:
         labelFromRow ||
         (cell.type === 'bnode' ? varName : this.uriFragment(value)),
-      type: varName,
+      queryVariable: varName,
+      ...(classes.length ? { classes } : {}),
+      classification: {
+        source: classes.length ? 'rdf-type' : 'query-variable',
+        inferred: false,
+      },
       attributes: {},
     };
     nodeMap.set(id, node);
@@ -461,51 +554,6 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     // usan URIs con '#' y cortando sólo por '/' quedaba "inmontology#real_estate_...".
     const idx = Math.max(uri.lastIndexOf('#'), uri.lastIndexOf('/'));
     return idx >= 0 && idx < uri.length - 1 ? uri.slice(idx + 1) : uri;
-  }
-
-  private findCoordinate(
-    row: ResultBinding,
-    variables: string[],
-  ): Coordinate | undefined {
-    for (const v of variables) {
-      const val = row[v];
-      if (val?.type === 'coordinate') {
-        return val.value;
-      }
-    }
-    return undefined;
-  }
-
-  private findTemporalEvents(
-    row: ResultBinding,
-    variables: string[],
-  ): TemporalEvent[] {
-    const events: TemporalEvent[] = [];
-    for (const v of variables) {
-      const val = row[v];
-      if (val?.type === 'date') {
-        const d = new Date(val.value);
-        events.push({
-          field: v,
-          isoDate: val.value,
-          numericValue: isNaN(d.getTime()) ? undefined : d.getFullYear(),
-        });
-      }
-    }
-    return events;
-  }
-
-  private collectAttributes(
-    row: ResultBinding,
-    variables: string[],
-  ): Record<string, BindingValue> {
-    const attrs: Record<string, BindingValue> = {};
-    for (const v of variables) {
-      if (row[v] && row[v].type !== 'uri') {
-        attrs[v] = row[v];
-      }
-    }
-    return attrs;
   }
 
   private isAxiosError(err: unknown): err is AxiosError {

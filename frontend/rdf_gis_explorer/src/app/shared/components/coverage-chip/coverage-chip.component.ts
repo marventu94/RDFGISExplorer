@@ -19,11 +19,11 @@ import { Component, Input } from '@angular/core';
       }
       .coverage-chip {
         display: inline-block;
-        padding: 6px 14px;
+         padding: 5px 11px;
         background: rgba(236, 239, 241, 0.95);
         border: 1px solid #b0bec5;
         border-radius: 16px;
-        font-size: 13px;
+         font-size: 12px;
         color: #546e7a;
         white-space: nowrap;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
