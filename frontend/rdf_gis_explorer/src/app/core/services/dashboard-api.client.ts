@@ -26,6 +26,8 @@ export interface GisDashboardPayload {
       pan?: { x: number; y: number };
       zoom?: number;
       manualPositions?: Record<string, { x: number; y: number }>;
+      detailLevel?: 'summary' | 'exploration' | 'detail';
+      expandedSuperEdgeIds?: string[];
     };
   };
   selection?: { selectedIds: string[]; pinnedId?: string };

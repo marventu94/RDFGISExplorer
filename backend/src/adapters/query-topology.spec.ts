@@ -195,4 +195,73 @@ describe('extractQueryTopology', () => {
     const t = extractQueryTopology('ASK WHERE { ?s ?p ?o }');
     expect(t.links).toEqual([]);
   });
+
+  describe('classAssertions', () => {
+    const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+
+    it('captura una afirmación de clase simple', () => {
+      const t = extractQueryTopology(`${PREFIXES}
+        SELECT ?listing ?realEstate WHERE {
+          ?listing a pronto:RealEstateListing ; sioc:about ?realEstate .
+        }`);
+
+      expect(t.classAssertions.get('listing')).toEqual([
+        'https://raw.githubusercontent.com/fdioguardi/pronto/main/ontology/pronto.owl#RealEstateListing',
+      ]);
+      // El patrón de clase no genera link, sólo la afirmación.
+      expect(t.links).toHaveLength(1);
+    });
+
+    it('también la captura con el predicado rdf:type escrito como IRI', () => {
+      const t = extractQueryTopology(
+        `SELECT ?x WHERE { ?x <${RDF_TYPE}> <http://example.org/House> }`,
+      );
+      expect(t.classAssertions.get('x')).toEqual(['http://example.org/House']);
+    });
+
+    it('agrupa varias clases para la misma variable (multi-tipo), en orden', () => {
+      const t = extractQueryTopology(`${PREFIXES}
+        SELECT ?realEstate WHERE {
+          ?realEstate a inm:House .
+          ?realEstate a inm:Apartment .
+        }`);
+
+      expect(t.classAssertions.get('realEstate')).toEqual([
+        'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#House',
+        'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#Apartment',
+      ]);
+    });
+
+    it('deduplica la misma clase afirmada dos veces', () => {
+      const t = extractQueryTopology(`${PREFIXES}
+        SELECT ?realEstate WHERE {
+          ?realEstate a inm:House .
+          ?realEstate a inm:House .
+        }`);
+
+      expect(t.classAssertions.get('realEstate')).toHaveLength(1);
+    });
+
+    it('?x a ?tipoVariable NO es afirmación: sigue siendo un link', () => {
+      const t = extractQueryTopology(`${PREFIXES}
+        SELECT ?realEstate ?tipo WHERE {
+          VALUES ?tipo { inm:House inm:Apartment }
+          ?realEstate a ?tipo .
+        }`);
+
+      expect(t.classAssertions.size).toBe(0);
+      expect(t.links).toHaveLength(1);
+      expect(t.links[0]).toMatchObject({
+        subject: 'realEstate',
+        object: 'tipo',
+        predicate: RDF_TYPE,
+      });
+    });
+
+    it('viene vacío en consultas sin clases', () => {
+      const t = extractQueryTopology(`${PREFIXES}
+        SELECT ?listing ?realEstate WHERE { ?listing sioc:about ?realEstate . }`);
+      expect(t.classAssertions.size).toBe(0);
+    });
+  });
 });
