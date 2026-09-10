@@ -4,6 +4,8 @@ import {
   SparqlEndpoint,
   ExecuteOptions,
   NotImplementedError,
+  type EntitySearchOptions,
+  type EntitySearchResult,
 } from './sparql-endpoint.interface';
 import { QueryResult } from '../shared/dto/query-result.dto';
 
@@ -22,6 +24,19 @@ export class MillenniumDBAdapter implements SparqlEndpoint {
     return Promise.reject(
       new NotImplementedError(
         'MillenniumDBAdapter.getPredicates — pending fase 2',
+      ),
+    );
+  }
+
+  searchEntities(
+    keyword: string,
+    opts: EntitySearchOptions,
+  ): Promise<EntitySearchResult[]> {
+    void keyword;
+    void opts;
+    return Promise.reject(
+      new NotImplementedError(
+        'MillenniumDBAdapter.searchEntities — pending fase 2',
       ),
     );
   }

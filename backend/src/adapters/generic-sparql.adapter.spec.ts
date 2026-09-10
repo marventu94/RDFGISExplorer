@@ -935,3 +935,99 @@ describe('GenericSparqlAdapter', () => {
     });
   });
 });
+
+describe('GenericSparqlAdapter.searchEntities', () => {
+  let adapter: GenericSparqlAdapter;
+
+  beforeEach(() => {
+    adapter = new GenericSparqlAdapter('graphdb');
+    process.env['SPARQL_USER'] = 'test-agent/1.0';
+    process.env['SPARQL_ENDPOINT_URL'] =
+      'http://localhost:7200/repositories/test';
+  });
+
+  afterEach(() => {
+    nock.cleanAll();
+    delete process.env['SPARQL_USER'];
+    delete process.env['SPARQL_ENDPOINT_URL'];
+    delete process.env['SPARQL_ENTITY_SEARCH_QUERY'];
+  });
+
+  function captureQuery(): { get: () => string; scope: nock.Scope } {
+    let sent = '';
+    const scope = nock('http://localhost:7200')
+      .post('/repositories/test', (body: unknown) => {
+        sent =
+          typeof body === 'string'
+            ? (new URLSearchParams(body).get('query') ?? '')
+            : ((body as Record<string, string>)['query'] ?? '');
+        return true;
+      })
+      .reply(200, { head: { vars: [] }, results: { bindings: [] } });
+    return { get: () => sent, scope };
+  }
+
+  it('busca por regex sobre los labels y mapea los resultados', async () => {
+    nock('http://localhost:7200')
+      .post('/repositories/test')
+      .reply(200, {
+        head: { vars: ['uri', 'label'] },
+        results: {
+          bindings: [
+            {
+              uri: { type: 'uri', value: 'http://example.org/entity/1' },
+              label: { type: 'literal', value: 'Entity One' },
+            },
+          ],
+        },
+      });
+
+    const results = await adapter.searchEntities('entity', { limit: 10 });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].uri).toBe('http://example.org/entity/1');
+    expect(results[0].label).toBe('Entity One');
+  });
+
+  it('inyecta el filtro de clase cuando se pide', async () => {
+    const captured = captureQuery();
+
+    await adapter.searchEntities('entity', {
+      limit: 10,
+      classUri: 'http://example.org/Class',
+    });
+
+    expect(captured.get()).toContain('?uri a <http://example.org/Class>');
+  });
+
+  it('escapa intentos de inyeccion en el keyword', async () => {
+    const captured = captureQuery();
+
+    // keyword malicioso: corta el literal, inyecta un patron y usa $& de replace
+    await adapter.searchEntities('x\\" } UNION { ?s ?p ?o } #$&', { limit: 10 });
+
+    const sentQuery = captured.get();
+    // el literal queda cerrado: backslash y comilla escapados
+    expect(sentQuery).toContain('x\\\\\\" } UNION');
+    // no quedo una comilla sin escapar que corte el string
+    expect(sentQuery).not.toContain('x\\" }');
+    // $& no se expandio como patron de reemplazo (quedaria el query duplicado)
+    expect(sentQuery).toContain('#$&');
+  });
+
+  it('respeta una plantilla propia y NO le inyecta el filtro de clase', async () => {
+    process.env['SPARQL_ENTITY_SEARCH_QUERY'] =
+      'SELECT ?uri ?label WHERE { ?uri ?p "$keyword" } LIMIT $limit';
+    const captured = captureQuery();
+
+    await adapter.searchEntities('algo', {
+      limit: 7,
+      classUri: 'http://example.org/Class',
+    });
+
+    const sentQuery = captured.get();
+    expect(sentQuery).toContain('"algo"');
+    expect(sentQuery).toContain('LIMIT 7');
+    expect(sentQuery).not.toContain('http://example.org/Class');
+  });
+});
