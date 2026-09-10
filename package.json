@@ -4,11 +4,14 @@
   "private": true,
   "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "dev": "concurrently --raw --names backend,shell,explorer,gis \"npm run dev:backend\" \"npm run dev:shell\" \"npm run dev:explorer\" \"npm run dev:gis\"",
-    "dev:backend": "cd backend && npm run start:dev",
-    "dev:shell": "cd frontend/app_shell && npm run start",
-    "dev:explorer": "cd frontend/rdf_explorer && npm run start",
-    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start"
+    "dev": "concurrently --raw --names backend,shell,explorer,gis \"pnpm run dev:backend\" \"pnpm run dev:shell\" \"pnpm run dev:explorer\" \"pnpm run dev:gis\"",
+    "dev:backend": "cd backend && pnpm run start:dev",
+    "dev:shell": "cd frontend/app_shell && pnpm run start",
+    "dev:explorer": "cd frontend/rdf_explorer && pnpm run start",
+    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

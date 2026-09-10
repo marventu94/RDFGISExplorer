@@ -511,7 +511,9 @@ export class MapViewComponent implements OnInit, OnDestroy {
       const m = layer as L.CircleMarker & { _node?: NormalizedNode };
       if (m._node?.uri === node.uri) {
         const latlng = m.getLatLng();
-        const cluster = this.clusterGroup as L.MarkerClusterGroup & { zoomToShowLayer?: Function };
+        const cluster = this.clusterGroup as L.MarkerClusterGroup & {
+          zoomToShowLayer?: (layer: L.Layer, onDone: () => void) => void;
+        };
         if (!isVisible && typeof cluster?.zoomToShowLayer === 'function') {
           cluster.zoomToShowLayer(layer, () => this.addPulseRing(latlng));
         } else {

@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Parser, Generator } from 'sparqljs';
 import {
   SPARQL_ENDPOINT,
@@ -36,7 +37,18 @@ export class QueryService {
 
   constructor(
     @Inject(SPARQL_ENDPOINT) private readonly endpoint: SparqlEndpoint,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Entero de configuracion. Se lee por ConfigService y no por el entorno del
+   * proceso, para que el servicio sea testeable sin manipular variables
+   * globales y para no leer configuracion en cada request.
+   */
+  private intConfig(key: string, fallback: number): number {
+    const parsed = parseInt(this.config.get<string>(key) ?? '', 10);
+    return Number.isInteger(parsed) ? parsed : fallback;
+  }
 
   async execute(
     sparql: string,
@@ -54,9 +66,8 @@ export class QueryService {
       );
     }
 
-    const maxLimit = parseInt(process.env['SPARQL_MAX_LIMIT'] ?? '2000', 10);
-    const resolvedLimit =
-      limit ?? parseInt(process.env['SPARQL_DEFAULT_LIMIT'] ?? '500', 10);
+    const maxLimit = this.intConfig('SPARQL_MAX_LIMIT', 2000);
+    const resolvedLimit = limit ?? this.intConfig('SPARQL_DEFAULT_LIMIT', 500);
 
     if (resolvedLimit > maxLimit) {
       throw new HttpException(
@@ -69,7 +80,7 @@ export class QueryService {
       );
     }
 
-    const timeout = parseInt(process.env['SPARQL_TIMEOUT_MS'] ?? '30000', 10);
+    const timeout = this.intConfig('SPARQL_TIMEOUT_MS', 30000);
     const preview =
       sparql.length > MAX_QUERY_LOG_LEN
         ? sparql.slice(0, MAX_QUERY_LOG_LEN) + '...'
@@ -126,8 +137,7 @@ export class QueryService {
     const categoricalVars = this.sanitizeVars(request.categoricalVars);
 
     const timeoutMs =
-      request.timeoutMs ??
-      parseInt(process.env['SPARQL_TIMEOUT_MS'] ?? '30000', 10);
+      request.timeoutMs ?? this.intConfig('SPARQL_TIMEOUT_MS', 30000);
 
     const summary: QuerySummary = {
       totalRows: null,
@@ -291,7 +301,7 @@ export class QueryService {
   /** Tope del top categórico: env SUMMARY_TOP_CATEGORICAL_LIMIT (default 12). */
   private topCategoricalLimit(): number {
     const parsed = parseInt(
-      process.env['SUMMARY_TOP_CATEGORICAL_LIMIT'] ?? '',
+      this.config.get<string>('SUMMARY_TOP_CATEGORICAL_LIMIT') ?? '',
       10,
     );
     return Number.isInteger(parsed) && parsed > 0

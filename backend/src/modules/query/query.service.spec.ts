@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { QueryService } from './query.service';
 import {
   SPARQL_ENDPOINT,
@@ -39,6 +40,9 @@ describe('QueryService', () => {
           provide: SPARQL_ENDPOINT,
           useValue: mockSparqlEndpoint,
         },
+        // Sin valores: el servicio cae en sus defaults. Antes esto se controlaba
+        // manipulando process.env del proceso de test.
+        { provide: ConfigService, useValue: { get: () => undefined } },
       ],
     }).compile();
 
