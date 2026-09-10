@@ -8,7 +8,10 @@
     "dev:backend": "cd backend && pnpm run start:dev",
     "dev:shell": "cd frontend/app_shell && pnpm run start",
     "dev:explorer": "cd frontend/rdf_explorer && pnpm run start",
-    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start"
+    "dev:gis": "cd frontend/rdf_gis_explorer && pnpm run start",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

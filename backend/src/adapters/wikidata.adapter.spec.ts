@@ -68,7 +68,9 @@ describe('WikidataAdapter.searchEntities', () => {
       .reply(200, {
         results: {
           bindings: [
-            { uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' } },
+            {
+              uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' },
+            },
           ],
         },
       });

@@ -28,7 +28,15 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
+      // La familia no-unsafe-* queda en warn, igual que no-unsafe-argument, que
+      // ya estaba asi. Son 55 avisos preexistentes (no-unsafe-call,
+      // -member-access, -assignment) sobre respuestas de upstream y filas de
+      // SQLite tipadas como any: deuda visible, pero que no puede tirar el CI
+      // desde el primer dia. Se bajan de a una tipando esos bordes.
       '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
