@@ -536,8 +536,8 @@ centrado en x ≈ 0**. De ahí la columna única.
 
 #### Pasos
 
-- [ ] Convertir relativo → absoluto también en el camino de arranque. Dos
-      opciones; preferir la primera:
+- [x] Convertir relativo → absoluto también en el camino de arranque. Se tomó la
+      **opción 1** (la de fondo):
       1. Que `computeElements()` reciba el centro del padre y emita **siempre**
          posiciones absolutas. Entonces el bloque de conversión del camino
          incremental (`:245-260`) se puede **borrar**, y desaparece la asimetría
@@ -545,21 +545,32 @@ centrado en x ≈ 0**. De ahí la columna única.
       2. Dejar `computeElements()` como está y convertir en el sitio de creación.
          Más chico, pero mantiene dos convenciones de coordenadas en el mismo
          archivo — o sea, el mismo bug esperando volver.
-- [ ] Si se toma la opción 1, revisar los otros consumidores de `computeElements()`
-      (`:224` `const desired = this.computeElements()`) para no convertir dos veces.
-- [ ] Test de regresión: construir un grafo con nodos en coordenadas conocidas y
-      distintas, crear el componente **de cero con ese grafo ya cargado**, y
-      afirmar que las `x` de los nodos compuestos **difieren** entre sí y se
-      corresponden con `node.x`. Hoy ese test falla; es exactamente el bug.
+- [x] Revisados los consumidores de `computeElements()`. Había **tres** lugares
+      con la convención de coordenadas, no dos: el arranque (sin convertir) y
+      **dos** bloques en `syncCytoscape` (el de update y el de `cy.add`), que sí
+      convertían. Los dos bloques de conversión se borraron: ~30 líneas menos y
+      una sola convención en todo el archivo.
+- [x] **Desviación deliberada:** el armado de elementos se extrajo a
+      `canvas-graph.elements.ts` como función pura (`buildCanvasElements`). Sin
+      esa costura, el test de regresión exigía instanciar el componente con
+      Cytoscape mockeado en jsdom para verificar lo que en el fondo es geometría.
+      El directorio ya usa este patrón (`canvas-graph.drop.ts`,
+      `canvas-graph.styles.ts`, `canvas-graph.context-menus.ts`).
+- [x] Test de regresión sobre `buildCanvasElements`: nodos en coordenadas
+      conocidas y distintas, y se afirma que las `x` de los hijos **difieren**
+      entre sí y valen `node.x` (antes valían 0 para todos). Se agregaron 4 casos:
+      el del bug, el centrado del bloque sobre `(node.x, node.y)`, el apilado de
+      varios hijos y el nodo sin hijos.
 - [ ] Verificación manual del camino que lo dispara: Explorer → exportar al GIS →
       volver al Explorer **sin recargar** (navegación del shell, no F5) → el grafo
-      debe aparecer bien puesto **antes** de tocar nada.
+      debe aparecer bien puesto **antes** de tocar nada (smoke test final).
 
 #### Criterio de aceptación
 
-- El test de regresión pasa.
-- Las 191 pruebas del Explorer siguen verdes.
-- Verificación manual OK, y el grafo no se "acomoda" al primer clic.
+- [x] Los 4 tests de regresión pasan.
+- [x] **198** pruebas del Explorer verdes y `pnpm build` OK.
+- [ ] Verificación manual OK, y el grafo no se "acomoda" al primer clic
+      (smoke test final).
 
 ---
 
