@@ -15,6 +15,11 @@ export interface HandoffPayload {
   query: string;
   backend: string;
   source: { workspaceId?: string; panelId?: string };
+  /**
+   * El Explorer ya avisó que la importación reemplaza el tablero abierto en el
+   * GIS y el usuario aceptó: el GIS no vuelve a preguntar.
+   */
+  overwriteConfirmed?: boolean;
   publishedAt: string;
 }
 
@@ -22,6 +27,7 @@ export interface HandoffPayloadInput {
   query: string;
   backend: string;
   source: { workspaceId?: string; panelId?: string };
+  overwriteConfirmed?: boolean;
 }
 
 const STORAGE_KEY = 'platform.handoff.pending';
