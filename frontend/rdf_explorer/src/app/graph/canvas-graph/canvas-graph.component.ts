@@ -18,6 +18,7 @@ import { PropertyGraphService } from '../property-graph.service';
 import { GraphInteractionService } from './interaction.service';
 import { CYTOSCAPE_STYLES, CHILD_HEIGHT, CHILD_PADDING, NODE_TITLE_HEIGHT } from './canvas-graph.styles';
 import { parseDropPayload } from './canvas-graph.drop';
+import { buildCanvasElements } from './canvas-graph.elements';
 import { buildContextMenuConfig } from './canvas-graph.context-menus';
 import { Node, Property, type Edge, type RDFResource } from '../domain';
 
@@ -98,112 +99,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
   /* ------------------------------------------------------------------ */
 
   private computeElements(): cytoscape.ElementDefinition[] {
-    const nodes = this.graph.nodes();
-    const edges = this.graph.edges();
-    const elements: cytoscape.ElementDefinition[] = [];
-
-    for (const node of nodes) {
-      const block = CHILD_HEIGHT + CHILD_PADDING;
-      const totalChildren = node.properties.reduce(
-        (n, p) => n + 1 + (p.literal ? 1 : 0),
-        0,
-      );
-      // Layout the children block so the compound (title + children + padding)
-      // is roughly centered on (node.x, node.y). When there are no children the
-      // initial childY is unused — the :childless style handles that case.
-      const childrenBlockHeight =
-        totalChildren > 0
-          ? totalChildren * CHILD_HEIGHT + (totalChildren - 1) * CHILD_PADDING
-          : 0;
-      const compoundHeight = NODE_TITLE_HEIGHT + childrenBlockHeight + CHILD_PADDING;
-      let childY = -compoundHeight / 2 + NODE_TITLE_HEIGHT + CHILD_HEIGHT / 2;
-
-      elements.push({
-        group: 'nodes',
-        data: {
-          id: `n${node.id}`,
-          kind: 'node',
-          color: node.isVariable() ? '#2ca02c' : '#1f77b4',
-          label: this.nodeLabel(node),
-          domain: node,
-        },
-        position: { x: node.x, y: node.y },
-        classes: 'cy-node',
-      });
-
-      if (totalChildren > 0) {
-        elements.push({
-          group: 'nodes',
-          data: { id: `t${node.id}`, parent: `n${node.id}`, kind: 'title-spacer' },
-          position: { x: 0, y: -compoundHeight / 2 + NODE_TITLE_HEIGHT / 2 },
-          classes: 'cy-spacer',
-        });
-      }
-
-      for (const prop of node.properties) {
-        const propColor = prop.isLiteral()
-          ? '#9467bd'
-          : prop.isVariable()
-            ? '#d62728'
-            : '#ff7f0e';
-
-        elements.push({
-          group: 'nodes',
-          data: {
-            id: `p${prop.id}`,
-            parent: `n${node.id}`,
-            kind: 'property',
-            color: propColor,
-            label: this.resourceLabel(prop),
-            domain: prop,
-          },
-          position: { x: 0, y: childY },
-          classes: 'cy-prop',
-        });
-        childY += block;
-
-        if (prop.literal) {
-          elements.push({
-            group: 'nodes',
-            data: {
-              id: `l${prop.id}`,
-              parent: `n${node.id}`,
-              kind: 'literal',
-              color: '#9467bd',
-              label: this.resourceLabel(prop.literal),
-              domain: prop.literal,
-            },
-            position: { x: 0, y: childY },
-            classes: 'cy-lit',
-          });
-          childY += block;
-        }
-      }
-    }
-
-    for (const edge of edges) {
-      elements.push({
-        group: 'edges',
-        data: {
-          id: `e${edge.source.id}-${edge.target.id}`,
-          source: `p${edge.source.id}`,
-          target: `n${edge.target.id}`,
-          kind: 'edge',
-          domain: edge,
-        },
-        classes: 'cy-edge',
-      });
-    }
-
-    return elements;
-  }
-
-  private nodeLabel(node: Node): string {
-    return node.getRepr() ?? 'No values set!';
-  }
-
-  private resourceLabel(r: RDFResource): string {
-    return (r as any).getRepr?.() ?? 'No values set!';
+    return buildCanvasElements(this.graph.nodes(), this.graph.edges());
   }
 
   /* ------------------------------------------------------------------ */
@@ -242,24 +138,13 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
 
         if (el.nonempty() && el.length === 1) {
           el.data(elDef.data as cytoscape.ElementDataDefinition);
-          // Child positions in computeElements are relative to parent center.
-          // After init, el.position() uses absolute coords — so we must convert.
-          // We must also re-apply on every sync because adding/removing siblings
-          // changes compoundHeight and therefore every child's relative offset.
-          // Parent nodes (kind="node") are NOT repositioned here — dragfree keeps
-          // domain.x/y in sync with Cytoscape so there is nothing to correct.
+          // Hay que re-aplicar la posicion en cada sync: agregar o quitar
+          // hermanos cambia compoundHeight y con eso el y de todos los hijos.
+          // Los padres (kind="node") NO se reposicionan: dragfree ya mantiene
+          // domain.x/y en sincronia con Cytoscape.
           if (el.isNode() && el.isChild()) {
-            const parentId = (elDef.data as any).parent as string | undefined;
-            if (parentId) {
-              const parentEl = this.cy.getElementById(parentId);
-              const parentDomain = parentEl.nonempty()
-                ? (parentEl.data('domain') as Node | undefined)
-                : undefined;
-              if (parentDomain && (elDef as any).position) {
-                const rel: cytoscape.Position = (elDef as any).position;
-                el.position({ x: parentDomain.x + rel.x, y: parentDomain.y + rel.y });
-              }
-            }
+            const position = (elDef as cytoscape.NodeDefinition).position;
+            if (position) el.position({ ...position });
           }
         } else {
           const isEdge = !!(elDef.data as any).source;
@@ -271,24 +156,11 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
             });
           } else {
             const nodeData = elDef.data as cytoscape.NodeDataDefinition;
-            let pos: cytoscape.Position = (elDef as any).position ?? { x: 0, y: 0 };
-            const parentId = nodeData.parent as string | undefined;
-            if (parentId) {
-              // computeElements gives children relative positions {x:0, y:childY}.
-              // cy.add() requires absolute graph coords, so add the parent's
-              // domain-stored center (updated on every drag via dragfree).
-              const parentEl = this.cy.getElementById(parentId);
-              const parentDomain = parentEl.nonempty()
-                ? (parentEl.data('domain') as Node | undefined)
-                : undefined;
-              if (parentDomain) {
-                pos = { x: parentDomain.x + pos.x, y: parentDomain.y + pos.y };
-              }
-            }
+            const pos = (elDef as cytoscape.NodeDefinition).position ?? { x: 0, y: 0 };
             this.cy.add({
               group: 'nodes',
               data: nodeData,
-              position: pos,
+              position: { ...pos },
               classes: elDef.classes,
             });
           }
