@@ -1,31 +1,17 @@
 import { Injectable, signal } from '@angular/core';
+import {
+  clearPendingHandoff,
+  readPendingHandoff,
+  subscribeHandoffChanges,
+  writePendingHandoff,
+} from '@rdfgis/platform-bridge';
+import type { HandoffPayload, HandoffPayloadInput } from '@rdfgis/platform-bridge';
 
-export interface HandoffPayload {
-  query: string;
-  backend: string;
-  source: { workspaceId?: string; panelId?: string };
-  /**
-   * El Explorer ya avisó que la importación reemplaza el tablero abierto en el
-   * GIS y el usuario aceptó: el GIS no vuelve a preguntar.
-   */
-  overwriteConfirmed?: boolean;
-  publishedAt: string;
-}
-
-export interface HandoffPayloadInput {
-  query: string;
-  backend: string;
-  source: { workspaceId?: string; panelId?: string };
-  overwriteConfirmed?: boolean;
-}
-
-const STORAGE_KEY = 'platform.handoff.pending';
-const TTL_MS = 5 * 60 * 1000;
-const CUSTOM_EVENT = 'query-handoff';
-
-function isExpired(publishedAt: string): boolean {
-  return Date.now() - new Date(publishedAt).getTime() > TTL_MS;
-}
+// El contrato (clave de storage, TTL, nombre del evento) y la logica de
+// lectura/escritura viven en @rdfgis/platform-bridge, compartidos con el otro
+// remote. Este servicio es solo el envoltorio en signals: cada remote necesita
+// su propia instancia de Angular, pero no su propia copia del contrato.
+export type { HandoffPayload, HandoffPayloadInput };
 
 @Injectable({ providedIn: 'root' })
 export class QueryHandoffService {
@@ -34,23 +20,12 @@ export class QueryHandoffService {
   readonly pending = this._pending.asReadonly();
 
   constructor() {
-    this.syncFromStorage();
-
-    window.addEventListener(CUSTOM_EVENT, () => this.syncFromStorage());
-    window.addEventListener('storage', (e) => {
-      if (e.key === STORAGE_KEY) this.syncFromStorage();
-    });
+    this.sync();
+    subscribeHandoffChanges(() => this.sync());
   }
 
   publish(input: HandoffPayloadInput): void {
-    const payload: HandoffPayload = {
-      ...input,
-      publishedAt: new Date().toISOString(),
-    };
-
-    this._pending.set(payload);
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    window.dispatchEvent(new CustomEvent(CUSTOM_EVENT, { detail: payload }));
+    this._pending.set(writePendingHandoff(input));
   }
 
   consume(): HandoffPayload | null {
@@ -58,38 +33,16 @@ export class QueryHandoffService {
     if (!payload) return null;
 
     this._pending.set(null);
-    sessionStorage.removeItem(STORAGE_KEY);
+    clearPendingHandoff();
     return payload;
   }
 
   peek(): HandoffPayload | null {
-    this.syncFromStorage();
-    const p = this._pending();
-    if (p && isExpired(p.publishedAt)) {
-      this._pending.set(null);
-      sessionStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
+    this.sync();
     return this._pending();
   }
 
-  private syncFromStorage(): void {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      this._pending.set(null);
-      return;
-    }
-    try {
-      const p: HandoffPayload = JSON.parse(raw);
-      if (isExpired(p.publishedAt)) {
-        sessionStorage.removeItem(STORAGE_KEY);
-        this._pending.set(null);
-        return;
-      }
-      this._pending.set(p);
-    } catch {
-      sessionStorage.removeItem(STORAGE_KEY);
-      this._pending.set(null);
-    }
+  private sync(): void {
+    this._pending.set(readPendingHandoff());
   }
 }

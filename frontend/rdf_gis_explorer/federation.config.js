@@ -32,6 +32,13 @@ module.exports = withNativeFederation({
     '@marijn/find-cluster-break',
     '@lezer/highlight',
     '@lezer/common',
+    // Contrato del handoff (packages/platform-bridge): tiene codigo de runtime.
+    // Se bundlea dentro de cada remote en vez de compartirse: son ~40 lineas y el
+    // host no lo tiene en sus deps, asi que con shareAll+ignoreUnusedDeps el host
+    // omitiria el chunk del import-map y el remote no resolveria el specifier
+    // (mismo problema que ag-grid). Ademas el acoplamiento es via sessionStorage y
+    // window, no via instancia compartida: no hace falta que sea singleton.
+    '@rdfgis/platform-bridge',
     '@softarc/native-federation-runtime',
     '@softarc/native-federation',
     '@softarc/native-federation-node',
