@@ -99,7 +99,7 @@ export class Query {
     }
     this.dep = dep;
     this.triples = triples;
-    this.optionals = optTriples.map(t => [t]);
+    this.optionals = groupOptionals(optTriples, triples);
     this.cache = null;
   }
 
@@ -284,12 +284,19 @@ export class Query {
    * No muta el estado: restaura `select` e invalida el cache al salir.
    * Las columnas `?<literal>Label` (siempre vacías, son literales) se
    * eliminan del SELECT, igual que hace el seed de dashboards demo.
+   * `opts.limit` agrega un LIMIT explícito si la query no tiene uno: el
+   * backend recorta las filas DESPUÉS de recibirlas, así que sin LIMIT el
+   * endpoint materializa el resultado completo y la ejecución en el GIS
+   * puede quedar colgada varios minutos.
    */
-  toSparqlFullProjection(): string | null {
+  toSparqlFullProjection(opts?: { limit?: number }): string | null {
     const prevSelect = this.select;
+    const prevLimit = this.limit;
     this.selectAll();
+    if (!this.limit && opts?.limit && opts.limit > 0) this.limit = opts.limit;
     let q = this.toSparql();
     this.select = prevSelect;
+    this.limit = prevLimit;
     this.cache = null;
     if (!q) return null;
     for (const r of this.dep) {
@@ -346,4 +353,112 @@ export class Query {
       if (cfg.callback) cfg.callback();
     }
   }
+}
+
+/**
+ * Agrupa los triples opcionales en bloques `OPTIONAL { }` conectados, en vez
+ * de emitir uno por triple.
+ *
+ * Un triple por bloque no es solo verboso: cambia la semántica. Con
+ * `OPTIONAL { ?a p ?b } OPTIONAL { ?b q ?c }`, si el primer bloque no matchea,
+ * ?b queda sin ligar y el segundo se evalúa igual con ?b libre — o sea que
+ * matchea CUALQUIER ?b del grafo y multiplica filas que no tienen nada que ver
+ * con ?a. Encadenados en un solo bloque (`OPTIONAL { ?a p ?b . ?b q ?c }`) el
+ * patrón matchea completo o no matchea, que es lo que se dibujó en el canvas.
+ *
+ * Criterio de agrupamiento: dos triples opcionales van al mismo bloque si
+ * comparten una variable que el patrón obligatorio NO liga (es decir, una
+ * variable que solo existe dentro del OPTIONAL). Las ramas opcionales que solo
+ * comparten variables ya ligadas afuera —dos propiedades opcionales distintas
+ * del mismo nodo— siguen siendo bloques separados, que es lo correcto: cada
+ * una matchea o no de forma independiente.
+ */
+function groupOptionals(
+  optTriples: RDFResource[][],
+  triples: RDFResource[][],
+): RDFResource[][][] {
+  if (optTriples.length <= 1) return optTriples.map(t => [t]);
+
+  // Variables que el patrón obligatorio ya deja ligadas.
+  const bound = new Set<RDFResource>();
+  for (const t of triples) {
+    for (const r of t) {
+      if (r.isVariable()) bound.add(r);
+    }
+  }
+
+  // Union-find sobre los índices de los triples opcionales.
+  const parent = optTriples.map((_, i) => i);
+  const find = (i: number): number => {
+    let root = i;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[i] !== root) {
+      const next = parent[i];
+      parent[i] = root;
+      i = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[rb] = ra;
+  };
+
+  const firstSeen = new Map<RDFResource, number>();
+  optTriples.forEach((t, i) => {
+    for (const r of t) {
+      if (!r.isVariable() || bound.has(r)) continue;
+      const prev = firstSeen.get(r);
+      if (prev === undefined) firstSeen.set(r, i);
+      else union(prev, i);
+    }
+  });
+
+  const groups = new Map<number, RDFResource[][]>();
+  optTriples.forEach((t, i) => {
+    const root = find(i);
+    const group = groups.get(root);
+    if (group) group.push(t);
+    else groups.set(root, [t]);
+  });
+
+  return [...groups.values()].map(g => orderOptionalGroup(g, bound));
+}
+
+/**
+ * Ordena los triples de un bloque OPTIONAL para que cada uno aparezca después
+ * del que liga a su sujeto: primero los que arrancan de algo ya ligado
+ * (constante o variable del patrón obligatorio) y después la cadena. El
+ * resultado es idéntico para el endpoint pero mucho más legible, y es el orden
+ * en que están escritas las queries de referencia.
+ */
+function orderOptionalGroup(
+  group: RDFResource[][],
+  bound: ReadonlySet<RDFResource>,
+): RDFResource[][] {
+  const ordered: RDFResource[][] = [];
+  const pending = [...group];
+  const reachable = new Set<RDFResource>(bound);
+
+  let progress = true;
+  while (pending.length > 0 && progress) {
+    progress = false;
+    for (let i = 0; i < pending.length; i++) {
+      const t = pending[i];
+      const subject = t[0];
+      if (subject.isVariable() && !reachable.has(subject)) continue;
+      ordered.push(t);
+      pending.splice(i, 1);
+      i--;
+      for (const r of t) {
+        if (r.isVariable()) reachable.add(r);
+      }
+      progress = true;
+    }
+  }
+
+  // Sujetos que nunca se ligan (o ciclos): se emiten igual, al final.
+  ordered.push(...pending);
+  return ordered;
 }
