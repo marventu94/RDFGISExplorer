@@ -62,6 +62,45 @@ describe('PropertyGraph mutations', () => {
       expect(graph.edges.length).toBe(1);
       expect(s.properties.length).toBe(1);
     });
+
+    it('is idempotent for the same (property, target) pair', () => {
+      const s = graph.addNode();
+      const o = graph.addNode();
+      const p = s.newProp();
+
+      const first = graph.addEdge(p, o);
+      const second = graph.addEdge(p, o);
+
+      expect(graph.edges.length).toBe(1);
+      expect(second).toBe(first);
+    });
+
+    it('does NOT deduplicate when source is a Node: each call is a new predicate slot', () => {
+      const s = graph.addNode();
+      const o = graph.addNode();
+
+      const first = graph.addEdge(s, o);
+      const second = graph.addEdge(s, o);
+
+      // `newProp()` crea una property nueva por llamada: son dos variables
+      // SPARQL distintas apuntando al mismo nodo, y las dos son legitimas.
+      expect(graph.edges.length).toBe(2);
+      expect(s.properties.length).toBe(2);
+      expect(second).not.toBe(first);
+      expect(second!.source).not.toBe(first!.source);
+    });
+
+    it('keeps a property with several distinct targets', () => {
+      const s = graph.addNode();
+      const a = graph.addNode();
+      const b = graph.addNode();
+      const p = s.newProp();
+
+      graph.addEdge(p, a);
+      graph.addEdge(p, b);
+
+      expect(graph.edges.length).toBe(2);
+    });
   });
 
   describe('removeNode', () => {

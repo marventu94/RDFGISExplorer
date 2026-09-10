@@ -347,7 +347,7 @@ identidad de `(source, target)`.
 
 #### Pasos
 
-- [ ] En `graph.ts`, mover el chequeo a `addEdge` (**no** a `addEdgeToList`): si
+- [x] En `graph.ts`, mover el chequeo a `addEdge` (**no** a `addEdgeToList`): si
       se rechazara dentro de `addEdgeToList`, la rama `Node` ya habría creado una
       `Property` huérfana vía `newProp()` y `addEdge` devolvería una arista que no
       está en la lista.
@@ -370,30 +370,34 @@ identidad de `(source, target)`.
           ...
       ```
 
-- [ ] Reemplazar el comentario de `addEdgeToList` por un doc comment que diga que
+- [x] Reemplazar el comentario de `addEdgeToList` por un doc comment que diga que
       la invariante se garantiza aguas arriba en `addEdge`. **Que no quede un
       `TODO`, pero que tampoco se pierda la explicación.**
-- [ ] Agregar dos casos al `describe('addEdge')` de
+- [x] Agregar los casos al `describe('addEdge')` de
       `graph/domain/__tests__/graph-mutations.spec.ts:45`:
       - `addEdge(p, o)` dos veces con la misma property → `graph.edges.length === 1`
         y la segunda llamada devuelve **la misma** instancia.
       - `addEdge(s, o)` dos veces con `s` siendo un `Node` → `graph.edges.length === 2`
         y `s.properties.length === 2` (**la rama Node NO se deduplica**).
-- [ ] Verificar `graph-serializer.ts` Pass 5 (línea 240): usa
+- [x] Verificar `graph-serializer.ts` Pass 5 (línea 240): usa
       `graph.addEdge(sourceProp, targetNode)`, o sea la rama `Property`. Un
       workspace viejo guardado con duplicados los va a **colapsar al cargar**.
       Es el comportamiento deseable (se auto-sana), pero revisar que ningún
       round-trip de `graph-serializer.spec.ts` dependa de conservar el duplicado.
-- [ ] Correr `query.golden.spec.ts`: el SPARQL generado **no debe cambiar** en
-      ningún golden, porque `addTriple` ya deduplicaba. Si algún golden cambia,
-      **parar** — significa que el análisis de impacto tiene un hueco.
+- [x] Correr `query.golden.spec.ts`: el SPARQL generado **no cambió** en ningún
+      golden, como predecía el análisis de impacto (`addTriple` ya deduplicaba).
+      Era la guarda del ítem y pasó.
 
 #### Criterio de aceptación
 
-- `grep -rnw "TODO\|FIXME\|HACK" --include='*.ts' backend/src frontend/*/src | grep -v spec`
-  no devuelve nada.
-- Las 191 pruebas del Explorer verdes, **incluidos los goldens sin cambios**.
-- Los dos casos nuevos de `graph-mutations.spec.ts` pasan.
+- [x] `grep -rnw "TODO\|FIXME\|HACK" --include='*.ts' backend/src frontend/*/src packages/*/src | grep -v spec`
+      no devuelve nada.
+- [x] **194** pruebas del Explorer verdes (191 + 3 nuevas), **incluidos los
+      goldens sin cambios**.
+- [x] Se agregaron 3 casos y no 2: además de la idempotencia y de que la rama
+      `Node` **no** deduplica, se cubrió que una property con varios targets
+      distintos sigue conservando sus aristas. Sin ese tercero, un dedup mal
+      escrito (por `source` solo, sin `target`) pasaría los otros dos.
 
 ---
 
