@@ -2,6 +2,7 @@ import axios from 'axios';
 
 import { GenericSparqlAdapter } from './generic-sparql.adapter';
 import type {
+  EndpointDescriptor,
   EntitySearchOptions,
   EntitySearchResult,
 } from './sparql-endpoint.interface';
@@ -24,6 +25,48 @@ export class WikidataAdapter extends GenericSparqlAdapter {
 
   /** Propiedad "instancia de": con esto se filtra por clase en Wikidata. */
   private static readonly P31 = 'http://www.wikidata.org/prop/direct/P31';
+
+  override describeEndpoint(): EndpointDescriptor {
+    return {
+      supportsWikibaseLabel: true,
+      search: {
+        mode: 'wikidata-api',
+        endpoint: 'https://www.wikidata.org/w/api.php',
+      },
+      describe: {
+        // Propiedades ruidosas que no aportan al panel de descripcion.
+        exclude: [
+          'http://www.wikidata.org/prop/direct/P443',
+          'http://www.wikidata.org/prop/direct/P109',
+        ],
+        objects: ['http://www.wikidata.org/prop/direct/P31'],
+        datatype: [],
+        text: ['http://dbpedia.org/ontology/abstract'],
+        image: [
+          'http://www.wikidata.org/prop/direct/P18',
+          'http://www.wikidata.org/prop/direct/P154',
+          'http://www.wikidata.org/prop/direct/P41',
+          'http://www.wikidata.org/prop/direct/P94',
+          'http://www.wikidata.org/prop/direct/P158',
+          'http://www.wikidata.org/prop/direct/P242',
+          'http://www.wikidata.org/prop/direct/P948',
+        ],
+        external: [
+          'http://www.wikidata.org/prop/direct/P2035',
+          'http://www.wikidata.org/prop/direct/P2888',
+          'http://www.wikidata.org/prop/direct/P973',
+          'http://www.wikidata.org/prop/direct/P856',
+          'http://www.wikidata.org/prop/direct/P3264',
+          'http://www.wikidata.org/prop/direct/P1896',
+          'http://www.wikidata.org/prop/direct/P1581',
+        ],
+      },
+      defaultSearchClass: {
+        uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' },
+        label: { type: 'literal', value: 'human', 'xml:lang': 'en' },
+      },
+    };
+  }
 
   override async searchEntities(
     keyword: string,

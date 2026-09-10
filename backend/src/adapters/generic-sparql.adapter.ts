@@ -4,6 +4,7 @@ import {
   ExecuteOptions,
   TimeoutError,
   UpstreamError,
+  type EndpointDescriptor,
   type EntitySearchOptions,
   type EntitySearchResult,
 } from './sparql-endpoint.interface';
@@ -265,6 +266,29 @@ LIMIT $limit`;
       uri: b['uri']?.value ?? '',
       label: b['label']?.value ?? b['uri']?.value ?? '',
     }));
+  }
+
+  /**
+   * Un endpoint SPARQL 1.1 cualquiera: se busca por SPARQL, no hay servicio de
+   * labels de Wikibase y el vocabulario que se asume es RDF/RDFS puro.
+   */
+  describeEndpoint(): EndpointDescriptor {
+    return {
+      supportsWikibaseLabel: false,
+      search: { mode: 'sparql' },
+      describe: {
+        exclude: [],
+        objects: ['http://www.w3.org/1999/02/22-rdf-syntax-ns#type'],
+        datatype: [],
+        text: ['http://www.w3.org/2000/01/rdf-schema#comment'],
+        image: [],
+        external: [],
+      },
+      defaultSearchClass: {
+        uri: { type: 'uri', value: 'http://www.w3.org/2002/07/owl#Thing' },
+        label: { type: 'literal', value: 'thing', 'xml:lang': 'en' },
+      },
+    };
   }
 
   protected resolveEndpointUrl(): string {

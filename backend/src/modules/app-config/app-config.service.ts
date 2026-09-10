@@ -1,18 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { DEFAULT_USER_AGENT } from '../../adapters/generic-sparql.adapter';
-import type {
-  AppConfigDto,
-  SearchClassDto,
-  SettingsDefaultsDto,
-} from './dto/app-config.dto';
+import { SPARQL_ENDPOINT } from '../../adapters/sparql-endpoint.interface';
+import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
+import type { AppConfigDto, SettingsDefaultsDto } from './dto/app-config.dto';
 import type { LimitsConfig } from '@rdfgis/contracts';
 
 @Injectable()
 export class AppConfigService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Inject(SPARQL_ENDPOINT) private readonly endpoint: SparqlEndpoint,
+  ) {}
 
   getConfig(): AppConfigDto {
     return {
@@ -28,7 +29,7 @@ export class AppConfigService {
       lang: 'en',
       resultLimit: cfg.defaultLimit,
       labelUri: cfg.labelUri,
-      searchClass: this.defaultSearchClassFor(cfg),
+      searchClass: this.endpoint.describeEndpoint().defaultSearchClass,
       endpointType: 'other',
     };
   }
@@ -76,6 +77,9 @@ export class AppConfigService {
   }
 
   private buildRuntimeConfig(): Omit<AppConfigDto, 'defaults' | 'classColors'> {
+    // Qué sabe hacer este backend y con qué vocabulario lo dice el adapter:
+    // acá no se pregunta "¿es Wikidata?".
+    const descriptor = this.endpoint.describeEndpoint();
     const backend = this.config.get<string>('SPARQL_BACKEND') ?? 'wikidata';
     const endpointUrl =
       this.config.get<string>('SPARQL_ENDPOINT_URL') ??
@@ -85,7 +89,6 @@ export class AppConfigService {
     const username = this.config.get<string>('SPARQL_USERNAME');
     const password = this.config.get<string>('SPARQL_PASSWORD');
 
-    const isWikidata = backend === 'wikidata';
     const defaultLimit = parseInt(
       this.config.get<string>('SPARQL_DEFAULT_LIMIT') ?? '500',
       10,
@@ -113,71 +116,12 @@ export class AppConfigService {
         'predicateSuggestions',
         'entitySearch',
       ],
-      supportsWikibaseLabel: isWikidata,
+      supportsWikibaseLabel: descriptor.supportsWikibaseLabel,
       defaultPrefixes: this.buildPrefixes(),
-      search: isWikidata
-        ? {
-            mode: 'wikidata-api',
-            endpoint: 'https://www.wikidata.org/w/api.php',
-            labelProperty: labelUri,
-          }
-        : {
-            mode: 'sparql',
-            labelProperty: labelUri,
-          },
+      search: { ...descriptor.search, labelProperty: labelUri },
       labelUri,
       limits: this.buildLimits(),
-      describe: isWikidata
-        ? {
-            exclude: [
-              'http://www.wikidata.org/prop/direct/P443',
-              'http://www.wikidata.org/prop/direct/P109',
-            ],
-            objects: ['http://www.wikidata.org/prop/direct/P31'],
-            datatype: [],
-            text: ['http://dbpedia.org/ontology/abstract'],
-            image: [
-              'http://www.wikidata.org/prop/direct/P18',
-              'http://www.wikidata.org/prop/direct/P154',
-              'http://www.wikidata.org/prop/direct/P41',
-              'http://www.wikidata.org/prop/direct/P94',
-              'http://www.wikidata.org/prop/direct/P158',
-              'http://www.wikidata.org/prop/direct/P242',
-              'http://www.wikidata.org/prop/direct/P948',
-            ],
-            external: [
-              'http://www.wikidata.org/prop/direct/P2035',
-              'http://www.wikidata.org/prop/direct/P2888',
-              'http://www.wikidata.org/prop/direct/P973',
-              'http://www.wikidata.org/prop/direct/P856',
-              'http://www.wikidata.org/prop/direct/P3264',
-              'http://www.wikidata.org/prop/direct/P1896',
-              'http://www.wikidata.org/prop/direct/P1581',
-            ],
-          }
-        : {
-            exclude: [],
-            objects: ['http://www.w3.org/1999/02/22-rdf-syntax-ns#type'],
-            datatype: [],
-            text: ['http://www.w3.org/2000/01/rdf-schema#comment'],
-            image: [],
-            external: [],
-          },
-    };
-  }
-
-  private defaultSearchClassFor(
-    cfg: Omit<AppConfigDto, 'defaults' | 'classColors'>,
-  ): SearchClassDto {
-    if (cfg.backend === 'wikidata') {
-      return {
-        uri: { type: 'uri', value: 'http://www.wikidata.org/entity/Q5' },
-        label: { type: 'literal', value: 'human', 'xml:lang': 'en' },
-      };
-    }
-    return {
-      uri: { type: 'uri', value: 'http://www.w3.org/2002/07/owl#Thing' },
-      label: { type: 'literal', value: 'thing', 'xml:lang': 'en' },
+      describe: descriptor.describe,
     };
   }
 
