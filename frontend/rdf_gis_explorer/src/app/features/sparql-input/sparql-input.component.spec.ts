@@ -5,6 +5,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SparqlInputComponent } from './sparql-input.component';
+import { ErrorDialogComponent } from './error-dialog.component';
 import { ApiService } from '@core/services/api.service';
 import { SelectionService } from '@core/services/selection.service';
 import { DashboardApiClient } from '@core/services/dashboard-api.client';
@@ -186,6 +187,12 @@ describe('SparqlInputComponent', () => {
     it('should not execute when editor is empty', () => {
       asAny().execute();
       expect(apiServiceMock.executeQuery).not.toHaveBeenCalled();
+      expect(realDialog.open).toHaveBeenCalledWith(
+        ErrorDialogComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'No hay query para ejecutar' }),
+        }),
+      );
     });
 
     it('should call apiService.executeQuery when editor has content', () => {
@@ -222,13 +229,15 @@ describe('SparqlInputComponent', () => {
       );
     });
 
-    it('should show error for invalid SPARQL syntax', () => {
+    it('should show error popup for invalid SPARQL syntax', () => {
       asAny().setEditorContent('INVALID SPARQL');
       asAny().execute();
-      expect(realSnackBar.open).toHaveBeenCalledWith(
-        expect.stringMatching(/Error de sintaxis SPARQL/),
-        'Cerrar',
-        expect.any(Object),
+      expect(apiServiceMock.executeQuery).not.toHaveBeenCalled();
+      expect(realDialog.open).toHaveBeenCalledWith(
+        ErrorDialogComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'SPARQL inválido' }),
+        }),
       );
     });
 
@@ -240,10 +249,11 @@ describe('SparqlInputComponent', () => {
       apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
-      expect(realSnackBar.open).toHaveBeenCalledWith(
-        expect.stringMatching(/SPARQL inválido/),
-        'Cerrar',
-        expect.any(Object),
+      expect(realDialog.open).toHaveBeenCalledWith(
+        ErrorDialogComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ message: expect.stringMatching(/SPARQL inválido/) }),
+        }),
       );
     });
 
@@ -252,10 +262,11 @@ describe('SparqlInputComponent', () => {
       apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
-      expect(realSnackBar.open).toHaveBeenCalledWith(
-        expect.stringMatching(/tiempo límite/),
-        'Cerrar',
-        expect.any(Object),
+      expect(realDialog.open).toHaveBeenCalledWith(
+        ErrorDialogComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ message: expect.stringMatching(/tiempo límite/) }),
+        }),
       );
     });
 
@@ -264,10 +275,11 @@ describe('SparqlInputComponent', () => {
       apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
-      expect(realSnackBar.open).toHaveBeenCalledWith(
-        expect.stringMatching(/endpoint SPARQL no responde/),
-        'Cerrar',
-        expect.any(Object),
+      expect(realDialog.open).toHaveBeenCalledWith(
+        ErrorDialogComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ message: expect.stringMatching(/endpoint SPARQL no responde/) }),
+        }),
       );
     });
 
@@ -276,10 +288,11 @@ describe('SparqlInputComponent', () => {
       apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
-      expect(realSnackBar.open).toHaveBeenCalledWith(
-        expect.stringMatching(/conectar con el backend/),
-        'Cerrar',
-        expect.any(Object),
+      expect(realDialog.open).toHaveBeenCalledWith(
+        ErrorDialogComponent,
+        expect.objectContaining({
+          data: expect.objectContaining({ message: expect.stringMatching(/conectar con el backend/) }),
+        }),
       );
     });
   });
