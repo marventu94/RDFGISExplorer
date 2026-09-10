@@ -48,7 +48,11 @@ export class RequestService {
     },
     batchSize = 100,
   ): Promise<void> {
-    const uniqueUris = [...new Set(uris.filter(u => u.trim().length > 0))];
+    // Solo IRIs absolutos: los relativos (o valores de literal que se
+    // colaron) se serializan como <foo> y hacen fallar el PARSEO de la query
+    // entera, así que un solo valor malo tiraba abajo el batch completo de
+    // labels con 400 INVALID_SPARQL ("Cannot resolve relative IRI ...").
+    const uniqueUris = [...new Set(uris.map(u => u.trim()).filter(isAbsoluteIri))];
 
     // Wikidata's label service resolves labels for entity URIs, not for direct
     // claim predicates (e.g. http://www.wikidata.org/prop/direct/P31). Map those
@@ -187,6 +191,13 @@ function buildGenericLabelQuery(uris: string[], labelUri: string, lang: string):
     `  OPTIONAL { ?uri <${labelUri}> ?uriLabel . FILTER(lang(?uriLabel) = "${escapeSparqlString(lang)}" || lang(?uriLabel) = "") }\n` +
     `}`
   );
+}
+
+/** IRI absoluto = tiene esquema (http:, urn:, mailto:, ...). */
+const ABSOLUTE_IRI = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+
+function isAbsoluteIri(value: string): boolean {
+  return ABSOLUTE_IRI.test(value);
 }
 
 function escapeSparqlString(value: string): string {
