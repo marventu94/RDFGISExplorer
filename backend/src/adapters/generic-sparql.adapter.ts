@@ -4,7 +4,10 @@ import {
   ExecuteOptions,
   TimeoutError,
   UpstreamError,
+  type EntitySearchOptions,
+  type EntitySearchResult,
 } from './sparql-endpoint.interface';
+import { escapeSparqlLiteral } from './sparql-text';
 import {
   BindingValue,
   Coordinate,
@@ -215,7 +218,56 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     return predicates;
   }
 
-  private resolveEndpointUrl(): string {
+  /**
+   * Busqueda por texto contra un endpoint SPARQL generico: `regex` sobre los
+   * labels. La query es configurable por `SPARQL_ENTITY_SEARCH_QUERY` con los
+   * placeholders `$keyword` y `$limit`; si se define una propia, el filtro de
+   * clase NO se inyecta (la plantilla manda).
+   */
+  async searchEntities(
+    keyword: string,
+    opts: EntitySearchOptions,
+  ): Promise<EntitySearchResult[]> {
+    const filterClauses = [`FILTER regex(?label, "$keyword", "i")`];
+    if (opts.classUri) {
+      filterClauses.unshift(`?uri a <${opts.classUri}>`);
+    }
+    const template =
+      process.env['SPARQL_ENTITY_SEARCH_QUERY'] ??
+      `PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT DISTINCT ?uri ?label WHERE {
+  ?uri rdfs:label ?label .
+  ${filterClauses.join(' .\n  ')}
+}
+LIMIT $limit`;
+
+    // Forma funcion de replace: un keyword con `$&`/`$'` inyectaria patrones
+    // de sustitucion si se pasara como string de reemplazo.
+    const escapedKeyword = escapeSparqlLiteral(keyword);
+    const query = template
+      .replace(/\$keyword/g, () => escapedKeyword)
+      .replace(/\$limit/g, () => String(opts.limit));
+
+    const response = await axios.post<WikidataRawResponse>(
+      this.resolveEndpointUrl(),
+      new URLSearchParams({ query }),
+      {
+        headers: {
+          'User-Agent': this.resolveUserAgent(),
+          Accept: 'application/sparql-results+json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        auth: this.resolveAuth(),
+      },
+    );
+
+    return (response.data?.results?.bindings ?? []).map((b) => ({
+      uri: b['uri']?.value ?? '',
+      label: b['label']?.value ?? b['uri']?.value ?? '',
+    }));
+  }
+
+  protected resolveEndpointUrl(): string {
     const url = process.env['SPARQL_ENDPOINT_URL'];
     if (url) return url;
     console.warn(
@@ -224,7 +276,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     return DEFAULT_SPARQL_URL;
   }
 
-  private resolveAuth(): { username: string; password: string } | undefined {
+  protected resolveAuth(): { username: string; password: string } | undefined {
     const username = process.env['SPARQL_USERNAME'];
     const password = process.env['SPARQL_PASSWORD'];
     if (username && password) {
@@ -233,7 +285,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     return undefined;
   }
 
-  private resolveUserAgent(): string {
+  protected resolveUserAgent(): string {
     const ua = process.env['SPARQL_USER'];
     if (!ua) {
       console.warn('SPARQL_USER not set, using default');

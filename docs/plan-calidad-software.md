@@ -64,6 +64,7 @@ Reproducir estas métricas: ver [Anexo A](#anexo-a--comandos-de-relevamiento).
 | 12 | `backend/data/wikidata.sqlite` trackeado | ℹ️ Informativo | ❌ [§5.5](#55--fuera-de-alcance-para-la-tesis) |
 | 13 | Dos majors de pnpm pineados en el mismo workspace: `pnpm run` aborta en root, `backend` y `packages/contracts` | 🔴 Alta | ✅ Ítem 5 |
 | 14 | Canvas: posiciones relativas tratadas como absolutas al inicializar Cytoscape | 🟠 Media | ✅ Ítem 6 |
+| 15 | `AppConfigService` también ramifica por backend (hallazgo nuevo) | 🟡 Media | ❌ [§5.6](#56--hallazgo-nuevo-appconfigservice-también-ramifica-por-backend) |
 
 **Esfuerzo total de lo que se ejecuta: ~11 horas.**
 
@@ -198,40 +199,52 @@ else { result = await this.sparqlSearch(...); }
 
 #### Pasos
 
-- [ ] Agregar a `backend/src/adapters/sparql-endpoint.interface.ts`:
+- [x] Agregar a `backend/src/adapters/sparql-endpoint.interface.ts`:
       `searchEntities(keyword: string, opts: { limit: number; classUri?: string }): Promise<EntitySearchResult[]>`
       y mover `EntitySearchResult` a un lugar compartido (el propio archivo de
       interfaz, o `shared/dto/`).
-- [ ] Crear `backend/src/adapters/wikidata.adapter.ts` extendiendo
+- [x] Crear `backend/src/adapters/wikidata.adapter.ts` extendiendo
       `GenericSparqlAdapter`, con `wikidataSearch` + `filterByClass` movidos tal
       cual (incluido el `P31`, que **acá sí corresponde**) y el caso especial de
       `owl#Thing`.
-- [ ] Implementar `searchEntities` en `GenericSparqlAdapter` con la lógica de
+- [x] Implementar `searchEntities` en `GenericSparqlAdapter` con la lógica de
       `sparqlSearch` (plantilla `SPARQL_ENTITY_SEARCH_QUERY`), reusando el
       cliente HTTP, las credenciales y el manejo de timeout que **ya tiene** en
       lugar de instanciar `axios` de nuevo.
-- [ ] `MillenniumDBAdapter`: `throw new NotImplementedError('searchEntities')`,
+- [x] `MillenniumDBAdapter`: `throw new NotImplementedError('searchEntities')`,
       consistente con el resto de ese stub.
-- [ ] `sparql-endpoint.factory.ts`: agregar `case 'wikidata': return new WikidataAdapter()`
+- [x] `sparql-endpoint.factory.ts`: agregar `case 'wikidata': return new WikidataAdapter()`
       y sacar `wikidata` del `default`.
-- [ ] `SuggestionsService` queda reducido a delegación + validación de entrada.
+- [x] `SuggestionsService` queda reducido a delegación + validación de entrada.
       **Conservar en el servicio** la validación `isValidUri(classUri)` con su
       `BadRequestException INVALID_CLASS_URI` (línea 67): es validación de borde
       HTTP, no responsabilidad del adapter.
-- [ ] Mover `escapeSparqlLiteral` + `URI_PATTERN` / `isValidUri` a un módulo
+- [x] Mover `escapeSparqlLiteral` + `URI_PATTERN` / `isValidUri` a un módulo
       compartido de adapters — los usan tanto el servicio como los adapters.
-- [ ] Bajar de `log.log` a `log.debug` los tres logs por request de
+- [x] Bajar de `log.log` a `log.debug` los tres logs por request de
       `suggestions.controller.ts` (hoy loguean la query cruda en nivel info).
 
 #### Criterio de aceptación
 
-- `grep -n "SPARQL_BACKEND" backend/src/modules/` no devuelve nada.
-- `grep -rn "P31\|axios" backend/src/modules/suggestions/` no devuelve nada.
-- Los 240 casos de `suggestions.service.spec.ts` siguen verdes (mover los que
-  testean el detalle de Wikidata a un `wikidata.adapter.spec.ts` nuevo).
-- Prueba manual con los dos entornos: `./start.sh` (Wikidata) y
-  `./start.sh .env.graphdb`, buscando entidades en el panel de búsqueda del
-  Explorer, con y sin filtro de clase.
+- [x] `grep -rn "P31\|axios" backend/src/modules/suggestions/` no devuelve nada.
+- [x] `SuggestionsService` pasa de **236 a 67 líneas**: validación de borde y
+      delegación. Ya no lee `SPARQL_BACKEND`, ni la URL del endpoint, ni las
+      credenciales.
+- [x] Suite del backend: **176 verdes** (antes 165), en 19 suites (antes 17).
+      Los casos del detalle de Wikidata se movieron a `wikidata.adapter.spec.ts`,
+      los del endpoint genérico a `generic-sparql.adapter.spec.ts` y los de
+      escapeo a `sparql-text.spec.ts`. Se agregaron casos que antes no existían:
+      el bypass de `owl#Thing`, la degradación cuando falla el filtro por clase,
+      el descarte de URIs que cortarían el `VALUES` y el respeto de una plantilla
+      propia de búsqueda.
+- [x] `pnpm build` del backend OK.
+- [ ] Prueba manual con los dos entornos: `./start.sh` (Wikidata) y
+      `./start.sh .env.graphdb`, buscando entidades con y sin filtro de clase
+      (smoke test final).
+
+> **Nota de alcance.** `grep -n "SPARQL_BACKEND" backend/src/modules/` **sí**
+> devuelve resultados todavía, pero de `app-config`, no de `suggestions`. Es un
+> hallazgo nuevo, de otra forma: ver [§5.6](#56--hallazgo-nuevo-appconfigservice-tambien-ramifica-por-backend).
 
 ---
 
@@ -654,6 +667,28 @@ providers, así que ahí `process.env` es defendible.
   runtime) y no deja escapar el `any`. Es el patrón correcto para un borde FFI.
 
 ---
+
+### 5.6 — Hallazgo nuevo: `AppConfigService` también ramifica por backend
+
+Apareció al verificar el criterio del Ítem 2. `app-config.service.ts` tiene
+`const isWikidata = backend === 'wikidata'` (línea 88) y
+`if (cfg.backend === 'wikidata')` en `defaultSearchClassFor` (línea 172), y lee
+`SPARQL_ENDPOINT_URL` / `SPARQL_USERNAME` / `SPARQL_PASSWORD` por su cuenta.
+
+**No se ejecutó, y es a propósito.** Es otra forma de problema: ahí el branch no
+decide *comportamiento de consulta* (lo que el Ítem 2 sacó del servicio) sino que
+produce **metadata de capacidades** para el frontend — la clase de búsqueda por
+defecto, `supportsWikibaseLabel`, los prefixes, el archivo de colores por backend.
+
+Arreglarlo bien significa que `SparqlEndpoint` exponga esas capacidades
+(`defaultSearchClass`, `supportsWikibaseLabel`, `defaultPrefixes`), lo que toca la
+interfaz, el DTO de `/api/config` y las 270 líneas de
+`app-config.service.spec.ts`. Es una decisión de diseño con su propio alcance, no
+la continuación del Ítem 2, así que queda documentada para decidirla aparte.
+
+Mientras no se haga, la afirmación *domain-agnostic* de
+`docs/design-decisions.md` §9 es verdadera para **ejecutar y buscar** (Ítem 2) y
+sigue teniendo esta excepción en **describir el backend**.
 
 ## 6. Definition of done
 
