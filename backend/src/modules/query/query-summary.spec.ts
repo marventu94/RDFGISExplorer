@@ -1,6 +1,7 @@
 import nock from 'nock';
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { QueryService } from './query.service';
 import {
   SPARQL_ENDPOINT,
@@ -8,6 +9,9 @@ import {
 } from '../../adapters/sparql-endpoint.interface';
 import { GenericSparqlAdapter } from '../../adapters/generic-sparql.adapter';
 import { QueryResult } from '../../shared/dto/query-result.dto';
+
+/** Config del servicio para cada test: se llena en el test que la necesite. */
+const config: Record<string, string | undefined> = {};
 
 const USER_QUERY =
   'PREFIX wd: <http://www.wikidata.org/entity/>\n' +
@@ -42,11 +46,16 @@ describe('QueryService.summarize', () => {
   let service: QueryService;
   let executeMock: jest.Mock;
 
+  beforeEach(() => {
+    for (const k of Object.keys(config)) delete config[k];
+  });
+
   beforeEach(async () => {
     executeMock = jest.fn();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         QueryService,
+        { provide: ConfigService, useValue: { get: (k: string) => config[k] } },
         {
           provide: SPARQL_ENDPOINT,
           useValue: {
@@ -178,20 +187,17 @@ describe('QueryService.summarize', () => {
     ]);
   });
 
-  it('honors SUMMARY_TOP_CATEGORICAL_LIMIT from env', async () => {
-    process.env['SUMMARY_TOP_CATEGORICAL_LIMIT'] = '7';
-    try {
-      executeMock.mockResolvedValueOnce(
-        aggRowResult([{ __agg_total: { type: 'literal', value: '3' } }]),
-      );
-      executeMock.mockResolvedValueOnce(aggRowResult([]));
+  it('honors SUMMARY_TOP_CATEGORICAL_LIMIT from config', async () => {
+    config['SUMMARY_TOP_CATEGORICAL_LIMIT'] = '7';
 
-      await service.summarize({ query: USER_QUERY, categoricalVars: ['city'] });
+    executeMock.mockResolvedValueOnce(
+      aggRowResult([{ __agg_total: { type: 'literal', value: '3' } }]),
+    );
+    executeMock.mockResolvedValueOnce(aggRowResult([]));
 
-      expect(sentQuery(executeMock, 1)).toContain('LIMIT 7');
-    } finally {
-      delete process.env['SUMMARY_TOP_CATEGORICAL_LIMIT'];
-    }
+    await service.summarize({ query: USER_QUERY, categoricalVars: ['city'] });
+
+    expect(sentQuery(executeMock, 1)).toContain('LIMIT 7');
   });
 
   it.each(['ASK', 'CONSTRUCT', 'DESCRIBE'])(
@@ -345,6 +351,7 @@ describe('QueryService.summarize through GenericSparqlAdapter (nock)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         QueryService,
+        { provide: ConfigService, useValue: { get: (k: string) => config[k] } },
         {
           provide: SPARQL_ENDPOINT,
           useValue: new GenericSparqlAdapter('wikidata'),
