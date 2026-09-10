@@ -69,8 +69,8 @@ Reproducir estas métricas: ver [Anexo A](#anexo-a--comandos-de-relevamiento).
 | 3 | Sin CI; ESLint solo en backend | 🟠 Media-alta | ✅ Ítem 3 |
 | 4 | `TODO` de aristas duplicadas en `graph.ts` | 🟢 Baja | ✅ Ítem 4 |
 | 5 | `graph-view.component.ts`: 915 líneas, God component | 🟡 Media | ❌ [§5.1](#51--no-partir-graph-viewcomponentts-todavía) |
-| 6 | Backend sin `strict` en TypeScript | 🟡 Media | ⚠️ [§5.2](#52--strict-en-el-backend-medir-primero) |
-| 7 | `process.env` directo aunque existe `ConfigService` | 🟡 Baja | ⚠️ [§5.3](#53--processenv--configservice-opcional) |
+| 6 | Backend sin `strict` en TypeScript | 🟡 Media | ✅ [§5.2](#52--strict-en-el-backend--ejecutado) |
+| 7 | `process.env` directo aunque existe `ConfigService` | 🟡 Baja | ✅ [§5.3](#53--processenv--configservice--ejecutado) |
 | 8 | DI mixto `inject()` + constructor en 14 archivos | 🟢 Cosmética | ❌ [§5.4](#54--no-hacer-por-sí-solo) |
 | 9 | 22 `console.*` en productivo | 🟢 Cosmética | ❌ [§5.4](#54--no-hacer-por-sí-solo) |
 | 10 | `federation.manifest.json` con `localhost` hardcodeado | 🟢 Baja | ❌ [§5.4](#54--no-hacer-por-sí-solo) |
@@ -78,9 +78,9 @@ Reproducir estas métricas: ver [Anexo A](#anexo-a--comandos-de-relevamiento).
 | 12 | `backend/data/wikidata.sqlite` trackeado | ℹ️ Informativo | ❌ [§5.5](#55--fuera-de-alcance-para-la-tesis) |
 | 13 | Dos majors de pnpm pineados en el mismo workspace: `pnpm run` aborta en root, `backend` y `packages/contracts` | 🔴 Alta | ✅ Ítem 5 |
 | 14 | Canvas: posiciones relativas tratadas como absolutas al inicializar Cytoscape | 🟠 Media | ✅ Ítem 6 |
-| 15 | `AppConfigService` también ramifica por backend (hallazgo nuevo) | 🟡 Media | ❌ [§5.6](#56--hallazgo-nuevo-appconfigservice-también-ramifica-por-backend) |
+| 15 | `AppConfigService` también ramifica por backend (hallazgo nuevo) | 🟡 Media | ✅ [§5.6](#56--appconfigservice-también-ramificaba-por-backend--ejecutado) |
 
-**Esfuerzo total de lo que se ejecuta: ~11 horas.**
+**Esfuerzo total: ~11 horas de los 6 ítems, más §5.2, §5.3 y §5.6 ejecutados después.**
 
 **Orden obligatorio:** el **Ítem 5 va primero** — es requisito del Ítem 3, que
 depende de que `pnpm -r` funcione. El resto es independiente entre sí.
@@ -671,18 +671,20 @@ a ~750 líneas sin tocar el núcleo:
   `emitFocusFromViewport` / `intersectsViewport` / `allInsideViewport` /
   `suppressViewport` (~90 líneas).
 
-### 5.2 — `strict` en el backend: medir primero
+### 5.2 — `strict` en el backend ✅ EJECUTADO
 
 `backend/tsconfig.json` no tiene `strict`, y tiene `noImplicitAny: false` y
 `strictBindCallApply: false`. Es el default de Nest, pero convive con tres
 frontends en `strict: true` + `strictTemplates`: asimetría de rigor en el mismo
 repo.
 
-**Acción:** activar `strict: true` + `noImplicitAny: true` y **contar los
-errores**. Si son menos de ~20, arreglarlos (30-60 min). Si explotan a cien,
-dejarlo documentado como deuda consciente y **no tocarlo antes de defender**.
+**Medido y ejecutado.** `strict: true` + `noImplicitAny: true` +
+`strictBindCallApply: true` agregan **cero errores nuevos**. Los 2 que aparecen
+en una pasada completa de `tsc` (`@jest/globals` en dos specs) son preexistentes,
+de resolución de módulos, y no afectan al build (`tsconfig.build.json` excluye
+specs) ni a los tests. Era gratis: activado.
 
-### 5.3 — `process.env` → `ConfigService` (opcional)
+### 5.3 — `process.env` → `ConfigService` ✅ EJECUTADO
 
 `ConfigModule` está configurado y `AppConfigService` / `SuggestionsService` usan
 `ConfigService` correctamente. Pero `QueryService` lee
@@ -690,10 +692,16 @@ dejarlo documentado como deuda consciente y **no tocarlo antes de defender**.
 **en cada request**, y lo mismo pasa en `create-dashboard.dto.ts`,
 `sqlite.provider.ts` y `sparql-endpoint.factory.ts`.
 
-Son dos formas de leer configuración en el mismo backend, y la de `QueryService`
-no es testeable sin manipular el entorno. **~30 min, cosmético pero visible.**
-Hacerlo solo si sobra tiempo. Nota: el `factory` corre en construcción de
-providers, así que ahí `process.env` es defendible.
+`QueryService` pasó a `ConfigService` con un helper `intConfig(key, fallback)`, y
+el test de `SUMMARY_TOP_CATEGORICAL_LIMIT` dejó de escribir `process.env` para
+manejar la config del servicio, que era el punto.
+
+Los `process.env` que quedan **están bien así**: bootstrap (`main.ts`,
+`app.module.ts`), factories de providers (`sparql-endpoint.factory`,
+`sqlite.provider`), los adapters (clases planas, no providers de Nest) y
+`create-dashboard.dto` (decoradores, que se evalúan antes de que exista el
+contenedor de DI). `QueryService` era el único **servicio inyectable** que leía
+el entorno directo.
 
 ### 5.4 — No hacer por sí solo
 
@@ -726,27 +734,31 @@ providers, así que ahí `process.env` es defendible.
 
 ---
 
-### 5.6 — Hallazgo nuevo: `AppConfigService` también ramifica por backend
+### 5.6 — `AppConfigService` también ramificaba por backend ✅ EJECUTADO
 
 Apareció al verificar el criterio del Ítem 2. `app-config.service.ts` tiene
 `const isWikidata = backend === 'wikidata'` (línea 88) y
 `if (cfg.backend === 'wikidata')` en `defaultSearchClassFor` (línea 172), y lee
 `SPARQL_ENDPOINT_URL` / `SPARQL_USERNAME` / `SPARQL_PASSWORD` por su cuenta.
 
-**No se ejecutó, y es a propósito.** Es otra forma de problema: ahí el branch no
-decide *comportamiento de consulta* (lo que el Ítem 2 sacó del servicio) sino que
-produce **metadata de capacidades** para el frontend — la clase de búsqueda por
-defecto, `supportsWikibaseLabel`, los prefixes, el archivo de colores por backend.
+Eran **cuatro** ramas produciendo metadata para el frontend:
+`supportsWikibaseLabel`, el modo de búsqueda, los predicados del panel *describe*
+y la clase preseleccionada.
 
-Arreglarlo bien significa que `SparqlEndpoint` exponga esas capacidades
-(`defaultSearchClass`, `supportsWikibaseLabel`, `defaultPrefixes`), lo que toca la
-interfaz, el DTO de `/api/config` y las 270 líneas de
-`app-config.service.spec.ts`. Es una decisión de diseño con su propio alcance, no
-la continuación del Ítem 2, así que queda documentada para decidirla aparte.
+`SparqlEndpoint` ahora declara `describeEndpoint(): EndpointDescriptor`.
+`GenericSparqlAdapter` devuelve los valores neutros, `WikidataAdapter` hace
+`override` con los suyos (wbsearchentities, las listas P18/P31/P2035, Q5/human) y
+`MillenniumDBAdapter` declara capacidades mínimas en vez de rechazar — porque
+`/api/config` se pide al arrancar el frontend y tiene que responder aunque el
+backend sea un stub. `AppConfigService` compone; se borraron
+`defaultSearchClassFor` e `isWikidata`.
 
-Mientras no se haga, la afirmación *domain-agnostic* de
-`docs/design-decisions.md` §9 es verdadera para **ejecutar y buscar** (Ítem 2) y
-sigue teniendo esta excepción en **describir el backend**.
+**Lo que NO se movió:** `prefixes.<backend>.json` y `class-colors.<backend>.json`.
+Eso no es una rama, es una convención de archivos por nombre de backend, y ya es
+domain-agnostic: para un backend nuevo se agrega un archivo.
+
+Con esto la afirmación *domain-agnostic* de `docs/design-decisions.md` §9 es
+verdadera también para **describir** el backend, no solo para ejecutar y buscar.
 
 ## 6. Definition of done
 
