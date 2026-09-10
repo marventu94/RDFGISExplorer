@@ -29,11 +29,7 @@ import {
   ExportCapDialogComponent,
   type ExportCapAction,
 } from '../export-cap-dialog.component';
-import {
-  SaveDashboardDialogComponent,
-  type SaveDashboardDialogData,
-  type SaveDashboardDialogResult,
-} from '../save-dashboard-dialog.component';
+import { DashboardSaveFlowService } from '../dashboard-save-flow.service';
 
 /**
  * Íconos propios para los presets de 3 y 4 vistas, dibujados en estilo
@@ -72,6 +68,7 @@ export class NavbarComponent {
   protected readonly layout = inject(DashboardLayoutService);
   protected readonly selectionService = inject(SelectionService);
   protected readonly persistence = inject(DashboardPersistenceService);
+  private readonly saveFlow = inject(DashboardSaveFlowService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly queryState = inject(SparqlQueryStateService);
@@ -173,20 +170,7 @@ export class NavbarComponent {
   }
 
   protected openSaveDialog(): void {
-    const data: SaveDashboardDialogData = {
-      currentName: this.persistence.currentDashboardName(),
-      hasCurrentDashboard: !!this.persistence.currentDashboardId(),
-    };
-
-    const dialogRef = this.dialog.open(SaveDashboardDialogComponent, {
-      width: '400px',
-      data,
-    });
-
-    dialogRef.afterClosed().subscribe((result: SaveDashboardDialogResult | undefined) => {
-      if (!result) return;
-      this.persistence.save(result.name, result.mode).subscribe();
-    });
+    this.saveFlow.saveInteractive().subscribe();
   }
 
   /**

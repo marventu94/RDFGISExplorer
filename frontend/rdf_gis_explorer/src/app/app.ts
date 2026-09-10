@@ -9,6 +9,7 @@ import { LimitsService } from '@core/services/limits.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
+import { GisSessionStateService } from '@core/services/gis-session-state.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
@@ -42,6 +43,10 @@ export class App implements OnInit {
   @ViewChild('sidenav') sidenav!: MatSidenav;
 
   constructor() {
+    // Publica en el canal compartido qué tablero/consulta hay abierto, para
+    // que el RDF Explorer avise antes de pisarlo con un handoff.
+    inject(GisSessionStateService);
+
     this.selectionService.selectedNode$.subscribe((sel) => {
       if (sel.node && !this.dashboardLayout.visibleSlots().includes('table')) {
         this.sidenavOpen.set(true);

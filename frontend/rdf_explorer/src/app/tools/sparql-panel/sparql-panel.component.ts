@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { PropertyGraphService } from '../../graph/property-graph.service';
 import { SparqlViewerComponent } from './sparql-viewer/sparql-viewer.component';
 import { QueryHandoffService } from '../../core/query-handoff.service';
+import { GisOverwriteGuardService } from '../../core/gis-overwrite-guard.service';
 import { AppConfigService } from '../../core/services/app-config.service';
 import { WorkspacePersistenceService } from '../../core/workspace-persistence.service';
 import type { Query, RDFResource } from '../../graph/domain';
@@ -20,6 +21,7 @@ import { Property } from '../../graph/domain';
 export class SparqlPanelComponent {
   private readonly graph = inject(PropertyGraphService);
   private readonly queryHandoff = inject(QueryHandoffService);
+  private readonly gisGuard = inject(GisOverwriteGuardService);
   private readonly appConfig = inject(AppConfigService);
   private readonly workspace = inject(WorkspacePersistenceService);
   private readonly router = inject(Router);
@@ -57,17 +59,29 @@ export class SparqlPanelComponent {
     this.graph.setSelected(resource);
   }
 
-  handoffQuery(query: Query): void {
+  async handoffQuery(query: Query): Promise<void> {
     // Proyección completa: el GIS necesita coords/fechas/intermedios
     // proyectados para alimentar mapa, timeline y grafo.
-    const sparql = query.toSparqlFullProjection();
+    const sparql = query.toSparqlFullProjection({
+      limit: this.appConfig.resultLimit(),
+    });
     if (!sparql?.trim()) return;
+
+    // Mismo aviso que el botón "Explorar en GIS": la query importada pisa el
+    // tablero abierto en el GIS.
+    const decision = await this.gisGuard.askBeforeHandoff();
+    if (decision === 'cancel') return;
+    if (decision === 'go-save') {
+      void this.router.navigate(['/gis']);
+      return;
+    }
 
     const backend = this.appConfig.config()?.backend || 'generic';
 
     this.queryHandoff.publish({
       query: sparql,
       backend,
+      overwriteConfirmed: decision === 'proceed-confirmed',
       source: {
         workspaceId: this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined,
         panelId: this.workspace.activePanel()?.id,
