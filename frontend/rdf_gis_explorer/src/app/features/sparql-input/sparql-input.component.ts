@@ -25,6 +25,7 @@ import { DashboardPersistenceService } from '@core/services/dashboard-persistenc
 import { DashboardApiClient, type Dashboard } from '@core/services/dashboard-api.client';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
 import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
+import { ErrorDialogComponent, type ErrorDialogData } from './error-dialog.component';
 import { applyMappingOverrides, VariableRole } from './mapping-overrides.util';
 import type { QueryResult } from '@shared/models';
 
@@ -261,25 +262,37 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   public execute(options?: { configureLayout?: boolean }): void {
     const sparql = this.sparqlText;
-    if (!sparql) return;
+    if (!sparql) {
+      this.showError({
+        title: 'No hay query para ejecutar',
+        message: 'El editor está vacío. Escribí una query o cargá un tablero.',
+      });
+      return;
+    }
 
     try {
       const parser = new Parser();
       parser.parse(sparql);
-    } catch {
-      this.snackBar.open('Error de sintaxis SPARQL. Revisá la query antes de ejecutar.', 'Cerrar', {
-        duration: 5000,
-        panelClass: 'snackbar-error',
+    } catch (e) {
+      this.showError({
+        title: 'SPARQL inválido',
+        message: 'La query no se pudo parsear, así que no se envió al backend.',
+        detail: e instanceof Error ? e.message : String(e),
       });
       return;
     }
 
     this.queryState.query.set(sparql);
     this.executing.set(true);
+    // Este endpoint puede tardar minutos (GraphDB con FILTER sobre cientos de
+    // miles de instancias). Sin un cartel persistente, la pantalla queda igual
+    // que antes de apretar y parece que el botón no hizo nada.
+    this.snackBar.open('Ejecutando la query… puede tardar', undefined, {});
 
     this.apiService.executeQuery({ sparql }).subscribe({
       next: (result) => {
         this.executing.set(false);
+        this.snackBar.dismiss();
         this.dashboardLayout.collapseEditor();
         this.lastResult.set(result);
 
@@ -308,17 +321,31 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       },
       error: (err: HttpErrorResponse) => {
         this.executing.set(false);
+        this.snackBar.dismiss();
         this.handleHttpError(err);
       },
     });
   }
 
   private handleHttpError(err: HttpErrorResponse): void {
-    const msg = this.mapErrorMessage(err);
-    this.snackBar.open(msg, 'Cerrar', {
-      duration: 8000,
-      panelClass: 'snackbar-error',
+    this.showError({
+      title: 'La query no se pudo ejecutar',
+      message: this.mapErrorMessage(err),
+      detail: this.errorDetail(err),
     });
+  }
+
+  /** Cuerpo crudo del error del backend, para poder pegarlo/depurarlo. */
+  private errorDetail(err: HttpErrorResponse): string | undefined {
+    const body = err.error as { error?: string; message?: string } | null;
+    if (!body) return undefined;
+    const parts = [body.error, body.message].filter(Boolean);
+    return parts.length > 0 ? parts.join(': ') : undefined;
+  }
+
+  private showError(data: ErrorDialogData): void {
+    this.snackBar.dismiss();
+    this.dialog.open(ErrorDialogComponent, { data, width: '480px' });
   }
 
   private mapErrorMessage(err: HttpErrorResponse): string {
