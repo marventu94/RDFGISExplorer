@@ -1,11 +1,9 @@
 import { Component, ElementRef, ViewChild, computed, inject, input, signal, AfterViewInit } from '@angular/core';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { trigger, state, style, transition, animate } from '@angular/animations';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { SparqlInputComponent } from '@features/sparql-input/sparql-input.component';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
-import { QueryHandoffService } from '@core/services/query-handoff.service';
-import { getAutoRunHandoff } from '@core/services/query-handoff.service';
+import { GisHandoffService } from './gis-handoff.service';
 import { ViewSlotComponent } from './view-slot.component';
 
 @Component({
@@ -28,8 +26,7 @@ export class DashboardComponent implements AfterViewInit {
   @ViewChild('container', { static: true }) containerRef!: ElementRef<HTMLElement>;
   @ViewChild(SparqlInputComponent) sparqlInput!: SparqlInputComponent;
 
-  private readonly queryHandoff = inject(QueryHandoffService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly gisHandoff = inject(GisHandoffService);
 
   protected readonly colLeft = signal(50);
   protected readonly rowTop = signal(50);
@@ -55,22 +52,15 @@ export class DashboardComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('handoff') === '1') {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('handoff');
-      window.history.replaceState({}, '', url.toString());
+    if (params.get('handoff') !== '1') return;
 
-      const payload = this.queryHandoff.consume();
-      if (payload) {
-        this.sparqlInput.setQuery(payload.query);
-        this.sparqlInput.setBackend(payload.backend);
-        if (getAutoRunHandoff()) {
-          setTimeout(() => this.sparqlInput.execute({ configureLayout: true }), 300);
-        }
-      } else {
-        this.snackBar.open('No se encontró la query a importar', 'Cerrar', { duration: 4000 });
-      }
-    }
+    // El flag se saca de la URL antes de consumir: si el usuario recarga, no
+    // se vuelve a intentar importar una query que ya no está.
+    const url = new URL(window.location.href);
+    url.searchParams.delete('handoff');
+    window.history.replaceState({}, '', url.toString());
+
+    this.gisHandoff.consumeInto(this.sparqlInput);
   }
 
   protected onVerticalDragEnded(event: CdkDragEnd): void {
