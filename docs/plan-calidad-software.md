@@ -37,12 +37,26 @@ este plan no es una refactorización: son cuatro intervenciones quirúrgicas.
 
 Reproducir estas métricas: ver [Anexo A](#anexo-a--comandos-de-relevamiento).
 
+> **Estado al cerrar el plan (2026-09-10).** Los 6 ítems ejecutados, cada uno en
+> su commit, en la rama `refactor/plan-calidad-software`. Las pruebas pasaron de
+> **701 a 719** (se agregaron 3 en el Ítem 4, 4 en el Ítem 6 y 11 netos en el
+> Ítem 2). Quedan **dos cosas pendientes que necesitan una terminal
+> interactiva**, ambas del usuario:
+>
+> 1. **`pnpm install` con TTY y commitear `pnpm-lock.yaml`.** Los Ítems 1 y 3
+>    agregaron dependencias (`@rdfgis/platform-bridge`, `eslint`, `@eslint/js`,
+>    `globals`, `typescript-eslint`) que el lockfile no tiene. Sin eso el
+>    `--frozen-lockfile` del CI falla. Los enlaces en `node_modules` se crearon a
+>    mano (los mismos symlinks que hace pnpm) para poder verificar todo acá.
+> 2. **Smoke test de `./start.sh` y `./start.sh .env.graphdb`**, con el camino
+>    Welcome → Explorer → exportar al GIS → volver sin recargar → guardar.
+>
 > **Cómo se corrieron las suites.** Con `npx jest` / `npx ng test --watch=false`
 > invocados dentro de cada paquete, **no** con `pnpm run test`: ese camino está
-> roto hoy (ver [Ítem 5](#ítem-5--unificar-el-pnpm-del-workspace)). La corrida se
-> hizo además sobre **Node 22**, no sobre el 24.18.0 del `.nvmrc`; las 701
-> pruebas pasan igual porque ninguna suite carga `better-sqlite3`, pero la
-> medición oficial debe repetirse sobre Node 24.
+> roto en el momento del relevamiento (ver
+> [Ítem 5](#ítem-5--unificar-el-pnpm-del-workspace)), y esa primera corrida se
+> hizo sobre **Node 22** en lugar del 24.18.0 del `.nvmrc`. Las dos cosas quedaron
+> resueltas: hoy se corre con `pnpm test` desde la raíz y sobre Node 24.
 
 ---
 
@@ -736,12 +750,16 @@ sigue teniendo esta excepción en **describir el backend**.
 
 ## 6. Definition of done
 
-- [ ] Ítems 1 a 6 completos, cada uno en su propio commit (**el 5 primero**).
-- [ ] `pnpm test` desde la raíz: **701+ casos verdes**, corridos **sobre Node 24.18.0**.
-- [ ] `pnpm run` funciona en los 6 paquetes (Ítem 5).
-- [ ] `pnpm build` desde la raíz sin errores en las cuatro apps.
-- [ ] CI verde.
-- [ ] Sin `TODO`/`FIXME` en código productivo.
+- [x] Ítems 1 a 6 completos, cada uno en su propio commit (el 5 fue primero).
+- [x] `pnpm test` desde la raíz sobre **Node 24.18.0**: **719 casos verdes**
+      (176 backend + 17 shell + 198 explorer + 328 GIS), exit 0.
+- [x] `pnpm run` funciona en los 6 paquetes y en la raíz (Ítem 5).
+- [x] `pnpm build` desde la raíz: exit 0, los dos paquetes del workspace y las
+      tres apps.
+- [x] `pnpm lint` desde la raíz: exit 0, 108 warnings, **0 errores**.
+- [ ] CI verde. **Bloqueado por el lockfile** — los tres pasos del workflow se
+      verificaron localmente uno por uno.
+- [x] Sin `TODO`/`FIXME` en código productivo.
 - [ ] Verificación manual del camino crítico end-to-end:
       Welcome → Explorer (construir query) → exportar al GIS → cuatro vistas
       coordinadas → guardar tablero → recargar desde Welcome.
