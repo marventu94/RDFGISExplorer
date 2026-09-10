@@ -16,3 +16,13 @@ allowBuilds:
 
 patchedDependencies:
   '@softarc/native-federation@3.5.5': 'frontend/rdf_gis_explorer/patches/@softarc__native-federation@3.5.5.patch'
+
+# pnpm 11 corre un chequeo de dependencias antes de cada script (runDepsStatusCheck).
+# Aca ese chequeo decide que node_modules esta desactualizado, dispara un `pnpm install`
+# y ese install quiere PURGAR el directorio de modulos: sin TTY aborta con
+# ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY y `pnpm run` queda inutilizable.
+# Se desactiva a proposito: la instalacion la maneja start.sh (instala si falta
+# node_modules y corre `pnpm rebuild` al cambiar de major de Node) y el CI siempre
+# parte de un `pnpm install --frozen-lockfile` limpio.
+# Ver docs/plan-calidad-software.md, Item 5.
+verifyDepsBeforeRun: false

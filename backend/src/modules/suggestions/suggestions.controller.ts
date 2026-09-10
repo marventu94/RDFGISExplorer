@@ -19,13 +19,13 @@ export class SuggestionsController {
   async searchEntities(@Query() query: EntitySearchQueryDto): Promise<{
     entities: import('./suggestions.service').EntitySearchResult[];
   }> {
-    this.log.log(
+    this.log.debug(
       `[controller] GET /api/suggestions/entities rawQuery=${JSON.stringify(query)}`,
     );
     const q = query.q ?? '';
     const limit = query.limit;
     const classUri = query.classUri;
-    this.log.log(
+    this.log.debug(
       `[controller] parsed q=${JSON.stringify(q)} limit=${limit} classUri=${classUri ?? '(none)'}`,
     );
     try {
@@ -34,7 +34,7 @@ export class SuggestionsController {
         limit,
         classUri,
       );
-      this.log.log(`[controller] returning ${entities.length} entities`);
+      this.log.debug(`[controller] returning ${entities.length} entities`);
       return { entities };
     } catch (err) {
       this.log.error(

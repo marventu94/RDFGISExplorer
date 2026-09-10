@@ -2,6 +2,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppConfigService } from './app-config.service';
 import { ConfigService } from '@nestjs/config';
 import { existsSync, rmSync, writeFileSync } from 'fs';
+import { SPARQL_ENDPOINT } from '../../adapters/sparql-endpoint.interface';
+import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
+import { GenericSparqlAdapter } from '../../adapters/generic-sparql.adapter';
+import { WikidataAdapter } from '../../adapters/wikidata.adapter';
+
+// Las capacidades del backend (supportsWikibaseLabel, modo de busqueda, describe,
+// clase por defecto) las aporta el adapter, no el SPARQL_BACKEND de la config.
+// Se arma el mismo adapter que armaria la factory.
+function endpointFor(backend: string | undefined): SparqlEndpoint {
+  return backend === 'wikidata'
+    ? new WikidataAdapter()
+    : new GenericSparqlAdapter(backend ?? 'generic');
+}
 
 function createConfigMock(values: Record<string, string | undefined>) {
   return {
@@ -17,6 +30,7 @@ describe('AppConfigService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AppConfigService,
+          { provide: SPARQL_ENDPOINT, useValue: endpointFor('wikidata') },
           {
             provide: ConfigService,
             useValue: createConfigMock({
@@ -87,6 +101,7 @@ describe('AppConfigService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AppConfigService,
+          { provide: SPARQL_ENDPOINT, useValue: endpointFor('generic') },
           {
             provide: ConfigService,
             useValue: createConfigMock({
@@ -147,6 +162,10 @@ describe('AppConfigService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AppConfigService,
+          {
+            provide: SPARQL_ENDPOINT,
+            useValue: endpointFor(values['SPARQL_BACKEND']),
+          },
           { provide: ConfigService, useValue: createConfigMock(values) },
         ],
       }).compile();
@@ -188,6 +207,7 @@ describe('AppConfigService', () => {
 
       const service = new AppConfigService(
         configMock as unknown as ConfigService,
+        endpointFor('generic'),
       );
       expect(service.getConfig().hasBasicAuth).toBe(true);
     });
@@ -202,6 +222,7 @@ describe('AppConfigService', () => {
 
       const service = new AppConfigService(
         configMock as unknown as ConfigService,
+        endpointFor('generic'),
       );
       expect(service.getConfig().hasBasicAuth).toBe(false);
     });
@@ -211,6 +232,7 @@ describe('AppConfigService', () => {
     it('exposes current defaults when the env vars are not set', () => {
       const service = new AppConfigService(
         createConfigMock({}) as unknown as ConfigService,
+        endpointFor('generic'),
       );
       expect(service.getConfig().limits).toEqual({
         graphMaxNodes: 300,
@@ -232,6 +254,7 @@ describe('AppConfigService', () => {
           EXPORT_MIN_PAGE_SIZE: '125',
           SUMMARY_TOP_CATEGORICAL_LIMIT: '7',
         }) as unknown as ConfigService,
+        endpointFor('generic'),
       );
       const limits = service.getConfig().limits;
       expect(limits.graphMaxNodes).toBe(150);
@@ -247,6 +270,7 @@ describe('AppConfigService', () => {
           GIS_LOT_SIZE_OPTIONS: '200, 400 ,800',
           GIS_TABLE_PAGE_SIZE_OPTIONS: '25,75',
         }) as unknown as ConfigService,
+        endpointFor('generic'),
       );
       const limits = service.getConfig().limits;
       expect(limits.lotSizeOptions).toEqual([200, 400, 800]);
@@ -260,6 +284,7 @@ describe('AppConfigService', () => {
           GIS_LOT_SIZE_OPTIONS: 'x,,y',
           EXPORT_MAX_ROWS: '-5',
         }) as unknown as ConfigService,
+        endpointFor('generic'),
       );
       const limits = service.getConfig().limits;
       expect(limits.graphMaxNodes).toBe(300);

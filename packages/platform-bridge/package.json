@@ -1,0 +1,23 @@
+{
+  "name": "@rdfgis/platform-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contrato compartido entre los remotes para el handoff Explorer<->GIS",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "pnpm run build"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  }
+}
