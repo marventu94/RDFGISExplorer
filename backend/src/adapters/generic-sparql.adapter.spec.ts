@@ -1004,7 +1004,9 @@ describe('GenericSparqlAdapter.searchEntities', () => {
     const captured = captureQuery();
 
     // keyword malicioso: corta el literal, inyecta un patron y usa $& de replace
-    await adapter.searchEntities('x\\" } UNION { ?s ?p ?o } #$&', { limit: 10 });
+    await adapter.searchEntities('x\\" } UNION { ?s ?p ?o } #$&', {
+      limit: 10,
+    });
 
     const sentQuery = captured.get();
     // el literal queda cerrado: backslash y comilla escapados

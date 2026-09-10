@@ -106,7 +106,6 @@ export class Query {
   toSparql(): string | null {
     if (this.cache) return this.cache;
     if (this.triples.length === 0) return null;
-    const self = this;
     const values = new Set<RDFResource>();
     const prefixes = new Set<Prefix>();
 
@@ -143,13 +142,13 @@ export class Query {
     };
 
     const labelSvc = this.ctx.endpointAdapter.labelService?.(this.ctx.lang) ?? null;
-    const selectVars = [...new Set(self.select.filter(r => !r.hide).map(r => String(r.variable)))];
+    const selectVars = [...new Set(this.select.filter(r => !r.hide).map(r => String(r.variable)))];
     const selectWithLabels = labelSvc
       ? [...new Set([...selectVars, ...selectVars.filter(v => !v.endsWith('Label')).map(v => v + 'Label')])]
       : selectVars;
     let q = 'SELECT DISTINCT ' + selectWithLabels.join(' ') + ' WHERE {\n';
 
-    self.triples.forEach(t => {
+    this.triples.forEach(t => {
       q += '  ' + writeTriple(t);
       const allFilters: Filter[] = [];
       t.filter(r => r.isVariable()).forEach(r => {
@@ -164,7 +163,7 @@ export class Query {
       }
     });
 
-    self.optionals.forEach(opt => {
+    this.optionals.forEach(opt => {
       q += '  OPTIONAL {\n';
       opt.forEach(t => {
         q += '    ' + writeTriple(t);
@@ -206,8 +205,8 @@ export class Query {
     }
 
     q += '}';
-    if (self.limit) q += ' LIMIT ' + self.limit;
-    if (self.offset) q += ' OFFSET ' + self.offset;
+    if (this.limit) q += ' LIMIT ' + this.limit;
+    if (this.offset) q += ' OFFSET ' + this.offset;
 
     let h = '';
     for (const p of prefixes) {

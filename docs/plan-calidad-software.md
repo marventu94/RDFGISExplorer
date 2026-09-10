@@ -271,25 +271,36 @@ hay ESLint configurado ahí, así que hoy son comentarios decorativos.
 
 #### Pasos
 
-- [ ] Agregar al `package.json` raíz:
+- [x] Agregar al `package.json` raíz:
       `"test": "pnpm -r --if-present test"`, `"lint": "pnpm -r --if-present lint"`,
       `"build": "pnpm -r --if-present build"`.
-- [ ] Agregar `"test": "ng test --watch=false"` en los tres `package.json` de
+- [x] Agregar `"test": "ng test --watch=false"` en los tres `package.json` de
       frontend (hoy es `ng test`, que en CI se queda en modo watch).
-- [ ] Crear `eslint.config.mjs` en los tres frontends con
-      `angular-eslint` + `typescript-eslint`.
-- [ ] Agregar `"lint": "ng lint"` a los tres.
-- [ ] Crear `.github/workflows/ci.yml`: Node desde `.nvmrc`, `corepack enable`,
+- [x] Crear `eslint.config.mjs` en los tres frontends. **Desviación:** con
+      `typescript-eslint` a secas, **no** con `angular-eslint`. Ese paquete no
+      está en el store y sin poder correr `pnpm install` no habría podido
+      *verificar* la config antes de dejarla — shippear un lint sin ejecutarlo es
+      justo lo que rompe un CI recién creado. `typescript-eslint` ya estaba
+      disponible (lo usa el backend), cubre todo el TS —que es donde viven los 29
+      `any` y los 22 `console.*`— y quedó corrido y verificado. Falta el lint de
+      los **templates HTML**: eso sí requiere `angular-eslint` y queda como
+      seguimiento para cuando haya un install.
+- [x] Agregar `"lint": "eslint src"` a los tres (no `ng lint`: sin
+      `angular-eslint` no hace falta el target de architect en `angular.json`).
+- [x] **No estaba en el plan y hacía falta:** el `lint` del backend corría con
+      `--fix`, o sea que en CI hubiera *modificado archivos*. Se partió en `lint`
+      (chequea) y `lint:fix` (arregla).
+- [x] Crear `.github/workflows/ci.yml`: Node desde `.nvmrc`, `corepack enable`,
       `pnpm install --frozen-lockfile`, `pnpm build` (contracts primero),
       `pnpm lint`, `pnpm test`. Nada de `better-sqlite3` recompilado a mano: el
       `allowBuilds` de `pnpm-workspace.yaml` ya lo cubre.
-- [ ] **Fijar Node 24.18.0 en el workflow leyendo `.nvmrc`**
+- [x] **Fijar Node 24.18.0 en el workflow leyendo `.nvmrc`**
       (`actions/setup-node` con `node-version-file: .nvmrc`), nunca una versión
       literal. `better-sqlite3` trae binario prebuilt por `NODE_MODULE_VERSION`:
       con la major equivocada, `pnpm install` recompila o directamente falla al
       cargar. Es la misma razón por la que `start.sh` mantiene el marcador
       `.node-version-built` y corre `pnpm rebuild` al cambiar de major.
-- [ ] En CI la variable `CI=true` ya viene seteada, así que el chequeo previo de
+- [x] En CI la variable `CI=true` ya viene seteada, así que el chequeo previo de
       dependencias no se queda esperando un TTY. **No** poner `confirmModulesPurge=false`
       como remedio: eso *autoriza* el borrado de `node_modules`, no lo evita.
 
@@ -305,9 +316,42 @@ promoverlas a `error` de forma selectiva en un commit aparte.
 
 #### Criterio de aceptación
 
-- `pnpm test` desde la raíz corre las cuatro suites y reporta 701 casos.
-- El workflow corre verde en un PR de prueba.
-- `pnpm lint` no falla (puede emitir warnings).
+- [x] `pnpm test` desde la raíz corre las cuatro suites: **719 casos verdes**
+      (176 backend + 17 shell + 198 explorer + 328 GIS).
+- [x] `pnpm lint` desde la raíz: **exit 0**, 108 warnings, **0 errores**.
+- [x] `pnpm build` desde la raíz: **exit 0**, los dos paquetes y las tres apps.
+- [ ] El workflow corre verde en un PR de prueba. **Bloqueado por el lockfile**
+      (ver abajo): los tres pasos ya se verificaron localmente uno por uno.
+
+#### Deuda que el lint dejó a la vista
+
+Los 108 warnings son el inventario de lo que hay que bajar, en commits aparte:
+
+| Paquete | Warnings | Qué son |
+|---|---|---|
+| `backend` | 55 | `no-unsafe-call` / `-member-access` / `-assignment` sobre respuestas de upstream y filas de SQLite tipadas como `any` |
+| `rdf_explorer` | 47 | `no-explicit-any`, `no-console` y `no-unused-vars` |
+| `rdf_gis_explorer` | 5 | idem |
+| `app_shell` | 1 | idem |
+
+Al medir se encontraron **2 errores reales** que sí se arreglaron acá, porque
+bajar la regla para taparlos hubiera sido el instinto equivocado:
+
+- `query.ts:109` — `const self = this` (`no-this-alias`), resabio de estilo
+  pre-arrow: los 5 usos estaban en callbacks arrow, así que `this` léxico
+  alcanza. Los golden tests confirman que el SPARQL generado no cambió.
+- `map-view.component.ts:514` — `zoomToShowLayer?: Function`
+  (`no-unsafe-function-type`) pasó a la firma concreta que se invoca.
+
+El resto de los `no-unused-vars` eran parámetros con prefijo `_` (`_node`,
+`_source`, `_options`), que ya es la convención del código: la config los ignora
+en vez de pedir que se cambien 40 firmas.
+
+> **⛔ Para que el CI pase hay que regenerar el lockfile.** Este ítem y el 1
+> agregaron dependencias (`@rdfgis/platform-bridge`, `eslint`, `@eslint/js`,
+> `globals`, `typescript-eslint`) que `pnpm-lock.yaml` todavía no tiene, así que
+> `pnpm install --frozen-lockfile` va a fallar. Correr `pnpm install` (con TTY) y
+> commitear el lockfile. Es el mismo install pendiente del Ítem 5.
 
 ---
 
