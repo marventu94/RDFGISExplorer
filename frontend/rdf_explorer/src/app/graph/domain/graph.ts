@@ -178,8 +178,11 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     }
   }
 
+  /**
+   * Agrega la arista a la lista sin validar nada: la unicidad la garantiza
+   * `addEdge`, que es el unico camino publico para crear aristas.
+   */
   addEdgeToList(edge: Edge): void {
-    // TODO: duplicate edges are not deduplicated (preserved legacy behavior)
     this.edges.push(edge);
   }
 
@@ -243,6 +246,22 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
 
   addEdge(source: Node | Property, target: Node): Edge | null {
     if (source instanceof Property) {
+      // Una arista repetida con el MISMO par (property, target) es ruido puro:
+      // `Query.addTriple` ya la colapsa en un unico patron, asi que no cambia el
+      // SPARQL generado, y en el canvas se dibujarian dos flechas superpuestas.
+      // Es idempotente: se devuelve la que ya existe.
+      //
+      // No aplica a la rama `Node` de abajo, que crea una property nueva con
+      // `newProp()`: dos llamadas Node->Node son dos slots de predicado
+      // distintos y ambos son legitimos. Tampoco toca el caso de una property
+      // con varios targets distintos, que `removeNodeFromGraph` contempla.
+      const existing = this.edges.find(
+        e => e.source === source && e.target === target,
+      );
+      if (existing) {
+        this.log('Edge from property id ' + source.id + ' to node id ' + target.id + ' already exists');
+        return existing;
+      }
       const edge = new Edge(source, target);
       this.addEdgeToList(edge);
       this.log('New edge from property id ' + source.id + ' to node id ' + target.id);
