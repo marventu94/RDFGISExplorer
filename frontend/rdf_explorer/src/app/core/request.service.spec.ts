@@ -263,6 +263,40 @@ describe('RequestService', () => {
       ).toBe('instance of');
     });
 
+    it('descarta valores que no son IRIs absolutos (valores de literal)', async () => {
+      const execSpy = vi
+        .spyOn(service, 'execQuery')
+        .mockResolvedValue({ results: { bindings: [] } } as unknown as SparqlJsonResult);
+
+      // "BASE" es el valor de un literal (gr:priceType "BASE"), no un IRI:
+      // enviarlo como <BASE> hacía fallar el parseo de TODA la query con
+      // 400 INVALID_SPARQL "Cannot resolve relative IRI BASE".
+      await service.prefetchLabels(['http://example.org/Q1', 'BASE', '  '], {
+        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'en',
+        supportsWikibaseLabel: false,
+      });
+
+      expect(execSpy).toHaveBeenCalledTimes(1);
+      const query = (execSpy.mock.calls as [string, ...unknown[]][])[0][0];
+      expect(query).toContain('<http://example.org/Q1>');
+      expect(query).not.toContain('<BASE>');
+    });
+
+    it('no hace request si ningún valor es un IRI absoluto', async () => {
+      const execSpy = vi
+        .spyOn(service, 'execQuery')
+        .mockResolvedValue({ results: { bindings: [] } } as unknown as SparqlJsonResult);
+
+      await service.prefetchLabels(['BASE', 'Casa en Berisso'], {
+        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'en',
+        supportsWikibaseLabel: false,
+      });
+
+      expect(execSpy).not.toHaveBeenCalled();
+    });
+
     it('partitions URIs into configurable batches', async () => {
       const execSpy = vi
         .spyOn(service, 'execQuery')

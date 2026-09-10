@@ -173,15 +173,20 @@ export class PropertyGraphService {
     }
   }
 
+  /**
+   * URIs de nodos y propiedades constantes, para pedirles el label.
+   * Los Literal quedan afuera a propósito: sus `uris` guardan el VALOR del
+   * literal (p.ej. "BASE" en `gr:priceType "BASE"`), no un IRI. Mandarlos al
+   * label service los serializaba como `<BASE>` y el endpoint rechazaba la
+   * query completa (400 INVALID_SPARQL: "Cannot resolve relative IRI BASE"),
+   * perdiendo los labels de todo el batch.
+   */
   private collectConstantUris(): string[] {
     const uris = new Set<string>();
     for (const node of this.graphRef.nodes) {
       this.collectResourceUris(node, uris);
       for (const prop of node.properties) {
         this.collectResourceUris(prop, uris);
-        if (prop.literal) {
-          this.collectResourceUris(prop.literal, uris);
-        }
       }
     }
     return [...uris];
