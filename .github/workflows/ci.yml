@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # La version sale del .nvmrc y nunca se escribe literal aca: better-sqlite3
+      # trae binario prebuilt por NODE_MODULE_VERSION, asi que con la major
+      # equivocada el install lo recompila o falla al cargar. Es la misma razon
+      # por la que start.sh mantiene el marcador .node-version-built.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # El pnpm lo fija `packageManager` en el package.json de la raiz.
+      - run: corepack enable
+
+      - run: pnpm install --frozen-lockfile
+
+      # Primero build: packages/contracts y packages/platform-bridge tienen que
+      # estar compilados antes que las apps que los consumen. `pnpm -r` respeta
+      # el orden topologico del workspace.
+      - run: pnpm build
+
+      - run: pnpm lint
+
+      - run: pnpm test
