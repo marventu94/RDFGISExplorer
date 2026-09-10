@@ -108,34 +108,58 @@ compartida.
 
 #### Pasos
 
-- [ ] Crear `packages/platform-bridge/` (mismo molde que `packages/contracts`:
+- [x] Crear `packages/platform-bridge/` (mismo molde que `packages/contracts`:
       `package.json` privado con `build: tsc -p tsconfig.json` y `prepare`).
       **No** meterlo dentro de `contracts`: ese paquete es `export type *` y
       debe seguir siendo solo tipos.
-- [ ] Mover al paquete: `STORAGE_KEY`, `TTL_MS`, `CUSTOM_EVENT`, `AUTO_RUN_KEY`,
+- [x] Mover al paquete: `STORAGE_KEY`, `TTL_MS`, `CUSTOM_EVENT`, `AUTO_RUN_KEY`,
       los tipos `HandoffPayload` / `HandoffPayloadInput`, la función `isExpired`,
       y el contrato de `gis-session-channel` (`GisSessionState` + el nombre de la
       propiedad de `window`).
-- [ ] Agregar `"@rdfgis/platform-bridge": "workspace:*"` a las `dependencies` de
-      `frontend/rdf_explorer`, `frontend/rdf_gis_explorer` y `frontend/app_shell`.
-- [ ] Reescribir ambos `QueryHandoffService` para importar el contrato. **Cada
+- [x] Agregar `"@rdfgis/platform-bridge": "workspace:*"` a las `dependencies` de
+      `frontend/rdf_explorer` y `frontend/rdf_gis_explorer`. **No** a `app_shell`:
+      se verificó que no usa el handoff (`grep -rln handoff frontend/app_shell/src`
+      no devuelve nada), así que agregarle la dep sería acoplamiento de más.
+- [x] Reescribir ambos `QueryHandoffService` para importar el contrato. **Cada
       remote conserva su propio `@Injectable({ providedIn: 'root' })`** — no se
       comparte la instancia, solo el contrato.
-- [ ] Igual para `gis-session-channel.ts` en ambos lados: el Explorer sigue solo
+- [x] Igual para `gis-session-channel.ts` en ambos lados: el Explorer sigue solo
       leyendo, el GIS sigue siendo el único que escribe. Preservar los comentarios
       de *por qué* el estado va en `window` y no en `sessionStorage`.
-- [ ] Revisar `federation.config.js` de ambos remotes: al ser un paquete workspace
+- [x] Revisar `federation.config.js` de ambos remotes: al ser un paquete workspace
       nuevo, decidir si va en `skip` (se bundlea en cada remote — **preferible**,
       porque son ~40 líneas y evita un chunk compartido más) o se comparte.
-- [ ] `pnpm install` y `pnpm --filter @rdfgis/platform-bridge build`.
+- [x] Build del paquete verificado. **Nota:** el enlace en `node_modules` se creó
+      a mano (mismo symlink que usa pnpm para `@rdfgis/contracts`) porque un
+      `pnpm install` acá quiere purgar `node_modules` y no hay TTY. Queda cubierto
+      por el `pnpm install` pendiente del Ítem 5.
+- [x] **Desviación deliberada respecto de lo planeado:** además de las constantes
+      y los tipos se movió la **lógica** de lectura/escritura
+      (`readPendingHandoff` / `writePendingHandoff` / `clearPendingHandoff` /
+      `subscribeHandoffChanges`). Mover solo las constantes dejaba ~50 líneas de
+      lógica de storage duplicadas, que es la mitad del problema que este ítem
+      viene a resolver. Los servicios quedaron en 49 líneas cada uno y son puro
+      envoltorio en signals.
 
 #### Criterio de aceptación
 
-- `grep -rn "platform.handoff.pending" frontend/*/src` devuelve **una sola**
-  definición (en el paquete), y solo referencias en los servicios.
-- Las 519 pruebas de los dos remotes siguen verdes.
-- Prueba manual del flujo completo: Explorer → *exportar al GIS* → el GIS levanta
-  la query, incluido el aviso de sobreescritura de tablero abierto.
+- [x] Cada constante del contrato tiene **una sola** definición, en el paquete:
+      `platform.handoff.pending`, el TTL, `query-handoff`,
+      `__rdfgisGisSession_v1` y `platform.handoff.autoRun`.
+      Excepción a propósito: `gis-overwrite-guard.service.spec.ts` y
+      `gis-session-channel.spec.ts` siguen con la clave literal. Ahí el valor
+      hardcodeado es un **canario**: si alguien cambia la clave en el paquete, el
+      test falla, que es exactamente lo que se quiere. Importarla del paquete
+      haría que el test siguiera el cambio en silencio y dejara de proteger.
+- [x] Las **519** pruebas de los dos remotes verdes (191 Explorer + 328 GIS) sobre
+      Node 24.18.0.
+- [x] `pnpm build` de **los dos remotes** OK, y verificado que el contrato queda
+      bundleado dentro de cada uno (las claves aparecen en `dist/`) y **no** en el
+      import-map de federación. Este chequeo no estaba en el plan y hacía falta:
+      es el modo real en que un paquete workspace con código de runtime puede
+      romper, y los tests con vitest no lo cubren.
+- [ ] Prueba manual del flujo completo: Explorer → *exportar al GIS* → el GIS
+      levanta la query, incluido el aviso de sobreescritura (smoke test final).
 
 ---
 
