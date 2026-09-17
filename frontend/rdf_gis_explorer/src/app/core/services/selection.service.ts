@@ -1,5 +1,12 @@
 import { Injectable, effect, inject } from '@angular/core';
-import { BehaviorSubject, Observable, combineLatest, map } from 'rxjs';
+import {
+  BehaviorSubject,
+  Observable,
+  combineLatest,
+  distinctUntilChanged,
+  map,
+  shareReplay,
+} from 'rxjs';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import type { NormalizedNode, QueryResult, Selection, Filter } from '@shared/models';
 import {
@@ -9,6 +16,12 @@ import {
   restrictResultToUris,
   sliceLot,
 } from '@shared/stats/lots';
+import {
+  buildRowIndex,
+  emptyRowIndex,
+  relatedUris,
+  type RowIndex,
+} from '@shared/selection/row-index';
 import { LimitsService } from './limits.service';
 
 export type FocusSource = 'map' | 'graph' | 'timeline' | null;
@@ -31,6 +44,12 @@ export interface LotState {
 }
 
 export { DEFAULT_LOT_SIZE, LOT_SIZE_OPTIONS };
+
+/** Lo visible y su estado de lote, calculados juntos para no duplicar trabajo. */
+interface SliceView {
+  result: QueryResult | null;
+  state: LotState;
+}
 
 @Injectable({ providedIn: 'root' })
 export class SelectionService {
@@ -57,6 +76,18 @@ export class SelectionService {
     this.limitsService.limits().lotSizeOptions,
   );
   private readonly _currentLot$ = new BehaviorSubject<number>(1);
+  /** Índice fila ↔ entidades del resultado actual (ver shared/selection). */
+  private rowIndex: RowIndex = emptyRowIndex();
+  /** Memo del lote sin pin; la clave es la identidad de sus tres entradas. */
+  private baseMemo: {
+    filtered: QueryResult | null;
+    lotSize: number;
+    currentLot: number;
+    view: SliceView;
+    uris: ReadonlySet<string>;
+  } | null = null;
+  /** Memo del lote con un nodo de otro lote inyectado (caso poco frecuente). */
+  private pinMemo: { base: SliceView; pinned: string; view: SliceView } | null = null;
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
   readonly activeFilters$: Observable<Filter[]> = this._activeFilters$.asObservable();
@@ -70,49 +101,60 @@ export class SelectionService {
     this._lotSizeOptions$.asObservable();
   readonly currentLot$: Observable<number> = this._currentLot$.asObservable();
 
+  /**
+   * `shareReplay` porque lo consumen las 4 vistas: sin esto, al ser frío, el
+   * filtrado se recalculaba una vez por vista en cada emisión.
+   */
   readonly filteredQueryResult$: Observable<QueryResult | null> = combineLatest([
     this._queryResult$,
     this._activeFilters$,
-  ]).pipe(map(([result, filters]) => this.applyFilters(result, filters)));
+  ]).pipe(
+    map(([result, filters]) => this.applyFilters(result, filters)),
+    shareReplay({ bufferSize: 1, refCount: true }),
+  );
+
+  /** Solo la URI pineada: cambiar de nodo no importa si el lote no cambia. */
+  private readonly pinnedUri$: Observable<string | null> = this._selectedNode$.pipe(
+    map((selection) => selection.node?.uri ?? null),
+    distinctUntilChanged(),
+  );
+
+  /**
+   * Lote visible + su estado, calculados UNA vez y compartidos.
+   *
+   * Clave del asunto: seleccionar NO tiene por qué repintar las vistas. El
+   * pinning solo cambia lo visible cuando el nodo seleccionado está fuera del
+   * lote; en el caso normal `computeSliceView` devuelve el MISMO objeto y
+   * `distinctUntilChanged` corta la emisión. Antes cada click recalculaba el
+   * lote (una vez por vista) y forzaba a las 4 a redibujarse: con lotes
+   * grandes y la vista coordinada encendida, eso trababa la app.
+   */
+  private readonly sliceView$: Observable<SliceView> = combineLatest([
+    this.filteredQueryResult$,
+    this._lotSize$,
+    this._currentLot$,
+    this.pinnedUri$,
+  ]).pipe(
+    map(([filtered, lotSize, currentLot, pinned]) =>
+      this.computeSliceView(filtered, lotSize, currentLot, pinned),
+    ),
+    distinctUntilChanged(),
+    shareReplay({ bufferSize: 1, refCount: true }),
+  );
 
   /**
    * Resultado que consumen las 4 vistas: `filteredQueryResult$` restringido al
    * lote actual, más el nodo seleccionado inyectado (pinning) aunque pertenezca
    * a otro lote. Con un solo lote equivale a `filteredQueryResult$`.
    */
-  readonly visibleQueryResult$: Observable<QueryResult | null> = combineLatest([
-    this.filteredQueryResult$,
-    this._lotSize$,
-    this._currentLot$,
-    this._selectedNode$,
-  ]).pipe(
-    map(([filtered, lotSize, currentLot, selection]) => {
-      if (!filtered) return null;
-      const pinned = selection.node ? [selection.node.uri] : [];
-      return sliceLot(filtered, lotSize, currentLot, pinned).result;
-    }),
+  readonly visibleQueryResult$: Observable<QueryResult | null> = this.sliceView$.pipe(
+    map((view) => view.result),
+    distinctUntilChanged(),
   );
 
-  readonly lotState$: Observable<LotState> = combineLatest([
-    this.filteredQueryResult$,
-    this._lotSize$,
-    this._currentLot$,
-    this._selectedNode$,
-  ]).pipe(
-    map(([filtered, lotSize, currentLot, selection]) => {
-      if (!filtered) {
-        return { lotSize, currentLot: 1, lotCount: 1, totalRows: 0, visibleNodes: 0 };
-      }
-      const pinned = selection.node ? [selection.node.uri] : [];
-      const slice = sliceLot(filtered, lotSize, currentLot, pinned);
-      return {
-        lotSize,
-        currentLot: slice.currentLot,
-        lotCount: slice.lotCount,
-        totalRows: filtered.bindings.length,
-        visibleNodes: slice.result.nodes.length,
-      };
-    }),
+  readonly lotState$: Observable<LotState> = this.sliceView$.pipe(
+    map((view) => view.state),
+    distinctUntilChanged(),
   );
 
   constructor() {
@@ -143,12 +185,26 @@ export class SelectionService {
   /** Última config de límites aplicada a los lotes (identidad por referencia). */
   private appliedLimits = this.limitsService.limits();
 
+  /**
+   * Publica la selección junto con las entidades que comparten fila con ella:
+   * cada vista dibuja una entidad distinta de la misma fila, así que sin ese
+   * grupo una selección solo se veía en la vista que dibujaba ese nodo exacto.
+   */
   select(node: NormalizedNode | null, source: Selection['source'] = 'external'): void {
-    this._selectedNode$.next({ node, source });
+    this._selectedNode$.next({
+      node,
+      source,
+      relatedUris: relatedUris(this.rowIndex, node?.uri),
+    });
   }
 
   clearSelection(): void {
     this._selectedNode$.next({ node: null, source: 'external' });
+  }
+
+  /** Entidades que comparten fila con `uri` (la propia incluida). */
+  relatedUrisFor(uri: string | null | undefined): ReadonlySet<string> {
+    return relatedUris(this.rowIndex, uri);
   }
 
   addFilter(filter: Filter): void {
@@ -173,6 +229,9 @@ export class SelectionService {
   }
 
   setQueryResult(result: QueryResult | null): void {
+    // El índice fila ↔ entidades se arma una vez por query: lo consultan todas
+    // las selecciones posteriores.
+    this.rowIndex = buildRowIndex(result);
     this._queryResult$.next(result);
     this._selectedNode$.next({ node: null, source: 'external' });
     this._activeFilters$.next([]);
@@ -266,6 +325,78 @@ export class SelectionService {
 
   getFocusSnapshot(): FocusState {
     return this._focus$.getValue();
+  }
+
+  /**
+   * Lote visible sin pin, memoizado por (resultado filtrado, tamaño, lote).
+   * Guarda además las URIs que ya están dentro, para decidir en O(1) si el
+   * nodo pineado agrega algo o no.
+   */
+  private baseSlice(
+    filtered: QueryResult | null,
+    lotSize: number,
+    currentLot: number,
+  ): { view: SliceView; uris: ReadonlySet<string> } {
+    const memo = this.baseMemo;
+    if (
+      memo &&
+      memo.filtered === filtered &&
+      memo.lotSize === lotSize &&
+      memo.currentLot === currentLot
+    ) {
+      return memo;
+    }
+
+    const view = this.buildSliceView(filtered, lotSize, currentLot, []);
+    const uris = new Set((view.result?.nodes ?? []).map((n) => n.uri));
+    this.baseMemo = { filtered, lotSize, currentLot, view, uris };
+    return this.baseMemo;
+  }
+
+  private computeSliceView(
+    filtered: QueryResult | null,
+    lotSize: number,
+    currentLot: number,
+    pinned: string | null,
+  ): SliceView {
+    const base = this.baseSlice(filtered, lotSize, currentLot);
+    // El caso normal: el nodo seleccionado ya está en el lote, así que lo
+    // visible es exactamente lo mismo de antes (mismo objeto, sin repintar).
+    if (pinned === null || base.uris.has(pinned)) return base.view;
+
+    const memo = this.pinMemo;
+    if (memo && memo.base === base.view && memo.pinned === pinned) return memo.view;
+
+    // Selección de otro lote: ahí sí hay que inyectar el nodo y redibujar.
+    const view = this.buildSliceView(filtered, lotSize, currentLot, [pinned]);
+    this.pinMemo = { base: base.view, pinned, view };
+    return view;
+  }
+
+  private buildSliceView(
+    filtered: QueryResult | null,
+    lotSize: number,
+    currentLot: number,
+    pinnedUris: readonly string[],
+  ): SliceView {
+    if (!filtered) {
+      return {
+        result: null,
+        state: { lotSize, currentLot: 1, lotCount: 1, totalRows: 0, visibleNodes: 0 },
+      };
+    }
+
+    const slice = sliceLot(filtered, lotSize, currentLot, pinnedUris);
+    return {
+      result: slice.result,
+      state: {
+        lotSize,
+        currentLot: slice.currentLot,
+        lotCount: slice.lotCount,
+        totalRows: filtered.bindings.length,
+        visibleNodes: slice.result.nodes.length,
+      },
+    };
   }
 
   private applyFilters(result: QueryResult | null, filters: Filter[]): QueryResult | null {

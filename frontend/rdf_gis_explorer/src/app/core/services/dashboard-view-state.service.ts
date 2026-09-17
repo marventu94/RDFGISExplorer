@@ -23,6 +23,7 @@ export interface GraphViewState {
   manualPositions?: Record<string, { x: number; y: number }>;
   detailLevel?: 'summary' | 'exploration' | 'detail';
   expandedSuperEdgeIds?: string[];
+  expandedMotifIds?: string[];
 }
 
 export interface TableViewState {

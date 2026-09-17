@@ -16,6 +16,162 @@ function edgeIds(result: ReturnType<typeof buildGraphElements>): string[] {
 }
 
 describe('buildGraphElements', () => {
+  it('siembra posiciones distintas para que el layout no parta con aristas de longitud cero', () => {
+    const source = makeNode('source');
+    const target = makeNode('target');
+
+    const built = buildGraphElements(
+      makeQueryResult([source, target], [makeEdge(source.uri, target.uri, 'relatedTo')]),
+      { maxNodes: 300 },
+    );
+    const positions = built.elements
+      .filter((element) => !('source' in element.data))
+      .map((element) => element.position);
+
+    expect(positions).toHaveLength(2);
+    expect(positions[0]).toBeDefined();
+    expect(positions[1]).toBeDefined();
+    expect(positions[0]).not.toEqual(positions[1]);
+  });
+
+  it('resume componentes multi-etapa isomorfos sin perder sus relaciones', () => {
+    const nodes = Array.from({ length: 2 }, (_, index) => [
+      makeNode(`listing-${index}`, { queryVariable: 'listing' }),
+      makeNode(`estate-${index}`, { queryVariable: 'realEstate' }),
+      makeNode(`geometry-${index}`, { queryVariable: 'geometry' }),
+    ]).flat();
+    const edges = Array.from({ length: 2 }, (_, index) => [
+      makeEdge(`listing-${index}`, `estate-${index}`, 'http://example.org/about'),
+      makeEdge(`estate-${index}`, `geometry-${index}`, 'http://example.org/hasGeometry'),
+    ]).flat();
+    const bindings = Array.from({ length: 2 }, (_, index) => ({
+      listing: { type: 'uri' as const, value: `listing-${index}` },
+      realEstate: { type: 'uri' as const, value: `estate-${index}` },
+      geometry: { type: 'uri' as const, value: `geometry-${index}` },
+    }));
+
+    const built = buildGraphElements(makeQueryResult(nodes, edges, bindings), {
+      maxNodes: 300,
+      detailLevel: 'summary',
+    });
+
+    expect(
+      built.elements.filter((element) => element.data['aggregateKind'] === 'repeated-component'),
+    ).toHaveLength(3);
+    expect(
+      built.elements.filter(
+        (element) => element.data['aggregateKind'] === 'repeated-component-edge',
+      ),
+    ).toHaveLength(2);
+    expect(built.abstractedNodes).toBe(6);
+    expect(built.motifCount).toBe(1);
+  });
+
+  it('conserva multiplicidades internas al resumir variantes estructurales repetidas', () => {
+    const nodes = Array.from({ length: 2 }, (_, component) => [
+      makeNode(`listing-${component}`, { queryVariable: 'listing' }),
+      makeNode(`address-${component}-a`, { queryVariable: 'address' }),
+      makeNode(`address-${component}-b`, { queryVariable: 'address' }),
+    ]).flat();
+    const edges = Array.from({ length: 2 }, (_, component) => [
+      makeEdge(`listing-${component}`, `address-${component}-a`, 'http://example.org/hasAddress'),
+      makeEdge(`listing-${component}`, `address-${component}-b`, 'http://example.org/hasAddress'),
+    ]).flat();
+
+    const built = buildGraphElements(makeQueryResult(nodes, edges), {
+      maxNodes: 300,
+      detailLevel: 'summary',
+    });
+    const motifNodes = built.elements.filter(
+      (element) => element.data['aggregateKind'] === 'repeated-component',
+    );
+    const motifEdge = built.elements.find(
+      (element) => element.data['aggregateKind'] === 'repeated-component-edge',
+    );
+
+    expect(motifNodes.map((element) => element.data['label']).sort()).toEqual([
+      'address (4)',
+      'listing (2)',
+    ]);
+    expect(motifEdge?.data['componentCount']).toBe(2);
+    expect(motifEdge?.data['multiplicity']).toBe(4);
+    expect(motifEdge?.data['representedTriples']).toBe(4);
+  });
+
+  it('resume componentes de dos nodos repetidos como un motivo reversible', () => {
+    const nodes = Array.from({ length: 3 }, (_, index) => [
+      makeNode(`listing-${index}`, { queryVariable: 'listing' }),
+      makeNode(`estate-${index}`, { queryVariable: 'realEstate' }),
+    ]).flat();
+    const edges = Array.from({ length: 3 }, (_, index) =>
+      makeEdge(`listing-${index}`, `estate-${index}`, 'http://rdfs.org/sioc/ns#about'),
+    );
+    const bindings = Array.from({ length: 3 }, (_, index) => ({
+      listing: { type: 'uri' as const, value: `listing-${index}` },
+      realEstate: { type: 'uri' as const, value: `estate-${index}` },
+    }));
+
+    const built = buildGraphElements(makeQueryResult(nodes, edges, bindings), {
+      maxNodes: 300,
+      detailLevel: 'summary',
+    });
+    const motifNodes = built.elements.filter(
+      (element) => element.data['aggregateKind'] === 'repeated-component',
+    );
+    const sourceMotif = motifNodes.find(
+      (element) => element.data['groupingValue'] === 'listing',
+    );
+    const motifEdge = built.elements.find(
+      (element) => element.data['aggregateKind'] === 'repeated-component-edge',
+    );
+
+    expect(motifNodes).toHaveLength(2);
+    expect(motifNodes.map((element) => element.data['label'])).toEqual([
+      'listing (3)',
+      'realEstate (3)',
+    ]);
+    expect(sourceMotif?.data['groupingSource']).toBe('query-variable');
+    expect(sourceMotif?.data['groupingValue']).toBe('listing');
+    expect(motifEdge?.data['componentCount']).toBe(3);
+    expect(motifEdge?.data['multiplicity']).toBe(3);
+    expect(motifEdge?.data['representedTriples']).toBe(3);
+    expect(motifEdge?.data['direction']).toBe('directed');
+    expect(motifEdge?.data['memberEdgeIds']).toEqual(edges.map((edge) => edge.id));
+    expect(built.abstractedNodes).toBe(6);
+    expect(built.motifCount).toBe(1);
+  });
+
+  it('conserva el id del motivo en sus aristas expandidas para poder contraerlo', () => {
+    const nodes = Array.from({ length: 2 }, (_, index) => [
+      makeNode(`listing-${index}`, { queryVariable: 'listing' }),
+      makeNode(`estate-${index}`, { queryVariable: 'realEstate' }),
+    ]).flat();
+    const edges = Array.from({ length: 2 }, (_, index) =>
+      makeEdge(`listing-${index}`, `estate-${index}`, 'http://rdfs.org/sioc/ns#about'),
+    );
+    const bindings = Array.from({ length: 2 }, (_, index) => ({
+      listing: { type: 'uri' as const, value: `listing-${index}` },
+      realEstate: { type: 'uri' as const, value: `estate-${index}` },
+    }));
+    const result = makeQueryResult(nodes, edges, bindings);
+    const summary = buildGraphElements(result, { maxNodes: 300, detailLevel: 'summary' });
+    const motifId = String(
+      summary.elements.find(
+        (element) => element.data['aggregateKind'] === 'repeated-component-edge',
+      )!.data['motifId'],
+    );
+
+    const expanded = buildGraphElements(result, {
+      maxNodes: 300,
+      detailLevel: 'summary',
+      expandedMotifIds: [motifId],
+    });
+    const expandedEdges = expanded.elements.filter((element) => 'source' in element.data);
+
+    expect(expandedEdges).toHaveLength(2);
+    expect(expandedEdges.every((element) => element.data['motifId'] === motifId)).toBe(true);
+  });
+
   it('un pinned de grado cero sobrevive al cap aunque compita contra hubs', () => {
     // Hub con 40 hojas + un nodo aislado: con maxNodes 2, sin pinning entrarían
     // el hub y una hoja; el aislado (seleccionado) tiene grado cero.

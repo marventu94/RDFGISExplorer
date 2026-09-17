@@ -7,6 +7,7 @@ import { SelectionService } from '@core/services/selection.service';
 import { ApiService } from '@core/services/api.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { SummaryStateService } from '@core/services/summary-state.service';
+import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { classifyVariables, computeLocalSummary } from '@shared/stats/result-summary';
 import type { QueryResult, QuerySummary } from '@shared/models';
 
@@ -41,6 +42,7 @@ export class SummaryPanelComponent {
   private readonly api = inject(ApiService);
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly summaryState = inject(SummaryStateService);
+  private readonly loadProgress = inject(DashboardLoadProgressService);
 
   protected readonly collapsed = signal(true);
   protected readonly loading = signal(false);
@@ -56,6 +58,7 @@ export class SummaryPanelComponent {
       .subscribe((resolved) => {
         this.loading.set(false);
         this.resolved.set(resolved);
+        this.loadProgress.reportSummaryDone(this.progressDetail(resolved));
         // El export completo usa el COUNT para el progreso real ("X de ~N").
         this.summaryState.set(resolved?.summary ?? null);
       });
@@ -69,6 +72,7 @@ export class SummaryPanelComponent {
     // Sin truncamiento: todas las filas están en el cliente, el resumen se
     // computa localmente sin pegarle al backend.
     if (!result.meta.truncated) {
+      this.loadProgress.reportSummaryStart('local');
       return of({ summary: computeLocalSummary(result, classification), source: 'local' });
     }
 
@@ -78,6 +82,7 @@ export class SummaryPanelComponent {
     if (!query) return of(null);
 
     this.loading.set(true);
+    this.loadProgress.reportSummaryStart('backend');
     return this.api
       .fetchSummary({
         query,
@@ -89,6 +94,14 @@ export class SummaryPanelComponent {
         map((summary) => ({ summary, source: 'backend' as const })),
         catchError(() => of(null)),
       );
+  }
+
+  /** Línea para el cartel de carga: qué se logró resumir. */
+  private progressDetail(resolved: ResolvedSummary | null): string {
+    if (!resolved) return 'sin resumen disponible';
+    const total = resolved.summary.totalRows;
+    const rows = total === null ? 'resultado completo' : `${total} filas`;
+    return resolved.source === 'local' ? `${rows} · en el navegador` : `${rows} · en el endpoint`;
   }
 
   protected toggleCollapsed(): void {

@@ -26,8 +26,10 @@ export function createGraphStyle(
           return Math.max(20, Math.min(80, 20 + deg * 3));
         },
         color: () => (isDark() ? '#f1f5f9' : '#212529'),
-        label: (ele: cytoscape.NodeSingular) =>
-          detailLevel() === 'summary' ? '' : (ele.data('label') as string),
+        label: (ele: cytoscape.NodeSingular) => {
+          const isMotif = ele.data('aggregateKind') === 'repeated-component';
+          return detailLevel() === 'summary' && !isMotif ? '' : (ele.data('label') as string);
+        },
         'font-size': '11px',
         'text-valign': 'bottom',
         'text-margin-y': 5,
@@ -38,7 +40,7 @@ export function createGraphStyle(
       } as cytoscape.Css.Node,
     },
     {
-      selector: 'node[aggregate = true]',
+      selector: 'node[aggregate]',
       style: {
         shape: 'round-rectangle',
         'border-width': 3,
@@ -63,7 +65,7 @@ export function createGraphStyle(
       },
     },
     {
-      selector: 'edge[aggregate = true]',
+      selector: 'edge[aggregate]',
       style: {
         'line-style': 'dashed',
         label: (ele: cytoscape.EdgeSingular) =>
@@ -72,7 +74,21 @@ export function createGraphStyle(
       } as cytoscape.Css.Edge,
     },
     {
-      selector: 'edge:not([aggregate = true])',
+      selector: 'edge[aggregateKind = "repeated-component-edge"]',
+      style: {
+        width: 5,
+        'line-style': 'solid',
+        label: (ele: cytoscape.EdgeSingular) => ele.data('predicateLabel') as string,
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-background-color': () => (isDark() ? '#0f172a' : '#ffffff'),
+        'text-background-opacity': 0.9,
+        'text-background-padding': '3px',
+        'text-rotation': 'autorotate',
+      } as cytoscape.Css.Edge,
+    },
+    {
+      selector: 'edge:not([aggregate])',
       style: {
         label: (ele: cytoscape.EdgeSingular) =>
           detailLevel() === 'detail' ? (ele.data('predicateLabel') as string) : '',
@@ -105,6 +121,22 @@ export function createGraphStyle(
       selector: '.is-dimmed',
       style: {
         opacity: 0.15,
+      },
+    },
+    {
+      // Dentro del foco coordinado, lo que no es el nodo seleccionado: se ve,
+      // pero deja de competir con él. Sin esto, con el foco que mandan el mapa
+      // y la timeline (decenas de nodos) el seleccionado no se distinguía.
+      selector: '.is-muted',
+      style: {
+        opacity: 0.35,
+      },
+    },
+    {
+      // Después de las reglas de atenuación: el seleccionado nunca se atenúa.
+      selector: '.is-selected',
+      style: {
+        opacity: 1,
       },
     },
     {

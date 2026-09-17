@@ -11,12 +11,7 @@
   </mat-sidenav>
 
   <mat-sidenav-content>
-    @if (persistence.isHydrating()) {
-      <div class="hydration-loader">
-        <mat-spinner diameter="48" />
-        <span>Cargando tablero…</span>
-      </div>
-    }
+    <app-load-progress-overlay />
     <app-navbar />
     <app-dashboard [editorCollapsed]="editorCollapsed()" />
   </mat-sidenav-content>

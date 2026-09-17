@@ -18,7 +18,7 @@ Las fuentes citadas provienen de la revisión de literatura realizada en el
 marco de la tesis, complementada con un conjunto reducido de referencias
 externas, incorporadas únicamente cuando la línea temática correspondiente
 carece de fuente primaria dentro de dicha revisión. Las referencias externas
-se identifican como tales en la sección 7.
+se identifican como tales en la sección 8.
 
 El estado de cada decisión se declara mediante dos categorías: **vigente**
 (implementada en el código actual) y **propuesta** (posible mejora aprobada
@@ -37,7 +37,7 @@ en cinco criterios que estructuran las decisiones de este documento:
    la vista debe explicar por qué dichos elementos forman parte del resultado
    (decisión 3.2).
 3. **Proveniencia.** Todo agregado debe ser exacto, reversible y explicable
-   (decisiones 3.3 y 3.8).
+   (decisiones 3.3 y 3.7).
 4. **Estabilidad cognitiva.** Las posiciones y transiciones deben preservar
    el mapa mental del usuario (decisiones 3.4 y 3.5).
 5. **Coordinación sin fusión.** El grafo convive con las vistas de tabla,
@@ -80,7 +80,7 @@ densidad de aristas constituye el segundo parámetro crítico de escalabilidad
 encima de aproximadamente 800 nodos (Wang, Li y Gu, 2023). Las herramientas
 que escalan con éxito lo hacen mediante subselección orientada a la pregunta
 del usuario y no por centralidad global (Antoniazzi y Viola, 2018 —RelFinder—;
-Sheng et al., 2019 —CEPV—; Kapler y Wright, 2004 —GeoTime—; Orlando et al.,
+Sheng et al., 2019 —CEPV—; Kapler y Wright, 2005 —GeoTime—; Orlando et al.,
 2024 —TGV—). Respecto de quién determina el contenido de la porción visible,
 la literatura propone el interés declarado por el usuario, ya sea de forma
 relativa —mediante el orden de presentación— o absoluta —mediante la fijación
@@ -96,12 +96,12 @@ caminos acotados entre entidades prioritarias; (v) contexto por relevancia;
 como función pura que registra las razones de inclusión de cada elemento y
 métricas de cobertura.
 
-**Estado:** vigente parcial. Se encuentra implementada la reserva de
-presupuesto para el nodo seleccionado y los fijados —que permanecen visibles
-incluso con grado cero— sobre una función pura de selección; la priorización
-query-aware completa (nodos intermedios y caminos por encima del contexto por
-grado) permanece propuesta. Hasta su implementación, continúa vigente el
-recorte por grado (`limits.graphMaxNodes`, 300 por defecto).
+**Estado:** vigente parcial. La función pura reserva presupuesto, en este
+orden, para el nodo seleccionado, las entidades que aparecen en los bindings,
+los vecinos intermedios a un salto y el contexto restante por grado. El nodo
+seleccionado permanece visible incluso con grado cero. La selección de caminos
+acotados entre entidades prioritarias continúa propuesta; el límite final
+sigue siendo `limits.graphMaxNodes` (300 por defecto).
 
 ### 3.3. Agregación reversible con proveniencia exacta
 
@@ -131,10 +131,34 @@ inexistente —criterio propio del proyecto; el beneficio del bundling en la
 reducción de saturación sí se encuentra documentado (Hadlak et al., 2015;
 Bach et al., 2014)—.
 
-**Estado:** vigente parcial. Se implementaron super-aristas exactas y
-reversibles por click, con proveniencia de miembros y multiplicidad. Quedan
-pendientes los abanicos de hojas, grupos por variable SPARQL, grupos por clase
-RDF, firmas de propiedades y motivos de blank nodes.
+**Estado:** vigente parcial. Se implementaron dos abstracciones exactas y
+reversibles por click:
+
+1. super-aristas para relaciones paralelas entre el mismo par de nodos;
+2. motivos de componentes repetidos. Cada componente desconectado se describe
+   mediante una firma que registra la cantidad de nodos por rol y la cantidad
+   de aristas por rol de origen, predicado y rol de destino. El rol procede de
+   la variable SPARQL; si no está disponible, se usa una clase RDF afirmada y,
+   como último recurso, la marca explícita `entity`.
+
+El motivo conserva los identificadores de cada nodo y arista, la fuente y el
+valor del agrupamiento, la dirección, el predicado, la cantidad de componentes
+y las cantidades exactas de entidades y tripletas. El modo Resumen muestra un
+supernodo por rol —rotulado con su cantidad de miembros— y una relación
+`predicado × N` por cada tipo de arista de la firma. Un click expande todos sus
+componentes y otro click sobre cualquiera de sus aristas los contrae. La
+selección tiene prioridad: el componente que contiene la entidad seleccionada
+queda explícito y el agregado resume solo los restantes. El estado
+expandido/contraído se persiste con el tablero.
+
+Esta segunda abstracción adapta el principio general de *motif
+simplification* de Dunne y Shneiderman (2013), pero no afirma implementar sus
+tres glifos específicos (abanico, conector y clique): la firma de componente
+repetido es una adaptación para los resultados SPARQL evaluados. No se afirma
+isomorfismo completo cuando un rol aparece varias veces; se garantiza igualdad
+de la firma declarada, conteos exactos y recuperación de sus miembros. Quedan
+pendientes los tres glifos de la técnica original, supernodos generales por
+clase y firmas de propiedades.
 
 ### 3.4. Layout adaptado a la topología y estable
 
@@ -159,9 +183,11 @@ verificación de compatibilidad con Native Federation.
 
 **Estado:** vigente parcial. La disposición inicial se elige por topología:
 grilla sin aristas, Dagre para grafos acíclicos y Cola para grafos cíclicos o
-con bucles. El usuario puede cambiarla explícitamente y se conserva la
-estabilidad incremental. fCoSE y el empaquetamiento dedicado de componentes
-siguen pendientes de benchmark.
+con bucles. El cálculo inicial se ejecuta sin animación después de registrar el
+evento de fin de layout; así los extremos no parten ni permanecen en `(0,0)` y
+el encuadre ocurre sobre la geometría terminada. Los cambios de layout pedidos
+por el usuario sí se animan y se conserva la estabilidad incremental. fCoSE y
+el empaquetamiento dedicado de componentes siguen pendientes de benchmark.
 
 ### 3.5. Progressive disclosure con niveles explícitos
 
@@ -176,20 +202,21 @@ polimórficos cuya representación cambia con el nivel de zoom (Menin et al.,
 2023)— y alternativas que exhiben todos los niveles de granularidad
 simultáneamente (Schulz et al., 2013). En materia de etiquetas, la evidencia
 se encuentra en tensión: la presentación bajo demanda cuenta con precedentes
-(Frasincar et al., 2006; Kapler y Wright, 2004), pero un estudio citado por
+(Frasincar et al., 2006; Kapler y Wright, 2005), pero un estudio citado por
 Beck et al. (2017) halló que las etiquetas permanentemente visibles superan a
 las bajo demanda en diagramas node-link animados.
 
-**Decisión.** Se establecen tres niveles de detalle —Resumen, Exploración y
-Detalle— con histéresis entre umbrales de zoom, control explícito para fijar
-el nivel, leyenda e indicadores de la cantidad de elementos ocultos. La
-política de etiquetas se determinará mediante pruebas de usuario, en lugar de
-asumir una regla única.
+**Decisión.** Se establecen tres niveles explícitos —Resumen, Entidades y
+Entidades + relaciones— con control manual, leyenda e indicadores de cobertura.
+La política de etiquetas se determinará mediante pruebas de usuario, en lugar
+de asumir una regla única.
 
-**Estado:** vigente parcial. Se implementaron los niveles explícitos Resumen,
-Exploración y Detalle, con leyenda y persistencia. Resumen oculta etiquetas y
-Detalle agrega etiquetas de predicados; el semantic zoom automático con
-histéresis queda pendiente de validación con usuarios.
+**Estado:** vigente parcial. Resumen es el nivel predeterminado: reemplaza los
+motivos repetidos por agregados etiquetados y oculta las etiquetas de entidades
+no agregadas. Entidades recupera la topología explícita y sus etiquetas;
+Entidades + relaciones agrega los predicados. Cambiar de nivel reconstruye la
+topología y el selector refleja siempre el estado efectivo. El semantic zoom
+automático con histéresis queda pendiente de validación con usuarios.
 
 ### 3.6. La dimensión geográfica no determina la posición de los nodos
 
@@ -201,7 +228,7 @@ aplicar una única fuerza cuando ambas estructuras difieren (Wang, Li y Gu,
 yuxtaposición de mapa y grafo abstracto con vínculos visuales (Hadlak et al.,
 2015), patrón ya aplicado en la separación deliberada del análisis
 georreferenciado del abstracto (Compieta et al., 2007) y en la integración
-coordinada de información geográfica y relacional (Kapler y Wright, 2004).
+coordinada de información geográfica y relacional (Kapler y Wright, 2005).
 
 **Decisión.** El mapa y el grafo permanecen como vistas especializadas
 coordinadas mediante selección y foco compartidos (*linking & brushing*;
@@ -237,6 +264,30 @@ backend y vistas migradas). Resta validar la cobertura efectiva de `rdf:type`
 en los conjuntos de datos antes de habilitar el agrupamiento por clase
 (decisión 3.3).
 
+### 3.8. Interpretación de resultados relacionalmente repetitivos
+
+Una consulta diseñada para comparar atributos puede devolver una fila lógica
+por entidad y, a la vez, una topología compuesta por muchos componentes
+desconectados con la misma firma. La tabla resulta entonces más eficaz para
+comparar valores; esto no vuelve incorrecta a la vista de grafo, pero limita la
+pregunta relacional que puede responder.
+
+La responsabilidad se separa de la siguiente manera:
+
+- el tablero y su consulta determinan qué entidades, relaciones y caminos
+  existen en el resultado; la vista no inventa conectividad ausente;
+- RDFGISExplorer debe dibujar correctamente esa estructura, explicar su
+  repetición, conservar sus cantidades y permitir recuperar los miembros;
+- las cuatro vistas permanecen disponibles porque responden preguntas
+  complementarias: valores exactos, distribución espacial, distribución
+  temporal y estructura relacional.
+
+Por ello, Resumen no presenta cientos de copias como si fueran nodos aislados:
+las expresa mediante motivos de componentes repetidos. Los niveles Entidades y
+Entidades + relaciones recuperan la topología explícita. Esta abstracción no
+convierte una consulta atributiva en una consulta de caminos o comunidades;
+hace legible la estructura que la consulta realmente produjo.
+
 ## 4. Posibles mejoras futuras
 
 Las siguientes mejoras no forman parte de la implementación actual. Podrán
@@ -244,8 +295,8 @@ evaluarse en una fase posterior únicamente con datos representativos,
 benchmarks y tareas de usuario que justifiquen su incorporación:
 
 - Completar la selección query-aware con caminos relevantes entre entidades.
-- Agregar abanicos de hojas, grupos por variable, supernodos por clase RDF,
-  firmas de propiedades y motivos de blank nodes.
+- Agregar abanicos, conectores y cliques; supernodos generales por clase RDF y
+  firmas de propiedades.
 - Evaluar fCoSE, ELK y un empaquetamiento específico de componentes
   desconectados.
 - Incorporar semantic zoom automático con histéresis entre niveles.
@@ -283,7 +334,7 @@ comprensión (Li, Z. et al., 2024).
 
 | Riesgo | Estrategia de mitigación |
 |--------|--------------------------|
-| Clasificación RDF ausente o incorrecta | Alternativa explícita por variable o firma; nunca presentarla como clase (§3.8) |
+| Clasificación RDF ausente o incorrecta | Alternativa explícita por variable o firma; nunca presentarla como clase (§3.7) |
 | Agregados que ocultan excepciones | Conteos exactos, expansión reversible e indicadores de heterogeneidad (§3.3) |
 | Cambios de zoom impredecibles | Histéresis, transiciones y control manual (§3.5) |
 | Costo del resumen en el cliente | Funciones puras, índices, caché y eventual soporte del backend |
@@ -295,15 +346,14 @@ comprensión (Li, Z. et al., 2024).
 ## 7. Cuestiones abiertas
 
 - ¿Ofrece la fuente RDF un `rdf:type` suficientemente completo y confiable?
-- ¿Debe el resumen construirse sobre el lote visible, sobre el resultado
-  recibido, o mediante agregados del endpoint sobre el resultado completo?
+- ¿Qué tareas justificarían agregar, además del resumen vigente sobre el lote
+  visible, un resumen global calculado por el endpoint?
 - ¿Qué entidades se consideran principales en una consulta con varias
   variables de tipo URI?
 - ¿Cómo representar la membresía múltiple sin duplicar entidades?
 - ¿Qué patrones de blank nodes deben colapsarse de manera predeterminada?
 - ¿Corresponde semantic zoom automático, expansión manual, o una combinación
   de ambos?
-- ¿Qué estado de expansión debe persistirse en los tableros?
 - ¿Qué tareas reales emplearán los usuarios para evaluar la vista?
 
 Estas cuestiones deberán resolverse con conjuntos de datos representativos y
@@ -321,10 +371,12 @@ todas disponen de copia pública archivada.
   Languages and Computing, 14, 503-541.
   <https://doi.org/10.1016/S1045-926X(03)00046-6>
 - Antoniazzi, F. y Viola, F. (2018). *RDF Graph Visualization Tools: a
-  Survey*. Proceedings of the 23rd FRUCT Conference, 28-38.
+  Survey*. Proceedings of the 23rd FRUCT Conference, 25-36.
+  <https://doi.org/10.23919/FRUCT.2018.8588069>
 - Bach, B., Dragicevic, P., Archambault, D., Hurter, C. y Carpendale, S.
   (2014). *A Review of Temporal Data Visualizations Based on Space-Time Cube
   Operations*. EuroVis 2014 (STAR).
+  <https://doi.org/10.2312/eurovisstar.20141171>
 - Beck, F., Burch, M., Diehl, S. y Weiskopf, D. (2017). *A Taxonomy and Survey
   of Dynamic Graph Visualization*. Computer Graphics Forum, 36(1), 133-159.
   <https://doi.org/10.1111/cgf.12791>
@@ -338,22 +390,20 @@ todas disponen de copia pública archivada.
   <https://doi.org/10.1007/978-3-030-59833-4_5>
 - Dunne, C. y Shneiderman, B. (2013). *Motif Simplification: Improving Network
   Visualization Readability with Fan, Connector, and Clique Glyphs*.
-  **(externa)** <https://doi.org/10.1145/2470654.2466444>
+  CHI 2013, 3247-3256. **(externa)**
+  <https://doi.org/10.1145/2470654.2466444>
 - Frasincar, F., Telea, A. y Houben, G.-J. (2006). *Adapting Graph
   Visualization Techniques for the Visualization of RDF Data*. En *Visualizing
   the Semantic Web* (2nd ed.), Springer, 154-171.
 - Ghoniem, M., Fekete, J.-D. y Castagliola, P. (2004). *A Comparison of the
   Readability of Graphs Using Node-Link and Matrix-Based Representations*.
   **(externa)** <https://doi.org/10.1109/INFVIS.2004.1>
-- Guo, D., Gahegan, M., MacEachren, A. M. y Zhou, B. (2005). *Multivariate
-  Analysis and Geovisualization with an Integrated Geographic Knowledge
-  Discovery Approach*. Cartography and Geographic Information Science, 32(2),
-  113-132. <https://doi.org/10.1559/1523040053722150>
 - Hadlak, S., Schumann, H. y Schulz, H.-J. (2015). *A Survey of Multi-faceted
   Graph Visualization*. EuroVis 2015 (STAR).
   <https://doi.org/10.2312/eurovisstar.20151109>
-- Kapler, T. y Wright, W. (2004). *GeoTime Information Visualization*. IEEE
-  InfoVis 2004.
+- Kapler, T. y Wright, W. (2005). *GeoTime Information Visualization*.
+  Information Visualization, 4(2), 136-146.
+  <https://doi.org/10.1057/palgrave.ivs.9500097>
 - Li, Z., Wang, X., Wang, M., Yang, Y., Li, B. y Han, D. (2024). *VQFT: A
   Visual Query Approach Based on Full-Text Search for Knowledge Graphs*.
   PVLDB, 17(12), 4397-4400. <https://doi.org/10.14778/3685800.3685884>
@@ -387,7 +437,8 @@ todas disponen de copia pública archivada.
   Information Visualizations*. IEEE Symposium on Visual Languages.
   **(externa)** <https://doi.org/10.1109/VL.1996.545307>
 - Vargas, H., Buil-Aranda, C., Hogan, A. y López, C. (2019). *RDF Explorer: A
-  Visual SPARQL Query Builder*. ISWC 2019.
+  Visual SPARQL Query Builder*. ISWC 2019, LNCS 11778, 647-663.
+  <https://doi.org/10.1007/978-3-030-30793-6_37>
 - Wang, S., Li, W. y Gu, Z. (2023). *GeoGraphViz: Geographically constrained
   3D force-directed graph for knowledge graph visualization*. Transactions in
   GIS, 27(4), 931-948. <https://doi.org/10.1111/tgis.13053>
@@ -397,6 +448,6 @@ todas disponen de copia pública archivada.
 - Wiens, V., Lohmann, S. y Auer, S. (2017). *Semantic Zooming for Ontology
   Graph Visualizations*. K-CAP. **(externa)**
   <https://doi.org/10.1145/3148011.3148015>
-- Yacoubi, N., Graux, D. y Faron, C. (2022). *Multi-Level Visual Tours of
-  Weather Linked Data*. VOILA 2022, CEUR Workshop Proceedings, Vol. 3253,
-  52-57.
+- Yacoubi Ayadi, N., Graux, D. y Faron, C. (2022). *Multi-Level Visual Tours
+  of Weather Linked Data*. VOILA 2022, CEUR Workshop Proceedings, Vol. 3253,
+  52-57. <https://ceur-ws.org/Vol-3253/paper5.pdf>

@@ -10,8 +10,9 @@ import {
   ChangeDetectorRef,
   inject,
 } from '@angular/core';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type LotState } from '@core/services/selection.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
+import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { combineLatest, debounceTime, filter, Subject, takeUntil } from 'rxjs';
 import './leaflet-global'; // setea window.L ANTES que los plugins — ver leaflet-global.ts
 import * as L from 'leaflet';
@@ -74,6 +75,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private readonly viewportChange$ = new Subject<void>();
 
   private readonly selectionService = inject(SelectionService);
+  private readonly loadProgress = inject(DashboardLoadProgressService);
   private readonly viewState = inject(DashboardViewStateService);
   private readonly colorService = inject(EntityColorService);
   private readonly ngZone = inject(NgZone);
@@ -244,56 +246,75 @@ export class MapViewComponent implements OnInit, OnDestroy {
     ])
       .pipe(takeUntil(this.destroy$))
       .subscribe(([original, visible, activeFilters, lotState]) => {
-        this.activeFilterCount = activeFilters.length;
-        this.coverageLabel = '';
-
-        if (!original || original.nodes.length === 0) {
-          this.queryState = 'no-query';
-          this.clearMarkers();
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.originalNodeCount = original.nodes.length;
-        this.filteredNodeCount = visible?.nodes.length ?? 0;
-
-        const originalHasCoords = original.nodes.some((n) => n.coordinate);
-
-        if (!originalHasCoords) {
-          this.queryState = 'no-coords';
-          this.clearMarkers();
-          this.cdr.markForCheck();
-          return;
-        }
-
-        if (!visible || visible.nodes.length === 0) {
-          this.queryState = activeFilters.length > 0 ? 'filtered-zero' : 'no-query';
-          this.clearMarkers();
-          this.syncDrawnItems(activeFilters);
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.queryState = 'normal';
-        this.currentNodes = visible.nodes;
-        const stats = computeCoverageStats(visible);
-        if (stats.primaryWithoutCoordinate > 0) {
-          const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
-          this.coverageLabel =
-            `Mostrando ${stats.primaryWithCoordinate} de ${stats.primary} entidades${lotSuffix} · ` +
-            `${stats.primaryWithoutCoordinate} sin coordenada${stats.primaryWithoutCoordinate !== 1 ? 's' : ''}`;
-        } else {
-          this.coverageLabel = '';
-        }
-        this.renderMarkers(visible);
-        this.syncDrawnItems(activeFilters);
-        this.cdr.markForCheck();
+        this.applyResult(original, visible, activeFilters, lotState);
+        // Le avisa al cartel de carga del tablero que esta vista ya aplicó el
+        // resultado nuevo (aunque el lote no tenga coordenadas: el trabajo del
+        // mapa con estos datos terminó).
+        if (visible) this.loadProgress.reportViewRendered('map');
       });
 
     this.viewportChange$
       .pipe(takeUntil(this.destroy$), debounceTime(500))
       .subscribe(() => this.emitFocusFromViewport());
 
+    this.setupInteractionSubscriptions();
+  }
+
+  /** Vuelca en el mapa el lote visible, con sus filtros y chips de cobertura. */
+  private applyResult(
+    original: QueryResult | null,
+    visible: QueryResult | null,
+    activeFilters: Filter[],
+    lotState: LotState,
+  ): void {
+    this.activeFilterCount = activeFilters.length;
+    this.coverageLabel = '';
+
+    if (!original || original.nodes.length === 0) {
+      this.queryState = 'no-query';
+      this.clearMarkers();
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.originalNodeCount = original.nodes.length;
+    this.filteredNodeCount = visible?.nodes.length ?? 0;
+
+    const originalHasCoords = original.nodes.some((n) => n.coordinate);
+
+    if (!originalHasCoords) {
+      this.queryState = 'no-coords';
+      this.clearMarkers();
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (!visible || visible.nodes.length === 0) {
+      this.queryState = activeFilters.length > 0 ? 'filtered-zero' : 'no-query';
+      this.clearMarkers();
+      this.syncDrawnItems(activeFilters);
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.queryState = 'normal';
+    this.currentNodes = visible.nodes;
+    const stats = computeCoverageStats(visible);
+    if (stats.primaryWithoutCoordinate > 0) {
+      const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
+      this.coverageLabel =
+        `Mostrando ${stats.primaryWithCoordinate} de ${stats.primary} entidades${lotSuffix} · ` +
+        `${stats.primaryWithoutCoordinate} sin coordenada${stats.primaryWithoutCoordinate !== 1 ? 's' : ''}`;
+    } else {
+      this.coverageLabel = '';
+    }
+    this.renderMarkers(visible);
+    this.syncDrawnItems(activeFilters);
+    this.cdr.markForCheck();
+  }
+
+  /** Sincronización con las otras vistas: vista activa, foco y selección. */
+  private setupInteractionSubscriptions(): void {
     this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
       this.isActiveView = v === 'map';
       this.cdr.markForCheck();
@@ -318,14 +339,32 @@ export class MapViewComponent implements OnInit, OnDestroy {
         filter((sel: Selection) => sel.source !== 'map'),
       )
       .subscribe((sel: Selection) => {
-        // El resalte se aplica siempre, incluso si el nodo no tiene coordenada o si
+        // El resalte se aplica siempre, incluso si no hay nada que resaltar o si
         // la selección se limpió (node === null): así se apaga el marcador anterior.
-        this.applySelectionStyle(sel.node?.uri ?? null);
+        const target = this.resolveMappableNode(sel);
+        this.applySelectionStyle(target?.uri ?? null);
 
-        if (sel.node?.coordinate) {
-          this.flyToNode(sel.node);
+        if (target) {
+          this.flyToNode(target);
         }
       });
+  }
+
+  /**
+   * Qué marcador le corresponde a una selección hecha en otra vista.
+   *
+   * Si la entidad seleccionada tiene coordenada, es esa. Si no (un click en una
+   * fila de la tabla o en una ficha de la timeline suele seleccionar algo sin
+   * geometría), se usa la entidad con coordenada de su MISMA fila: es lo que el
+   * mapa sabe dibujar de esa selección. Sin esto el mapa se quedaba quieto.
+   */
+  private resolveMappableNode(sel: Selection): NormalizedNode | null {
+    if (!sel.node) return null;
+    if (sel.node.coordinate) return sel.node;
+
+    const related = sel.relatedUris;
+    if (!related || related.size === 0) return null;
+    return this.currentNodes.find((n) => n.coordinate && related.has(n.uri)) ?? null;
   }
 
   /**

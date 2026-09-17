@@ -11,13 +11,14 @@ import {
   effect,
   inject,
 } from '@angular/core';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type LotState } from '@core/services/selection.service';
+import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
 import dagre from 'cytoscape-dagre';
-import type { QueryResult, NormalizedNode, Selection } from '@shared/models';
+import type { QueryResult, NormalizedNode, Selection, Filter } from '@shared/models';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
 import { createGraphStyle } from './graph-style';
@@ -38,6 +39,15 @@ const NEW_NODE_OFFSET = 40;
 /** Ventana en la que se ignoran los eventos de viewport propios (animaciones). */
 const SUPPRESS_VIEWPORT_MS = 800;
 
+/** Margen del encuadre de la vista coordinada, en la línea del que usa el mapa. */
+const FOCUS_PADDING = 40;
+/**
+ * Piso de zoom del encuadre coordinado. Un nodo chico mide 20px, así que por
+ * debajo de esto los nodos son puntos y las etiquetas (11px) no se leen:
+ * preferimos mostrar menos nodos pero legibles. Subilo para acercar más.
+ */
+const FOCUS_MIN_ZOOM = 0.8;
+
 @Component({
   selector: 'app-graph-view',
   standalone: true,
@@ -50,12 +60,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   cy?: cytoscape.Core;
   currentLayout: GraphLayout = 'cola';
-  detailLevel: GraphDetailLevel = 'exploration';
+  detailLevel: GraphDetailLevel = 'summary';
   private expandedSuperEdgeIds = new Set<string>();
+  private expandedMotifIds = new Set<string>();
   readonly detailLevels = [
     { value: 'summary' as const, label: 'Resumen' },
-    { value: 'exploration' as const, label: 'Exploración' },
-    { value: 'detail' as const, label: 'Detalle' },
+    { value: 'exploration' as const, label: 'Entidades' },
+    { value: 'detail' as const, label: 'Entidades + relaciones' },
   ];
   readonly layoutOptions = [
     { value: 'cola' as const, label: 'cola' },
@@ -112,6 +123,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private readonly viewState = inject(DashboardViewStateService);
   private readonly colorService = inject(EntityColorService);
   private readonly limitsService = inject(LimitsService);
+  private readonly loadProgress = inject(DashboardLoadProgressService);
+  /** Entidad → id del nodo resumen que la agrupa en el lienzo actual. */
+  private readonly aggregateByMember = new Map<string, string>();
+  /** Nodo dibujado que representa la selección vigente (puede ser un resumen). */
+  private selectedDrawnUri: string | null = null;
 
   constructor(
     private selectionService: SelectionService,
@@ -133,8 +149,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const storedGraphState = this.viewState.graphState();
-    this.detailLevel = storedGraphState?.detailLevel ?? 'exploration';
+    this.detailLevel = storedGraphState?.detailLevel ?? 'summary';
     this.expandedSuperEdgeIds = new Set(storedGraphState?.expandedSuperEdgeIds ?? []);
+    this.expandedMotifIds = new Set(storedGraphState?.expandedMotifIds ?? []);
     this.initResizeObserver();
     this.bindContainerListeners();
 
@@ -146,34 +163,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     ])
       .pipe(takeUntil(this.destroy$))
       .subscribe(([original, visible, filters, lotState]) => {
-        this.activeFilterCount = filters.length;
-        this.coverageLabel = '';
-        this.indexNodes(original, visible);
-
-        if (!visible || visible.nodes.length === 0) {
-          if (!original || original.nodes.length === 0) {
-            this.queryState = 'no-query';
-          } else if (filters.length > 0) {
-            this.queryState = 'filtered-zero';
-            this.originalNodeCount = original.nodes.length;
-          } else {
-            this.queryState = 'no-query';
-          }
-          this.destroyGraph();
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.filteredNodeCount = visible.nodes.length;
-        this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
-        this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
-        this.lastVisibleResult = visible;
-        this.lastLotState = { lotCount: lotState.lotCount, currentLot: lotState.currentLot };
-
-        const built = this.buildElements(visible);
-        this.coverageLabel = this.buildCoverageLabel(built, visible, lotState.lotCount, lotState.currentLot);
-        this.syncGraph(built);
-        this.cdr.markForCheck();
+        this.applyResult(original, visible, filters, lotState);
+        // Cartel de carga: los elementos ya están en Cytoscape (el layout puede
+        // seguir acomodándolos, pero el grafo ya se ve).
+        if (visible) this.loadProgress.reportViewRendered('graph');
       });
 
     this.selectionService.selectedNode$
@@ -187,11 +180,19 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           // Un clear externo (p. ej. desde otra vista) también limpia el
           // resalte; antes solo se actuaba cuando había nodo y las clases
           // is-selected/is-dimmed quedaban pintadas.
+          this.selectedDrawnUri = null;
           this.clearFocusClasses();
           return;
         }
-        this.panToNode(sel.node.uri);
-        this.applyFocusContext(sel.node.uri);
+        const uri = this.resolveDrawnUri(sel);
+        // Se recuerda para poder re-marcarlo cuando llegue un foco coordinado.
+        this.selectedDrawnUri = uri;
+        if (!uri) {
+          this.clearFocusClasses();
+          return;
+        }
+        this.panToNode(uri);
+        this.applyFocusContext(uri);
       });
 
     this.viewportChange$
@@ -283,6 +284,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * cámara en cada click.
    */
   private syncGraph(built: BuiltGraph): void {
+    this.indexAggregates(built.elements);
     const key = this.topologyKey(built.elements);
 
     if (!this.cy) {
@@ -311,16 +313,20 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.currentLayout = storedLayout && storedLayout in LAYOUT_CONFIGS
       ? (storedLayout as GraphLayout)
       : defaultLayout;
-    this.detailLevel = stored?.detailLevel ?? 'exploration';
+    this.detailLevel = stored?.detailLevel ?? 'summary';
     this.expandedSuperEdgeIds = new Set(stored?.expandedSuperEdgeIds ?? []);
+    this.expandedMotifIds = new Set(stored?.expandedMotifIds ?? []);
 
     this.cy = cytoscape({
       container: this.container.nativeElement,
       elements,
-       style: createGraphStyle(this.colorService, () => false, () => this.detailLevel),
+      style: createGraphStyle(this.colorService, () => false, () => this.detailLevel),
       // Antes acá iba `defaultLayout` mientras currentLayout venía del estado
       // guardado: el dropdown decía una cosa y el grafo dibujaba otra.
-      layout: this.getLayoutOptions(this.currentLayout),
+      // El layout real se ejecuta después de registrar `layoutstop`: con
+      // `animate: false` puede terminar sincrónicamente durante el constructor
+      // y se perdería el fit/restaurado de cámara.
+      layout: { name: 'preset' },
       // No pasar wheelSensitivity: el default ya es 1 y Cytoscape >= 3.31
       // normaliza el scroll por deltaMode (fix para Firefox/Linux integrado).
       // Definir la opción, incluso en 1.0, solo dispara el warning de consola.
@@ -344,6 +350,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     this.cy.on('layoutstop', () => this.onLayoutStop());
     this.bindGraphEvents();
+    // Calcular primero la geometría final evita que los componentes pequeños
+    // queden visualmente superpuestos al animar desde la posición (0,0).
+    this.cy.layout(this.getInitialLayoutOptions(this.currentLayout)).run();
   }
 
   private onLayoutStop(): void {
@@ -521,6 +530,103 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   // Construcción de elementos y chip
   // ---------------------------------------------------------------------------
 
+  /**
+   * Índice entidad → nodo resumen que la representa.
+   *
+   * Los niveles de detalle colapsan componentes repetidos en un nodo sintético
+   * (`component-motif:…`) que NO es una entidad del resultado: lleva en
+   * `memberNodeIds` las que agrupa. Sin este índice, una selección hecha en
+   * otra vista sobre una entidad colapsada no encontraba nada que resaltar.
+   */
+  private indexAggregates(elements: cytoscape.ElementDefinition[]): void {
+    this.aggregateByMember.clear();
+    for (const element of elements) {
+      const data = element.data as {
+        id?: string;
+        aggregate?: boolean;
+        memberNodeIds?: string[];
+      };
+      if (!data?.aggregate || !data.id || !data.memberNodeIds) continue;
+      for (const member of data.memberNodeIds) {
+        if (!this.aggregateByMember.has(member)) this.aggregateByMember.set(member, data.id);
+      }
+    }
+  }
+
+  /**
+   * Qué nodo dibujado le corresponde a una selección hecha en otra vista.
+   *
+   * El grafo no dibuja todo: el lote recorta por cantidad de nodos y los
+   * niveles de detalle agrupan en motivos. Se busca, en este orden:
+   *   1. la entidad seleccionada, si está dibujada;
+   *   2. el nodo resumen que la contiene ("está acá adentro");
+   *   3. otra entidad de su misma fila que sí esté dibujada;
+   *   4. el resumen que contenga a alguna de esas.
+   * Mostrar el grupo que la contiene es más fiel que saltar a un pariente.
+   */
+  private resolveDrawnUri(sel: Selection): string | null {
+    if (!this.cy || !sel.node) return null;
+
+    const drawn = (id: string | undefined): string | null =>
+      id && this.cy!.getElementById(id).nonempty() ? id : null;
+
+    const exact = drawn(sel.node.uri) ?? drawn(this.aggregateByMember.get(sel.node.uri));
+    if (exact) return exact;
+
+    const related = [...(sel.relatedUris ?? [])];
+    for (const uri of related) {
+      const hit = drawn(uri);
+      if (hit) return hit;
+    }
+    for (const uri of related) {
+      const hit = drawn(this.aggregateByMember.get(uri));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  /** Vuelca en Cytoscape el lote visible, con su chip de cobertura. */
+  private applyResult(
+    original: QueryResult | null,
+    visible: QueryResult | null,
+    filters: Filter[],
+    lotState: LotState,
+  ): void {
+    this.activeFilterCount = filters.length;
+    this.coverageLabel = '';
+    this.indexNodes(original, visible);
+
+    if (!visible || visible.nodes.length === 0) {
+      if (!original || original.nodes.length === 0) {
+        this.queryState = 'no-query';
+      } else if (filters.length > 0) {
+        this.queryState = 'filtered-zero';
+        this.originalNodeCount = original.nodes.length;
+      } else {
+        this.queryState = 'no-query';
+      }
+      this.destroyGraph();
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.filteredNodeCount = visible.nodes.length;
+    this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
+    this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
+    this.lastVisibleResult = visible;
+    this.lastLotState = { lotCount: lotState.lotCount, currentLot: lotState.currentLot };
+
+    const built = this.buildElements(visible);
+    this.coverageLabel = this.buildCoverageLabel(
+      built,
+      visible,
+      lotState.lotCount,
+      lotState.currentLot,
+    );
+    this.syncGraph(built);
+    this.cdr.markForCheck();
+  }
+
   private indexNodes(original: QueryResult | null, visible: QueryResult | null): void {
     this.nodeIndex.clear();
     for (const node of original?.nodes ?? []) this.nodeIndex.set(node.uri, node);
@@ -542,13 +648,22 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       maxNodes: this.MAX_NODES,
       pinnedUris: selected ? [selected.uri] : [],
       expandedSuperEdgeIds: [...this.expandedSuperEdgeIds],
+      detailLevel: this.detailLevel,
+      expandedMotifIds: [...this.expandedMotifIds],
     });
   }
 
   setDetailLevel(level: GraphDetailLevel): void {
+    if (level === this.detailLevel) return;
     this.detailLevel = level;
     this.persistGraphState();
-    this.cy?.style().update();
+    if (this.cy && this.lastVisibleResult) {
+      const visible = this.lastVisibleResult;
+      this.destroyGraph();
+      this.syncGraph(this.buildElements(visible));
+    } else {
+      this.cy?.style().update();
+    }
     this.cdr.markForCheck();
   }
 
@@ -590,11 +705,21 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       parts.push(`Lote ${currentLot} de ${lotCount} · ${visible.bindings.length} filas`);
     }
 
-    if (built.totalNodes > built.drawnNodes) {
+    if (built.motifCount > 0) {
+      const motifWord = built.motifCount === 1 ? 'motivo repetido' : 'motivos repetidos';
+      parts.push(
+        `${built.abstractedNodes} nodos representados en ${built.motifCount} ${motifWord}`,
+      );
+    }
+
+    const explicitDrawnNodes = built.drawnNodes - built.aggregateNodes;
+    const representedOriginalNodes = built.abstractedNodes + explicitDrawnNodes;
+    if (built.totalNodes > representedOriginalNodes) {
       const prioritized =
         built.inclusionReasons.selected + built.inclusionReasons['query-entity'];
+      const coverageNoun = built.motifCount > 0 ? 'representados' : 'visibles';
       parts.push(
-        `${built.drawnNodes} de ${built.totalNodes} nodos visibles` +
+        `${representedOriginalNodes} de ${built.totalNodes} nodos ${coverageNoun}` +
           (prioritized ? ` · ${prioritized} priorizados por la query` : ''),
       );
       if (built.edgesHiddenByTruncation > 0) {
@@ -621,11 +746,35 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           this.selectionService.select(nodeData, 'graph');
         });
       }
+      // La suscripción a selectedNode$ descarta lo propio (source 'graph'), así
+      // que el nodo marcado se recuerda acá para que un foco coordinado
+      // posterior no se lo lleve puesto.
+      this.selectedDrawnUri = nodeUri;
       this.applyFocusContext(nodeUri);
     });
 
     this.cy.on('tap', 'edge', (evt) => {
       const edge = evt.target;
+      const motifId = edge.data('motifId') as string | undefined;
+      if (motifId) {
+        if (this.expandedMotifIds.has(motifId)) this.expandedMotifIds.delete(motifId);
+        else this.expandedMotifIds.add(motifId);
+        this.persistGraphState();
+        if (this.lastVisibleResult) {
+          const visible = this.lastVisibleResult;
+          const built = this.buildElements(visible);
+          this.coverageLabel = this.buildCoverageLabel(
+            built,
+            visible,
+            this.lastLotState.lotCount,
+            this.lastLotState.currentLot,
+          );
+          this.destroyGraph();
+          this.syncGraph(built);
+          this.cdr.markForCheck();
+        }
+        return;
+      }
       const id = (edge.data('superEdgeId') as string | undefined) ??
         (edge.data('aggregate') ? edge.id() : undefined);
       if (!id) return;
@@ -655,6 +804,20 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       const edge = evt.target;
       const multiplicity = (edge.data('multiplicity') as number) ?? 1;
       const predicates = (edge.data('predicates') as string[] | undefined) ?? [];
+      const motifId = edge.data('motifId') as string | undefined;
+      if (motifId && edge.data('aggregateKind') === 'repeated-component-edge') {
+        const componentCount = (edge.data('componentCount') as number) ?? multiplicity;
+        this.showTooltip(
+          `${componentCount} componentes con el mismo patrón · ${multiplicity} relaciones · click para expandir`,
+        );
+        return;
+      }
+      if (motifId) {
+        this.showTooltip(
+          `${(edge.data('predicateLabel') as string) || (edge.data('predicate') as string)} · click para contraer el motivo`,
+        );
+        return;
+      }
       if (multiplicity > 1) {
         this.showTooltip(
           `${multiplicity} relaciones: ${predicates.join(', ')} · click para expandir`,
@@ -808,7 +971,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   private clearFocusClasses(): void {
-    this.cy?.elements().removeClass('is-dimmed is-selected is-focus-edge');
+    this.cy?.elements().removeClass('is-dimmed is-muted is-selected is-focus-edge');
   }
 
   private applyExternalFocus(uris: ReadonlySet<string>): void {
@@ -823,11 +986,53 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy.elements().difference(matched).addClass('is-dimmed');
     matched.connectedEdges().removeClass('is-dimmed').addClass('is-focus-edge');
 
+    // El foco coordinado no puede borrar la selección: se vuelve a marcar y el
+    // resto del foco baja de opacidad. Antes `clearFocusClasses` se la llevaba
+    // puesta y, con decenas de nodos enfocados, el seleccionado se perdía.
+    const selected = this.selectedDrawnUri ? this.cy.getElementById(this.selectedDrawnUri) : null;
+    if (selected?.nonempty()) {
+      matched.difference(selected).addClass('is-muted');
+      selected.removeClass('is-muted is-dimmed').addClass('is-selected');
+    }
+
     if (this.allInsideViewport(matched)) return;
 
     this.suppressViewport();
-    this.cy.animate({
-      fit: { eles: matched, padding: 60 },
+    this.frameFocus(matched);
+  }
+
+  /**
+   * Encuadra los nodos enfocados por la vista coordinada, pero sin alejarse
+   * tanto que dejen de leerse.
+   *
+   * Con `fit` a secas el grafo quedaba inservible: el foco que mandan el mapa y
+   * la timeline es todo lo que entra en SU viewport (decenas de entidades más
+   * sus vecinos), y encuadrarlas a todas dejaba los nodos como puntos sin
+   * etiqueta. Ahora el encuadre tiene un piso de zoom: si entrar todos exige
+   * alejarse por debajo de ese piso, se prioriza que se lea y quedan nodos
+   * fuera de pantalla.
+   */
+  private frameFocus(nodes: cytoscape.NodeCollection): void {
+    const cy = this.cy;
+    if (!cy) return;
+
+    const bb = nodes.boundingBox();
+    const width = cy.width();
+    const height = cy.height();
+    const usableWidth = Math.max(1, width - 2 * FOCUS_PADDING);
+    const usableHeight = Math.max(1, height - 2 * FOCUS_PADDING);
+
+    // Mismo cálculo que hace `fit`, para no cambiar el encuadre cuando ya alcanza.
+    const fitZoom = Math.min(usableWidth / Math.max(bb.w, 1), usableHeight / Math.max(bb.h, 1));
+    const zoom = Math.min(Math.max(fitZoom, FOCUS_MIN_ZOOM), cy.maxZoom());
+
+    const centerX = (bb.x1 + bb.x2) / 2;
+    const centerY = (bb.y1 + bb.y2) / 2;
+
+    cy.animate({
+      zoom,
+      // rendered = modelo * zoom + pan: así el centro del foco queda centrado.
+      pan: { x: width / 2 - centerX * zoom, y: height / 2 - centerY * zoom },
       duration: 600,
     });
   }
@@ -906,10 +1111,30 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       ...(this.expandedSuperEdgeIds.size > 0
         ? { expandedSuperEdgeIds: [...this.expandedSuperEdgeIds] }
         : {}),
+      ...(this.expandedMotifIds.size > 0
+        ? { expandedMotifIds: [...this.expandedMotifIds] }
+        : {}),
     });
   }
 
   private getLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {
     return LAYOUT_CONFIGS[layout]?.options ?? LAYOUT_CONFIGS['cola'].options;
+  }
+
+  private getInitialLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {
+    if (layout === 'cola') {
+      return {
+        ...(this.getLayoutOptions(layout) as unknown as Record<string, unknown>),
+        // webcola con `animate: false` resuelve su simulación sincrónicamente y
+        // puede bloquear el hilo principal. Además, partir todos los nodos de
+        // (0,0) reproduce el solapamiento observado en componentes pequeños.
+        animate: true,
+        randomize: true,
+      } as unknown as cytoscape.LayoutOptions;
+    }
+    return {
+      ...(this.getLayoutOptions(layout) as unknown as Record<string, unknown>),
+      animate: false,
+    } as unknown as cytoscape.LayoutOptions;
   }
 }

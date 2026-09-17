@@ -16,7 +16,9 @@ import { SelectionService } from './selection.service';
 import { SparqlQueryStateService } from './sparql-query-state.service';
 import { DashboardViewStateService } from './dashboard-view-state.service';
 import { ApiService } from './api.service';
-import type { NormalizedNode } from '@shared/models';
+import { DashboardLoadProgressService } from './dashboard-load-progress.service';
+import type { LoadStageId } from '@shared/progress/load-stages';
+import type { NormalizedNode, QueryResult } from '@shared/models';
 
 const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad'> = {
   1: 'single',
@@ -24,6 +26,26 @@ const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'triple' | 'tr
   3: 'triple',
   4: 'quad',
 };
+
+/** Etapas del pipeline de hidratación, en el orden en que se muestran. */
+const HYDRATION_STAGES: readonly LoadStageId[] = [
+  'fetch-dashboard',
+  'execute-query',
+  'process-results',
+  'summary',
+  'render-views',
+];
+
+/** Lo que el usuario quiere saber de la respuesta: volumen y tiempo del endpoint. */
+function describeResult(result: QueryResult): string {
+  const rows = result.bindings.length;
+  const parts = [
+    `${rows} fila${rows !== 1 ? 's' : ''}`,
+    `endpoint ${result.meta.durationMs} ms`,
+  ];
+  if (result.meta.truncated) parts.push(`truncado a ${result.meta.limitApplied}`);
+  return parts.join(' · ');
+}
 
 @Injectable({ providedIn: 'root' })
 export class DashboardPersistenceService {
@@ -33,10 +55,16 @@ export class DashboardPersistenceService {
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly viewState = inject(DashboardViewStateService);
   private readonly apiService = inject(ApiService);
+  private readonly progress = inject(DashboardLoadProgressService);
   private readonly snackBar = inject(MatSnackBar);
 
   readonly currentDashboardId = signal<string | null>(null);
   readonly currentDashboardName = signal<string | null>(null);
+  /**
+   * Hidratación de DATOS en curso. El cartel de carga no se guía por este flag
+   * sino por `DashboardLoadProgressService`: sigue visible un poco más, hasta
+   * que las vistas terminan de pintar.
+   */
   readonly isHydrating = signal(false);
   readonly isDirty = signal(false);
 
@@ -120,13 +148,27 @@ export class DashboardPersistenceService {
       this.viewState.graphState.set(payload.filters.graph);
     }
 
+    this.progress.complete('fetch-dashboard', this.layoutDetail());
+    this.progress.start('execute-query', 'esperando la respuesta del endpoint SPARQL');
+
     return this.apiService
       .executeQuery({
         sparql: payload.query,
       })
       .pipe(
         tap((result) => {
+          this.progress.complete('execute-query', describeResult(result));
+          this.progress.start(
+            'process-results',
+            `${result.nodes.length} nodos · ${result.edges.length} aristas`,
+          );
+          // Las vistas del layout tienen que pintar antes de dar por cargado el
+          // tablero; el fan-out de SelectionService es SINCRÓNICO, así que hay
+          // que declararlas antes de publicar el resultado.
+          this.progress.expectViews(this.layout.visibleSlots());
           this.selection.setQueryResult(result);
+          // Si ninguna vista reportó (ningún slot montado), la etapa se cierra acá.
+          this.progress.complete('process-results');
         }),
         switchMap(() => {
           if (payload.selection) {
@@ -147,6 +189,7 @@ export class DashboardPersistenceService {
         }),
         catchError((err) => {
           this.isHydrating.set(false);
+          this.progress.failActive('query inválida o backend no disponible');
           this.snackBar.open(
             'Error al hidratar el dashboard. Query inválida o backend no disponible.',
             'Cerrar',
@@ -208,6 +251,9 @@ export class DashboardPersistenceService {
   }
 
   load(id: string): Observable<void> {
+    this.progress.begin('Cargando tablero', HYDRATION_STAGES);
+    this.progress.start('fetch-dashboard', 'leyendo la definición guardada');
+
     return this.api.get(id).pipe(
       switchMap((dashboard) => {
         if (dashboard.kind !== 'gis') {
@@ -215,9 +261,11 @@ export class DashboardPersistenceService {
         }
         this.currentDashboardId.set(dashboard.id);
         this.currentDashboardName.set(dashboard.name);
+        this.progress.setSubtitle(dashboard.name);
         return this.deserialize(dashboard.payload as GisDashboardPayload);
       }),
       catchError((err) => {
+        this.progress.failActive('no se pudo cargar el tablero');
         this.snackBar.open('No se pudo cargar el dashboard.', 'Cerrar', {
           duration: 5000,
           panelClass: 'snackbar-error',
@@ -234,6 +282,12 @@ export class DashboardPersistenceService {
     const url = new URL(window.location.href);
     url.searchParams.delete('dashboardId');
     window.history.replaceState({}, '', url.toString());
+  }
+
+  /** Lo que se restauró antes de salir a buscar los datos. */
+  private layoutDetail(): string {
+    const count = this.layout.visibleSlots().length;
+    return `layout y filtros restaurados · ${count} vista${count !== 1 ? 's' : ''}`;
   }
 
   private findNodeByUri(uri: string): NormalizedNode | null {
