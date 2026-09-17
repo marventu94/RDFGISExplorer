@@ -4,6 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom, Observable } from 'rxjs';
 import { dashboardRedirectGuard } from './dashboard-redirect.guard';
+import { GisOpenGuardService, type OpenDecision } from './gis-open-guard.service';
 import type { Dashboard } from './dashboard.model';
 
 describe('dashboardRedirectGuard', () => {
@@ -28,9 +29,29 @@ describe('dashboardRedirectGuard', () => {
     updatedAt: '2025-01-01T00:00:00Z',
   };
 
+  // El aviso de "vas a pisar lo que hay en GIS" se stubea: su contenido se
+  // prueba en gis-open-guard.service.spec.ts. Acá importa a dónde se navega.
+  let decision: OpenDecision;
+  let asked: { id: string; name: string } | null;
+
   beforeEach(() => {
+    decision = 'proceed';
+    asked = null;
+
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: GisOpenGuardService,
+          useValue: {
+            askBeforeOpen: (id: string, name: string) => {
+              asked = { id, name };
+              return Promise.resolve(decision);
+            },
+          },
+        },
+      ],
     });
     router = TestBed.inject(Router);
     httpMock = TestBed.inject(HttpTestingController);
@@ -66,6 +87,44 @@ describe('dashboardRedirectGuard', () => {
     httpMock.expectOne('/api/dashboards/dash-2').flush(explorerDashboard);
     const urlTree = await promise;
     expect(router.serializeUrl(urlTree as UrlTree)).toBe('/explorer?workspaceId=dash-2');
+  });
+
+  it('asks before opening a gis dashboard, naming the one being opened', async () => {
+    const promise = getGuardResult('dash-1');
+    httpMock.expectOne('/api/dashboards/dash-1').flush(gisDashboard);
+    await promise;
+    expect(asked).toEqual({ id: 'dash-1', name: 'GIS Dashboard' });
+  });
+
+  it('cancels the navigation when the user backs out', async () => {
+    decision = 'cancel';
+    const promise = getGuardResult('dash-1');
+    httpMock.expectOne('/api/dashboards/dash-1').flush(gisDashboard);
+    expect(await promise).toBe(false);
+  });
+
+  it('goes to gis without dashboardId when the user wants to save first', async () => {
+    decision = 'go-save';
+    const promise = getGuardResult('dash-1');
+    httpMock.expectOne('/api/dashboards/dash-1').flush(gisDashboard);
+    const urlTree = await promise;
+    // Sin dashboardId no se rehidrata nada: el tablero abierto sigue en pantalla.
+    expect(router.serializeUrl(urlTree as UrlTree)).toBe('/gis');
+  });
+
+  it('opens the dashboard when the user confirms the replacement', async () => {
+    decision = 'proceed-confirmed';
+    const promise = getGuardResult('dash-1');
+    httpMock.expectOne('/api/dashboards/dash-1').flush(gisDashboard);
+    const urlTree = await promise;
+    expect(router.serializeUrl(urlTree as UrlTree)).toBe('/gis?dashboardId=dash-1');
+  });
+
+  it('does not ask anything for explorer workspaces', async () => {
+    const promise = getGuardResult('dash-2');
+    httpMock.expectOne('/api/dashboards/dash-2').flush(explorerDashboard);
+    await promise;
+    expect(asked).toBeNull();
   });
 
   it('redirects to / with snackbar on 404', async () => {
