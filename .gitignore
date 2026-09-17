@@ -4,6 +4,7 @@ dist/
 *.db
 data/
 .env.graphdb
+.env.evaluation.local
 .env.local
 .angular/cache/
 coverage/
