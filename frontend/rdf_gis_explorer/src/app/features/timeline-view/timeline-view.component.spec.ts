@@ -540,6 +540,83 @@ describe('TimelineViewComponent', () => {
       );
     });
 
+    /**
+     * El mapa selecciona la entidad con coordenada y la tabla la de la fila:
+     * casi nunca son la que tiene las fechas. Sin resolver por fila, la
+     * timeline se quedaba quieta ante cualquier click de las otras vistas.
+     */
+    it('should select the dated entity of the same row when the selected one has no dates', () => {
+      const result = createMockQueryResult([nodeWithoutDates, nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      timelineMock.instance.setSelection.mockClear();
+
+      selectedNodeSubject.next({
+        node: nodeWithoutDates,
+        source: 'map',
+        relatedUris: new Set([nodeWithoutDates.uri, nodeWithOneDate.uri]),
+      });
+      fixture.detectChanges();
+
+      expect(timelineMock.instance.setSelection).toHaveBeenCalledWith([nodeWithOneDate.uri]);
+    });
+
+    /**
+     * Regresión: seleccionar reemite el resultado visible (el lote inyecta el
+     * nodo pineado) y `renderItems` rehace los items desde cero, apagando la
+     * ficha recién marcada — incluida la que el usuario clickeó acá.
+     */
+    it('should keep the selected item marked after the items are rebuilt', () => {
+      const result = createMockQueryResult([nodeWithDates, nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      selectedNodeSubject.next({ node: nodeWithOneDate, source: 'map' });
+      fixture.detectChanges();
+      timelineMock.instance.setSelection.mockClear();
+
+      // Re-render: mismo resultado, objeto nuevo (como el que dispara el pin).
+      filteredQueryResultSubject.next({ ...result });
+      fixture.detectChanges();
+
+      expect(timelineMock.instance.setSelection).toHaveBeenCalledWith([nodeWithOneDate.uri]);
+    });
+
+    it('should keep its own click marked after the rebuild it triggers', () => {
+      const result = createMockQueryResult([nodeWithDates, nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      timelineMock.instance.simulateSelect([nodeWithOneDate.uri]);
+      timelineMock.instance.setSelection.mockClear();
+
+      filteredQueryResultSubject.next({ ...result });
+      fixture.detectChanges();
+
+      expect(timelineMock.instance.setSelection).toHaveBeenCalledWith([nodeWithOneDate.uri]);
+    });
+
+    it('should stay put when nothing in the selected row has dates', () => {
+      const result = createMockQueryResult([nodeWithoutDates]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+
+      timelineMock.instance.setSelection.mockClear();
+
+      selectedNodeSubject.next({
+        node: nodeWithoutDates,
+        source: 'map',
+        relatedUris: new Set([nodeWithoutDates.uri]),
+      });
+      fixture.detectChanges();
+
+      expect(timelineMock.instance.setSelection).not.toHaveBeenCalled();
+    });
   });
 
   describe('temporal filter', () => {

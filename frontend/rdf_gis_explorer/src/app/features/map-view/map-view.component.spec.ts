@@ -420,6 +420,66 @@ describe('MapViewComponent', () => {
         expect(component['destroy$'].observed).toBeFalsy();
       });
     });
+
+    /**
+     * La tabla y la timeline seleccionan entidades que casi nunca tienen
+     * geometría propia (el aviso, la ficha temporal). Sin resolver por fila el
+     * mapa se quedaba sin resaltar nada.
+     */
+    describe('external selection', () => {
+      /** Marcador falso: `eachLayer` del cluster mockeado no recorre nada solo. */
+      function stubMarkerFor(node: NormalizedNode): { setStyle: ReturnType<typeof vi.fn> } {
+        const marker = {
+          _node: node,
+          setStyle: vi.fn(),
+          getLatLng: () => ({ lat: 0, lng: 0 }),
+        };
+        const cluster = component['clusterGroup'] as unknown as {
+          eachLayer: ReturnType<typeof vi.fn>;
+        };
+        cluster.eachLayer.mockImplementation((cb: (layer: unknown) => void) => cb(marker));
+        return marker;
+      }
+
+      it('highlights the entity with coordinate of the same row', () => {
+        const result = createMockQueryResult([mockNode, mockNodeNoCoord]);
+        queryResultSubject.next(result);
+        filteredSubject.next(result);
+        fixture.detectChanges();
+
+        const marker = stubMarkerFor(mockNode);
+
+        selectedNodeSubject.next({
+          node: mockNodeNoCoord,
+          source: 'table',
+          relatedUris: new Set([mockNodeNoCoord.uri, mockNode.uri]),
+        });
+
+        // Se resalta el marcador relacionado con el estilo de seleccionado.
+        expect(marker.setStyle).toHaveBeenCalledWith(
+          expect.objectContaining({ fillColor: '#2196f3' }),
+        );
+      });
+
+      it('leaves every marker in its base style when the row has nothing mappable', () => {
+        const result = createMockQueryResult([mockNode, mockNodeNoCoord]);
+        queryResultSubject.next(result);
+        filteredSubject.next(result);
+        fixture.detectChanges();
+
+        const marker = stubMarkerFor(mockNode);
+
+        selectedNodeSubject.next({
+          node: mockNodeNoCoord,
+          source: 'table',
+          relatedUris: new Set([mockNodeNoCoord.uri]),
+        });
+
+        expect(marker.setStyle).not.toHaveBeenCalledWith(
+          expect.objectContaining({ fillColor: '#2196f3' }),
+        );
+      });
+    });
   });
 
   describe('scroll to editor', () => {

@@ -51,6 +51,27 @@ function createMockQueryResult(
   };
 }
 
+function createRepeatedPairResult(count = 2): QueryResult {
+  const nodes = Array.from({ length: count }, (_, index) => [
+    { uri: `listing-${index}`, label: `listing-${index}`, queryVariable: 'listing', attributes: {} },
+    { uri: `estate-${index}`, label: `estate-${index}`, queryVariable: 'realEstate', attributes: {} },
+  ]).flat() as NormalizedNode[];
+  const edges = Array.from({ length: count }, (_, index) => ({
+    id: `about-${index}`,
+    source: `listing-${index}`,
+    target: `estate-${index}`,
+    predicate: 'http://rdfs.org/sioc/ns#about',
+    predicateLabel: 'about',
+  }));
+  return {
+    ...createMockQueryResult(nodes, edges),
+    bindings: Array.from({ length: count }, (_, index) => ({
+      listing: { type: 'uri' as const, value: `listing-${index}` },
+      realEstate: { type: 'uri' as const, value: `estate-${index}` },
+    })),
+  };
+}
+
 // vi.hoisted: la factory de vi.mock se hoistea y no ve el scope del módulo;
 // esto hace que los helpers existan tanto para la factory como para los tests.
 // El mock guarda estado real (elementos, clases, posiciones, handlers) porque los
@@ -145,9 +166,15 @@ const { createMockCy, cyRegistry } = vi.hoisted(() => {
           }
           return items[0]?.position ?? { x: 0, y: 0 };
         },
+        // Unión de las cajas de TODOS los elementos: el encuadre de la vista
+        // coordinada se calcula sobre la colección enfocada, no sobre uno.
         boundingBox: () => {
-          const p = items[0]?.position ?? { x: 0, y: 0 };
-          return { x1: p.x - 5, x2: p.x + 5, y1: p.y - 5, y2: p.y + 5, w: 10, h: 10 };
+          const points = items.length ? items.map((it) => it.position) : [{ x: 0, y: 0 }];
+          const x1 = Math.min(...points.map((p) => p.x)) - 5;
+          const x2 = Math.max(...points.map((p) => p.x)) + 5;
+          const y1 = Math.min(...points.map((p) => p.y)) - 5;
+          const y2 = Math.max(...points.map((p) => p.y)) + 5;
+          return { x1, x2, y1, y2, w: x2 - x1, h: y2 - y1 };
         },
         lock: () => {
           items.forEach((it) => (it.locked = true));
@@ -206,6 +233,12 @@ const { createMockCy, cyRegistry } = vi.hoisted(() => {
       },
       destroy: vi.fn(),
       resize: vi.fn(),
+      // Viewport: el encuadre de la vista coordinada calcula el zoom a mano
+      // (piso de zoom), así que necesita medidas y el tope de zoom reales.
+      width: () => 800,
+      height: () => 600,
+      maxZoom: () => 5,
+      minZoom: () => 0.05,
       fit: vi.fn(),
       center: vi.fn(),
       animate: vi.fn(),
@@ -416,6 +449,170 @@ describe('GraphViewComponent', () => {
 
   it('should have cola as default layout', () => {
     expect(component.currentLayout).toBe('cola');
+  });
+
+  it('calcula la disposición inicial sin animar desde posiciones superpuestas', () => {
+    emitResult([mockNode, mockNode2], [mockEdge]);
+
+    const cy = lastCy();
+    const bootstrapLayout = cy._options['layout'] as Record<string, unknown>;
+
+    expect(bootstrapLayout['name']).toBe('preset');
+    expect(cy._layoutRuns[0]?.['animate']).toBe(false);
+  });
+
+  it('inicia Cola con posiciones aleatorias sin bloquear el hilo principal', () => {
+    const reverseEdge: NormalizedEdge = {
+      id: 'edge-2',
+      source: mockNode2.uri,
+      target: mockNode.uri,
+      predicate: 'http://example.org/reverse',
+    };
+
+    emitResult([mockNode, mockNode2], [mockEdge, reverseEdge]);
+
+    const initialLayout = lastCy()._layoutRuns[0];
+    expect(initialLayout?.['name']).toBe('cola');
+    expect(initialLayout?.['animate']).toBe(true);
+    expect(initialLayout?.['randomize']).toBe(true);
+  });
+
+  it('inicia en Resumen y el selector refleja el nivel activo', () => {
+    emitResult([mockNode, mockNode2], [mockEdge]);
+    fixture.detectChanges();
+
+    const select = fixture.nativeElement.querySelector('#graph-detail') as HTMLSelectElement;
+    expect(component.detailLevel).toBe('summary');
+    expect(select.value).toBe('summary');
+  });
+
+  it('Resumen construye un único motivo para pares estructuralmente repetidos', () => {
+    const nodes = Array.from({ length: 3 }, (_, index) => [
+      { uri: `listing-${index}`, label: `listing-${index}`, queryVariable: 'listing', attributes: {} },
+      { uri: `estate-${index}`, label: `estate-${index}`, queryVariable: 'realEstate', attributes: {} },
+    ]).flat() as NormalizedNode[];
+    const edges = Array.from({ length: 3 }, (_, index) => ({
+      id: `about-${index}`,
+      source: `listing-${index}`,
+      target: `estate-${index}`,
+      predicate: 'http://rdfs.org/sioc/ns#about',
+      predicateLabel: 'about',
+    }));
+    const result: QueryResult = {
+      ...createMockQueryResult(nodes, edges),
+      bindings: Array.from({ length: 3 }, (_, index) => ({
+        listing: { type: 'uri' as const, value: `listing-${index}` },
+        realEstate: { type: 'uri' as const, value: `estate-${index}` },
+      })),
+    };
+
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+
+    expect(lastCy()._ids().filter((id: string) => id.includes('component-motif'))).toHaveLength(3);
+    expect(component.coverageLabel).toBe('6 nodos representados en 1 motivo repetido');
+  });
+
+  it('Exploración reemplaza el motivo por sus entidades originales', () => {
+    const nodes = Array.from({ length: 2 }, (_, index) => [
+      { uri: `listing-${index}`, label: `listing-${index}`, queryVariable: 'listing', attributes: {} },
+      { uri: `estate-${index}`, label: `estate-${index}`, queryVariable: 'realEstate', attributes: {} },
+    ]).flat() as NormalizedNode[];
+    const edges = Array.from({ length: 2 }, (_, index) => ({
+      id: `about-${index}`,
+      source: `listing-${index}`,
+      target: `estate-${index}`,
+      predicate: 'http://rdfs.org/sioc/ns#about',
+    }));
+    const result: QueryResult = {
+      ...createMockQueryResult(nodes, edges),
+      bindings: Array.from({ length: 2 }, (_, index) => ({
+        listing: { type: 'uri' as const, value: `listing-${index}` },
+        realEstate: { type: 'uri' as const, value: `estate-${index}` },
+      })),
+    };
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+
+    component.setDetailLevel('exploration');
+
+    expect(lastCy()._ids()).toContain('listing-0');
+    expect(lastCy()._ids().some((id: string) => id.includes('component-motif'))).toBe(false);
+  });
+
+  /**
+   * Una entidad colapsada dentro de un motivo no existe como nodo propio en el
+   * lienzo: antes, seleccionarla desde otra vista no resaltaba nada. Ahora se
+   * resalta el nodo resumen que la contiene ("está acá adentro").
+   */
+  it('resalta el nodo resumen que contiene a la entidad seleccionada en otra vista', () => {
+    const result = createRepeatedPairResult();
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+
+    const cy = lastCy();
+    expect(cy._ids()).not.toContain('listing-0'); // quedó colapsada en el motivo
+
+    selectedNodeSubject.next({
+      node: { uri: 'listing-0', label: 'listing-0', attributes: {} },
+      source: 'timeline',
+      relatedUris: new Set(['listing-0', 'estate-0']),
+    });
+    fixture.detectChanges();
+
+    const seleccionados = cy
+      ._ids()
+      .filter((id: string) => cy._classesOf(id).includes('is-selected'));
+    expect(seleccionados).toHaveLength(1);
+    expect(seleccionados[0]).toContain('component-motif');
+    // Y el resumen resaltado es justamente el que agrupa a listing-0.
+    const miembros = (cy._els as Array<{ id: string; data: Record<string, unknown> }>).find(
+      (el) => el.id === seleccionados[0],
+    )?.data['memberNodeIds'] as string[] | undefined;
+    expect(miembros).toContain('listing-0');
+  });
+
+  it('no resalta nada si ni la entidad ni su fila están en el lienzo', () => {
+    const result = createRepeatedPairResult();
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+
+    const cy = lastCy();
+    selectedNodeSubject.next({
+      node: { uri: 'ajena-1', label: 'ajena', attributes: {} },
+      source: 'map',
+      relatedUris: new Set(['ajena-1']),
+    });
+    fixture.detectChanges();
+
+    expect(cy._ids().filter((id: string) => cy._classesOf(id).includes('is-selected'))).toHaveLength(
+      0,
+    );
+  });
+
+  it('expande reversiblemente un motivo al pulsar su arista agregada', () => {
+    const result = createRepeatedPairResult();
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+    const cy = lastCy();
+    const motifEdgeId = cy._ids().find((id: string) => id.includes(':edge:'))!;
+
+    cy._emit('tap', 'edge', { target: cy.getElementById(motifEdgeId) });
+
+    expect(lastCy()._ids()).toContain('listing-0');
+    expect(lastCy()._ids().some((id: string) => id.includes('component-motif'))).toBe(false);
+    expect(component.coverageLabel).toBe('');
+
+    const expandedCy = lastCy();
+    expandedCy._emit('tap', 'edge', { target: expandedCy.getElementById('about-0') });
+
+    expect(lastCy()._ids().filter((id: string) => id.includes('component-motif'))).toHaveLength(3);
+    expect(component.coverageLabel).toBe('4 nodos representados en 1 motivo repetido');
   });
 
   it('should detect no-edges state when nodes exist but no edges', () => {
@@ -696,6 +893,14 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(lonely.uri)).toEqual([]);
     });
 
+    /** El mock tipa las colecciones como índice, así que posicionar pide cast. */
+    function placeNode(cy: ReturnType<typeof lastCy>, id: string, x: number, y: number): void {
+      (cy.getElementById(id) as { position: (p: { x: number; y: number }) => unknown }).position({
+        x,
+        y,
+      });
+    }
+
     it('un foco externo vacío limpia el dimming y las is-focus-edge', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
@@ -710,6 +915,87 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(mockEdge.id)).toEqual([]);
       expect(cy._classesOf(mockNode.uri)).toEqual([]);
       expect(cy._classesOf(mockNode2.uri)).toEqual([]);
+    });
+
+    /**
+     * Antes, el foco coordinado limpiaba las clases y se llevaba puesto el
+     * resaltado del nodo seleccionado: con decenas de nodos enfocados, todos
+     * iguales, no se veía cuál estaba seleccionado.
+     */
+    it('conserva el resaltado del seleccionado y atenúa el resto del foco', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+
+      selectedNodeSubject.next({ node: mockNode, source: 'table' });
+      fixture.detectChanges();
+      expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
+
+      focusSubject.next({ uris: new Set([mockNode.uri, mockNode2.uri]), source: 'map' });
+      fixture.detectChanges();
+
+      expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
+      expect(cy._classesOf(mockNode.uri)).not.toContain('is-muted');
+      // El otro nodo del foco se ve, pero deja de competir con el seleccionado.
+      expect(cy._classesOf(mockNode2.uri)).toContain('is-muted');
+      expect(cy._classesOf(mockNode2.uri)).not.toContain('is-dimmed');
+    });
+
+    it('no atenúa el foco cuando no hay nada seleccionado', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+
+      focusSubject.next({ uris: new Set([mockNode.uri, mockNode2.uri]), source: 'map' });
+      fixture.detectChanges();
+
+      expect(cy._classesOf(mockNode.uri)).not.toContain('is-muted');
+      expect(cy._classesOf(mockNode2.uri)).not.toContain('is-muted');
+    });
+
+    /**
+     * El foco que mandan el mapa y la timeline abarca todo lo que entra en SU
+     * viewport: encuadrarlo con `fit` dejaba el grafo tan lejos que los nodos
+     * eran puntos. El encuadre no baja de `FOCUS_MIN_ZOOM`.
+     */
+    it('no se aleja por debajo del piso de zoom al encuadrar un foco amplio', () => {
+      const nodes: NormalizedNode[] = Array.from({ length: 6 }, (_, i) => ({
+        uri: `Q${i}`,
+        label: `N${i}`,
+        attributes: {},
+      }));
+      emitResult(nodes, []);
+      const cy = lastCy();
+      // Nodos bien separados: encuadrarlos a todos exigiría alejarse mucho.
+      nodes.forEach((n, i) => placeNode(cy, n.uri, i * 4000, i * 4000));
+      cy.animate.mockClear();
+
+      focusSubject.next({ uris: new Set(nodes.map((n) => n.uri)), source: 'map' });
+      fixture.detectChanges();
+
+      expect(cy.animate).toHaveBeenCalledTimes(1);
+      const opts = cy.animate.mock.calls[0][0] as { zoom: number; pan: { x: number; y: number } };
+      expect(opts.zoom).toBeCloseTo(0.8, 5);
+      expect(Number.isFinite(opts.pan.x)).toBe(true);
+    });
+
+    it('respeta el encuadre ajustado cuando el foco entra sin alejarse', () => {
+      const nodes: NormalizedNode[] = Array.from({ length: 3 }, (_, i) => ({
+        uri: `P${i}`,
+        label: `N${i}`,
+        attributes: {},
+      }));
+      emitResult(nodes, []);
+      const cy = lastCy();
+      // Foco chico y compacto, pero fuera del viewport actual.
+      nodes.forEach((n, i) => placeNode(cy, n.uri, 20000 + i * 10, 20000));
+      cy.animate.mockClear();
+
+      focusSubject.next({ uris: new Set(nodes.map((n) => n.uri)), source: 'timeline' });
+      fixture.detectChanges();
+
+      const opts = cy.animate.mock.calls[0][0] as { zoom: number };
+      // Cabe de sobra: el zoom lo decide el encuadre (tope 5), no el piso.
+      expect(opts.zoom).toBeGreaterThan(0.8);
+      expect(opts.zoom).toBeLessThanOrEqual(5);
     });
   });
 
@@ -900,9 +1186,9 @@ describe('GraphViewComponent', () => {
 
       emitResult([mockNode, mockNode2], [mockEdge]);
 
-      const options = lastCy()._options as { layout?: { name?: string } };
+      const cy = lastCy();
       expect(component.currentLayout).toBe('dagre');
-      expect(options.layout?.name).toBe('dagre');
+      expect(cy._layoutRuns[0]?.['name']).toBe('dagre');
     });
 
     it('restaura la cámara guardada en vez de encuadrar', () => {

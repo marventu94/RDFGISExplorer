@@ -59,15 +59,17 @@ lote.
 |------------|-----|----------|--------------------------|
 | Tabla | Inspección y verificación de valores | Quick filter | No |
 | Mapa | Distribución geográfica | Polígono | Agregación visual (clusters) |
-| Grafo | Estructura relacional del foco | Top por conexiones | No |
+| Grafo | Estructura relacional del foco | Presupuesto query-aware y motivos reversibles | No |
 | Timeline | Distribución temporal | Rango (brush) | Agregación visual |
 | Panel de resumen | Estadística descriptiva | No | **Sí** (COUNT, AVG, MIN/MAX, top valores) |
 | Export Excel | Materia prima para análisis externo | No | Sí (todas las filas) |
 
-La fila Grafo describe la estrategia vigente (*top por conexiones*). Su
-reemplazo planificado —un presupuesto visual query-aware con agregación
-reversible— está fundamentado y registrado en `graph-rendering-decisions.md`
-(§2 y §3) y se ejecuta de forma incremental por milestones.
+La fila Grafo describe la estrategia vigente: prioriza selección, entidades de
+la consulta y nodos intermedios; aplica el cap configurado al contexto restante
+y, en Resumen, reemplaza componentes con la misma firma estructural por motivos
+reversibles con conteos y miembros exactos. El alcance, la proveniencia y las
+abstracciones aún pendientes se registran en `graph-rendering-decisions.md`
+(§3.2 y §3.3).
 
 ## 3. La tabla como vista (y no solo vistas visuales)
 

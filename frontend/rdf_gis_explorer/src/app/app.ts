@@ -11,7 +11,7 @@ import { DashboardLayoutService } from '@core/services/dashboard-layout.service'
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { LoadProgressOverlayComponent } from '@features/dashboard/load-progress/load-progress-overlay.component';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -21,7 +21,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
   standalone: true,
   imports: [
     MatSidenavModule,
-    MatProgressSpinnerModule,
+    LoadProgressOverlayComponent,
     DashboardComponent,
     NavbarComponent,
     DetailPanelComponent,

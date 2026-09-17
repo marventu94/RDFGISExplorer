@@ -157,4 +157,188 @@ describe('TableViewComponent', () => {
     // Verify the mock function is in place
     expect(typeof selectionServiceMock.select).toBe('function');
   });
+
+  /**
+   * Una fila de una consulta espacio-temporal menciona varias entidades y cada
+   * vista dibuja la suya: el mapa la que tiene coordenada, la tabla la fila.
+   * Estos casos cubren que un click en cualquier vista se vea acá.
+   */
+  describe('selección cruzada con las otras vistas', () => {
+    /** Fila donde la entidad con coordenada NO es la primera columna. */
+    const listing: BindingValue = { type: 'uri', value: 'urn:listing/1' };
+    const casa: BindingValue = { type: 'uri', value: 'urn:casa/1' };
+    const casaNode: NormalizedNode = {
+      uri: 'urn:casa/1',
+      label: 'Casa 1',
+      attributes: {},
+      coordinate: { lat: -34.87, lng: -57.89 },
+    };
+    const listingNode: NormalizedNode = {
+      uri: 'urn:listing/1',
+      label: 'Aviso 1',
+      attributes: {},
+    };
+    const result: QueryResult = {
+      variables: ['listing', 'casa'],
+      bindings: [{ listing, casa } as ResultBinding],
+      nodes: [listingNode, casaNode],
+      edges: [],
+      meta: { durationMs: 1, truncated: false, limitApplied: 500, backend: 'graphdb' },
+    };
+
+    let selectedRows: Array<{ uri: string; selected: boolean }>;
+
+    /**
+     * Los row nodes de AG Grid se recrean en cada `rowData` nuevo, así que el
+     * fake también los recrea: es justo lo que borraba la selección.
+     */
+    function makeRows(): Array<{ selected: boolean } & Record<string, unknown>> {
+      return result.bindings.map((binding) => {
+        const row = {
+          data: binding,
+          rowIndex: 0,
+          selected: false,
+          isSelected(): boolean {
+            return row.selected;
+          },
+          setSelected(value: boolean): void {
+            row.selected = value;
+            selectedRows.push({
+              uri: (binding['casa'] as { value: string }).value,
+              selected: value,
+            });
+          },
+        };
+        return row;
+      });
+    }
+
+    let rows: ReturnType<typeof makeRows>;
+
+    function attachGrid(): void {
+      rows = makeRows();
+      const api = {
+        sizeColumnsToFit: vi.fn(),
+        forEachNode: (cb: (row: unknown) => void) => rows.forEach(cb),
+        paginationGetPageSize: () => 50,
+        paginationGetCurrentPage: () => 0,
+        paginationGoToPage: vi.fn(),
+        getFirstDisplayedRowIndex: () => 0,
+        getLastDisplayedRowIndex: () => 0,
+        ensureNodeVisible: vi.fn(),
+      };
+      component.onGridReady({ api } as never);
+    }
+
+    /** La grilla rehace sus filas (lote nuevo, filtro, o la propia selección). */
+    function rebuildRows(): void {
+      rows = makeRows();
+      component.onRowDataUpdated();
+    }
+
+    beforeEach(() => {
+      selectedRows = [];
+      selectionServiceMock.queryResult$.next(result);
+      selectionServiceMock.visibleQueryResult$.next(result);
+      fixture.detectChanges();
+      attachGrid();
+    });
+
+    it('selects the row when the map picks an entity that is not the first column', () => {
+      selectionServiceMock.selectedNode$.next({
+        node: casaNode,
+        source: 'map',
+        relatedUris: new Set(['urn:casa/1', 'urn:listing/1']),
+      });
+      fixture.detectChanges();
+
+      expect(selectedRows).toContainEqual({ uri: 'urn:casa/1', selected: true });
+    });
+
+    it('falls back to the row of a related entity when the exact one has no column', () => {
+      const geometry: NormalizedNode = { uri: 'urn:geo/1', label: 'Geometría', attributes: {} };
+
+      selectionServiceMock.selectedNode$.next({
+        node: geometry,
+        source: 'map',
+        relatedUris: new Set(['urn:geo/1', 'urn:casa/1']),
+      });
+      fixture.detectChanges();
+
+      expect(selectedRows).toContainEqual({ uri: 'urn:casa/1', selected: true });
+    });
+
+    it('ignores a selection that has nothing to do with the rows', () => {
+      selectionServiceMock.selectedNode$.next({
+        node: { uri: 'urn:otra/9', label: 'Otra', attributes: {} },
+        source: 'map',
+        relatedUris: new Set(['urn:otra/9']),
+      });
+      fixture.detectChanges();
+
+      expect(selectedRows.every((r) => r.selected === false)).toBe(true);
+    });
+
+    /**
+     * Regresión: seleccionar reemite `visibleQueryResult$` (el lote inyecta el
+     * nodo pineado), la grilla rehace sus filas y la selección recién aplicada
+     * se apagaba sola. Pasaba con cualquier origen, incluido el click acá.
+     */
+    it('keeps the row selected after the grid rebuilds its rows', () => {
+      selectionServiceMock.selectedNode$.next({
+        node: casaNode,
+        source: 'map',
+        relatedUris: new Set(['urn:casa/1', 'urn:listing/1']),
+      });
+      fixture.detectChanges();
+      selectedRows = [];
+
+      rebuildRows();
+
+      expect(rows.some((r) => r.selected)).toBe(true);
+    });
+
+    it('keeps its own click selected after the rebuild it triggers', () => {
+      component.onRowSelected({
+        node: { isSelected: () => true },
+        data: result.bindings[0],
+      } as never);
+      // El servicio real responde publicando la selección con origen 'table'.
+      selectionServiceMock.selectedNode$.next({
+        node: casaNode,
+        source: 'table',
+        relatedUris: new Set(['urn:casa/1', 'urn:listing/1']),
+      });
+      fixture.detectChanges();
+
+      rebuildRows();
+
+      expect(rows.some((r) => r.selected)).toBe(true);
+    });
+
+    it('clears the grid selection when the selection is cleared', () => {
+      selectionServiceMock.selectedNode$.next({
+        node: casaNode,
+        source: 'map',
+        relatedUris: new Set(['urn:casa/1']),
+      });
+      fixture.detectChanges();
+
+      selectionServiceMock.selectedNode$.next({ node: null, source: 'external' });
+      fixture.detectChanges();
+
+      expect(rows.every((r) => !r.selected)).toBe(true);
+    });
+
+    it('emits the entity with data of its own when a row is clicked', () => {
+      component.onRowSelected({
+        node: { isSelected: () => true },
+        data: result.bindings[0],
+      } as never);
+
+      // No la primera URI de la fila (el aviso), sino la que las otras vistas
+      // saben dibujar.
+      expect(selectionServiceMock.select).toHaveBeenCalledWith(casaNode, 'table');
+    });
+  });
 });

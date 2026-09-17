@@ -158,7 +158,7 @@ app-coverage-chip {
 .graph-legend {
   position: absolute;
   bottom: 8px;
-  left: 8px;
+  right: 8px;
   z-index: 11;
   display: flex;
   gap: 10px;
@@ -187,6 +187,12 @@ app-coverage-chip {
 .legend-dot--aggregate {
   border-radius: 2px;
   background: #607d8b;
+}
+
+.legend-dot--motif {
+  width: 13px;
+  border-radius: 2px;
+  background: #78909c;
 }
 
 .legend-line {

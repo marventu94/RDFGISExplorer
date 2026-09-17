@@ -52,6 +52,7 @@
         [tooltipShowDelay]="300"
         [tooltipInteraction]="true"
         (gridReady)="onGridReady($event)"
+        (rowDataUpdated)="onRowDataUpdated()"
         (rowSelected)="onRowSelected($event)"
       ></ag-grid-angular>
     </div>

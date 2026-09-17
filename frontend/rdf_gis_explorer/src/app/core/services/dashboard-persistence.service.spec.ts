@@ -10,6 +10,7 @@ import { DashboardLayoutService } from './dashboard-layout.service';
 import { SelectionService } from './selection.service';
 import { SparqlQueryStateService } from './sparql-query-state.service';
 import { DashboardViewStateService } from './dashboard-view-state.service';
+import { DashboardLoadProgressService } from './dashboard-load-progress.service';
 import type { QueryResult, NormalizedNode } from '@shared/models';
 
 function makeNode(overrides: Partial<NormalizedNode> = {}): NormalizedNode {
@@ -43,6 +44,7 @@ describe('DashboardPersistenceService', () => {
   let selection: SelectionService;
   let queryState: SparqlQueryStateService;
   let viewState: DashboardViewStateService;
+  let progress: DashboardLoadProgressService;
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -59,6 +61,7 @@ describe('DashboardPersistenceService', () => {
     selection = TestBed.inject(SelectionService);
     queryState = TestBed.inject(SparqlQueryStateService);
     viewState = TestBed.inject(DashboardViewStateService);
+    progress = TestBed.inject(DashboardLoadProgressService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -471,6 +474,85 @@ describe('DashboardPersistenceService', () => {
       );
 
       expect(errored).toBe(true);
+    });
+  });
+
+  describe('cartel de carga por etapas', () => {
+    const payload: GisDashboardPayload = {
+      query: 'SELECT ?s WHERE { ?s a <City> }',
+      backend: 'wikidata',
+      layout: {
+        slotsCount: 2,
+        slots: [
+          { id: 'slot-0', view: 'map' },
+          { id: 'slot-1', view: 'table' },
+        ],
+      },
+      filters: {},
+    };
+
+    function flushDashboard(id = 'dash-abc'): void {
+      httpMock.expectOne(`/api/dashboards/${id}`).flush({
+        id,
+        kind: 'gis',
+        name: 'Batallas WWII',
+        payload,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    it('should walk the stages of the hydration pipeline', () => {
+      service.load('dash-abc').subscribe();
+
+      expect(progress.active()).toBe(true);
+      expect(progress.stageStatus('fetch-dashboard')).toBe('active');
+      expect(progress.stageStatus('execute-query')).toBe('pending');
+
+      flushDashboard();
+      expect(progress.run()?.subtitle).toBe('Batallas WWII');
+      expect(progress.stageStatus('fetch-dashboard')).toBe('done');
+
+      flushConfig();
+      expect(progress.stageStatus('execute-query')).toBe('active');
+
+      httpMock
+        .expectOne('/api/query/execute')
+        .flush(makeQueryResult({ bindings: [{ s: { type: 'uri', value: 'urn:a' } }] }));
+
+      // Sin vistas montadas en el spec nadie reporta el render, pero el resto
+      // del pipeline ya quedó registrado con sus tiempos.
+      expect(progress.stageStatus('execute-query')).toBe('done');
+      expect(progress.stageStatus('process-results')).toBe('done');
+      const executed = progress.run()?.stages.find((s) => s.id === 'execute-query');
+      expect(executed?.detail).toContain('1 fila');
+      expect(executed?.detail).toContain('endpoint 100 ms');
+    });
+
+    it('should close the poster once every view of the layout has painted', () => {
+      service.load('dash-abc').subscribe();
+      flushDashboard();
+      flushConfig();
+      httpMock.expectOne('/api/query/execute').flush(makeQueryResult());
+
+      progress.reportViewRendered('map');
+      expect(progress.active()).toBe(true);
+
+      progress.reportViewRendered('table');
+      expect(progress.active()).toBe(false);
+      expect(progress.stageStatus('render-views')).toBe('done');
+    });
+
+    it('should mark the stage that broke when the query fails', () => {
+      service.load('dash-abc').subscribe({ error: () => undefined });
+      flushDashboard();
+      flushConfig();
+      httpMock
+        .expectOne('/api/query/execute')
+        .flush({ message: 'boom' }, { status: 502, statusText: 'Bad Gateway' });
+
+      expect(progress.stageStatus('execute-query')).toBe('failed');
+      expect(progress.active()).toBe(false);
     });
   });
 

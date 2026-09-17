@@ -115,6 +115,92 @@ describe('SelectionService', () => {
       expect(last.source).toBe('table');
     });
 
+    /**
+     * Cada vista dibuja una entidad distinta de la misma fila, así que la
+     * selección viaja con el grupo de entidades de esas filas: es lo que deja
+     * que un click en el mapa se vea en la tabla, la timeline y el grafo.
+     */
+    it('should publish the entities that share a row with the selection', () => {
+      const casa = makeNode({ uri: 'urn:casa/1' });
+      service.setQueryResult(
+        makeQueryResult({
+          variables: ['listing', 'casa'],
+          bindings: [
+            {
+              listing: { type: 'uri', value: 'urn:listing/1' },
+              casa: { type: 'uri', value: 'urn:casa/1' },
+            },
+          ],
+          nodes: [casa],
+        }),
+      );
+
+      let received: Selection | undefined;
+      service.selectedNode$.subscribe((s) => (received = s));
+      service.select(casa, 'map');
+
+      expect([...(received?.relatedUris ?? [])].sort()).toEqual(['urn:casa/1', 'urn:listing/1']);
+    });
+
+    /**
+     * Regresión de performance: `visibleQueryResult$` y `lotState$` dependen de
+     * la selección por el pinning. Si reemiten en cada click, las 4 vistas se
+     * redibujan enteras (grilla, mapa, timeline y grafo) y con lotes grandes la
+     * app se traba. Solo tienen que reemitir si lo visible cambió de verdad.
+     */
+    it('should not re-emit the visible result when selecting a node already visible', () => {
+      const a = makeNode({ uri: 'urn:a' });
+      const b = makeNode({ uri: 'urn:b' });
+      service.setQueryResult(makeQueryResult({ nodes: [a, b] }));
+
+      const visible: (QueryResult | null)[] = [];
+      const lots: unknown[] = [];
+      service.visibleQueryResult$.subscribe((r) => visible.push(r));
+      service.lotState$.subscribe((s) => lots.push(s));
+      const visibleAfterQuery = visible.length;
+      const lotsAfterQuery = lots.length;
+
+      service.select(a, 'map');
+      service.select(b, 'table');
+      service.select(null, 'external');
+
+      expect(visible.length).toBe(visibleAfterQuery);
+      expect(lots.length).toBe(lotsAfterQuery);
+    });
+
+    it('should still re-emit when the selected node lives outside the current lot', () => {
+      // Lote de 1 fila: seleccionar la entidad de la otra fila la inyecta.
+      const a = makeNode({ uri: 'urn:a' });
+      const b = makeNode({ uri: 'urn:b' });
+      service.setQueryResult(
+        makeQueryResult({
+          variables: ['x'],
+          bindings: [{ x: { type: 'uri', value: 'urn:a' } }, { x: { type: 'uri', value: 'urn:b' } }],
+          nodes: [a, b],
+        }),
+      );
+      service.setLotSize(1);
+
+      const visible: (QueryResult | null)[] = [];
+      service.visibleQueryResult$.subscribe((r) => visible.push(r));
+      const before = visible.length;
+
+      service.select(b, 'graph');
+
+      expect(visible.length).toBe(before + 1);
+      expect(visible[visible.length - 1]?.nodes.map((n) => n.uri)).toContain('urn:b');
+    });
+
+    it('should publish only the entity itself when the result does not mention it', () => {
+      service.setQueryResult(makeQueryResult({ bindings: [] }));
+
+      let received: Selection | undefined;
+      service.selectedNode$.subscribe((s) => (received = s));
+      service.select(makeNode({ uri: 'urn:suelta' }), 'graph');
+
+      expect([...(received?.relatedUris ?? [])]).toEqual(['urn:suelta']);
+    });
+
     it('should default source to "external"', () => {
       const node = makeNode({ uri: 'http://example.org/node/a', label: 'Node A' });
       let received: Selection | undefined;

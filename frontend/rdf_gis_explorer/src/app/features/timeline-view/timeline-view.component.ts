@@ -10,13 +10,20 @@ import {
   ChangeDetectorRef,
   inject,
 } from '@angular/core';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type LotState } from '@core/services/selection.service';
+import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
 import { Timeline } from 'vis-timeline/standalone';
 import type { DataItem, DataGroup, TimelineOptions } from 'vis-timeline/standalone';
 import { DataSet } from 'vis-data';
-import type { QueryResult, NormalizedNode, Selection, TemporalFilter } from '@shared/models';
+import type {
+  QueryResult,
+  NormalizedNode,
+  Selection,
+  TemporalFilter,
+  Filter,
+} from '@shared/models';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { computeCoverageStats } from '@shared/stats/coverage-stats';
@@ -70,12 +77,15 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private pendingRange?: { start: Date; end: Date };
   private allNodes: NormalizedNode[] = [];
+  /** Ficha marcada ahora mismo, para repintarla cuando se rehacen los items. */
+  private selectedItemId: string | null = null;
   private suppressViewportEmit = false;
   private readonly viewportChange$ = new Subject<{ start: Date; end: Date }>();
   private markActiveListener?: () => void;
   private redrawHandle?: number;
 
   private readonly viewState = inject(DashboardViewStateService);
+  private readonly loadProgress = inject(DashboardLoadProgressService);
 
   constructor(
     private readonly selectionService: SelectionService,
@@ -100,68 +110,113 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     ])
       .pipe(takeUntil(this.destroy$))
       .subscribe(([original, visible, filters, lotState]) => {
-        this.activeFilterCount = filters.length;
-        this.coverageLabel = '';
-
-        const temporalFilter = filters.find((f): f is TemporalFilter => f.kind === 'temporal');
-        this.activeFilterLabel = temporalFilter?.label ?? '';
-
-        if (!visible || visible.nodes.length === 0) {
-          if (!original || original.nodes.length === 0) {
-            this.queryState = 'no-query';
-          } else if (filters.length > 0) {
-            this.queryState = 'filtered-zero';
-            this.originalNodeCount = original.nodes.length;
-          } else {
-            this.queryState = 'no-query';
-          }
-
-          this.allNodes = [];
-          this.items.clear();
-          this.groups.clear();
-          this.timeline?.setItems(this.items);
-          this.timeline?.setGroups(this.groups);
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
-        this.filteredNodeCount = visible.nodes.length;
-        this.allNodes = visible.nodes;
-
-        const nodesWithDates = visible.nodes.filter((n) => (n.temporalEvents?.length ?? 0) > 0);
-
-        if (nodesWithDates.length === 0) {
-          // Si el resultado completo tampoco tiene fechas, la query no las
-          // devuelve; si el completo sí tiene y el lote visible no, las fechas
-          // quedaron en otro lote (o fuera por un filtro si hay uno solo).
-          const originalHasDates = (original?.nodes ?? []).some(
-            (n) => (n.temporalEvents?.length ?? 0) > 0,
-          );
-          this.queryState =
-            originalHasDates && lotState.lotCount > 1 ? 'no-dates-lot' : 'no-dates';
-          this.items.clear();
-          this.groups.clear();
-          this.timeline?.setItems(this.items);
-          this.timeline?.setGroups(this.groups);
-          this.cdr.markForCheck();
-          return;
-        }
-
-        this.queryState = 'normal';
-        const stats = computeCoverageStats(visible);
-        if (stats.primaryWithoutTemporalEvents > 0) {
-          const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
-          this.coverageLabel =
-            `Mostrando ${stats.primaryWithTemporalEvents} de ${stats.primary} entidades${lotSuffix} · ` +
-            `${stats.primaryWithoutTemporalEvents} sin fecha${stats.primaryWithoutTemporalEvents !== 1 ? 's' : ''}`;
-        } else {
-          this.coverageLabel = '';
-        }
-        this.renderItems(visible);
-        this.cdr.markForCheck();
+        this.applyResult(original, visible, filters, lotState);
+        // Cartel de carga: la línea de tiempo ya aplicó el resultado nuevo
+        // (tenga o no fechas el lote visible).
+        if (visible) this.loadProgress.reportViewRendered('timeline');
       });
 
+    this.setupInteractionSubscriptions();
+  }
+
+  /** Vuelca en la línea de tiempo el lote visible, con su chip de cobertura. */
+  private applyResult(
+    original: QueryResult | null,
+    visible: QueryResult | null,
+    filters: Filter[],
+    lotState: LotState,
+  ): void {
+    this.activeFilterCount = filters.length;
+    this.coverageLabel = '';
+
+    const temporalFilter = filters.find((f): f is TemporalFilter => f.kind === 'temporal');
+    this.activeFilterLabel = temporalFilter?.label ?? '';
+
+    if (!visible || visible.nodes.length === 0) {
+      if (!original || original.nodes.length === 0) {
+        this.queryState = 'no-query';
+      } else if (filters.length > 0) {
+        this.queryState = 'filtered-zero';
+        this.originalNodeCount = original.nodes.length;
+      } else {
+        this.queryState = 'no-query';
+      }
+
+      this.allNodes = [];
+      this.items.clear();
+      this.groups.clear();
+      this.timeline?.setItems(this.items);
+      this.timeline?.setGroups(this.groups);
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
+    this.filteredNodeCount = visible.nodes.length;
+    this.allNodes = visible.nodes;
+
+    const nodesWithDates = visible.nodes.filter((n) => (n.temporalEvents?.length ?? 0) > 0);
+
+    if (nodesWithDates.length === 0) {
+      // Si el resultado completo tampoco tiene fechas, la query no las
+      // devuelve; si el completo sí tiene y el lote visible no, las fechas
+      // quedaron en otro lote (o fuera por un filtro si hay uno solo).
+      const originalHasDates = (original?.nodes ?? []).some(
+        (n) => (n.temporalEvents?.length ?? 0) > 0,
+      );
+      this.queryState = originalHasDates && lotState.lotCount > 1 ? 'no-dates-lot' : 'no-dates';
+      this.items.clear();
+      this.groups.clear();
+      this.timeline?.setItems(this.items);
+      this.timeline?.setGroups(this.groups);
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.queryState = 'normal';
+    const stats = computeCoverageStats(visible);
+    if (stats.primaryWithoutTemporalEvents > 0) {
+      const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
+      this.coverageLabel =
+        `Mostrando ${stats.primaryWithTemporalEvents} de ${stats.primary} entidades${lotSuffix} · ` +
+        `${stats.primaryWithoutTemporalEvents} sin fecha${stats.primaryWithoutTemporalEvents !== 1 ? 's' : ''}`;
+    } else {
+      this.coverageLabel = '';
+    }
+    this.renderItems(visible);
+    this.cdr.markForCheck();
+  }
+
+  /** Vuelve a marcar la ficha seleccionada si sigue existiendo tras el render. */
+  private reapplySelection(): void {
+    if (!this.timeline) return;
+    const id = this.selectedItemId;
+    if (id && this.items.get(id)) {
+      this.timeline.setSelection([id]);
+    }
+  }
+
+  /**
+   * Qué ficha le corresponde a una selección hecha en otra vista.
+   *
+   * Si la entidad seleccionada tiene fechas, es la suya. Si no (un click en el
+   * mapa suele caer sobre una geometría, y uno en la tabla sobre el aviso), se
+   * usa la entidad con fechas de su MISMA fila: es lo que la timeline sabe
+   * dibujar de esa selección. Sin esto la timeline se quedaba quieta.
+   */
+  private resolveDatedNode(sel: Selection): NormalizedNode | null {
+    if (!sel.node) return null;
+    if (sel.node.temporalEvents?.length) return sel.node;
+
+    const related = sel.relatedUris;
+    if (!related || related.size === 0) return null;
+    return (
+      this.allNodes.find((n) => (n.temporalEvents?.length ?? 0) > 0 && related.has(n.uri)) ?? null
+    );
+  }
+
+  /** Sincronización con las otras vistas: selección, foco y vista activa. */
+  private setupInteractionSubscriptions(): void {
     this.selectionService.selectedNode$
       .pipe(
         takeUntil(this.destroy$),
@@ -170,11 +225,23 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       .subscribe((sel: Selection) => {
         this.cdr.markForCheck();
 
-        if (sel.node && sel.node.temporalEvents?.length && this.timeline) {
-          const mostRecent = sel.node.temporalEvents.reduce((a, b) =>
+        const target = this.resolveDatedNode(sel);
+        if (!target) {
+          // Solo se apaga lo que estaba marcado: sin esto, la emisión inicial
+          // (selección vacía) ya pediría un deselect que nadie necesita.
+          if (this.selectedItemId !== null) {
+            this.selectedItemId = null;
+            this.timeline?.setSelection([]);
+          }
+          return;
+        }
+
+        this.selectedItemId = target.uri;
+        if (this.timeline) {
+          const mostRecent = target.temporalEvents!.reduce((a, b) =>
             a.isoDate > b.isoDate ? a : b,
           );
-          this.timeline.setSelection([sel.node.uri]);
+          this.timeline.setSelection([target.uri]);
 
           const targetDate = new Date(mostRecent.isoDate);
           const window = this.timeline.getWindow();
@@ -421,6 +488,11 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.timeline.on('select', (props: { items: string[] }) => {
       if (!props.items || props.items.length === 0) return;
       const nodeUri = String(props.items[0]);
+      // Cortafuegos: marcar por código no puede realimentar el ciclo.
+      if (nodeUri === this.selectedItemId) return;
+      // Se recuerda antes de emitir: la emisión rehace los items y hay que
+      // poder volver a marcar la ficha que el usuario clickeó.
+      this.selectedItemId = nodeUri;
       const node = this.allNodes.find((n) => n.uri === nodeUri);
       if (node) {
         this.ngZone.run(() => {
@@ -519,6 +591,10 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.groups.add(groups);
     this.timeline?.setItems(this.items);
     this.timeline?.setGroups(this.groups);
+    // Los items se rehacen desde cero en cada render (y seleccionar dispara uno,
+    // porque el lote inyecta el nodo pineado): sin volver a aplicarla, la ficha
+    // seleccionada —incluso la que el usuario acaba de clickear acá— se apagaba.
+    this.reapplySelection();
 
     if (this.timeline && isFinite(minMs) && isFinite(maxMs)) {
       // Padding para que los items de los extremos no queden pegados al borde;
