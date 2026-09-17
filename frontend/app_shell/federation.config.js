@@ -42,6 +42,10 @@ module.exports = withNativeFederation({
     'rxjs/fetch',
     'rxjs/testing',
     'rxjs/webSocket',
+    // Contrato del canal GIS (packages/platform-bridge): se bundlea en cada app
+    // igual que en los remotes. El acoplamiento es via `window`, no via
+    // instancia compartida, asi que tener una copia por bundle es correcto.
+    '@rdfgis/platform-bridge',
     '@softarc/native-federation-runtime',
     '@softarc/native-federation',
     '@softarc/native-federation-node',
