@@ -21,6 +21,7 @@
     "clean:unused-data": "ts-node scripts/clean-unused-data.ts",
     "clean:unused-data:force": "ts-node scripts/clean-unused-data.ts --force",
     "seed:demo-dashboards": "ts-node --transpile-only scripts/seed-demo-dashboards.ts",
+    "seed:evaluation-dashboards": "ts-node --transpile-only scripts/seed-evaluation-dashboards.ts",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {

@@ -210,6 +210,23 @@ espaciotemporal contra el endpoint configurado y escribe en el SQLite del
 backend activo (idempotente: reemplaza por nombre). Como `data/` está en
 `.gitignore`, para versionar el archivo se usa `git add -f`.
 
+### Entorno aislado para el ensayo C1–C5
+
+El entorno de evaluación contiene cuatro workspaces RDF Explorer marcados como
+`DRAFT` para C1–C4, sus cuatro tableros GIS derivados y el workspace C5. Los
+grafos C1–C4 se construyen en `backend/scripts/evaluation-dashboards.ts`; la
+consulta de cada GIS se genera desde el mismo grafo con la proyección completa
+del handoff. No hay consultas GIS paralelas mantenidas a mano.
+
+```bash
+cp .env.evaluation.example .env.evaluation.local  # completar credenciales locales
+cd backend && pnpm run seed:evaluation-dashboards
+cd .. && ./start.sh --env .env.evaluation.local
+```
+
+El seed recrea `backend/data/evaluation.sqlite` desde cero con IDs estables para
+los nueve tableros; conviene ejecutarlo antes de cada ensayo manual.
+
 ---
 
 ## Variables de entorno
