@@ -17,3 +17,6 @@ skills-lock.json
 .node-version-built
 backend/config/prefixes.graphdb.json
 backend/config/class-colors.graphdb.json
+
+# Worktrees y estado local de Claude Code
+.claude/
