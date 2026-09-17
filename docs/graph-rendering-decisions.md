@@ -41,8 +41,8 @@ en cinco criterios que estructuran las decisiones de este documento:
 4. **Estabilidad cognitiva.** Las posiciones y transiciones deben preservar
    el mapa mental del usuario (decisiones 3.4 y 3.5).
 5. **Coordinación sin fusión.** El grafo convive con las vistas de tabla,
-   mapa y línea temporal sin absorber las tareas de estas (decisiones 3.6 y
-   3.7).
+   mapa y línea temporal sin absorber las tareas de estas, ni las que
+   corresponden a la construcción de la consulta (decisiones 3.6, 3.7 y 3.10).
 
 El principio de centralidad de la consulta se apoya en la línea de sistemas
 de consulta visual sobre grafos de conocimiento, cuya evidencia empírica
@@ -91,17 +91,22 @@ por un presupuesto de entidades explícitas, agregados y aristas, con el
 siguiente orden de prioridad: (i) nodo seleccionado y nodos fijados; (ii)
 entidades principales de las filas visibles de la consulta; (iii) nodos
 intermedios necesarios para conservar la topología de la consulta; (iv)
-caminos acotados entre entidades prioritarias; (v) contexto por relevancia;
-(vi) grado únicamente como criterio de desempate. La selección se implementa
-como función pura que registra las razones de inclusión de cada elemento y
-métricas de cobertura.
+caminos acotados entre entidades prioritarias; (v) el contexto restante,
+ordenado por grado total descendente; (vi) ante empate de grado, el orden de
+entrada (ordenamiento estable, sin aleatoriedad). El grado deja así de ser el
+criterio de recorte para pasar a ordenar únicamente el último bucket. La
+selección se implementa como función pura que registra las razones de
+inclusión de cada elemento y métricas de cobertura.
 
 **Estado:** vigente parcial. La función pura reserva presupuesto, en este
 orden, para el nodo seleccionado, las entidades que aparecen en los bindings,
-los vecinos intermedios a un salto y el contexto restante por grado. El nodo
-seleccionado permanece visible incluso con grado cero. La selección de caminos
-acotados entre entidades prioritarias continúa propuesta; el límite final
-sigue siendo `limits.graphMaxNodes` (300 por defecto).
+los vecinos intermedios a un salto y el contexto restante por grado. Esas
+cuatro son también las razones de inclusión que registra por nodo
+(`selected`, `query-entity`, `intermediate`, `context`); el grado no es una
+razón, es el orden del último bucket. El nodo seleccionado permanece visible
+incluso con grado cero. La selección de caminos acotados entre entidades
+prioritarias continúa propuesta; el límite final sigue siendo
+`limits.graphMaxNodes` (300 por defecto).
 
 ### 3.3. Agregación reversible con proveniencia exacta
 
@@ -148,7 +153,10 @@ supernodo por rol —rotulado con su cantidad de miembros— y una relación
 `predicado × N` por cada tipo de arista de la firma. Un click expande todos sus
 componentes y otro click sobre cualquiera de sus aristas los contrae. La
 selección tiene prioridad: el componente que contiene la entidad seleccionada
-queda explícito y el agregado resume solo los restantes. El estado
+queda fuera del agrupamiento y se dibuja explícito. Como consecuencia, si la
+firma solo tenía dos componentes y uno de ellos queda excluido por la
+selección, el restante deja de alcanzar el mínimo de dos y no se agrega: al
+seleccionar, ese resumen desaparece en lugar de reducirse. El estado
 expandido/contraído se persiste con el tablero.
 
 Esta segunda abstracción adapta el principio general de *motif
@@ -183,11 +191,23 @@ verificación de compatibilidad con Native Federation.
 
 **Estado:** vigente parcial. La disposición inicial se elige por topología:
 grilla sin aristas, Dagre para grafos acíclicos y Cola para grafos cíclicos o
-con bucles. El cálculo inicial se ejecuta sin animación después de registrar el
-evento de fin de layout; así los extremos no parten ni permanecen en `(0,0)` y
-el encuadre ocurre sobre la geometría terminada. Los cambios de layout pedidos
-por el usuario sí se animan y se conserva la estabilidad incremental. fCoSE y
-el empaquetamiento dedicado de componentes siguen pendientes de benchmark.
+con bucles. El layout real se ejecuta después de registrar el evento de fin de
+layout, de modo que el encuadre siempre ocurre sobre la geometría terminada y
+ningún nodo queda en `(0,0)`.
+
+La animación del cálculo inicial depende del layout, y la diferencia es
+deliberada: Dagre y Grid se resuelven sin animar, mientras que Cola sí se anima
+—con `animate: false` webcola resuelve su simulación de forma sincrónica y
+puede bloquear el hilo principal—. Cola arranca además con posiciones
+aleatorias (`randomize`), por lo que el primer dibujo de un grafo cíclico no es
+reproducible entre corridas; la semilla geométrica determinista que calcula la
+función pura de construcción solo gobierna el camino incremental (los nodos
+nuevos sin vecino ya ubicado). Estabilizar ese primer dibujo queda como mejora
+pendiente, ligada al benchmark de layouts.
+
+Los cambios de layout pedidos por el usuario sí se animan y se conserva la
+estabilidad incremental. fCoSE y el empaquetamiento dedicado de componentes
+siguen pendientes de benchmark.
 
 ### 3.5. Progressive disclosure con niveles explícitos
 
@@ -264,7 +284,61 @@ backend y vistas migradas). Resta validar la cobertura efectiva de `rdf:type`
 en los conjuntos de datos antes de habilitar el agrupamiento por clase
 (decisión 3.3).
 
-### 3.8. Interpretación de resultados relacionalmente repetitivos
+### 3.8. La vista de grafo como lectura del modelo de datos
+
+**Fundamento.** RDF carece de relaciones n-arias nativas: un atributo con
+unidad, procedencia o vigencia no se expresa como un literal colgado de la
+entidad, sino reificado en una cadena de nodos intermedios. La consecuencia es
+que la forma en que un conjunto de datos guarda un valor no es deducible del
+valor. La literatura trata a esos nodos como material de primera clase —TGV
+colapsa nodos estructurales para volver legible la topología (Orlando et al.,
+2024) y KGNav resume por firma estructural de predicados (Wang, Wang, Li y Han,
+2023)—, la tolerancia a la irregularidad de los grafos de conocimiento reales
+es un requisito documentado (Sheng et al., 2019) y la curación de grafos por
+usuarios de dominio aparece como tarea propia (Mulholland et al., 2024).
+
+**Decisión (criterio propio del proyecto).** La vista de grafo no es una
+representación alternativa de las filas: es la única vista que muestra **el
+camino que une una entidad con sus valores a través de los intermedios del
+modelo**. Ese es su aporte diferencial frente a la tabla, el mapa y la línea
+temporal, y la razón por la que permanece en el conjunto de cuatro vistas
+(`design-decisions.md`, §1).
+
+De ahí se derivan las dos preguntas que responde y que ninguna otra vista
+responde:
+
+1. **¿De dónde sale este valor?** Proveniencia estructural de un atributo. La
+   tabla muestra la columna `superficieCubierta = 120`; el grafo muestra que
+   ese número vive a tres saltos de la entidad, en
+   `inmueble —rec:includes→ Site —inm:hasFeature→ Feature —inm:hasValue→ Spec`,
+   y que la unidad de medida cuelga del mismo `Spec` por
+   `gr:hasUnitOfMeasurement`. Sin la vista, el usuario no tiene modo de saber
+   que la columna es el final de una cadena ni dónde intervenir si el valor es
+   incorrecto.
+2. **¿Todo el conjunto tiene la misma forma?** Un componente cuya firma
+   estructural no coincide con el motivo dominante es una excepción de
+   modelado. El nivel Resumen la delata por construcción: agrega lo que se
+   repite y deja explícito lo que no, de modo que la anomalía queda visible sin
+   buscarla (véase §3.3 y la interpretación de §3.9).
+
+**Estado:** vigente. Las aristas no se infieren de la coincidencia de una fila:
+`query-topology.ts` lee los patrones `?s <p> ?o` de la consulta, detecta las
+variables que participan de alguna relación pero no están proyectadas —los
+intermedios del modelo—, reescribe el `SELECT` para recuperarlas del endpoint y
+las dibuja como nodos propios con su predicado y su dirección reales. Las filas
+que recibe la tabla conservan la proyección original del usuario; el grafo
+recibe la topología completa.
+
+Esto tiene un efecto adicional sobre el nivel Resumen. Como el rol de un nodo
+se toma primero de su variable SPARQL (§3.3) y cada entidad del conjunto
+reproduce la misma cadena de reificación, Resumen colapsa esas cadenas en una
+sola secuencia de supernodos rotulados por rol y con multiplicidades exactas
+—`inmueble (N) —rec:includes ×N→ Site (N) —inm:hasFeature ×N→ …`—, es decir,
+una lectura del esquema efectivo del resultado a nivel de instancias. No es un
+resumen del esquema declarado por la ontología: describe exactamente lo que la
+consulta trajo, con sus cantidades.
+
+### 3.9. Interpretación de resultados relacionalmente repetitivos
 
 Una consulta diseñada para comparar atributos puede devolver una fila lógica
 por entidad y, a la vez, una topología compuesta por muchos componentes
@@ -288,13 +362,56 @@ Entidades + relaciones recuperan la topología explícita. Esta abstracción no
 convierte una consulta atributiva en una consulta de caminos o comunidades;
 hace legible la estructura que la consulta realmente produjo.
 
+### 3.10. Alcance: la vista explora el resultado, no recorre el grafo
+
+**Fundamento.** La línea de sistemas de consulta visual del corpus separa dos
+actividades distintas: construir la consulta de forma gráfica —RDF Explorer
+(Vargas et al., 2019), KGNav (Wang, Wang, Li y Han, 2023), VQFT (Li, Z. et al.,
+2024)— y visualizar su resultado —QueDI (De Donato et al., 2020), TGV (Orlando
+et al., 2024)—. Recorrer el grafo más allá de lo consultado (expandir vecinos,
+buscar caminos entre dos entidades arbitrarias, alcanzar profundidad variable)
+pertenece a la primera: cada expansión es, en los hechos, una consulta nueva.
+El criterio 5 de §2 —coordinación sin fusión— exige además que ninguna vista
+absorba tareas que ya tienen su lugar.
+
+**Decisión.** La vista de grafo de RDF GIS Explorer **no** emite consultas
+propias: dibuja el resultado de la consulta del tablero y nada más. La
+exploración por recorrido es responsabilidad de **RDF Explorer**, el otro
+frontend de la plataforma, cuyo paradigma es precisamente ese: el usuario
+extiende el grafo de la consulta arrastrando nodos y propiedades, el dominio
+puro genera el SPARQL por BFS y el handoff (`toSparqlFullProjection()`) entrega
+la consulta resultante al GIS. El flujo declarado del producto es
+**construir → ejecutar → explorar** (`design-decisions.md`, §11), con la
+construcción de un lado del handoff y las cuatro vistas coordinadas del otro.
+
+Incorporar expansión de vecinos o búsqueda de caminos dentro de la vista de
+grafo del GIS duplicaría el paradigma de construcción de consultas en las dos
+herramientas y rompería esa frontera; por eso se declara **no-objetivo
+explícito**, no una funcionalidad pendiente.
+
+Conviene no confundir este límite con la decisión 3.2: los «caminos acotados
+entre entidades prioritarias» que allí figuran como propuesta operan
+**dentro del resultado ya recuperado** —deciden qué caminos preservar cuando el
+presupuesto obliga a recortar— y no recuperan datos nuevos del endpoint.
+
+**Estado:** vigente. La vista consume `visibleQueryResult$` y no dispone de
+ningún camino hacia el endpoint; el backend expone `POST /api/query/execute`,
+`POST /api/query/summary` y `GET /api/suggestions/*`, sin operación de
+vecindad ni de caminos. Las acciones de «expandir» de la vista (motivos y
+super-aristas) son estrictamente visuales: reordenan lo ya dibujado y no piden
+nada.
+
 ## 4. Posibles mejoras futuras
 
 Las siguientes mejoras no forman parte de la implementación actual. Podrán
 evaluarse en una fase posterior únicamente con datos representativos,
 benchmarks y tareas de usuario que justifiquen su incorporación:
 
-- Completar la selección query-aware con caminos relevantes entre entidades.
+- Completar la selección query-aware con los caminos relevantes entre entidades
+  **presentes en el resultado**, como criterio de recorte del presupuesto. No
+  incluye recuperar caminos nuevos del endpoint: eso es no-objetivo (§3.10).
+- Estabilizar el primer dibujo de los grafos cíclicos, hoy no reproducible
+  porque el cálculo inicial de Cola randomiza posiciones (§3.4).
 - Agregar abanicos, conectores y cliques; supernodos generales por clase RDF y
   firmas de propiedades.
 - Evaluar fCoSE, ELK y un empaquetamiento específico de componentes
@@ -336,6 +453,7 @@ comprensión (Li, Z. et al., 2024).
 |--------|--------------------------|
 | Clasificación RDF ausente o incorrecta | Alternativa explícita por variable o firma; nunca presentarla como clase (§3.7) |
 | Agregados que ocultan excepciones | Conteos exactos, expansión reversible e indicadores de heterogeneidad (§3.3) |
+| Motivo expandido sin control para contraerse | Contraer exige clickear una arista que lleve su `motifId`; si la expansión supera el presupuesto de nodos, esas aristas pueden quedar recortadas y el estado expandido persiste con el tablero. Mitigación pendiente: acción explícita de contraer todo (§3.3) |
 | Cambios de zoom impredecibles | Histéresis, transiciones y control manual (§3.5) |
 | Costo del resumen en el cliente | Funciones puras, índices, caché y eventual soporte del backend |
 | Pérdida del enlace entre vistas | Identidad mediante URIs originales como fuente de selección (§3.6) |
