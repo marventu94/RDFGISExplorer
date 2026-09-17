@@ -3,7 +3,11 @@ import type { NormalizedEdge, QueryResult } from '@shared/models';
 import { bindingGraphId } from '@shared/stats/lots';
 import { aggregateParallelEdges } from './graph-abstraction';
 
-export type GraphInclusionReason = 'selected' | 'query-entity' | 'intermediate' | 'context' | 'degree';
+/**
+ * Por qué un nodo entró al presupuesto. No hay razón "grado": el grado ordena
+ * el bucket `context` (ver `buildGraphElements`), no es una categoría propia.
+ */
+export type GraphInclusionReason = 'selected' | 'query-entity' | 'intermediate' | 'context';
 
 /**
  * Construcción pura de los ElementDefinition de Cytoscape a partir de un
@@ -381,7 +385,6 @@ export function buildGraphElements(
     'query-entity': 0,
     intermediate: 0,
     context: 0,
-    degree: 0,
   };
 
   for (const node of visibleNodes) {
@@ -444,10 +447,17 @@ export function buildGraphElements(
     });
   }
 
-  // El layout `preset` usado al crear Cytoscape deja todos los nodos en el
-  // mismo punto. Cola no siempre rompe esa simetría —en especial con muchos
-  // componentes desconectados—, por lo que se entrega una semilla geométrica
-  // determinista antes de ejecutar el layout real.
+  // El layout `preset` usado al crear Cytoscape deja todos los nodos en el mismo
+  // punto, así que se entrega una semilla geométrica determinista antes de correr
+  // el layout real.
+  //
+  // Qué hace hoy, para no confundir a quien la lea: en el dibujo inicial NO
+  // decide nada. cola arranca con `randomize: true`
+  // (`GraphViewComponent.getInitialLayoutOptions`) y descarta estas posiciones,
+  // y dagre/grid calculan las suyas. Donde sí manda es en el camino incremental:
+  // los nodos que `patchGraph` agrega y que no tienen ningún vecino ya colocado
+  // del que colgarse (`placeNewNodes`) conservan esta posición, y el layout
+  // incremental corre con `randomize: false`.
   const nodeElements = elements.filter((element) => !('source' in element.data));
   const columns = Math.max(1, Math.ceil(Math.sqrt(nodeElements.length)));
   nodeElements.forEach((element, index) => {
