@@ -81,7 +81,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   filteredNodeCount = 0;
   activeFilterCount = 0;
 
-  @HostBinding('class.is-active-view') isActiveView = false;
+  private activeView = false;
+
+  /** El indicador coordinado no debe asomar por debajo del overlay de carga. */
+  @HostBinding('class.is-active-view')
+  get isActiveView(): boolean {
+    return this.activeView && !this.loadProgress.active();
+  }
 
   tooltipText = '';
   tooltipVisible = false;
@@ -203,7 +209,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       });
 
     this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
-      this.isActiveView = v === 'graph';
+      this.activeView = v === 'graph';
       this.cdr.markForCheck();
     });
 

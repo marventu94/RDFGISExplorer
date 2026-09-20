@@ -68,7 +68,13 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   /** Texto del chip de cobertura; vacío cuando la timeline muestra todos los nodos. */
   coverageLabel = '';
 
-  @HostBinding('class.is-active-view') isActiveView = false;
+  private activeView = false;
+
+  /** El indicador coordinado no debe asomar por debajo del overlay de carga. */
+  @HostBinding('class.is-active-view')
+  get isActiveView(): boolean {
+    return this.activeView && !this.loadProgress.active();
+  }
 
   private timeline?: Timeline;
   private readonly items = new DataSet<DataItem>();
@@ -261,7 +267,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       .subscribe((range) => this.emitFocusFromViewport(range));
 
     this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((v) => {
-      this.isActiveView = v === 'timeline';
+      this.activeView = v === 'timeline';
       this.cdr.markForCheck();
     });
 
