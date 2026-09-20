@@ -2,7 +2,15 @@ import { Injectable, computed, effect, signal } from '@angular/core';
 import type { QueryResult } from '@shared/models';
 
 export type ViewType = 'table' | 'graph' | 'map' | 'timeline';
-export type LayoutPreset = 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad';
+export type LayoutPreset =
+  | 'single'
+  | 'split-h'
+  | 'split-v'
+  | 'triple'
+  | 'triple-inv'
+  | 'triple-v'
+  | 'triple-v-inv'
+  | 'quad';
 
 interface PersistedState {
   preset: LayoutPreset;
@@ -14,8 +22,11 @@ const DEFAULT_SLOTS: ViewType[] = ['table', 'graph', 'map', 'timeline'];
 const SLOT_COUNT: Record<LayoutPreset, number> = {
   single: 1,
   'split-h': 2,
+  'split-v': 2,
   triple: 3,
   'triple-inv': 3,
+  'triple-v': 3,
+  'triple-v-inv': 3,
   quad: 4,
 };
 

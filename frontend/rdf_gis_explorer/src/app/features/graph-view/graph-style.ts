@@ -35,7 +35,10 @@ export function createGraphStyle(
         'text-valign': 'bottom',
         'text-margin-y': 5,
         'text-wrap': 'wrap',
-        'text-max-width': () => (detailLevel() === 'detail' ? '160px' : '140px'),
+        'text-max-width': () =>
+          detailLevel() === 'detail' || detailLevel() === 'literals-detail'
+            ? '160px'
+            : '140px',
         'text-outline-color': () => (isDark() ? '#0f172a' : '#ffffff'),
         'text-outline-width': 2,
       } as cytoscape.Css.Node,
@@ -77,7 +80,9 @@ export function createGraphStyle(
       style: {
         'line-style': 'dashed',
         label: (ele: cytoscape.EdgeSingular) =>
-          detailLevel() === 'detail' ? (ele.data('predicateLabel') as string) : '',
+          detailLevel() === 'detail' || detailLevel() === 'literals-detail'
+            ? (ele.data('predicateLabel') as string)
+            : '',
         'text-rotation': 'autorotate',
       } as cytoscape.Css.Edge,
     },
@@ -99,7 +104,9 @@ export function createGraphStyle(
       selector: 'edge:not([aggregate])',
       style: {
         label: (ele: cytoscape.EdgeSingular) =>
-          detailLevel() === 'detail' ? (ele.data('predicateLabel') as string) : '',
+          detailLevel() === 'detail' || detailLevel() === 'literals-detail'
+            ? (ele.data('predicateLabel') as string)
+            : '',
         'text-rotation': 'autorotate',
       } as cytoscape.Css.Edge,
     },
@@ -129,7 +136,7 @@ export function createGraphStyle(
     {
       selector: '.is-dimmed',
       style: {
-        opacity: 0.15,
+        opacity: 0.4,
       },
     },
     {
@@ -138,7 +145,7 @@ export function createGraphStyle(
       // y la timeline (decenas de nodos) el seleccionado no se distinguía.
       selector: '.is-muted',
       style: {
-        opacity: 0.35,
+        opacity: 0.7,
       },
     },
     {

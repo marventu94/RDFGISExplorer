@@ -20,7 +20,7 @@ import { DashboardLoadProgressService } from './dashboard-load-progress.service'
 import type { LoadStageId } from '@shared/progress/load-stages';
 import type { NormalizedNode, QueryResult } from '@shared/models';
 
-const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad'> = {
+const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'split-v' | 'triple' | 'triple-inv' | 'triple-v' | 'triple-v-inv' | 'quad'> = {
   1: 'single',
   2: 'split-h',
   3: 'triple',

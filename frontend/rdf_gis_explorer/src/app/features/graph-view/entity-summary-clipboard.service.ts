@@ -4,6 +4,7 @@ import { explorationSubgraph, isExplorationActive, type ExplorationContext, type
 import { buildAvailableStructure } from './entity-structure';
 import {
   buildEntitySummary,
+  formatTerm,
   summaryScopeLabel,
   type EntitySummaryDocument,
   type EntitySummaryMetrics,
@@ -84,6 +85,25 @@ export interface EntitySummaryRequest {
 
 @Injectable({ providedIn: 'root' })
 export class EntitySummaryClipboardService {
+  /** Copia sólo la información básica de la vista que está en pantalla. */
+  copyBasicView(subgraph: EntitySubgraph): Promise<SummaryCopyResult> {
+    const root = subgraph.nodes.find((node) => node.uri === subgraph.rootUri)?.node;
+    const active = subgraph.nodes.find((node) => node.uri === subgraph.activeUri)?.node;
+    const lines = [`Entidad: ${root?.label || subgraph.rootUri}`, `URI: ${subgraph.rootUri}`];
+    if (active && subgraph.activeUri !== subgraph.rootUri) {
+      lines.push(`Nodo seleccionado: ${active.label || active.uri} (${active.uri})`);
+    }
+    if (subgraph.edges.length > 0) {
+      lines.push('', 'Relaciones visibles:');
+      for (const edge of subgraph.edges) {
+        lines.push(
+          `- ${formatTerm(edge.source)} — ${edge.predicateLabel || edge.predicate} — ${formatTerm(edge.target)}`,
+        );
+      }
+    }
+    return this.copyText(lines.join('\n'), 'view');
+  }
+
   /** Documento de la vista explorada. `null` si no hay exploración activa. */
   buildCurrentViewDocument(request: EntitySummaryRequest): EntitySummaryDocument | null {
     const subgraph = request.subgraph ?? explorationSubgraph(request.context, request.state);

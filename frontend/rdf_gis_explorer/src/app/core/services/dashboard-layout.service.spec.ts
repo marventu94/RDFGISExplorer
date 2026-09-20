@@ -35,6 +35,30 @@ describe('DashboardLayoutService', () => {
     service = TestBed.inject(DashboardLayoutService);
   });
 
+  it('supports three views with the first one spanning the vertical axis', () => {
+    service.setLayout('triple-v');
+
+    expect(service.preset()).toBe('triple-v');
+    expect(service.slotCount()).toBe(3);
+    expect(service.visibleSlots()).toHaveLength(3);
+  });
+
+  it('supports the mirrored vertical three-view layout', () => {
+    service.setLayout('triple-v-inv');
+
+    expect(service.preset()).toBe('triple-v-inv');
+    expect(service.slotCount()).toBe(3);
+    expect(service.visibleSlots()).toHaveLength(3);
+  });
+
+  it('supports two vertically stacked views', () => {
+    service.setLayout('split-v');
+
+    expect(service.preset()).toBe('split-v');
+    expect(service.slotCount()).toBe(2);
+    expect(service.visibleSlots()).toHaveLength(2);
+  });
+
   describe('applyLayoutForResult', () => {
     it('should use quad layout when result has both geo and temporal data', () => {
       service.applyLayoutForResult(

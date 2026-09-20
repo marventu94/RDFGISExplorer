@@ -40,10 +40,16 @@ import { DashboardSaveFlowService } from '../dashboard-save-flow.service';
  * `splitscreen`. Se registran como svgIcon.
  */
 const LAYOUT_SVG_ICONS: Record<string, string> = {
+  'layout-split-v':
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/></svg>',
   'layout-triple':
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="12" x2="12" y2="20"/></svg>',
   'layout-triple-inv':
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="12"/><line x1="4" y1="12" x2="20" y2="12"/></svg>',
+  'layout-triple-v':
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="13" y1="4" x2="13" y2="20"/><line x1="13" y1="12" x2="20" y2="12"/></svg>',
+  'layout-triple-v-inv':
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="11" y1="4" x2="11" y2="20"/><line x1="4" y1="12" x2="11" y2="12"/></svg>',
   'layout-quad':
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
 };
@@ -119,9 +125,12 @@ export class NavbarComponent {
     svgIcon?: string;
   }[] = [
     { preset: 'single', label: '1 vista', icon: 'crop_square' },
-    { preset: 'split-h', label: '2 vistas', icon: 'splitscreen' },
-    { preset: 'triple', label: '3 vistas (1 arriba)', svgIcon: 'layout-triple' },
-    { preset: 'triple-inv', label: '3 vistas (2 arriba)', svgIcon: 'layout-triple-inv' },
+    { preset: 'split-h', label: '2 vistas · Lado a lado', icon: 'splitscreen' },
+    { preset: 'split-v', label: '2 vistas · Apiladas', svgIcon: 'layout-split-v' },
+    { preset: 'triple', label: '3 vistas · Grande arriba', svgIcon: 'layout-triple' },
+    { preset: 'triple-inv', label: '3 vistas · Grande abajo', svgIcon: 'layout-triple-inv' },
+    { preset: 'triple-v', label: '3 vistas · Grande izquierda', svgIcon: 'layout-triple-v' },
+    { preset: 'triple-v-inv', label: '3 vistas · Grande derecha', svgIcon: 'layout-triple-v-inv' },
     { preset: 'quad', label: '4 vistas', svgIcon: 'layout-quad' },
   ];
 

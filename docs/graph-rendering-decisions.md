@@ -203,12 +203,12 @@ ningún nodo queda en `(0,0)`.
 La animación del cálculo inicial depende del layout, y la diferencia es
 deliberada: Dagre y Grid se resuelven sin animar, mientras que Cola sí se anima
 —con `animate: false` webcola resuelve su simulación de forma sincrónica y
-puede bloquear el hilo principal—. Cola arranca además con posiciones
-aleatorias (`randomize`), por lo que el primer dibujo de un grafo cíclico no es
-reproducible entre corridas; la semilla geométrica determinista que calcula la
-función pura de construcción solo gobierna el camino incremental (los nodos
-nuevos sin vecino ya ubicado). Estabilizar ese primer dibujo queda como mejora
-pendiente, ligada al benchmark de layouts.
+puede bloquear el hilo principal—. Cola reutiliza la semilla geométrica
+determinista (`randomize: false`) y dispone de hasta 4 s para converger, valor
+de referencia de la extensión. En grafos de más de 100 nodos se elimina la
+restricción de flujo vertical: imponer niveles a una red cíclica o heterogénea
+grande estira innecesariamente la simulación. El modo Orgánico sigue siendo
+una alternativa manual; el default para cualquier grafo con aristas es Dagre.
 
 Los cambios de layout pedidos por el usuario sí se animan y se conserva la
 estabilidad incremental. fCoSE y el empaquetamiento dedicado de componentes

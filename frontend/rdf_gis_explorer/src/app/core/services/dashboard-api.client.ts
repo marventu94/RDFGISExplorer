@@ -11,7 +11,7 @@ export interface GisDashboardPayload {
   backend: string;
   layout: {
     slotsCount: 1 | 2 | 3 | 4;
-    preset?: 'single' | 'split-h' | 'triple' | 'triple-inv' | 'quad';
+    preset?: 'single' | 'split-h' | 'split-v' | 'triple' | 'triple-inv' | 'triple-v' | 'triple-v-inv' | 'quad';
     slots: Array<{ id: string; view: 'map' | 'timeline' | 'graph' | 'table' }>;
   };
   filters: {

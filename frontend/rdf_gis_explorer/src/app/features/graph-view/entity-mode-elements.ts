@@ -1,4 +1,5 @@
 import type cytoscape from 'cytoscape';
+import type { BindingValue, NormalizedNode } from '@shared/models';
 import type {
   BranchDirection,
   EntitySubgraph,
@@ -29,10 +30,35 @@ export interface EntityModeGraph {
   edgeCount: number;
 }
 
+export function entityAttributeValue(value: BindingValue): string {
+  switch (value.type) {
+    case 'coordinate':
+      return value.raw || `${value.value.lat}, ${value.value.lng}`;
+    case 'date':
+      return value.value;
+    case 'literal':
+      return value.lang ? `${value.value} (${value.lang})` : value.value;
+    case 'bnode':
+      return value.value.startsWith('_:') ? value.value : `_:${value.value}`;
+    case 'uri':
+      return value.value;
+  }
+}
+
+/** Literales propios del nodo, sin heredar datos de nodos vecinos o ancestros. */
+export function entityAttributeLabel(node: NormalizedNode): string {
+  return Object.entries(node.directAttributes ?? node.attributes ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => `${name}: ${entityAttributeValue(value)}`)
+    .join('\n');
+}
+
 export interface EntityBranchItem {
   id: string;
   nodeUri: string;
   nodeLabel: string;
+  /** Primer nodo que aparecerá al expandir. */
+  revealedUri: string | null;
   direction: BranchDirection;
   /** Predicado legible, con la flecha del sentido. */
   label: string;
@@ -129,7 +155,8 @@ export function buildEntityModeElements(subgraph: EntitySubgraph): EntityModeGra
     elements.push({
       data: {
         id: node.uri,
-        label: node.node.label,
+        label: node.node.label || node.node.uri,
+        attributeLabel: entityAttributeLabel(node.node),
         classUri: node.node.classes?.[0] ?? '',
         classes: node.node.classes ?? [],
         queryVariable: node.node.queryVariable ?? '',
@@ -208,6 +235,7 @@ function branchItem(
     id: branch.id,
     nodeUri: branch.nodeUri,
     nodeLabel,
+    revealedUri: branch.pendingUris[0] ?? null,
     direction: branch.direction,
     label,
     detail: detail.join(' · '),

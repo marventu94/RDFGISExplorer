@@ -468,12 +468,13 @@ LIMIT $limit`;
       }
 
       // Atribución de literales, coordenadas y eventos temporales. Regla:
-      // - Si la variable es el objeto de un link cuyo sujeto es una variable
-      //   proyectada con valor URI en esta fila, cuelga del nodo de ese sujeto
+      // - Para las vistas coordinadas se conserva el comportamiento histórico:
+      //   un sujeto URI proyectado es dueño; un blank node/intermedio enriquece
+      //   la entidad ancla que mapa y timeline pueden representar.
       //   (la entidad correcta en filas multi-entidad:
       //   `?ciudad <fundacion> ?fundacionCiudad` → la fecha va a la ciudad).
-      // - Si no hay tal link (literal suelto, o sujeto bnode/intermedio no
-      //   proyectado), cae al nodo ancla: la primera variable URI de la proyección.
+      // - Si no hay tal sujeto URI (literal suelto o estructura anónima), cae al
+      //   nodo ancla: la primera variable URI de la proyección.
       //   Así el caso estructural del OVS (`?inmueble hasFeature ?f . ?f asWKT ?wkt`,
       //   con intermedios/bnodes) sigue llevando coordenada y fechas al inmueble,
       //   que es donde el mapa y la timeline las buscan.
@@ -487,6 +488,11 @@ LIMIT $limit`;
       );
       if (!anchor) continue;
 
+      const boundResources = new Set(
+        [...exposedVars, ...topology.intermediates].filter(
+          (v) => row[v]?.type === 'uri' || row[v]?.type === 'bnode',
+        ),
+      );
       const projectedUris = new Set(
         exposedVars.filter((v) => row[v]?.type === 'uri'),
       );
@@ -503,6 +509,18 @@ LIMIT $limit`;
           projectedUris,
           anchor,
         );
+
+        const directOwner = this.resolveDirectOwnerNode(
+          nodeMap,
+          row,
+          topology,
+          v,
+          boundResources,
+        );
+        if (directOwner) {
+          directOwner.directAttributes ??= {};
+          directOwner.directAttributes[v] = val;
+        }
 
         // Merge entre filas: si dos filas traen la misma variable para el mismo
         // nodo, la última gana (Object.assign sobre la misma clave).
@@ -534,8 +552,8 @@ LIMIT $limit`;
 
   /**
    * Resuelve a qué nodo se atribuye una variable no-URI de la fila: el sujeto de un
-   * link `?sujeto <p> ?variable` cuando ese sujeto es una variable proyectada con
-   * valor URI en la fila; si no, el ancla. Toma el primer link que cumple.
+   * link `?sujeto <p> ?variable` cuando ese sujeto es una URI proyectada; si no,
+   * usa el ancla para conservar la entidad central de mapa y timeline.
    */
   private resolveOwnerNode(
     nodeMap: Map<string, NormalizedNode>,
@@ -557,6 +575,21 @@ LIMIT $limit`;
       if (owner) return owner;
     }
     return anchor;
+  }
+
+  /** Propietario RDF exacto del valor, incluyendo blank nodes e intermedios. */
+  private resolveDirectOwnerNode(
+    nodeMap: Map<string, NormalizedNode>,
+    row: ResultBinding,
+    topology: QueryTopology,
+    varName: string,
+    boundResources: ReadonlySet<string>,
+  ): NormalizedNode | null {
+    for (const link of topology.links) {
+      if (link.object !== varName || !boundResources.has(link.subject)) continue;
+      return this.ensureNode(nodeMap, row, link.subject, topology.classAssertions);
+    }
+    return null;
   }
 
   /**

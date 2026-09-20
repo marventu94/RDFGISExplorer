@@ -59,4 +59,13 @@ describe('createGraphStyle', () => {
     expect((node['text-outline-color'] as () => string)()).toBe('#0f172a');
     expect((edge['text-background-color'] as () => string)()).toBe('#0f172a');
   });
+
+  it('mantiene visibles los nodos no seleccionados', () => {
+    const styles = createGraphStyle(colorService as never, () => false, () => 'detail');
+    const dimmed = styles.find((style) => style.selector === '.is-dimmed')!.style as Record<string, unknown>;
+    const muted = styles.find((style) => style.selector === '.is-muted')!.style as Record<string, unknown>;
+
+    expect(dimmed['opacity']).toBe(0.4);
+    expect(muted['opacity']).toBe(0.7);
+  });
 });

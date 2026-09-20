@@ -25,6 +25,7 @@ import { createGraphStyle } from './graph-style';
 import {
   chooseGraphLayout,
   GRAPH_LAYOUT_OPTIONS,
+  initialColaOptions,
   LAYOUT_CONFIGS,
   layoutOptionsFor,
   type GraphDetailLevel,
@@ -58,6 +59,7 @@ import { DEFAULT_SUBGRAPH_BUDGET, type EntitySubgraph } from './entity-subgraph'
 import {
   activeBranchItems,
   buildEntityModeElements,
+  entityAttributeValue,
   entityBreadcrumb,
   entityLabelResolver,
   entityMetricsLabel,
@@ -109,11 +111,19 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   detailLevel: GraphDetailLevel = 'summary';
   private expandedSuperEdgeIds = new Set<string>();
   private expandedMotifIds = new Set<string>();
-  readonly detailLevels = [
+  private readonly resultDetailLevels = [
     { value: 'summary' as const, label: 'Resumen' },
     { value: 'exploration' as const, label: 'Entidades' },
     { value: 'detail' as const, label: 'Entidades + relaciones' },
   ];
+  private readonly entityDetailLevels = [
+    ...this.resultDetailLevels,
+    { value: 'literals' as const, label: 'Literales' },
+    { value: 'literals-detail' as const, label: 'Literales + relaciones' },
+  ];
+  get availableDetailLevels() {
+    return this.isEntityMode ? this.entityDetailLevels : this.resultDetailLevels;
+  }
   get availableLayoutOptions(): readonly GraphLayoutOption[] {
     if (this.queryState === 'no-edges' || this.currentLayout === 'grid') {
       return GRAPH_LAYOUT_OPTIONS;
@@ -189,6 +199,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   explorationMessage = '';
   /** Texto expuesto para copia manual cuando el navegador bloquea el portapapeles. */
   copyFallbackText = '';
+  entityPanelVisible = true;
   /** Selección explícita vigente, sea cual sea la vista que la originó. */
   private selectedUri: string | null = null;
   private selectedLabel = '';
@@ -273,11 +284,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           if (context) {
             const next = notifySelection(context, this.explorationState, sel.node.uri);
             if (next.lastRejection) {
-              // Que la selección no pertenezca a la estructura no es un error:
-              // el panel ofrece explorarla como nueva raíz y la raíz vigente no
-              // se reemplaza sola (§9 del plan).
-              this.explorationState = next;
-              this.explorationMessage = '';
+              // Una selección explícita siempre gobierna esta vista. Si quedó
+              // fuera de la estructura actual, se convierte en la nueva entidad.
+              this.enterEntity(sel.node.uri, 'user-action');
             } else {
               this.applyExploration(next);
             }
@@ -460,7 +469,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         ),
         // Reglas del modo entidad: seleccionan por clases `.entity-*`, que solo
         // existen cuando dibuja el subgrafo explorado.
-        ...entityModeStyleRules(() => document.documentElement.dataset['theme'] === 'dark'),
+        ...entityModeStyleRules(
+          () => document.documentElement.dataset['theme'] === 'dark',
+          () => this.detailLevel,
+        ),
       ],
       // Antes acá iba `defaultLayout` mientras currentLayout venía del estado
       // guardado: el dropdown decía una cosa y el grafo dibujaba otra.
@@ -814,7 +826,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       maxNodes: this.MAX_NODES,
       pinnedUris: selected ? [selected.uri] : [],
       expandedSuperEdgeIds: [...this.expandedSuperEdgeIds],
-      detailLevel: this.detailLevel,
+      detailLevel:
+        this.detailLevel === 'literals' || this.detailLevel === 'literals-detail'
+          ? 'exploration'
+          : this.detailLevel,
       expandedMotifIds: [...this.expandedMotifIds],
     });
   }
@@ -918,20 +933,31 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy.on('tap', 'node', (evt) => {
       const nodeUri = evt.target.id() as string;
       const nodeData = this.nodeIndex.get(nodeUri);
-      if (nodeData) {
-        this.ngZone.run(() => {
-          this.selectionService.select(nodeData, 'graph');
-        });
-      } else if (this.isEntityMode) {
-        // Nodo estructural que no llegó al índice (p. ej. viene del resultado
-        // completo): igual puede inspeccionarse, sin emitir selección a las
-        // otras vistas.
+      if (this.isEntityMode) {
+        // El tap manda sobre cualquier selección previa: primero activa el
+        // nodo exacto y recién después publica la selección coordinada.
         const context = this.explorationContext();
         if (context) {
           this.ngZone.run(() => {
-            this.applyExploration(setActiveNode(context, this.explorationState, nodeUri));
+            let next = this.explorationState;
+            const expandable = this.entitySubgraph?.branches.filter(
+              (branch) =>
+                branch.nodeUri === nodeUri &&
+                branch.pendingUris.length > 0 &&
+                !branch.expanded,
+            ) ?? [];
+            for (const branch of expandable) {
+              const expanded = expandBranch(context, next, branch.id);
+              if (expanded.lastRejection) break;
+              next = expanded;
+            }
+            this.applyExploration(setActiveNode(context, next, nodeUri));
           });
         }
+      } else if (nodeData) {
+        this.ngZone.run(() => {
+          this.selectionService.select(nodeData, 'graph');
+        });
       }
       // La suscripción a selectedNode$ descarta lo propio (source 'graph'), así
       // que el nodo marcado se recuerda acá para que un foco coordinado
@@ -979,7 +1005,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         (evt.originalEvent?.target as HTMLElement)?.tagName === 'CANVAS'
       ) {
         this.ngZone.run(() => {
-          this.selectionService.clearSelection();
+          if (!this.isEntityMode) this.selectionService.clearSelection();
         });
         this.applyFocusContext(null);
       }
@@ -1143,7 +1169,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const connections =
       total === drawn ? `${total} conexiones` : `${total} conexiones (${drawn} dibujadas)`;
     const variable = node.data('queryVariable') as string;
-    return variable ? `${label} · ${variable} · ${connections}` : `${label} · ${connections}`;
+    const expandable = ((node.data('entityPending') as number) ?? 0) > 0
+      ? ' · click para mostrar más relaciones'
+      : '';
+    const description = variable
+      ? `${label} · ${variable} · ${connections}`
+      : `${label} · ${connections}`;
+    return description + expandable;
   }
 
   private applyFocusContext(focusUri: string | null): void {
@@ -1300,7 +1332,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       pan: { x: pan.x, y: pan.y },
       zoom: this.cy.zoom(),
       ...(Object.keys(manual).length > 0 ? { manualPositions: manual } : {}),
-      detailLevel: this.detailLevel,
+      detailLevel:
+        this.detailLevel === 'literals' || this.detailLevel === 'literals-detail'
+          ? 'exploration'
+          : this.detailLevel,
       ...(this.expandedSuperEdgeIds.size > 0
         ? { expandedSuperEdgeIds: [...this.expandedSuperEdgeIds] }
         : {}),
@@ -1342,6 +1377,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   entityActiveLabel = '';
   entityActiveShortUri = '';
   entityActivePinned = false;
+  entityActiveAttributes: Array<{ name: string; value: string }> = [];
   entityMetrics = '';
   entityWarnings = '';
   entityCrumbs: EntityCrumb[] = [];
@@ -1393,7 +1429,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   /** `Ver estructura`: única entrada al modo entidad desde la interfaz. */
   showStructure(trigger: EntityModeTrigger = 'user-action'): void {
     if (!this.selectedUri) return;
+    this.entityPanelVisible = true;
     this.enterEntity(this.selectedUri, trigger);
+  }
+
+  toggleEntityPanel(): void {
+    this.entityPanelVisible = !this.entityPanelVisible;
+    this.cdr.markForCheck();
   }
 
   /** Explora la selección que llegó de otra vista como nueva raíz (acción explícita). */
@@ -1427,7 +1469,21 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   toggleBranch(item: EntityBranchItem): void {
     if (item.expanded) this.collapseBranchById(item.id);
-    else this.expandBranchById(item.id);
+    else {
+      const context = this.explorationContext();
+      if (!context) return;
+      const expanded = expandBranch(context, this.explorationState, item.id);
+      const targetUri = item.revealedUri ?? item.nodeUri;
+      const activated = expanded.lastRejection
+        ? expanded
+        : setActiveNode(context, expanded, targetUri);
+      this.applyExploration(activated);
+      if (!activated.lastRejection) {
+        this.selectedDrawnUri = targetUri;
+        this.panToNode(targetUri);
+        this.applyFocusContext(targetUri);
+      }
+    }
   }
 
   /** Activa un nodo desde el panel (sin pasar por el lienzo). */
@@ -1461,11 +1517,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   async copyCurrentEntityView(): Promise<void> {
-    await this.copyEntitySummary('view');
-  }
-
-  async copyFullEntityStructure(): Promise<void> {
-    await this.copyEntitySummary('structure');
+    if (!this.entitySubgraph) return;
+    const result = await this.summaryClipboard.copyBasicView(this.entitySubgraph);
+    this.explorationMessage = result.message;
+    this.copyFallbackText = result.status === 'unsupported' ? result.text : '';
+    this.cdr.markForCheck();
   }
 
   dismissCopyFallback(): void {
@@ -1629,10 +1685,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     this.explorationState = next;
     this.explorationMessage = '';
-    // §9: el modo entidad usa Jerárquico, y con etiquetas visibles (en Resumen
-    // los nodos no las muestran y el subgrafo sería ilegible).
+    // El modo entidad arranca mostrando la propiedad directa de cada literal.
     this.currentLayout = 'dagre';
-    if (this.detailLevel === 'summary') this.detailLevel = 'exploration';
+    this.detailLevel = 'literals';
     this.manualPositions.clear();
     this.destroyGraph();
     this.syncEntityMode();
@@ -1670,6 +1725,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.entityActiveLabel = '';
       this.entityActiveShortUri = '';
       this.entityActivePinned = false;
+      this.entityActiveAttributes = [];
       this.entityMetrics = '';
       this.entityWarnings = '';
       this.entityCrumbs = [];
@@ -1692,6 +1748,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.entityActiveLabel = labelOf(subgraph.activeUri);
     this.entityActiveShortUri = shortenUri(subgraph.activeUri);
     this.entityActivePinned = this.explorationState.pinnedUris.includes(subgraph.activeUri);
+    const activeNode = subgraph.nodes.find((node) => node.uri === subgraph.activeUri)?.node;
+    this.entityActiveAttributes = Object.entries(
+      activeNode?.directAttributes ?? activeNode?.attributes ?? {},
+    )
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, value]) => ({ name, value: entityAttributeValue(value) }));
     this.entityMetrics = entityMetricsLabel(subgraph);
     this.entityWarnings = entityWarningsLabel(subgraph);
     this.entityCrumbs = entityBreadcrumb(explorationBreadcrumb(this.explorationState), labelOf);
@@ -1746,14 +1808,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   private getInitialLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {
     if (layout === 'cola') {
-      return {
-        ...(this.getLayoutOptions(layout) as unknown as Record<string, unknown>),
-        // webcola con `animate: false` resuelve su simulación sincrónicamente y
-        // puede bloquear el hilo principal. Además, partir todos los nodos de
-        // (0,0) reproduce el solapamiento observado en componentes pequeños.
-        animate: true,
-        randomize: true,
-      } as unknown as cytoscape.LayoutOptions;
+      return initialColaOptions(this.detailLevel, this.cy?.nodes().length ?? 0);
     }
     return {
       ...(this.getLayoutOptions(layout) as unknown as Record<string, unknown>),

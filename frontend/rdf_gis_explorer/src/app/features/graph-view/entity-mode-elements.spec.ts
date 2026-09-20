@@ -136,6 +136,30 @@ describe('entityNodeRole', () => {
   });
 });
 
+describe('literales por nodo', () => {
+  it('muestra cada atributo sólo en el nodo que lo posee', () => {
+    const subgraph = subgraphOf();
+    const listing = subgraph.nodes[0];
+    const specification = subgraph.nodes[1];
+    listing.node.attributes = {};
+    specification.node.attributes = {
+      moneda: { type: 'literal', value: 'USD' },
+      precio: { type: 'literal', value: '125000' },
+    };
+
+    const graph = buildEntityModeElements(subgraph);
+    const listingElement = graph.elements.find((element) => element.data['id'] === listing.uri);
+    const specificationElement = graph.elements.find(
+      (element) => element.data['id'] === specification.uri,
+    );
+
+    expect(listingElement?.data['attributeLabel']).toBe('');
+    expect(specificationElement?.data['attributeLabel']).toBe(
+      'moneda: USD\nprecio: 125000',
+    );
+  });
+});
+
 describe('ramas', () => {
   it('lista las ramas del nodo activo con sus conteos', () => {
     const fixture = realEstateFixture();
@@ -174,6 +198,7 @@ describe('ramas', () => {
     expect(items.length).toBeLessThanOrEqual(2);
     expect(items.every((item) => item.nodeUri !== subgraph.activeUri)).toBe(true);
     expect(items.every((item) => item.pendingCount > 0)).toBe(true);
+    expect(items.every((item) => item.revealedUri !== null)).toBe(true);
     // Con nodo en el texto: hace falta para saber de dónde sale la rama.
     for (const item of items) expect(item.label).toContain(item.nodeLabel);
   });

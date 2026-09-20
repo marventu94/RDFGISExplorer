@@ -52,6 +52,8 @@ export interface NormalizedNode {
     inferred: boolean;
   };
   attributes: Record<string, BindingValue>;
+  /** Valores cuyo sujeto RDF es exactamente este nodo. */
+  directAttributes?: Record<string, BindingValue>;
   coordinate?: Coordinate;
   temporalEvents?: TemporalEvent[];
   flags?: {

@@ -479,7 +479,7 @@ describe('GraphViewComponent', () => {
     expect(cy._layoutRuns[0]?.['animate']).toBe(false);
   });
 
-  it('inicia Cola con posiciones aleatorias sin bloquear el hilo principal', () => {
+  it('inicia Cola desde posiciones deterministas sin bloquear el hilo principal', () => {
     TestBed.inject(DashboardViewStateService).graphState.set({ layout: 'cola' });
     const reverseEdge: NormalizedEdge = {
       id: 'edge-2',
@@ -493,7 +493,7 @@ describe('GraphViewComponent', () => {
     const initialLayout = lastCy()._layoutRuns[0];
     expect(initialLayout?.['name']).toBe('cola');
     expect(initialLayout?.['animate']).toBe(true);
-    expect(initialLayout?.['randomize']).toBe(true);
+    expect(initialLayout?.['randomize']).toBe(false);
   });
 
   it('inicia en Resumen y el selector refleja el nivel activo', () => {
@@ -503,6 +503,11 @@ describe('GraphViewComponent', () => {
     const select = fixture.nativeElement.querySelector('#graph-detail') as HTMLSelectElement;
     expect(component.detailLevel).toBe('summary');
     expect(select.value).toBe('summary');
+    expect([...select.options].map((option) => option.value)).toEqual([
+      'summary',
+      'exploration',
+      'detail',
+    ]);
   });
 
   it('Resumen construye un único motivo para pares estructuralmente repetidos', () => {
@@ -1489,20 +1494,27 @@ describe('GraphViewComponent', () => {
       },
     );
 
-    it('usa Jerárquico y sube el nivel para que se lean las etiquetas', () => {
+    it('usa Jerárquico y Literales como nivel inicial de la entidad', () => {
       expect(component.detailLevel).toBe('summary');
 
       enter();
 
       expect(component.currentLayout).toBe('dagre');
-      expect(component.detailLevel).toBe('exploration');
+      expect(component.detailLevel).toBe('literals');
+      expect(component.availableDetailLevels.map((option) => option.value)).toEqual([
+        'summary',
+        'exploration',
+        'detail',
+        'literals',
+        'literals-detail',
+      ]);
       expect(lastCy()._layoutRuns[0]?.['name']).toBe('dagre');
     });
 
-    it('conecta las dos acciones de copia y anuncia el resultado', async () => {
+    it('copia una versión básica de la vista actual y anuncia el resultado', async () => {
       enter();
       const clipboard = TestBed.inject(EntitySummaryClipboardService);
-      const view = vi.spyOn(clipboard, 'copyCurrentView').mockResolvedValue({
+      const view = vi.spyOn(clipboard, 'copyBasicView').mockResolvedValue({
         status: 'copied',
         scope: 'view',
         copied: true,
@@ -1510,27 +1522,14 @@ describe('GraphViewComponent', () => {
         metrics: null,
         message: 'Vista copiada.',
       });
-      const structure = vi.spyOn(clipboard, 'copyFullStructure').mockResolvedValue({
-        status: 'copied',
-        scope: 'structure',
-        copied: true,
-        text: 'estructura',
-        metrics: null,
-        message: 'Estructura copiada.',
-      });
-
       await component.copyCurrentEntityView();
       expect(view).toHaveBeenCalledOnce();
       expect(component.explorationMessage).toBe('Vista copiada.');
-
-      await component.copyFullEntityStructure();
-      expect(structure).toHaveBeenCalledOnce();
-      expect(component.explorationMessage).toBe('Estructura copiada.');
     });
 
     it('expone el texto para copia manual cuando no hay API disponible', async () => {
       enter();
-      vi.spyOn(TestBed.inject(EntitySummaryClipboardService), 'copyCurrentView').mockResolvedValue({
+      vi.spyOn(TestBed.inject(EntitySummaryClipboardService), 'copyBasicView').mockResolvedValue({
         status: 'unsupported',
         scope: 'view',
         copied: false,
@@ -1638,15 +1637,50 @@ describe('GraphViewComponent', () => {
       expect(alert?.textContent).toContain('presupuesto');
     });
 
-    it('el panel publica métricas de visibles, disponibles y omitidos', () => {
+    it('el panel omite las métricas técnicas', () => {
       enter();
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.entity-panel__metrics'),
+      ).toBeNull();
+    });
 
-      const metrics = (fixture.nativeElement as HTMLElement).querySelector(
-        '.entity-panel__metrics',
-      );
-      expect(metrics?.textContent).toContain('nodos');
-      expect(metrics?.textContent).toContain('tripletas');
-      expect(component.entityMetrics).toBe(metrics?.textContent?.trim());
+    it('deja sólo las acciones principales y omite la ayuda de teclado', () => {
+      enter();
+      fixture.detectChanges();
+      const panel = (fixture.nativeElement as HTMLElement).querySelector('.entity-panel')!;
+      const text = panel.textContent ?? '';
+
+      expect(text).toContain('Copiar vista actual');
+      expect(text).not.toContain('Volver al resultado');
+      expect((fixture.nativeElement as HTMLElement).querySelector('.graph-toolbar')?.textContent)
+        .toContain('Volver al resultado');
+      expect(text).not.toContain('Copiar estructura completa');
+      expect(text).not.toContain('Fijar');
+      expect(text).not.toContain('Usar como raíz');
+      expect(text).not.toContain('Teclado:');
+      expect(panel.querySelector('.entity-panel__warning')).toBeNull();
+    });
+
+    it('permite ocultar y volver a mostrar el panel sin salir del modo entidad', () => {
+      enter();
+      fixture.detectChanges();
+
+      component.toggleEntityPanel();
+      fixture.detectChanges();
+      expect(component.isEntityMode).toBe(true);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.entity-panel')).toBeNull();
+
+      component.toggleEntityPanel();
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.entity-panel')).not.toBeNull();
+    });
+
+    it('no duplica los atributos literales dentro del panel', () => {
+      enter();
+      fixture.detectChanges();
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.entity-attributes'),
+      ).toBeNull();
     });
 
     it('fija y desfija el nodo activo', () => {
@@ -1705,16 +1739,10 @@ describe('GraphViewComponent', () => {
       expect(component.isEntityMode).toBe(true);
     });
 
-    it('una selección posterior no reemplaza la raíz sin acción explícita', () => {
+    it('una selección posterior fuera de la estructura pasa a ser la nueva entidad', () => {
       enter();
 
       select(estate.otherListing, 'map');
-
-      expect(component.entityRootUri).toBe(estate.root);
-      expect(component.entityRootCandidate?.uri).toBe(estate.otherListing);
-
-      component.exploreSelectedAsRoot();
-      fixture.detectChanges();
 
       expect(component.entityRootUri).toBe(estate.otherListing);
     });
@@ -1729,17 +1757,31 @@ describe('GraphViewComponent', () => {
       expect(component.entityRootCandidate).toBeNull();
     });
 
-    it('el tap en el lienzo emite selección y mueve el nodo activo', () => {
+    it('el tap en el lienzo mueve el nodo activo sin reemplazar la selección global', () => {
       enter();
       const cy = lastCy();
       const selectionService = TestBed.inject(SelectionService);
 
       cy._emit('tap', 'node', { target: cy.getElementById(estate.address) });
-      selectedNodeSubject.next({ node: nodeOf(estate.address), source: 'graph' });
       fixture.detectChanges();
 
-      expect(selectionService.select).toHaveBeenCalledWith(nodeOf(estate.address), 'graph');
+      expect(selectionService.select).not.toHaveBeenCalled();
       expect(component.entityActiveUri).toBe(estate.address);
+      expect(component.entityRootUri).toBe(estate.root);
+    });
+
+    it('mostrar otra relación activa y centra el nodo recién incorporado', () => {
+      enter();
+      const branch = branchOf(estate.partido);
+      const revealedUri = branch.revealedUri!;
+      const selectionService = TestBed.inject(SelectionService);
+
+      component.toggleBranch(branch);
+      fixture.detectChanges();
+
+      expect(component.entityActiveUri).toBe(revealedUri);
+      expect(drawnNodeIds()).toContain(revealedUri);
+      expect(selectionService.select).not.toHaveBeenCalled();
     });
 
     it('volver al resultado recupera cámara, layout y nivel previos', () => {

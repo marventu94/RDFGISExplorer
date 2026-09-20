@@ -1,4 +1,5 @@
 import type cytoscape from 'cytoscape';
+import type { GraphDetailLevel } from './graph-layouts';
 
 /**
  * Etapa 5: reglas de estilo adicionales del modo entidad.
@@ -7,7 +8,10 @@ import type cytoscape from 'cytoscape';
  * seleccionan por clases (`.entity-*`) que sólo existen cuando el modo entidad
  * está dibujando, así que la vista de resultado queda exactamente igual.
  */
-export function entityModeStyleRules(isDark: () => boolean): cytoscape.StylesheetStyle[] {
+export function entityModeStyleRules(
+  isDark: () => boolean,
+  detailLevel: () => GraphDetailLevel,
+): cytoscape.StylesheetStyle[] {
   const accent = '#1565C0';
   const activeAccent = '#EF6C00';
   return [
@@ -16,7 +20,14 @@ export function entityModeStyleRules(isDark: () => boolean): cytoscape.Styleshee
       // una estructura concreta, no a mirar una nube.
       selector: 'node.entity-node',
       style: {
-        label: (ele: cytoscape.NodeSingular) => (ele.data('label') as string) ?? '',
+        label: (ele: cytoscape.NodeSingular) => {
+          if (detailLevel() === 'summary') return '';
+          const label = (ele.data('label') as string) ?? '';
+          const attributes = (ele.data('attributeLabel') as string) ?? '';
+          return (detailLevel() === 'literals' || detailLevel() === 'literals-detail') && attributes
+            ? `${label}\n${attributes}`
+            : label;
+        },
         'font-size': '10px',
       } as cytoscape.Css.Node,
     },

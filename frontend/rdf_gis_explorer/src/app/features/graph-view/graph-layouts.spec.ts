@@ -1,6 +1,7 @@
 import {
   chooseGraphLayout,
   GRAPH_LAYOUT_OPTIONS,
+  initialColaOptions,
   layoutOptionsFor,
 } from './graph-layouts';
 
@@ -55,5 +56,14 @@ describe('layoutOptionsFor', () => {
     expect(summary).toMatchObject({ nodeSep: 34, rankSep: 70, edgeSep: 14 });
     expect(entities).toMatchObject({ nodeSep: 60, rankSep: 95, edgeSep: 24 });
     expect(relations).toMatchObject({ nodeSep: 78, rankSep: 125, edgeSep: 36 });
+  });
+
+  it('keeps cola deterministic and drops the flow constraint for large graphs', () => {
+    const small = initialColaOptions('exploration', 40) as unknown as Record<string, unknown>;
+    const large = initialColaOptions('exploration', 300) as unknown as Record<string, unknown>;
+
+    expect(small).toMatchObject({ randomize: false, maxSimulationTime: 4000 });
+    expect(small['flow']).toBeDefined();
+    expect(large['flow']).toBeUndefined();
   });
 });

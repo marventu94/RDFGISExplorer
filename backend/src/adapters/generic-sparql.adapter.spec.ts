@@ -719,7 +719,7 @@ describe('GenericSparqlAdapter', () => {
       expect(ciudad!.attributes['fechaNac']).toBeUndefined();
     });
 
-    it('caso estructural OVS: fecha y coordenada colgadas de un intermedio siguen yendo al ancla', async () => {
+    it('atribuye fecha y coordenada al blank node que es sujeto del triple', async () => {
       mockWikidata({
         head: { vars: ['inmueble', 'wkt', 'fecha', 'f'] },
         results: {
@@ -750,14 +750,15 @@ describe('GenericSparqlAdapter', () => {
         (n) => n.uri === 'http://example.org/inmueble/1',
       );
       const intermedio = result.nodes.find((n) => n.uri === '_:b0');
-      // El sujeto del link (?f) es un intermedio no proyectado: wkt y fecha caen al ancla.
+      // El ancla conserva los datos consumidos por mapa/timeline, mientras el
+      // blank node registra la propiedad directa para inspeccionar la topología.
       expect(inmueble!.coordinate).toEqual({ lat: -34.6037, lng: -58.3816 });
       expect(inmueble!.temporalEvents?.map((e) => e.field)).toEqual(['fecha']);
       expect(inmueble!.attributes['wkt']).toBeDefined();
       expect(inmueble!.attributes['fecha']).toBeDefined();
-      expect(intermedio!.coordinate).toBeUndefined();
-      expect(intermedio!.temporalEvents).toBeUndefined();
       expect(intermedio!.attributes).toEqual({});
+      expect(intermedio!.directAttributes?.['wkt']).toBeDefined();
+      expect(intermedio!.directAttributes?.['fecha']).toBeDefined();
     });
 
     it('un bnode con label ya prefijado no queda doblemente prefijado', async () => {

@@ -2,7 +2,12 @@ import type cytoscape from 'cytoscape';
 import type { QueryResult } from '@shared/models';
 
 export type GraphLayout = 'cola' | 'dagre' | 'grid';
-export type GraphDetailLevel = 'summary' | 'exploration' | 'detail';
+export type GraphDetailLevel =
+  | 'summary'
+  | 'exploration'
+  | 'detail'
+  | 'literals'
+  | 'literals-detail';
 
 export interface GraphLayoutOption {
   value: GraphLayout;
@@ -40,7 +45,7 @@ export interface LayoutConfig {
 }
 
 /** Techo de la simulación de cola; también es su "duración" a efectos del fit. */
-const COLA_SIMULATION_MS = 1500;
+const COLA_SIMULATION_MS = 4000;
 
 export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
   cola: {
@@ -56,8 +61,8 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
       // sin perder el aspecto orgánico del force-directed.
       flow: { axis: 'y', minSeparation: 30 },
       // El default de cola es 10; el 15 anterior casi no separaba nada.
-      nodeSpacing: 40,
-      edgeLength: 90,
+      nodeSpacing: 30,
+      edgeLength: 80,
       // Los labels van debajo del nodo, así que sin esto no cuentan para el
       // espaciado y se pisan entre sí.
       nodeDimensionsIncludeLabels: true,
@@ -98,6 +103,8 @@ const DAGRE_SPACING: Record<GraphDetailLevel, Record<'nodeSep' | 'rankSep' | 'ed
   summary: { nodeSep: 34, rankSep: 70, edgeSep: 14 },
   exploration: { nodeSep: 60, rankSep: 95, edgeSep: 24 },
   detail: { nodeSep: 78, rankSep: 125, edgeSep: 36 },
+  literals: { nodeSep: 78, rankSep: 125, edgeSep: 36 },
+  'literals-detail': { nodeSep: 90, rankSep: 140, edgeSep: 42 },
 };
 
 export function layoutOptionsFor(
@@ -107,6 +114,24 @@ export function layoutOptionsFor(
   const base = LAYOUT_CONFIGS[layout]?.options ?? LAYOUT_CONFIGS['dagre'].options;
   if (layout !== 'dagre') return { ...base } as cytoscape.LayoutOptions;
   return { ...base, ...DAGRE_SPACING[detailLevel] } as cytoscape.LayoutOptions;
+}
+
+/**
+ * Cola escala mejor si parte de la semilla determinista ya dibujada. En grafos
+ * grandes se quita además la restricción de flujo: imponer niveles a una red
+ * cíclica/heterogénea hace que la simulación se estire y cruce componentes.
+ */
+export function initialColaOptions(
+  detailLevel: GraphDetailLevel,
+  nodeCount: number,
+): cytoscape.LayoutOptions {
+  const options: Record<string, unknown> = {
+    ...(layoutOptionsFor('cola', detailLevel) as unknown as Record<string, unknown>),
+    animate: true,
+    randomize: false,
+  };
+  if (nodeCount > 100) delete options['flow'];
+  return options as unknown as cytoscape.LayoutOptions;
 }
 
 export function chooseGraphLayout(result: Pick<QueryResult, 'nodes' | 'edges'>): GraphLayout {
