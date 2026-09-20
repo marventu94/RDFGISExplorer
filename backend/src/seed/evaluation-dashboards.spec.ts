@@ -124,6 +124,44 @@ describe('evaluation dashboards seed', () => {
     expect(queryOf('c2')).toContain('regex(?barrioLabel, "^city bell$", "i")');
   });
 
+  it('projects the source of every feature that repeats per row', () => {
+    const rows = buildEvaluationRows();
+    const queryOf = (suffix: string) =>
+      (
+        rows.find((row) => row.id === `eval-${suffix}`)!.payload as {
+          query: string;
+        }
+      ).query;
+
+    // Un inmueble trae una dirección por fuente (Scraper y AVE): sin el origen
+    // las filas repetidas del mismo aviso quedan indistinguibles en la tabla.
+    // Vale para los cuatro casos, incluso donde la dirección es solo el filtro:
+    // la proyección completa del handoff lleva igual esa rama al GIS.
+    const originFeature: Record<string, string> = {
+      c1: '?addressFeature',
+      c2: '?locationFeature',
+      c3: '?locationFeature',
+      c4: '?cityFeature',
+    };
+    for (const [suffix, feature] of Object.entries(originFeature)) {
+      const query = queryOf(suffix);
+      expect(query).toContain(`${feature} inm:hasOrigin ?origenDireccion`);
+      expect(query.slice(0, query.indexOf('WHERE'))).toContain(
+        '?origenDireccion',
+      );
+      // El origen es funcional por feature: se suma como triple obligatorio
+      // porque no agrega ni descarta filas.
+      expect(query).not.toMatch(
+        /OPTIONAL\s*\{[^}]*inm:hasOrigin\s+\?origenDireccion/s,
+      );
+    }
+
+    // C3 ya lo hacía con la antigüedad; el patrón es el mismo.
+    expect(queryOf('c3')).toContain(
+      '?featureAntiguedad inm:hasOrigin ?origenAntiguedad',
+    );
+  });
+
   it('requires publication date in the C3 Explorer graph and GIS handoff', () => {
     const rows = buildEvaluationRows();
     const c3 = rows.find((row) => row.id === 'eval-c3');

@@ -223,7 +223,17 @@ function addCityFilterToAddress(
   label.getLiteral()?.addFilter('regex', { regex: `^${value}$` }, graph);
 }
 
-/** Cadena inmueble → feature de dirección → dirección, que es donde cuelgan barrio y partido. */
+/**
+ * Cadena inmueble → feature de dirección → dirección, que es donde cuelgan barrio
+ * y partido.
+ *
+ * Aunque la rama se use solo como filtro, el origen se proyecta igual: el
+ * inmueble suele tener una dirección por fuente (`feature_address_1` del
+ * Scraper y `feature_address_2` de AVE) y la proyección completa del handoff
+ * lleva `?locationFeature` a la tabla del GIS, así que la duplicación se ve
+ * aunque el caso no muestre la dirección. Sin el origen esas filas repetidas
+ * parecen un error de la consulta.
+ */
 function addLocationAddress(
   graph: PropertyGraph,
   realEstate: Node,
@@ -234,6 +244,8 @@ function addLocationAddress(
   const address = varNode(graph, 'locationValue', x + 180, y, false);
   connect(graph, realEstate, `${INM}hasFeature`, feature);
   connect(graph, feature, `${INM}hasValue`, address);
+  const origin = varNode(graph, 'origenDireccion', x, y - 140);
+  connect(graph, feature, `${INM}hasOrigin`, origin);
   return address;
 }
 
@@ -310,6 +322,14 @@ const CASES: EvaluationCaseDefinition[] = [
       connect(graph, addressFeature, `${INM}hasValue`, postalAddress);
       // La dirección se proyecta como dato de la fila, no como filtro.
       literalProp(graph, postalAddress, `${INM}address`, 'direccion');
+      // Un mismo inmueble suele traer una dirección por fuente
+      // (`feature_address_1` del Scraper y `feature_address_2` de AVE, con su
+      // propio `time:hasTime`): son dos filas del mismo aviso, con la misma
+      // calle escrita distinto. Sin el origen la duplicación parece un error de
+      // la consulta; con él, la fila dice de qué fuente viene cada variante.
+      // Es el mismo recurso que C3 proyecta para la antigüedad.
+      const addressOrigin = varNode(graph, 'origenDireccion', 920, -60);
+      connect(graph, addressFeature, `${INM}hasOrigin`, addressOrigin);
       addCityFilterToAddress(graph, postalAddress, 'berisso', 1100, 60);
 
       addPrice(graph, listing, 360, 420);
@@ -435,6 +455,9 @@ const CASES: EvaluationCaseDefinition[] = [
       connect(graph, realEstate, `${INM}hasFeature`, cityFeature);
       connect(graph, cityFeature, `${INM}hasValue`, cityValue);
       connect(graph, cityValue, `${INM}city`, city);
+      // Misma razón que en `addLocationAddress`: una dirección por fuente.
+      const cityOrigin = varNode(graph, 'origenDireccion', 660, -160);
+      connect(graph, cityFeature, `${INM}hasOrigin`, cityOrigin);
       const cityLabel = literalProp(graph, city, `${RDFS}label`, 'ciudadLabel');
       cityLabel
         .getLiteral()
