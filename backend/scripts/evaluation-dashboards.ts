@@ -26,6 +26,27 @@ const PREFIXES_PATH = path.resolve(
 );
 const RESULT_LIMIT = 500;
 
+/**
+ * LIMIT propio de la query de cada tablero GIS. `null` = sin LIMIT.
+ *
+ * C1 y C3 se siembran sin LIMIT a propósito: son los casos donde interesa el
+ * total de elementos. Un LIMIT propio recorta en el endpoint antes del tope del
+ * backend y, al llegar menos filas que ese tope, `meta.truncated` queda en false:
+ * el tablero trata el recorte como el resultado completo y tanto el panel de
+ * resumen como el export se quedan con esa muestra. Sin LIMIT el recorte lo hace
+ * el backend (`SPARQL_MAX_LIMIT`), que sí marca el truncamiento, y las vistas
+ * paginan el volumen en lotes.
+ */
+export const GIS_RESULT_LIMITS: Record<
+  EvaluationCaseDefinition['suffix'],
+  number | null
+> = {
+  c1: null,
+  c2: RESULT_LIMIT,
+  c3: null,
+  c4: RESULT_LIMIT,
+};
+
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
 const INM = 'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#';
@@ -172,6 +193,67 @@ function addRequiredGeometry(
   literalProp(graph, geometry, `${GEO}asWKT`, 'wkt');
 }
 
+/**
+ * Filtro por ciudad/partido sobre una dirección ya armada.
+ *
+ * `inm:address` es texto libre del scraper: filtrarlo por nombre de localidad
+ * mezcla calles homónimas de otros partidos y, sobre todo, se pierde la enorme
+ * mayoría de los avisos (la dirección casi nunca nombra la localidad). El eje
+ * administrativo del modelo es `inm:city` → `district_*` con su `rdfs:label`.
+ *
+ * El filtro va sobre el label y no sobre la URI porque el dataset trae el mismo
+ * partido bajo varios distritos (`district_GBA_Sur_Berisso`,
+ * `district_Buenos_Aires_Berisso`, `district_Buenos_Aires_Interior_Berisso`):
+ * son la misma localidad duplicada por la taxonomía de regiones del scraper.
+ *
+ * Cuelga de la `?postalAddress` que se le pase: cuando el caso ya proyecta una
+ * dirección (C1) se reusa esa misma, porque una rama aparte multiplicaría filas
+ * por producto cartesiano sin agregar información.
+ */
+function addCityFilterToAddress(
+  graph: PropertyGraph,
+  postalAddress: Node,
+  value: string,
+  x: number,
+  y: number,
+): void {
+  const city = varNode(graph, 'ciudad', x, y, false);
+  connect(graph, postalAddress, `${INM}city`, city);
+  const label = literalProp(graph, city, `${RDFS}label`, 'ciudadLabel');
+  label.getLiteral()?.addFilter('regex', { regex: `^${value}$` }, graph);
+}
+
+/** Cadena inmueble → feature de dirección → dirección, que es donde cuelgan barrio y partido. */
+function addLocationAddress(
+  graph: PropertyGraph,
+  realEstate: Node,
+  x: number,
+  y: number,
+): Node {
+  const feature = varNode(graph, 'locationFeature', x, y, false);
+  const address = varNode(graph, 'locationValue', x + 180, y, false);
+  connect(graph, realEstate, `${INM}hasFeature`, feature);
+  connect(graph, feature, `${INM}hasValue`, address);
+  return address;
+}
+
+/** Filtro por partido/localidad, armando la dirección desde el inmueble. */
+function addCityFilter(
+  graph: PropertyGraph,
+  realEstate: Node,
+  value: string,
+  x: number,
+  y: number,
+): void {
+  const address = addLocationAddress(graph, realEstate, x, y);
+  addCityFilterToAddress(graph, address, value, x + 360, y);
+}
+
+/**
+ * Filtro por barrio. Es el nivel correcto cuando el caso es un barrio y no una
+ * localidad entera: City Bell (C2), por ejemplo, no existe como `inm:city` en el
+ * dataset — es barrio de La Plata.
+ */
 function addNeighborhoodFilter(
   graph: PropertyGraph,
   realEstate: Node,
@@ -179,11 +261,8 @@ function addNeighborhoodFilter(
   x: number,
   y: number,
 ): void {
-  const feature = varNode(graph, 'locationFeature', x, y, false);
-  const address = varNode(graph, 'locationValue', x + 180, y, false);
+  const address = addLocationAddress(graph, realEstate, x, y);
   const neighborhood = varNode(graph, 'neighborhood', x + 360, y, false);
-  connect(graph, realEstate, `${INM}hasFeature`, feature);
-  connect(graph, feature, `${INM}hasValue`, address);
   connect(graph, address, `${INM}neighborhood`, neighborhood);
   const label = literalProp(graph, neighborhood, `${RDFS}label`, 'barrioLabel');
   label.getLiteral()?.addFilter('regex', { regex: `^${value}$` }, graph);
@@ -229,13 +308,9 @@ const CASES: EvaluationCaseDefinition[] = [
       connect(graph, realEstate, `${INM}hasFeature`, addressFeature);
       typeIs(graph, addressFeature, `${INM}Address`, 700, -80);
       connect(graph, addressFeature, `${INM}hasValue`, postalAddress);
-      const address = literalProp(
-        graph,
-        postalAddress,
-        `${INM}address`,
-        'direccion',
-      );
-      address.getLiteral()?.addFilter('regex', { regex: 'berisso' }, graph);
+      // La dirección se proyecta como dato de la fila, no como filtro.
+      literalProp(graph, postalAddress, `${INM}address`, 'direccion');
+      addCityFilterToAddress(graph, postalAddress, 'berisso', 1100, 60);
 
       addPrice(graph, listing, 360, 420);
       const priceTime = varNode(graph, 'priceTime', 780, 420, false);
@@ -308,7 +383,7 @@ const CASES: EvaluationCaseDefinition[] = [
       literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
       // La fecha es obligatoria: C3 debe conservar dimensiones G+S+T.
       literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
-      addNeighborhoodFilter(graph, realEstate, 'berisso', 640, -20);
+      addCityFilter(graph, realEstate, 'berisso', 640, -20);
 
       const ageFeature = varNode(graph, 'featureAntiguedad', 680, 220, false);
       connect(graph, realEstate, `${INM}hasFeature`, ageFeature);
@@ -399,7 +474,10 @@ function buildCaseArtifacts(
     );
   }
   const explorerQuery = queries[0].toSparql();
-  const gisQuery = queries[0].toSparqlFullProjection({ limit: RESULT_LIMIT });
+  const gisLimit = GIS_RESULT_LIMITS[definition.suffix];
+  const gisQuery = queries[0].toSparqlFullProjection(
+    gisLimit === null ? {} : { limit: gisLimit },
+  );
   if (!explorerQuery || !gisQuery) {
     throw new Error(`[${definition.title}] no se pudo generar la consulta`);
   }
@@ -446,6 +524,9 @@ function explorerPayload(artifacts: CaseArtifacts): Record<string, unknown> {
       },
     ],
     activePanelId: 'panel-0',
+    // `limit` acá es decorativo: al cargar un workspace el Explorer no lo lee
+    // (`workspace-persistence.service.fromPayload`), toma su límite de
+    // `/api/config` → `defaults.resultLimit` (env `SPARQL_DEFAULT_LIMIT`).
     settings: { endpointType: 'generic', limit: RESULT_LIMIT },
   };
 }

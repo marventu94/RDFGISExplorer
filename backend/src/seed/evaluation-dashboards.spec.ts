@@ -8,6 +8,7 @@ import { GenericAdapter } from '../../../frontend/rdf_explorer/src/app/graph/dom
 import {
   buildEvaluationRows,
   seedEvaluationDatabase,
+  GIS_RESULT_LIMITS,
 } from '../../scripts/evaluation-dashboards';
 
 describe('evaluation dashboards seed', () => {
@@ -43,7 +44,7 @@ describe('evaluation dashboards seed', () => {
   it('derives every GIS C1-C4 query from its RDF Explorer graph', () => {
     const rows = buildEvaluationRows();
 
-    for (const suffix of ['c1', 'c2', 'c3', 'c4']) {
+    for (const suffix of ['c1', 'c2', 'c3', 'c4'] as const) {
       const explorer = rows.find(
         (row) => row.id === `draft-explorer-${suffix}`,
       );
@@ -74,9 +75,53 @@ describe('evaluation dashboards seed', () => {
       deserializeGraph(graph, panel.graph);
       const queries = graph.getQueriesForGraph().queries;
       expect(queries).toHaveLength(1);
-      const handoff = queries[0].toSparqlFullProjection({ limit: 500 });
+      const limit = GIS_RESULT_LIMITS[suffix];
+      const handoff = queries[0].toSparqlFullProjection(
+        limit === null ? {} : { limit },
+      );
       expect((gis!.payload as { query: string }).query).toBe(handoff);
     }
+  });
+
+  it('seeds C1 and C3 without a query LIMIT so the views see every row', () => {
+    const rows = buildEvaluationRows();
+    const queryOf = (suffix: string) =>
+      (
+        rows.find((row) => row.id === `eval-${suffix}`)!.payload as {
+          query: string;
+        }
+      ).query;
+
+    // Sin LIMIT propio el recorte lo hace el backend, que marca el truncamiento
+    // y deja que el resumen y el export vayan por el resultado completo.
+    expect(queryOf('c1')).not.toMatch(/\bLIMIT\b/);
+    expect(queryOf('c3')).not.toMatch(/\bLIMIT\b/);
+    expect(queryOf('c2')).toMatch(/LIMIT 500\s*$/);
+    expect(queryOf('c4')).toMatch(/LIMIT 500\s*$/);
+    expect(GIS_RESULT_LIMITS).toEqual({ c1: null, c2: 500, c3: null, c4: 500 });
+  });
+
+  it('scopes C1 and C3 to the Berisso district, not to address text or a barrio', () => {
+    const rows = buildEvaluationRows();
+    const queryOf = (suffix: string) =>
+      (
+        rows.find((row) => row.id === `eval-${suffix}`)!.payload as {
+          query: string;
+        }
+      ).query;
+
+    for (const suffix of ['c1', 'c3']) {
+      const query = queryOf(suffix);
+      expect(query).toContain('inm:city ?ciudad');
+      expect(query).toContain('regex(?ciudadLabel, "^berisso$", "i")');
+      // El texto libre de la dirección trae calles homónimas de otros partidos
+      // y se pierde la mayoría de los avisos: no puede ser el filtro.
+      expect(query).not.toContain('regex(?direccion');
+      expect(query).not.toContain('?barrioLabel');
+    }
+
+    // C2 sigue por barrio: City Bell no existe como inm:city en el dataset.
+    expect(queryOf('c2')).toContain('regex(?barrioLabel, "^city bell$", "i")');
   });
 
   it('requires publication date in the C3 Explorer graph and GIS handoff', () => {
