@@ -18,7 +18,7 @@ interface PersistedState {
 }
 
 const STORAGE_KEY = 'rdf-gis-explorer:dashboard-layout';
-const DEFAULT_SLOTS: ViewType[] = ['table', 'graph', 'map', 'timeline'];
+const DEFAULT_SLOTS: ViewType[] = ['graph', 'map', 'timeline', 'table'];
 const SLOT_COUNT: Record<LayoutPreset, number> = {
   single: 1,
   'split-h': 2,
@@ -63,20 +63,10 @@ export class DashboardLayoutService {
   }
 
   setLayout(preset: LayoutPreset): void {
-    const count = SLOT_COUNT[preset];
-    const current = this.slots();
-    const visible = current.slice(0, count);
-    const used = new Set<ViewType>(visible);
-    const filled = [...visible];
-    for (const v of DEFAULT_SLOTS) {
-      if (filled.length >= count) break;
-      if (!used.has(v)) {
-        filled.push(v);
-        used.add(v);
-      }
-    }
-    const tail = current.slice(count).filter((v) => !used.has(v));
-    this.slots.set([...filled, ...tail]);
+    // Cambiar manualmente la cantidad de vistas vuelve a la prioridad de
+    // sugerencia. La hidratación de un dashboard no pasa por este método y,
+    // por lo tanto, sigue respetando el orden guardado en su payload.
+    this.slots.set([...DEFAULT_SLOTS]);
     this.preset.set(preset);
   }
 
@@ -106,16 +96,16 @@ export class DashboardLayoutService {
 
     if (hasGeo && hasTemporal) {
       this.preset.set('quad');
-      this.slots.set(['table', 'graph', 'map', 'timeline']);
+      this.slots.set(['graph', 'map', 'timeline', 'table']);
     } else if (hasGeo) {
       this.preset.set('split-h');
-      this.slots.set(['table', 'map']);
+      this.slots.set(['graph', 'map']);
     } else if (hasTemporal) {
       this.preset.set('split-h');
-      this.slots.set(['table', 'timeline']);
+      this.slots.set(['graph', 'timeline']);
     } else {
       this.preset.set('split-h');
-      this.slots.set(['table', 'graph']);
+      this.slots.set(['graph', 'table']);
     }
   }
 
@@ -144,7 +134,7 @@ export class DashboardLayoutService {
         const valid: ViewType[] = [];
         for (const v of parsed.slots) {
           if (
-            ['table', 'graph', 'map', 'timeline'].includes(v as string) &&
+            DEFAULT_SLOTS.includes(v as ViewType) &&
             !seen.has(v as ViewType)
           ) {
             valid.push(v as ViewType);

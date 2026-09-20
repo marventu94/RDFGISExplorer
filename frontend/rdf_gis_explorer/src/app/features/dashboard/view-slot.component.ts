@@ -110,14 +110,14 @@ export class ViewSlotComponent {
   private readonly layout = inject(DashboardLayoutService);
 
   readonly options: ViewOption[] = [
-    { type: 'table', label: 'Tabla', icon: 'table_chart' },
     { type: 'graph', label: 'Grafo', icon: 'hub' },
     { type: 'map', label: 'Mapa', icon: 'map' },
     { type: 'timeline', label: 'Línea del tiempo', icon: 'timeline' },
+    { type: 'table', label: 'Tabla', icon: 'table_chart' },
   ];
 
   currentView(): ViewType {
-    return this.layout.slots()[this.index] ?? 'table';
+    return this.layout.slots()[this.index] ?? 'graph';
   }
 
   currentIcon(): string {

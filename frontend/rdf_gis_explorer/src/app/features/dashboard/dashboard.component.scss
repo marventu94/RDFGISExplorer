@@ -42,7 +42,7 @@
 }
 
 .views-grid--triple {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: var(--col-left, 50%) 1fr;
   grid-template-rows: var(--row-top, 55%) 1fr;
 
   .cell:first-child {
@@ -115,7 +115,11 @@
 }
 
 .views-grid--triple ~ .divider-vertical {
-  display: none;
+  top: var(--row-top, 50%);
+}
+
+.views-grid--triple-inv ~ .divider-vertical {
+  bottom: calc(100% - var(--row-top, 50%));
 }
 
 .divider-horizontal {
@@ -135,7 +139,7 @@
 }
 
 .views-grid--triple-v-inv ~ .divider-horizontal {
-  left: var(--col-left, 50%);
+  right: calc(100% - var(--col-left, 50%));
 }
 
 :host {
