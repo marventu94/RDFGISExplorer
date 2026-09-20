@@ -27,7 +27,14 @@ import { FieldMappingPanelComponent } from './field-mapping-panel.component';
 import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
 import { ErrorDialogComponent, type ErrorDialogData } from './error-dialog.component';
 import { applyMappingOverrides, VariableRole } from './mapping-overrides.util';
+import {
+  buildQueryLimitNotice,
+  type QueryLimitNotice,
+} from '@shared/sparql/query-limit';
 import type { QueryResult } from '@shared/models';
+
+/** Espera antes de reparsear la query para el aviso de LIMIT. */
+const LIMIT_CHECK_DEBOUNCE_MS = 300;
 
 @Component({
   selector: 'app-sparql-input',
@@ -63,12 +70,17 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private editorView: EditorView | null = null;
   private fallbackContent = '';
+  private limitCheckTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly executing = signal(false);
   protected readonly hasContent = signal(false);
   protected readonly lastResult = signal<QueryResult | null>(null);
   protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
   protected readonly overridesCount = signal(0);
+
+  /** Tope de filas del backend; hasta que llega la config no se avisa nada. */
+  private readonly maxLimit = signal<number | null>(null);
+  protected readonly limitNotice = signal<QueryLimitNotice | null>(null);
 
   protected readonly gisDashboards = signal<Dashboard[]>([]);
   protected readonly loadingDashboards = signal(false);
@@ -85,6 +97,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.createEditor();
     this.setupKeyboardShortcut();
+    this.loadMaxLimit();
 
     const serviceQuery = this.queryState.query();
     if (serviceQuery) {
@@ -120,6 +133,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.limitCheckTimer) clearTimeout(this.limitCheckTimer);
     this.editorView?.destroy();
     this.editorView = null;
   }
@@ -130,6 +144,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const updateHasContent = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         this.hasContent.set(update.state.doc.toString().trim().length > 0);
+        this.scheduleLimitCheck();
       }
     });
 
@@ -168,6 +183,38 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * `AppConfig.maxLimit` para el aviso de LIMIT propio. La config tiene shareReplay,
+   * así que comparte la request con el resto de la app.
+   */
+  private loadMaxLimit(): void {
+    this.appConfig.load().subscribe({
+      next: (cfg) => {
+        this.maxLimit.set(cfg.maxLimit);
+        this.refreshLimitNotice();
+      },
+      error: () => {
+        // sin config no se sabe el tope: no se avisa nada
+      },
+    });
+  }
+
+  /**
+   * El chequeo parsea con sparqljs, así que se debouncea: mientras se tipea la
+   * mayoría de los estados intermedios no parsean y el aviso parpadearía.
+   */
+  private scheduleLimitCheck(): void {
+    if (this.limitCheckTimer) clearTimeout(this.limitCheckTimer);
+    this.limitCheckTimer = setTimeout(() => {
+      this.limitCheckTimer = null;
+      this.refreshLimitNotice();
+    }, LIMIT_CHECK_DEBOUNCE_MS);
+  }
+
+  private refreshLimitNotice(): void {
+    this.limitNotice.set(buildQueryLimitNotice(this.sparqlText, this.maxLimit()));
+  }
+
   private setupKeyboardShortcut(): void {
     document.addEventListener('keydown', this.shortcutHandler);
   }
@@ -197,14 +244,18 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected setEditorContent(text: string): void {
     this.fallbackContent = text;
     this.hasContent.set(text.trim().length > 0);
-    if (!this.editorView) return;
-    this.editorView.dispatch({
-      changes: {
-        from: 0,
-        to: this.editorView.state.doc.length,
-        insert: text,
-      },
-    });
+    if (this.editorView) {
+      this.editorView.dispatch({
+        changes: {
+          from: 0,
+          to: this.editorView.state.doc.length,
+          insert: text,
+        },
+      });
+    }
+    // Sin debounce: cargar un tablero o un handoff trae la query entera de una,
+    // y esperar 300ms acá haría aparecer el aviso después de pintar el editor.
+    this.refreshLimitNotice();
   }
 
   protected loadDashboards(): void {

@@ -33,6 +33,13 @@
           <span>Generar tablero nuevo</span>
         </button>
       </mat-menu>
+
+      @if (limitNotice(); as notice) {
+        <span class="limit-notice" [title]="notice.detail">
+          <mat-icon>warning</mat-icon>
+          {{ notice.summary }}
+        </span>
+      }
     </div>
 
     <div class="toolbar-right">

@@ -10,6 +10,7 @@ import { ApiService } from '@core/services/api.service';
 import { SelectionService } from '@core/services/selection.service';
 import { DashboardApiClient } from '@core/services/dashboard-api.client';
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
+import { AppConfigService } from '@core/services/app-config.service';
 import type { QueryResult } from '@shared/models';
 
 function makeQueryResult(overrides: Partial<QueryResult> = {}): QueryResult {
@@ -52,6 +53,7 @@ describe('SparqlInputComponent', () => {
     currentDashboardId: ReturnType<typeof vi.fn>;
     clearCurrent: ReturnType<typeof vi.fn>;
   };
+  let appConfigMock: { load: ReturnType<typeof vi.fn>; config: ReturnType<typeof vi.fn> };
   let realSnackBar: MatSnackBar;
   let realDialog: MatDialog;
   let originalConfirm: typeof window.confirm;
@@ -73,6 +75,11 @@ describe('SparqlInputComponent', () => {
       currentDashboardId: vi.fn().mockReturnValue(null),
       clearCurrent: vi.fn(),
     };
+    // Sin prefixes: el editor arranca vacío igual que antes de mockear la config.
+    appConfigMock = {
+      load: vi.fn().mockReturnValue(of({ maxLimit: 1000, defaultPrefixes: {} })),
+      config: vi.fn().mockReturnValue({ maxLimit: 1000, defaultPrefixes: {} }),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SparqlInputComponent, NoopAnimationsModule],
@@ -81,6 +88,7 @@ describe('SparqlInputComponent', () => {
         { provide: SelectionService, useValue: selectionServiceMock },
         { provide: DashboardApiClient, useValue: dashboardApiMock },
         { provide: DashboardPersistenceService, useValue: persistenceMock },
+        { provide: AppConfigService, useValue: appConfigMock },
       ],
     }).compileComponents();
 
@@ -107,6 +115,45 @@ describe('SparqlInputComponent', () => {
   function asAny(): any {
     return component as any;
   }
+
+  describe('aviso de LIMIT propio en la consulta', () => {
+    function noticeEl(): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector('.limit-notice');
+    }
+
+    it('no muestra nada con una consulta sin LIMIT', () => {
+      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o }');
+      fixture.detectChanges();
+      expect(noticeEl()).toBeNull();
+    });
+
+    it('avisa cuando la consulta trae un LIMIT bajo el tope del backend', () => {
+      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 500');
+      fixture.detectChanges();
+
+      const el = noticeEl();
+      expect(el).not.toBeNull();
+      expect(el!.textContent).toContain('LIMIT 500');
+      expect(el!.getAttribute('title')).toContain('no se marca');
+    });
+
+    it('avisa que el backend recorta igual cuando el LIMIT supera el tope', () => {
+      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 9000');
+      fixture.detectChanges();
+
+      expect(noticeEl()!.textContent).toContain('recorta a 1000 filas');
+    });
+
+    it('saca el aviso al borrar el LIMIT de la consulta', () => {
+      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 500');
+      fixture.detectChanges();
+      expect(noticeEl()).not.toBeNull();
+
+      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o }');
+      fixture.detectChanges();
+      expect(noticeEl()).toBeNull();
+    });
+  });
 
   it('should create the component', () => {
     expect(component).toBeTruthy();

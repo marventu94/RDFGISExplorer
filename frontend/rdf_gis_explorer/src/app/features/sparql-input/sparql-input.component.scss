@@ -55,6 +55,31 @@
   margin-left: auto;
 }
 
+// Aviso de LIMIT propio en la consulta. Vive dentro del editor a propósito: se ve
+// solo con el editor expandido, y se va con él al colapsarlo tras ejecutar.
+.limit-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--mat-sys-on-surface-variant);
+  cursor: help;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.limit-notice .mat-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: #f9a825;
+}
+
 .mat-spinner {
   margin-right: 8px;
 }
