@@ -250,12 +250,9 @@ export class TableViewComponent implements OnDestroy {
           const val = params.data?.[variable] as BindingValue | undefined;
           return this.bindingToRawString(val);
         },
-        // La primera columna la dibuja UriCellRendererComponent, que abrevia la URI,
-        // así que el valor completo casi nunca está a la vista: tooltip siempre.
-        // En el resto sólo cuando el texto no entra en el ancho actual de la columna.
-        tooltipValueGetter: isPrimaryUriColumn
-          ? (params: ITooltipParams) => this.fullTextOrNull(params)
-          : (params: ITooltipParams) => this.tooltipIfOverflowing(params),
+        // Todas las celdas exponen el valor completo. Esto también cubre renderers
+        // que muestran una versión abreviada, como las URI y las coordenadas.
+        tooltipValueGetter: (params: ITooltipParams) => this.fullTextOrNull(params),
         cellRendererSelector: (params: ICellRendererParams) => {
           if (isPrimaryUriColumn) {
             return { component: UriCellRendererComponent };
@@ -276,33 +273,6 @@ export class TableViewComponent implements OnDestroy {
   private fullTextOrNull(params: ITooltipParams): string | null {
     const text = params.value == null ? '' : String(params.value);
     return text.length > 0 ? text : null;
-  }
-
-  /**
-   * Devuelve el texto completo sólo si es probable que la celda lo esté recortando,
-   * y `null` en caso contrario (null suprime el tooltip en AG Grid).
-   *
-   * No hay forma de medir el texto renderizado desde `tooltipValueGetter`, así que se
-   * estima la capacidad de la columna a partir de su ancho real. `getActualWidth()` se
-   * lee en el momento de mostrar el tooltip, de modo que al redimensionar una columna
-   * el criterio se recalcula solo.
-   */
-  private tooltipIfOverflowing(params: ITooltipParams): string | null {
-    const text = params.value == null ? '' : String(params.value);
-    if (text.length === 0) return null;
-
-    const width = params.column?.getActualWidth?.() ?? 0;
-    if (width <= 0) return text;
-
-    // ~7 px por carácter con la tipografía de 13 px de la grilla, menos el padding
-    // horizontal de la celda (8 px por lado). Es una estimación deliberadamente
-    // conservadora: si sobra un carácter se muestra el tooltip igual, que es
-    // preferible a esconderlo cuando el texto sí está cortado.
-    const CHAR_PX = 7;
-    const CELL_PADDING_PX = 16;
-    const capacity = Math.floor((width - CELL_PADDING_PX) / CHAR_PX);
-
-    return text.length > capacity ? text : null;
   }
 
   private bindingToRawString(value: BindingValue | undefined): string {

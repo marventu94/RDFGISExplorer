@@ -134,6 +134,27 @@ describe('TableViewComponent', () => {
     expect(defs[2].field).toBe('coord');
   });
 
+  it('should expose the complete value as a tooltip in every column', () => {
+    selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
+
+    const defs = component.columnDefs();
+    const values = [
+      'http://example.org/Q1',
+      'Buenos Aires',
+      '-34.6037, -58.3816',
+    ];
+
+    defs.forEach((definition, index) => {
+      expect(definition.headerTooltip).toBe(mockQueryResult.variables[index]);
+      expect(definition.tooltipValueGetter).toBeTypeOf('function');
+      expect(
+        (definition.tooltipValueGetter as (params: { value: string }) => string)({
+          value: values[index],
+        }),
+      ).toBe(values[index]);
+    });
+  });
+
   it('should clear columns and rows when result is null', () => {
     selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
     fixture.detectChanges();
