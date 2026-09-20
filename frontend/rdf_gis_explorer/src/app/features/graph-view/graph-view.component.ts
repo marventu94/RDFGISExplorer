@@ -22,16 +22,62 @@ import type { QueryResult, NormalizedNode, Selection, Filter } from '@shared/mod
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
 import { createGraphStyle } from './graph-style';
-import { chooseGraphLayout, LAYOUT_CONFIGS } from './graph-layouts';
+import {
+  chooseGraphLayout,
+  GRAPH_LAYOUT_OPTIONS,
+  LAYOUT_CONFIGS,
+  layoutOptionsFor,
+  type GraphDetailLevel,
+  type GraphLayout,
+  type GraphLayoutOption,
+} from './graph-layouts';
 import { buildGraphElements, type BuiltGraph } from './graph-elements';
+import {
+  applyCoordinatedFocus,
+  collapseBranch,
+  createExplorationState,
+  enterEntityMode,
+  exitToResult,
+  expandBranch,
+  explorationBreadcrumb,
+  explorationSubgraph,
+  goBack,
+  goToRoot,
+  isExplorationActive,
+  notifySelection,
+  promoteActiveToRoot,
+  resetExploration,
+  setActiveNode,
+  setExplorationBudget,
+  togglePin,
+  type EntityModeTrigger,
+  type ExplorationContext,
+  type ExplorationState,
+} from './entity-exploration';
+import { DEFAULT_SUBGRAPH_BUDGET, type EntitySubgraph } from './entity-subgraph';
+import {
+  activeBranchItems,
+  buildEntityModeElements,
+  entityBreadcrumb,
+  entityLabelResolver,
+  entityMetricsLabel,
+  entityWarningsLabel,
+  otherBranchItems,
+  shortenUri,
+  type EntityBranchItem,
+  type EntityCrumb,
+} from './entity-mode-elements';
+import { entityModeStyleRules } from './entity-mode-style';
+import {
+  EntitySummaryClipboardService,
+  type EntitySummaryRequest,
+} from './entity-summary-clipboard.service';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { LimitsService } from '@core/services/limits.service';
 
 cytoscape.use(cola);
 cytoscape.use(dagre);
 
-type GraphLayout = 'cola' | 'dagre' | 'grid';
-type GraphDetailLevel = 'summary' | 'exploration' | 'detail';
 type QueryState = 'no-query' | 'no-edges' | 'filtered-zero' | 'normal';
 
 /** Cuánto se separa un nodo nuevo del vecino que se usa para ubicarlo. */
@@ -59,7 +105,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   @ViewChild('cyContainer', { static: true }) container!: ElementRef<HTMLDivElement>;
 
   cy?: cytoscape.Core;
-  currentLayout: GraphLayout = 'cola';
+  currentLayout: GraphLayout = 'dagre';
   detailLevel: GraphDetailLevel = 'summary';
   private expandedSuperEdgeIds = new Set<string>();
   private expandedMotifIds = new Set<string>();
@@ -68,11 +114,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     { value: 'exploration' as const, label: 'Entidades' },
     { value: 'detail' as const, label: 'Entidades + relaciones' },
   ];
-  readonly layoutOptions = [
-    { value: 'cola' as const, label: 'cola' },
-    { value: 'dagre' as const, label: 'dagre' },
-    { value: 'grid' as const, label: 'grid' },
-  ];
+  get availableLayoutOptions(): readonly GraphLayoutOption[] {
+    if (this.queryState === 'no-edges' || this.currentLayout === 'grid') {
+      return GRAPH_LAYOUT_OPTIONS;
+    }
+    return GRAPH_LAYOUT_OPTIONS.filter((option) => option.value !== 'grid');
+  }
 
   queryState: QueryState = 'no-query';
   /** Texto del chip de cobertura; vacío cuando el grafo muestra todo sin recortes. */
@@ -124,12 +171,47 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   /** Último resultado visible dibujado; lo usa el rebuild por cambio de límite. */
   private lastVisibleResult: QueryResult | null = null;
+  /** Resultado completo: el modo entidad lo usa cuando la raíz no está en el lote. */
+  private lastOriginalResult: QueryResult | null = null;
   private lastLotState: { lotCount: number; currentLot: number } = { lotCount: 1, currentLot: 1 };
+
+  // ---------------------------------------------------------------------------
+  // Modo entidad (etapa 5). Todo este estado es TRANSITORIO: no se persiste en
+  // el dashboard (§9 del plan), así que `persistGraphState()` no lo escribe y
+  // volver al resultado lo descarta entero.
+  // ---------------------------------------------------------------------------
+
+  /** Estado puro de exploración (etapa 4). El componente sólo lo reemplaza. */
+  explorationState: ExplorationState = createExplorationState();
+  /** Subgrafo vigente; `null` en modo resultado. */
+  entitySubgraph: EntitySubgraph | null = null;
+  /** Último rechazo o aviso para el usuario; se anuncia con aria-live. */
+  explorationMessage = '';
+  /** Texto expuesto para copia manual cuando el navegador bloquea el portapapeles. */
+  copyFallbackText = '';
+  /** Selección explícita vigente, sea cual sea la vista que la originó. */
+  private selectedUri: string | null = null;
+  private selectedLabel = '';
+  /**
+   * Foto de la vista de resultado tomada al entrar al modo entidad: volver
+   * restaura cámara, layout, nivel y acomodo manual exactamente como estaban.
+   */
+  private resultViewSnapshot: {
+    layout: GraphLayout;
+    detailLevel: GraphDetailLevel;
+    camera?: { pan: { x: number; y: number }; zoom: number };
+    manualPositions: Map<string, { x: number; y: number }>;
+  } | null = null;
+  /** Cámara a restaurar en el próximo `createGraph`, por encima de la guardada. */
+  private restoreCamera?: { pan: { x: number; y: number }; zoom: number };
+  /** Acomodo manual a restaurar en el próximo `createGraph`. */
+  private restoreManualPositions?: Map<string, { x: number; y: number }>;
 
   private readonly viewState = inject(DashboardViewStateService);
   private readonly colorService = inject(EntityColorService);
   private readonly limitsService = inject(LimitsService);
   private readonly loadProgress = inject(DashboardLoadProgressService);
+  private readonly summaryClipboard = inject(EntitySummaryClipboardService);
   /** Entidad → id del nodo resumen que la agrupa en el lienzo actual. */
   private readonly aggregateByMember = new Map<string, string>();
   /** Nodo dibujado que representa la selección vigente (puede ser un resumen). */
@@ -146,6 +228,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       const maxNodes = this.limitsService.limits().graphMaxNodes;
       const changed = maxNodes !== this.MAX_NODES;
       this.MAX_NODES = maxNodes;
+      // El presupuesto local nunca puede pedir más nodos que el cap del lienzo.
+      this.explorationState = setExplorationBudget(this.explorationState, {
+        maxNodes: Math.min(DEFAULT_SUBGRAPH_BUDGET.maxNodes, maxNodes),
+      });
       // El cap nuevo solo aplicaba a la próxima emisión; si ya hay grafo
       // dibujado se reconstruye una sola vez con los mismos datos. Sin cambio
       // de valor (primer run incluido) no se toca nada.
@@ -173,6 +259,31 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         // Cartel de carga: los elementos ya están en Cytoscape (el layout puede
         // seguir acomodándolos, pero el grafo ya se ve).
         if (visible) this.loadProgress.reportViewRendered('graph');
+      });
+
+    // Selección explícita, venga de donde venga: habilita `Ver estructura` y,
+    // dentro del modo entidad, mueve el nodo activo SIN reemplazar la raíz.
+    this.selectionService.selectedNode$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((sel: Selection) => {
+        this.selectedUri = sel.node?.uri ?? null;
+        this.selectedLabel = sel.node?.label ?? '';
+        if (sel.node && this.isEntityMode) {
+          const context = this.explorationContext();
+          if (context) {
+            const next = notifySelection(context, this.explorationState, sel.node.uri);
+            if (next.lastRejection) {
+              // Que la selección no pertenezca a la estructura no es un error:
+              // el panel ofrece explorarla como nueva raíz y la raíz vigente no
+              // se reemplaza sola (§9 del plan).
+              this.explorationState = next;
+              this.explorationMessage = '';
+            } else {
+              this.applyExploration(next);
+            }
+          }
+        }
+        this.cdr.markForCheck();
       });
 
     this.selectionService.selectedNode$
@@ -224,6 +335,14 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         ),
       )
       .subscribe((f) => {
+        if (this.isEntityMode) {
+          // §8 del plan: el foco masivo del viewport de otra vista es inerte
+          // para la exploración (no entra al modo, no cambia la raíz, no
+          // expande) y tampoco reencuadra el subgrafo que el usuario está
+          // leyendo. La función pura deja la decisión documentada.
+          this.explorationState = applyCoordinatedFocus(this.explorationState, [...f.uris]);
+          return;
+        }
         // Foco externo vacío (otra vista dejó de tener nada en viewport):
         // se limpia el dimming en vez de dejarlo congelado.
         if (f.uris.size === 0) {
@@ -289,12 +408,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * el layout completo — de ahí que los nodos se reacomodaran y se perdiera la
    * cámara en cada click.
    */
-  private syncGraph(built: BuiltGraph): void {
-    this.indexAggregates(built.elements);
-    const key = this.topologyKey(built.elements);
+  private syncGraph(elements: cytoscape.ElementDefinition[]): void {
+    this.indexAggregates(elements);
+    const key = this.topologyKey(elements);
 
     if (!this.cy) {
-      this.createGraph(built.elements);
+      this.createGraph(elements);
       this.lastTopologyKey = key;
       return;
     }
@@ -302,31 +421,47 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (key === this.lastTopologyKey) {
       // Caso dominante: el conjunto de elementos no cambió (p. ej. un click en un
       // nodo ya visible). Solo se refrescan los datos; ni layout ni cámara.
-      this.updateElementData(built.elements);
+      this.updateElementData(elements);
       return;
     }
 
-    this.patchGraph(built.elements);
+    this.patchGraph(elements);
     this.lastTopologyKey = key;
   }
 
   private createGraph(elements: cytoscape.ElementDefinition[]): void {
-    const stored = this.viewState.graphState();
-    const defaultLayout: GraphLayout = elements.some((e) => 'source' in (e.data ?? {}))
-      ? chooseGraphLayout(this.lastVisibleResult ?? { nodes: [], edges: [] })
-      : 'grid';
+    // El modo entidad es transitorio: ni lee el estado guardado del tablero ni
+    // deja que su layout/nivel lo pisen. Siempre arranca en Jerárquico (§9).
+    const entityMode = this.isEntityMode;
+    const stored = entityMode ? null : this.viewState.graphState();
+    const defaultLayout: GraphLayout = entityMode
+      ? 'dagre'
+      : elements.some((e) => 'source' in (e.data ?? {}))
+        ? chooseGraphLayout(this.lastVisibleResult ?? { nodes: [], edges: [] })
+        : 'grid';
     const storedLayout = stored?.layout;
     this.currentLayout = storedLayout && storedLayout in LAYOUT_CONFIGS
       ? (storedLayout as GraphLayout)
       : defaultLayout;
-    this.detailLevel = stored?.detailLevel ?? 'summary';
-    this.expandedSuperEdgeIds = new Set(stored?.expandedSuperEdgeIds ?? []);
-    this.expandedMotifIds = new Set(stored?.expandedMotifIds ?? []);
+    if (!entityMode) {
+      this.detailLevel = stored?.detailLevel ?? 'summary';
+      this.expandedSuperEdgeIds = new Set(stored?.expandedSuperEdgeIds ?? []);
+      this.expandedMotifIds = new Set(stored?.expandedMotifIds ?? []);
+    }
 
     this.cy = cytoscape({
       container: this.container.nativeElement,
       elements,
-      style: createGraphStyle(this.colorService, () => false, () => this.detailLevel),
+      style: [
+        ...createGraphStyle(
+          this.colorService,
+          () => document.documentElement.dataset['theme'] === 'dark',
+          () => this.detailLevel,
+        ),
+        // Reglas del modo entidad: seleccionan por clases `.entity-*`, que solo
+        // existen cuando dibuja el subgrafo explorado.
+        ...entityModeStyleRules(() => document.documentElement.dataset['theme'] === 'dark'),
+      ],
       // Antes acá iba `defaultLayout` mientras currentLayout venía del estado
       // guardado: el dropdown decía una cosa y el grafo dibujaba otra.
       // El layout real se ejecuta después de registrar `layoutstop`: con
@@ -341,14 +476,27 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     });
 
     this.manualPositions.clear();
-    for (const [uri, pos] of Object.entries(stored?.manualPositions ?? {})) {
-      this.manualPositions.set(uri, pos);
+    const restoredPositions = this.restoreManualPositions;
+    this.restoreManualPositions = undefined;
+    if (restoredPositions) {
+      restoredPositions.forEach((pos, uri) => this.manualPositions.set(uri, pos));
+    } else {
+      for (const [uri, pos] of Object.entries(stored?.manualPositions ?? {})) {
+        this.manualPositions.set(uri, pos);
+      }
     }
 
     // Si hay cámara guardada se restaura en vez de encuadrar, así volver al slot
-    // no pierde el zoom.
-    if (stored?.pan && typeof stored.zoom === 'number') {
-      this.pendingCamera = { pan: stored.pan, zoom: stored.zoom };
+    // no pierde el zoom. La cámara de `restoreCamera` (volver del modo entidad)
+    // gana: es la que el usuario tenía hace un instante.
+    const camera =
+      this.restoreCamera ??
+      (stored?.pan && typeof stored.zoom === 'number'
+        ? { pan: stored.pan, zoom: stored.zoom }
+        : undefined);
+    this.restoreCamera = undefined;
+    if (camera) {
+      this.pendingCamera = camera;
       this.shouldFitAfterLayout = false;
     } else {
       this.shouldFitAfterLayout = true;
@@ -603,6 +751,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.indexNodes(original, visible);
 
     if (!visible || visible.nodes.length === 0) {
+      // Sin nada que dibujar no hay estructura que explorar: el modo entidad se
+      // descarta en silencio y la vista vuelve a su estado global.
+      if (this.isEntityMode) this.discardEntityMode();
       if (!original || original.nodes.length === 0) {
         this.queryState = 'no-query';
       } else if (filters.length > 0) {
@@ -620,7 +771,16 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
     this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
     this.lastVisibleResult = visible;
+    this.lastOriginalResult = original;
     this.lastLotState = { lotCount: lotState.lotCount, currentLot: lotState.currentLot };
+
+    if (this.isEntityMode) {
+      // Filtros y lotes siguen mandando sobre los datos; la exploración se
+      // recalcula sobre el nuevo resultado visible sin perder raíz ni ramas.
+      this.syncEntityMode();
+      this.cdr.markForCheck();
+      return;
+    }
 
     const built = this.buildElements(visible);
     this.coverageLabel = this.buildCoverageLabel(
@@ -629,7 +789,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       lotState.lotCount,
       lotState.currentLot,
     );
-    this.syncGraph(built);
+    this.syncGraph(built.elements);
     this.cdr.markForCheck();
   }
 
@@ -663,10 +823,15 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (level === this.detailLevel) return;
     this.detailLevel = level;
     this.persistGraphState();
-    if (this.cy && this.lastVisibleResult) {
+    if (this.isEntityMode) {
+      // El nivel cambia el espacio que ocupan las etiquetas, así que el
+      // subgrafo se vuelve a dibujar con el layout recalculado.
+      this.destroyGraph();
+      this.syncEntityMode();
+    } else if (this.cy && this.lastVisibleResult) {
       const visible = this.lastVisibleResult;
       this.destroyGraph();
-      this.syncGraph(this.buildElements(visible));
+      this.syncGraph(this.buildElements(visible).elements);
     } else {
       this.cy?.style().update();
     }
@@ -681,6 +846,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    */
   private rebuildGraphForLimitChange(): void {
     if (!this.cy || !this.lastVisibleResult) return;
+    if (this.isEntityMode) {
+      this.destroyGraph();
+      this.syncEntityMode();
+      this.cdr.markForCheck();
+      return;
+    }
     const visible = this.lastVisibleResult;
     const built = this.buildElements(visible);
     this.coverageLabel = this.buildCoverageLabel(
@@ -690,7 +861,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.lastLotState.currentLot,
     );
     this.destroyGraph();
-    this.syncGraph(built);
+    this.syncGraph(built.elements);
     this.cdr.markForCheck();
   }
 
@@ -751,6 +922,16 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         this.ngZone.run(() => {
           this.selectionService.select(nodeData, 'graph');
         });
+      } else if (this.isEntityMode) {
+        // Nodo estructural que no llegó al índice (p. ej. viene del resultado
+        // completo): igual puede inspeccionarse, sin emitir selección a las
+        // otras vistas.
+        const context = this.explorationContext();
+        if (context) {
+          this.ngZone.run(() => {
+            this.applyExploration(setActiveNode(context, this.explorationState, nodeUri));
+          });
+        }
       }
       // La suscripción a selectedNode$ descarta lo propio (source 'graph'), así
       // que el nodo marcado se recuerda acá para que un foco coordinado
@@ -776,7 +957,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
             this.lastLotState.currentLot,
           );
           this.destroyGraph();
-          this.syncGraph(built);
+          this.syncGraph(built.elements);
           this.cdr.markForCheck();
         }
         return;
@@ -787,7 +968,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       if (this.expandedSuperEdgeIds.has(id)) this.expandedSuperEdgeIds.delete(id);
       else this.expandedSuperEdgeIds.add(id);
       this.persistGraphState();
-      if (this.lastVisibleResult) this.syncGraph(this.buildElements(this.lastVisibleResult));
+      if (this.lastVisibleResult) {
+        this.syncGraph(this.buildElements(this.lastVisibleResult).elements);
+      }
     });
 
     this.cy.on('tap', (evt) => {
@@ -1103,6 +1286,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   /** Único escritor de graphState: cámara y acomodo manual viajan juntos. */
   private persistGraphState(): void {
     if (!this.cy) return;
+    // §9 del plan: raíz, historial y selección de la exploración son estado
+    // transitorio. Tampoco se guardan su cámara ni su layout, para que volver
+    // al resultado encuentre el tablero tal como estaba.
+    if (this.isEntityMode) return;
     const pan = this.cy.pan();
     const manual: Record<string, { x: number; y: number }> = {};
     this.manualPositions.forEach((p, uri) => {
@@ -1123,8 +1310,438 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Modo entidad (etapa 5): glue entre el modelo puro y la vista
+  // ---------------------------------------------------------------------------
+
+  /** `true` mientras hay una entidad en exploración con raíz resuelta. */
+  get isEntityMode(): boolean {
+    return isExplorationActive(this.explorationState);
+  }
+
+  /** Valor del selector `Resultado completo / Entidad seleccionada`. */
+  get explorationMode(): 'result' | 'entity' {
+    return this.isEntityMode ? 'entity' : 'result';
+  }
+
+  /**
+   * La entrada es explícita: hace falta una selección y un grafo dibujado.
+   * Recorrer filas o marcadores no alcanza para cambiar de modo (§9).
+   */
+  get canEnterEntityMode(): boolean {
+    return !this.isEntityMode && !!this.selectedUri && !!this.lastVisibleResult;
+  }
+
+  get selectedEntityLabel(): string {
+    return this.selectedLabel || this.selectedUri || '';
+  }
+
+  /** Etiquetas del panel, recalculadas con cada subgrafo (ver `refreshEntityViewModel`). */
+  entityRootLabel = '';
+  entityRootShortUri = '';
+  entityActiveLabel = '';
+  entityActiveShortUri = '';
+  entityActivePinned = false;
+  entityMetrics = '';
+  entityWarnings = '';
+  entityCrumbs: EntityCrumb[] = [];
+  entityBranches: EntityBranchItem[] = [];
+  entityOtherBranches: EntityBranchItem[] = [];
+
+  get entityRootUri(): string {
+    return this.explorationState.rootUri ?? '';
+  }
+
+  get entityActiveUri(): string {
+    return this.explorationState.activeUri ?? '';
+  }
+
+  get canPromoteActive(): boolean {
+    return this.isEntityMode && !!this.entityActiveUri && this.entityActiveUri !== this.entityRootUri;
+  }
+
+  get canGoToRoot(): boolean {
+    return this.canPromoteActive;
+  }
+
+  get canGoBack(): boolean {
+    return this.isEntityMode && this.explorationState.history.length > 0;
+  }
+
+  get canResetExploration(): boolean {
+    const state = this.explorationState;
+    return (
+      this.isEntityMode &&
+      (state.expandedBranchIds.length > 0 ||
+        state.collapsedBranchIds.length > 0 ||
+        state.pinnedUris.length > 0 ||
+        state.activeUri !== state.rootUri)
+    );
+  }
+
+  /**
+   * Selección que no pertenece a la estructura explorada. La raíz NO se
+   * reemplaza sola: la UI ofrece explorarla y el usuario decide.
+   */
+  get entityRootCandidate(): { uri: string; label: string } | null {
+    if (!this.isEntityMode || !this.selectedUri) return null;
+    if (this.selectedUri === this.entityRootUri) return null;
+    const inside = this.entitySubgraph?.nodes.some((node) => node.uri === this.selectedUri);
+    return inside ? null : { uri: this.selectedUri, label: this.selectedEntityLabel };
+  }
+
+  /** `Ver estructura`: única entrada al modo entidad desde la interfaz. */
+  showStructure(trigger: EntityModeTrigger = 'user-action'): void {
+    if (!this.selectedUri) return;
+    this.enterEntity(this.selectedUri, trigger);
+  }
+
+  /** Explora la selección que llegó de otra vista como nueva raíz (acción explícita). */
+  exploreSelectedAsRoot(): void {
+    const candidate = this.entityRootCandidate;
+    if (candidate) this.enterEntity(candidate.uri, 'user-action');
+  }
+
+  setExplorationMode(mode: string): void {
+    if (mode === 'entity') this.showStructure();
+    else this.exitEntityMode();
+  }
+
+  /** `Volver al resultado`: restaura cámara, layout y nivel globales. */
+  exitEntityMode(): void {
+    if (!this.isEntityMode) return;
+    this.leaveEntityMode('');
+  }
+
+  expandBranchById(branchId: string): void {
+    const context = this.explorationContext();
+    if (!context) return;
+    this.applyExploration(expandBranch(context, this.explorationState, branchId));
+  }
+
+  collapseBranchById(branchId: string): void {
+    const context = this.explorationContext();
+    if (!context) return;
+    this.applyExploration(collapseBranch(context, this.explorationState, branchId));
+  }
+
+  toggleBranch(item: EntityBranchItem): void {
+    if (item.expanded) this.collapseBranchById(item.id);
+    else this.expandBranchById(item.id);
+  }
+
+  /** Activa un nodo desde el panel (sin pasar por el lienzo). */
+  activateNode(uri: string): void {
+    const context = this.explorationContext();
+    if (!context) return;
+    this.applyExploration(setActiveNode(context, this.explorationState, uri));
+  }
+
+  togglePinActive(): void {
+    const context = this.explorationContext();
+    const uri = this.entityActiveUri;
+    if (!context || !uri) return;
+    this.applyExploration(togglePin(context, this.explorationState, uri));
+  }
+
+  promoteActive(): void {
+    this.applyExploration(promoteActiveToRoot(this.explorationState));
+  }
+
+  backToRoot(): void {
+    this.applyExploration(goToRoot(this.explorationState));
+  }
+
+  stepBack(): void {
+    this.applyExploration(goBack(this.explorationState));
+  }
+
+  resetEntityExploration(): void {
+    this.applyExploration(resetExploration(this.explorationState));
+  }
+
+  async copyCurrentEntityView(): Promise<void> {
+    await this.copyEntitySummary('view');
+  }
+
+  async copyFullEntityStructure(): Promise<void> {
+    await this.copyEntitySummary('structure');
+  }
+
+  dismissCopyFallback(): void {
+    this.copyFallbackText = '';
+  }
+
+  /**
+   * Vuelve a una raíz anterior del breadcrumb deshaciendo pasos del historial.
+   * Se compone con la operación pura `goBack` en vez de inventar una nueva:
+   * el historial sigue siendo la única fuente de verdad del recorrido.
+   */
+  goToCrumb(uri: string): void {
+    if (!this.isEntityMode || uri === this.entityRootUri) return;
+    let state = this.explorationState;
+    let guard = state.history.length;
+    while (guard-- > 0 && state.rootUri !== uri) {
+      const previous = goBack(state);
+      if (previous.lastRejection) break;
+      state = previous;
+    }
+    this.applyExploration(state.rootUri === uri ? state : this.explorationState);
+  }
+
+  /**
+   * Atajos de teclado del modo entidad. La interacción no depende del puntero:
+   * los controles del panel son botones reales y estos atajos cubren el lienzo.
+   */
+  @HostListener('keydown', ['$event'])
+  onEntityKeydown(event: KeyboardEvent): void {
+    if (!this.isEntityMode) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const tag = (event.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+    const handled = (): void => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    switch (event.key) {
+      case 'Escape':
+        handled();
+        this.exitEntityMode();
+        return;
+      case 'Backspace':
+        handled();
+        this.stepBack();
+        return;
+      case 'Home':
+        handled();
+        this.backToRoot();
+        return;
+      case 'Delete':
+        handled();
+        this.resetEntityExploration();
+        return;
+      case 'f':
+      case 'F':
+        handled();
+        this.togglePinActive();
+        return;
+      case 'r':
+      case 'R':
+        handled();
+        this.promoteActive();
+        return;
+      case '+':
+      case 'ArrowRight': {
+        const next = this.entityBranches.find((branch) => branch.canExpand);
+        if (!next) return;
+        handled();
+        this.expandBranchById(next.id);
+        return;
+      }
+      case '-':
+      case 'ArrowLeft': {
+        const last = [...this.entityBranches].reverse().find((branch) => branch.canCollapse);
+        if (!last) return;
+        handled();
+        this.collapseBranchById(last.id);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  // --- interno ---------------------------------------------------------------
+
+  private explorationContext(): ExplorationContext | null {
+    if (!this.lastVisibleResult) return null;
+    return { visibleResult: this.lastVisibleResult, fullResult: this.lastOriginalResult };
+  }
+
+  private entitySummaryRequest(): EntitySummaryRequest | null {
+    const context = this.explorationContext();
+    if (!context || !this.isEntityMode) return null;
+    return {
+      context,
+      state: this.explorationState,
+      subgraph: this.entitySubgraph,
+      lot: {
+        currentLot: this.lastLotState.currentLot,
+        lotCount: this.lastLotState.lotCount,
+        totalRows: this.lastOriginalResult?.bindings.length,
+        visibleRows: this.lastVisibleResult?.bindings.length,
+        truncated: this.lastOriginalResult?.meta.truncated,
+      },
+    };
+  }
+
+  private async copyEntitySummary(scope: 'view' | 'structure'): Promise<void> {
+    const request = this.entitySummaryRequest();
+    if (!request) return;
+    const result =
+      scope === 'view'
+        ? await this.summaryClipboard.copyCurrentView(request)
+        : await this.summaryClipboard.copyFullStructure(request);
+    this.explorationMessage = result.message;
+    this.copyFallbackText = result.status === 'unsupported' ? result.text : '';
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Aplica el resultado de una operación pura. Un rechazo no redibuja nada y se
+   * anuncia; los `no-op` (re-seleccionar el nodo activo, volver a la raíz
+   * estando en ella) son ruido y quedan mudos.
+   */
+  private applyExploration(next: ExplorationState): void {
+    const rejection = next.lastRejection;
+    this.explorationState = next;
+    this.explorationMessage = rejection && rejection.code !== 'no-op' ? rejection.message : '';
+    if (!rejection) this.syncEntityMode();
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Entra al modo entidad. Antes de cambiar nada guarda la vista global: volver
+   * tiene que devolver cámara, layout, nivel y acomodo manual intactos.
+   */
+  private enterEntity(rootUri: string, trigger: EntityModeTrigger): void {
+    const context = this.explorationContext();
+    if (!context) return;
+    const next = enterEntityMode(this.explorationState, { rootUri, trigger });
+    if (next.lastRejection) {
+      this.explorationState = next;
+      this.explorationMessage =
+        next.lastRejection.code === 'no-op' ? '' : next.lastRejection.message;
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (!this.isEntityMode) {
+      this.resultViewSnapshot = {
+        layout: this.currentLayout,
+        detailLevel: this.detailLevel,
+        camera: this.cy ? { pan: { ...this.cy.pan() }, zoom: this.cy.zoom() } : undefined,
+        manualPositions: new Map(this.manualPositions),
+      };
+    }
+
+    this.explorationState = next;
+    this.explorationMessage = '';
+    // §9: el modo entidad usa Jerárquico, y con etiquetas visibles (en Resumen
+    // los nodos no las muestran y el subgrafo sería ilegible).
+    this.currentLayout = 'dagre';
+    if (this.detailLevel === 'summary') this.detailLevel = 'exploration';
+    this.manualPositions.clear();
+    this.destroyGraph();
+    this.syncEntityMode();
+    this.cdr.markForCheck();
+  }
+
+  /** Recalcula el subgrafo del estado actual y lo vuelca en Cytoscape. */
+  private syncEntityMode(): void {
+    if (!isExplorationActive(this.explorationState)) return;
+    const context = this.explorationContext();
+    if (!context) return;
+    const subgraph = explorationSubgraph(context, this.explorationState);
+    if (!subgraph) return;
+    if (subgraph.sourceScope === 'none') {
+      this.leaveEntityMode(
+        'La entidad ya no está en el resultado: se volvió al resultado completo.',
+      );
+      return;
+    }
+
+    this.entitySubgraph = subgraph;
+    // El chip de cobertura describe el lote del resultado; en modo entidad los
+    // indicadores viven en el panel.
+    this.coverageLabel = '';
+    this.refreshEntityViewModel();
+    this.syncGraph(buildEntityModeElements(subgraph).elements);
+  }
+
+  /** Textos del panel. Se calculan una vez por subgrafo, no por ciclo de CD. */
+  private refreshEntityViewModel(): void {
+    const subgraph = this.entitySubgraph;
+    if (!subgraph) {
+      this.entityRootLabel = '';
+      this.entityRootShortUri = '';
+      this.entityActiveLabel = '';
+      this.entityActiveShortUri = '';
+      this.entityActivePinned = false;
+      this.entityMetrics = '';
+      this.entityWarnings = '';
+      this.entityCrumbs = [];
+      this.entityBranches = [];
+      this.entityOtherBranches = [];
+      return;
+    }
+
+    const fromSubgraph = entityLabelResolver(subgraph);
+    // Las raíces anteriores del breadcrumb pueden haber salido del subgrafo
+    // vigente: el índice de nodos las sigue conociendo.
+    const labelOf = (uri: string): string => {
+      const label = fromSubgraph(uri);
+      if (label !== uri) return label;
+      return this.nodeIndex.get(uri)?.label || uri;
+    };
+
+    this.entityRootLabel = labelOf(subgraph.rootUri);
+    this.entityRootShortUri = shortenUri(subgraph.rootUri);
+    this.entityActiveLabel = labelOf(subgraph.activeUri);
+    this.entityActiveShortUri = shortenUri(subgraph.activeUri);
+    this.entityActivePinned = this.explorationState.pinnedUris.includes(subgraph.activeUri);
+    this.entityMetrics = entityMetricsLabel(subgraph);
+    this.entityWarnings = entityWarningsLabel(subgraph);
+    this.entityCrumbs = entityBreadcrumb(explorationBreadcrumb(this.explorationState), labelOf);
+    this.entityBranches = activeBranchItems(subgraph);
+    this.entityOtherBranches = otherBranchItems(subgraph);
+  }
+
+  /**
+   * Abandona el modo entidad sin redibujar: sólo devuelve los campos de la
+   * vista global a lo que eran. Lo usan tanto la salida explícita como los
+   * casos en los que el resultado deja de tener la raíz.
+   */
+  private discardEntityMode(): void {
+    const next = exitToResult(this.explorationState);
+    if (!next.lastRejection) this.explorationState = next;
+    this.entitySubgraph = null;
+    this.copyFallbackText = '';
+    this.refreshEntityViewModel();
+
+    const snapshot = this.resultViewSnapshot;
+    this.resultViewSnapshot = null;
+    if (!snapshot) return;
+    this.currentLayout = snapshot.layout;
+    this.detailLevel = snapshot.detailLevel;
+    this.restoreCamera = snapshot.camera;
+    this.restoreManualPositions = snapshot.manualPositions;
+  }
+
+  /** Vuelve al resultado completo y lo redibuja con su estado previo. */
+  private leaveEntityMode(message: string): void {
+    this.discardEntityMode();
+    this.explorationMessage = message;
+    this.destroyGraph();
+
+    const visible = this.lastVisibleResult;
+    if (visible) {
+      const built = this.buildElements(visible);
+      this.coverageLabel = this.buildCoverageLabel(
+        built,
+        visible,
+        this.lastLotState.lotCount,
+        this.lastLotState.currentLot,
+      );
+      this.syncGraph(built.elements);
+    }
+    this.cdr.markForCheck();
+  }
+
   private getLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {
-    return LAYOUT_CONFIGS[layout]?.options ?? LAYOUT_CONFIGS['cola'].options;
+    return layoutOptionsFor(layout, this.detailLevel);
   }
 
   private getInitialLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {

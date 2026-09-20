@@ -10,6 +10,8 @@ import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { DEFAULT_LIMITS, LimitsService } from '@core/services/limits.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
+import { realEstateFixture } from './testing/entity-subgraph-fixtures';
+import { EntitySummaryClipboardService } from './entity-summary-clipboard.service';
 
 const mockNode: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q7742',
@@ -441,14 +443,30 @@ describe('GraphViewComponent', () => {
     component.ngOnDestroy();
   });
 
-  it('should have three layout options', () => {
-    expect(component.layoutOptions.length).toBe(3);
-    const values = component.layoutOptions.map((o) => o.value);
-    expect(values).toEqual(['cola', 'dagre', 'grid']);
+  it('should have dagre as default layout', () => {
+    expect(component.currentLayout).toBe('dagre');
   });
 
-  it('should have cola as default layout', () => {
-    expect(component.currentLayout).toBe('cola');
+  it('oculta Cuadrícula cuando hay relaciones', () => {
+    emitResult([mockNode, mockNode2], [mockEdge]);
+    fixture.detectChanges();
+
+    const options = Array.from(
+      fixture.nativeElement.querySelectorAll('#graph-layout option') as NodeListOf<HTMLOptionElement>,
+    );
+    expect(options.map((option) => option.value)).toEqual(['dagre', 'cola']);
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Jerárquico — Ordena relaciones dirigidas por niveles',
+      'Orgánico — Distribuye redes mediante fuerzas',
+    ]);
+  });
+
+  it('usa y ofrece Cuadrícula automáticamente cuando no hay relaciones', () => {
+    emitResult([mockNode, mockNode2], []);
+    fixture.detectChanges();
+
+    expect(component.currentLayout).toBe('grid');
+    expect(component.availableLayoutOptions.map((option) => option.value)).toContain('grid');
   });
 
   it('calcula la disposición inicial sin animar desde posiciones superpuestas', () => {
@@ -462,6 +480,7 @@ describe('GraphViewComponent', () => {
   });
 
   it('inicia Cola con posiciones aleatorias sin bloquear el hilo principal', () => {
+    TestBed.inject(DashboardViewStateService).graphState.set({ layout: 'cola' });
     const reverseEdge: NormalizedEdge = {
       id: 'edge-2',
       source: mockNode2.uri,
@@ -540,6 +559,13 @@ describe('GraphViewComponent', () => {
 
     expect(lastCy()._ids()).toContain('listing-0');
     expect(lastCy()._ids().some((id: string) => id.includes('component-motif'))).toBe(false);
+    expect(lastCy()._layoutRuns[0]).toMatchObject({
+      name: 'dagre',
+      nodeDimensionsIncludeLabels: true,
+      nodeSep: 60,
+      rankSep: 95,
+      edgeSep: 24,
+    });
   });
 
   /**
@@ -1191,6 +1217,18 @@ describe('GraphViewComponent', () => {
       expect(cy._layoutRuns[0]?.['name']).toBe('dagre');
     });
 
+    it.each(['cola', 'dagre', 'grid'] as const)('acepta el identificador histórico %s', (layout) => {
+      TestBed.inject(DashboardViewStateService).graphState.set({ layout });
+
+      emitResult([mockNode, mockNode2], [mockEdge]);
+
+      expect(component.currentLayout).toBe(layout);
+      expect(lastCy()._layoutRuns[0]?.['name']).toBe(layout);
+      if (layout === 'grid') {
+        expect(component.availableLayoutOptions.map((option) => option.value)).toContain('grid');
+      }
+    });
+
     it('restaura la cámara guardada en vez de encuadrar', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({ layout: 'cola', pan: { x: 15, y: 25 }, zoom: 2 });
@@ -1356,6 +1394,477 @@ describe('GraphViewComponent', () => {
       component.setLayout('dagre');
 
       expect(viewState.graphState()?.manualPositions).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Etapa 5: interfaz del modo entidad
+  // ---------------------------------------------------------------------------
+  describe('modo entidad', () => {
+    const estate = realEstateFixture(10);
+
+    function nodeOf(uri: string): NormalizedNode {
+      return estate.result.nodes.find((n) => n.uri === uri)!;
+    }
+
+    function emitEstate(result: QueryResult = estate.result): void {
+      queryResultSubject.next(result);
+      visibleQueryResultSubject.next(result);
+      fixture.detectChanges();
+    }
+
+    function select(uri: string, source: Selection['source'] = 'table'): void {
+      selectedNodeSubject.next({ node: nodeOf(uri), source });
+      fixture.detectChanges();
+    }
+
+    /** Entra al modo entidad con `listing/0` como raíz, desde la tabla. */
+    function enter(): void {
+      emitEstate();
+      select(estate.root);
+      component.showStructure();
+      fixture.detectChanges();
+    }
+
+    function drawnIds(): string[] {
+      return lastCy()._ids();
+    }
+
+    /** Sólo nodos: `_ids()` incluye también las aristas. */
+    function drawnNodeIds(): string[] {
+      return lastCy()
+        ._els.filter((element) => element.isNode)
+        .map((element) => element.id);
+    }
+
+    function branchOf(uri: string) {
+      return [...component.entityBranches, ...component.entityOtherBranches].find(
+        (branch) => branch.nodeUri === uri && branch.canExpand,
+      )!;
+    }
+
+    function press(key: string): void {
+      (fixture.nativeElement as HTMLElement).dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true }),
+      );
+      fixture.detectChanges();
+    }
+
+    it('no ofrece Ver estructura sin una selección explícita', () => {
+      emitEstate();
+
+      expect(component.canEnterEntityMode).toBe(false);
+      const compiled = fixture.nativeElement as HTMLElement;
+      const labels = [...compiled.querySelectorAll('button')].map((b) => b.textContent?.trim());
+      expect(labels).not.toContain('Ver estructura');
+    });
+
+    it('ofrece Ver estructura cuando hay una selección de otra vista', () => {
+      emitEstate();
+      select(estate.root, 'map');
+
+      expect(component.canEnterEntityMode).toBe(true);
+      const compiled = fixture.nativeElement as HTMLElement;
+      const labels = [...compiled.querySelectorAll('button')].map((b) => b.textContent?.trim());
+      expect(labels).toContain('Ver estructura');
+    });
+
+    it.each(['table', 'map', 'timeline', 'graph'] as const)(
+      'entra desde una selección de %s y dibuja sólo la estructura de la raíz',
+      (source) => {
+        emitEstate();
+        select(estate.root, source);
+        component.showStructure();
+        fixture.detectChanges();
+
+        expect(component.isEntityMode).toBe(true);
+        expect(component.entityRootUri).toBe(estate.root);
+        const ids = drawnIds();
+        expect(ids).toContain(estate.root);
+        expect(ids).toContain(estate.estate);
+        expect(ids).toContain(estate.geometry);
+        // El hairball no vuelve: los otros avisos no entran por el hub.
+        expect(ids).not.toContain(estate.otherListing);
+        expect(ids).not.toContain(estate.otherEstate);
+      },
+    );
+
+    it('usa Jerárquico y sube el nivel para que se lean las etiquetas', () => {
+      expect(component.detailLevel).toBe('summary');
+
+      enter();
+
+      expect(component.currentLayout).toBe('dagre');
+      expect(component.detailLevel).toBe('exploration');
+      expect(lastCy()._layoutRuns[0]?.['name']).toBe('dagre');
+    });
+
+    it('conecta las dos acciones de copia y anuncia el resultado', async () => {
+      enter();
+      const clipboard = TestBed.inject(EntitySummaryClipboardService);
+      const view = vi.spyOn(clipboard, 'copyCurrentView').mockResolvedValue({
+        status: 'copied',
+        scope: 'view',
+        copied: true,
+        text: 'vista',
+        metrics: null,
+        message: 'Vista copiada.',
+      });
+      const structure = vi.spyOn(clipboard, 'copyFullStructure').mockResolvedValue({
+        status: 'copied',
+        scope: 'structure',
+        copied: true,
+        text: 'estructura',
+        metrics: null,
+        message: 'Estructura copiada.',
+      });
+
+      await component.copyCurrentEntityView();
+      expect(view).toHaveBeenCalledOnce();
+      expect(component.explorationMessage).toBe('Vista copiada.');
+
+      await component.copyFullEntityStructure();
+      expect(structure).toHaveBeenCalledOnce();
+      expect(component.explorationMessage).toBe('Estructura copiada.');
+    });
+
+    it('expone el texto para copia manual cuando no hay API disponible', async () => {
+      enter();
+      vi.spyOn(TestBed.inject(EntitySummaryClipboardService), 'copyCurrentView').mockResolvedValue({
+        status: 'unsupported',
+        scope: 'view',
+        copied: false,
+        text: 'texto inequívoco',
+        metrics: null,
+        message: 'Copialo manualmente.',
+      });
+
+      await component.copyCurrentEntityView();
+      fixture.detectChanges();
+
+      expect(component.copyFallbackText).toBe('texto inequívoco');
+      expect((fixture.nativeElement as HTMLElement).querySelector('textarea')?.value).toBe(
+        'texto inequívoco',
+      );
+    });
+
+    it('el selector de vista refleja y cambia el modo', () => {
+      emitEstate();
+      select(estate.root);
+      expect(component.explorationMode).toBe('result');
+
+      component.setExplorationMode('entity');
+      fixture.detectChanges();
+      expect(component.explorationMode).toBe('entity');
+
+      component.setExplorationMode('result');
+      fixture.detectChanges();
+      expect(component.explorationMode).toBe('result');
+    });
+
+    it('el foco coordinado no inicia la exploración', () => {
+      emitEstate();
+      select(estate.root);
+
+      focusSubject.next({
+        uris: new Set(estate.result.nodes.map((node) => node.uri)),
+        source: 'map',
+      });
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(false);
+    });
+
+    it('el foco coordinado no reencuadra ni altera el subgrafo explorado', () => {
+      enter();
+      const cy = lastCy();
+      const before = drawnIds();
+      cy.animate.mockClear();
+
+      focusSubject.next({
+        uris: new Set(estate.result.nodes.map((node) => node.uri)),
+        source: 'timeline',
+      });
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(true);
+      expect(drawnIds()).toEqual(before);
+      expect(cy.animate).not.toHaveBeenCalled();
+    });
+
+    it('expandir un recurso compartido agrega sólo sus vecinos, sin recrear el lienzo', () => {
+      enter();
+      const instances = cyRegistry.instances.length;
+      const before = drawnNodeIds().length;
+      const branch = branchOf(estate.partido);
+
+      expect(branch.reachesHub || branch.pendingCount > 0).toBe(true);
+      component.expandBranchById(branch.id);
+      fixture.detectChanges();
+
+      expect(drawnNodeIds().length).toBeGreaterThan(before);
+      // Ni se reconstruye el grafo global ni se recrea la instancia: patch.
+      expect(drawnNodeIds().length).toBeLessThan(estate.result.nodes.length);
+      expect(cyRegistry.instances.length).toBe(instances);
+      expect(component.explorationMessage).toBe('');
+    });
+
+    it('contraer devuelve la vista al estado anterior', () => {
+      enter();
+      const before = drawnNodeIds().length;
+      const branch = branchOf(estate.partido);
+
+      component.expandBranchById(branch.id);
+      fixture.detectChanges();
+      component.collapseBranchById(branch.id);
+      fixture.detectChanges();
+
+      expect(drawnNodeIds().length).toBe(before);
+      expect(component.explorationState.expandedBranchIds).toEqual([]);
+    });
+
+    it('una expansión que no entra en el presupuesto se rechaza con explicación accesible', () => {
+      TestBed.inject(LimitsService).apply({ ...DEFAULT_LIMITS, graphMaxNodes: 8 });
+      fixture.detectChanges();
+      enter();
+      const before = drawnNodeIds().length;
+
+      component.expandBranchById(branchOf(estate.partido).id);
+      fixture.detectChanges();
+
+      expect(component.explorationMessage).toContain('presupuesto');
+      expect(drawnNodeIds().length).toBe(before);
+      const alert = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+      expect(alert?.textContent).toContain('presupuesto');
+    });
+
+    it('el panel publica métricas de visibles, disponibles y omitidos', () => {
+      enter();
+
+      const metrics = (fixture.nativeElement as HTMLElement).querySelector(
+        '.entity-panel__metrics',
+      );
+      expect(metrics?.textContent).toContain('nodos');
+      expect(metrics?.textContent).toContain('tripletas');
+      expect(component.entityMetrics).toBe(metrics?.textContent?.trim());
+    });
+
+    it('fija y desfija el nodo activo', () => {
+      enter();
+
+      component.togglePinActive();
+      expect(component.explorationState.pinnedUris).toEqual([estate.root]);
+
+      component.togglePinActive();
+      expect(component.explorationState.pinnedUris).toEqual([]);
+    });
+
+    it('usa el nodo activo como nueva raíz y el breadcrumb recuerda la anterior', () => {
+      enter();
+      select(estate.estate);
+
+      expect(component.entityActiveUri).toBe(estate.estate);
+      expect(component.entityRootUri).toBe(estate.root);
+
+      component.promoteActive();
+      fixture.detectChanges();
+
+      expect(component.entityRootUri).toBe(estate.estate);
+      expect(component.entityCrumbs.map((crumb) => crumb.uri)).toEqual([
+        estate.root,
+        estate.estate,
+      ]);
+      expect(component.entityCrumbs[1].current).toBe(true);
+    });
+
+    it('el breadcrumb vuelve a una raíz anterior', () => {
+      enter();
+      select(estate.estate);
+      component.promoteActive();
+      fixture.detectChanges();
+
+      component.goToCrumb(estate.root);
+      fixture.detectChanges();
+
+      expect(component.entityRootUri).toBe(estate.root);
+    });
+
+    it('volver a la raíz y restablecer no salen del modo entidad', () => {
+      enter();
+      select(estate.estate);
+      component.expandBranchById(branchOf(estate.partido).id);
+      fixture.detectChanges();
+
+      component.backToRoot();
+      fixture.detectChanges();
+      expect(component.entityActiveUri).toBe(estate.root);
+
+      component.resetEntityExploration();
+      fixture.detectChanges();
+      expect(component.explorationState.expandedBranchIds).toEqual([]);
+      expect(component.isEntityMode).toBe(true);
+    });
+
+    it('una selección posterior no reemplaza la raíz sin acción explícita', () => {
+      enter();
+
+      select(estate.otherListing, 'map');
+
+      expect(component.entityRootUri).toBe(estate.root);
+      expect(component.entityRootCandidate?.uri).toBe(estate.otherListing);
+
+      component.exploreSelectedAsRoot();
+      fixture.detectChanges();
+
+      expect(component.entityRootUri).toBe(estate.otherListing);
+    });
+
+    it('una selección dentro de la estructura sólo mueve el nodo activo', () => {
+      enter();
+
+      select(estate.address, 'timeline');
+
+      expect(component.entityActiveUri).toBe(estate.address);
+      expect(component.entityRootUri).toBe(estate.root);
+      expect(component.entityRootCandidate).toBeNull();
+    });
+
+    it('el tap en el lienzo emite selección y mueve el nodo activo', () => {
+      enter();
+      const cy = lastCy();
+      const selectionService = TestBed.inject(SelectionService);
+
+      cy._emit('tap', 'node', { target: cy.getElementById(estate.address) });
+      selectedNodeSubject.next({ node: nodeOf(estate.address), source: 'graph' });
+      fixture.detectChanges();
+
+      expect(selectionService.select).toHaveBeenCalledWith(nodeOf(estate.address), 'graph');
+      expect(component.entityActiveUri).toBe(estate.address);
+    });
+
+    it('volver al resultado recupera cámara, layout y nivel previos', () => {
+      emitEstate();
+      component.setDetailLevel('detail');
+      component.setLayout('cola');
+      fixture.detectChanges();
+      const resultCy = lastCy();
+      resultCy.zoom(2);
+      resultCy.pan({ x: 15, y: 25 });
+
+      select(estate.root);
+      component.showStructure();
+      fixture.detectChanges();
+      expect(component.currentLayout).toBe('dagre');
+
+      component.exitEntityMode();
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(false);
+      expect(component.currentLayout).toBe('cola');
+      expect(component.detailLevel).toBe('detail');
+      const restored = lastCy();
+      restored._emit('layoutstop', null, {});
+      expect(restored.zoom).toHaveBeenCalledWith(2);
+      expect(restored.pan()).toEqual({ x: 15, y: 25 });
+      expect(restored.fit).not.toHaveBeenCalled();
+      // El resultado completo vuelve a estar dibujado.
+      expect(drawnIds()).toContain(estate.otherListing);
+    });
+
+    it('el estado de exploración es transitorio: no se persiste en el tablero', () => {
+      emitEstate();
+      component.setLayout('cola');
+      const viewState = TestBed.inject(DashboardViewStateService);
+      const persisted = viewState.graphState();
+
+      select(estate.root);
+      component.showStructure();
+      component.setLayout('grid');
+      component.expandBranchById(branchOf(estate.partido).id);
+      fixture.detectChanges();
+
+      expect(viewState.graphState()).toEqual(persisted);
+      expect(viewState.graphState()?.layout).toBe('cola');
+    });
+
+    it('se maneja con teclado: Esc sale, Retroceso deshace, Inicio vuelve a la raíz', () => {
+      enter();
+      select(estate.estate);
+      expect(component.entityActiveUri).toBe(estate.estate);
+
+      press('Home');
+      expect(component.entityActiveUri).toBe(estate.root);
+
+      press('Backspace');
+      expect(component.entityActiveUri).toBe(estate.estate);
+
+      press('Escape');
+      expect(component.isEntityMode).toBe(false);
+    });
+
+    it('las flechas expanden y contraen la rama del nodo activo', () => {
+      enter();
+      select(estate.partido);
+      const before = drawnNodeIds().length;
+
+      press('ArrowRight');
+      expect(drawnNodeIds().length).toBeGreaterThan(before);
+
+      press('ArrowLeft');
+      expect(drawnNodeIds().length).toBe(before);
+    });
+
+    it('el teclado no interfiere fuera del modo entidad', () => {
+      emitEstate();
+      select(estate.root);
+
+      press('Escape');
+
+      expect(component.isEntityMode).toBe(false);
+      expect(component.canEnterEntityMode).toBe(true);
+    });
+
+    it('sigue explorando cuando la raíz sale del lote pero está en el resultado completo', () => {
+      enter();
+
+      visibleQueryResultSubject.next({
+        ...estate.result,
+        nodes: estate.result.nodes.filter((node) => node.uri !== estate.root),
+        bindings: [],
+      });
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(true);
+      expect(component.entityWarnings).toContain('resultado completo');
+    });
+
+    it('vuelve al resultado con aviso si la raíz desaparece del resultado', () => {
+      enter();
+
+      const without = {
+        ...estate.result,
+        nodes: estate.result.nodes.filter((node) => node.uri !== estate.root),
+        bindings: [],
+      };
+      queryResultSubject.next(without);
+      visibleQueryResultSubject.next(without);
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(false);
+      expect(component.explorationMessage).toContain('resultado completo');
+    });
+
+    it('un resultado vacío descarta la exploración sin dejar estado colgado', () => {
+      enter();
+
+      queryResultSubject.next(null);
+      visibleQueryResultSubject.next(null);
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(false);
+      expect(component.entitySubgraph).toBeNull();
+      expect(component.entityBranches).toEqual([]);
+      expect(component.queryState).toBe('no-query');
     });
   });
 });

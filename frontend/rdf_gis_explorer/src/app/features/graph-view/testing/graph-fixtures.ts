@@ -139,6 +139,25 @@ export function makeDisconnectedComponents(components = 4, size = 3): QueryResul
   return makeQueryResult(nodes, edges);
 }
 
+/** Componentes con el mismo motivo de dos roles y una relación dirigida. */
+export function makeRepeatedMotif(components = 4): QueryResult {
+  const nodes: NormalizedNode[] = [];
+  const edges: NormalizedEdge[] = [];
+  const bindings: ResultBinding[] = [];
+  for (let i = 0; i < components; i++) {
+    const listing = `${EX}listing${i}`;
+    const estate = `${EX}estate${i}`;
+    nodes.push(makeNode(listing, { queryVariable: 'listing' }));
+    nodes.push(makeNode(estate, { queryVariable: 'realEstate' }));
+    edges.push(makeEdge(listing, estate, `${EX}p/about`));
+    bindings.push({
+      listing: { type: 'uri', value: listing },
+      realEstate: { type: 'uri', value: estate },
+    });
+  }
+  return makeQueryResult(nodes, edges, bindings);
+}
+
 /** 300 nodos con pocas aristas (resultado ancho y ralo, típico de SELECT grande). */
 export function makeWideSparse(nodeCount = 300, edgeCount = 30): QueryResult {
   const nodes = Array.from({ length: nodeCount }, (_, i) => makeNode(`${EX}w${i}`));

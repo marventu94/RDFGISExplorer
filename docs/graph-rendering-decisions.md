@@ -189,9 +189,14 @@ nueva; respeto de las posiciones manuales. La incorporación de toda nueva
 extensión de layout queda condicionada a un benchmark comparativo y a la
 verificación de compatibilidad con Native Federation.
 
-**Estado:** vigente parcial. La disposición inicial se elige por topología:
-grilla sin aristas, Dagre para grafos acíclicos y Cola para grafos cíclicos o
-con bucles. El layout real se ejecuta después de registrar el evento de fin de
+**Estado:** vigente parcial. La disposición inicial usa Cuadrícula sin aristas
+y Jerárquico (Dagre) ante cualquier relación, incluidos ciclos y bucles. Dagre
+tolera esas estructuras y ofrece un punto de partida más estable; Orgánico
+(Cola) permanece como alternativa manual. Cuadrícula se oculta del selector
+cuando hay relaciones, salvo que sea el valor efectivo de un tablero histórico.
+Los identificadores persistidos `dagre`, `cola` y `grid` conservan su semántica
+y no se migran; los estados históricos se respetan. El layout real se ejecuta
+después de registrar el evento de fin de
 layout, de modo que el encuadre siempre ocurre sobre la geometría terminada y
 ningún nodo queda en `(0,0)`.
 
@@ -235,7 +240,12 @@ de asumir una regla única.
 motivos repetidos por agregados etiquetados y oculta las etiquetas de entidades
 no agregadas. Entidades recupera la topología explícita y sus etiquetas;
 Entidades + relaciones agrega los predicados. Cambiar de nivel reconstruye la
-topología y el selector refleja siempre el estado efectivo. El semantic zoom
+topología, recalcula el layout y restaura la cámara persistida. Dagre incluye
+las dimensiones de las etiquetas y aplica separación creciente por nivel:
+34/70/14, 60/95/24 y 78/125/36 para `nodeSep/rankSep/edgeSep`. La tipografía
+común es 9–10 px; selección y agregados conservan 11 px y negrita. Los nombres
+largos se envuelven y el tooltip conserva el valor completo. El selector
+refleja siempre el estado efectivo. El semantic zoom
 automático con histéresis queda pendiente de validación con usuarios.
 
 ### 3.6. La dimensión geográfica no determina la posición de los nodos
@@ -394,12 +404,43 @@ entre entidades prioritarias» que allí figuran como propuesta operan
 **dentro del resultado ya recuperado** —deciden qué caminos preservar cuando el
 presupuesto obliga a recortar— y no recuperan datos nuevos del endpoint.
 
-**Estado:** vigente. La vista consume `visibleQueryResult$` y no dispone de
-ningún camino hacia el endpoint; el backend expone `POST /api/query/execute`,
-`POST /api/query/summary` y `GET /api/suggestions/*`, sin operación de
-vecindad ni de caminos. Las acciones de «expandir» de la vista (motivos y
-super-aristas) son estrictamente visuales: reordenan lo ya dibujado y no piden
-nada.
+**Estado:** vigente. La vista consume `visibleQueryResult$` y el resultado ya
+recuperado, pero no dispone de ningún camino hacia el endpoint; el backend
+expone `POST /api/query/execute`, `POST /api/query/summary` y
+`GET /api/suggestions/*`, sin operación de vecindad ni de caminos. Las acciones
+de «expandir» —motivos, super-aristas y ramas del modo entidad— son estrictamente
+locales: reorganizan elementos presentes en el `QueryResult` y no piden datos.
+
+### 3.11. Exploración local de una entidad y copia inequívoca
+
+**Decisión.** Una selección explícita puede abrir el modo **Entidad
+seleccionada**. La entrada nunca se dispara por foco coordinado. El contenido se
+obtiene mediante un modelo puro y determinista que prioriza raíz, entidades de
+las mismas filas, caminos e intermedios; los hubs quedan como frontera y sólo se
+atraviesan mediante acción explícita. La expansión es manual, de un salto, con
+presupuestos separados de nodos y aristas; raíz, activo y fijados tienen
+prioridad y ningún exceso se recorta en silencio.
+
+El estado local conserva raíz, activo, ramas expandidas/contraídas, fijados e
+historial. Es transitorio: salir restaura cámara, layout y nivel del resultado,
+sin cambiar consulta, filtros ni lote. La interfaz usa Jerárquico y ofrece
+breadcrumb, expansión/contracción, fijación, promoción de raíz, deshacer,
+restablecer y equivalentes de teclado.
+
+Las acciones **Copiar vista actual** y **Copiar estructura completa** producen
+texto estable con URIs completas y blank nodes opacos. Cada arista RDF cuenta
+como tripleta; las relaciones paralelas declaran su multiplicidad. Los
+atributos sin predicado conocido se presentan aparte y nunca se inventan como
+tripletas. Se usa `navigator.clipboard`, luego `execCommand` como fallback y,
+si ambos faltan, se expone el texto para copia manual con un mensaje accesible.
+
+**Estado:** vigente. La selección del subgrafo (`entity-subgraph.ts`), el estado
+de recorrido (`entity-exploration.ts`), el cierre de estructura disponible y el
+generador de texto son funciones puras con tests. `GraphViewComponent` aporta
+solamente integración Angular/Cytoscape. El umbral de hub predeterminado es 8;
+el presupuesto visual local es 60 nodos/120 aristas y la estructura copiable
+amplía el tope a 500/1000. Los predicados se agrupan por URI completa y usan la
+etiqueta sólo como presentación.
 
 ## 4. Posibles mejoras futuras
 
@@ -407,9 +448,6 @@ Las siguientes mejoras no forman parte de la implementación actual. Podrán
 evaluarse en una fase posterior únicamente con datos representativos,
 benchmarks y tareas de usuario que justifiquen su incorporación:
 
-- Completar la selección query-aware con los caminos relevantes entre entidades
-  **presentes en el resultado**, como criterio de recorte del presupuesto. No
-  incluye recuperar caminos nuevos del endpoint: eso es no-objetivo (§3.10).
 - Estabilizar el primer dibujo de los grafos cíclicos, hoy no reproducible
   porque el cálculo inicial de Cola randomiza posiciones (§3.4).
 - Agregar abanicos, conectores y cliques; supernodos generales por clase RDF y

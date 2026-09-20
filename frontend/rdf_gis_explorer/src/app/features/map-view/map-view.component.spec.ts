@@ -102,6 +102,9 @@ vi.mock('leaflet', () => {
   const mockCircleMarker = {
     bindTooltip: vi.fn().mockReturnThis(),
     on: vi.fn(),
+    setStyle: vi.fn().mockReturnThis(),
+    setRadius: vi.fn().mockReturnThis(),
+    bringToFront: vi.fn().mockReturnThis(),
     getLatLng: vi.fn(() => ({ lat: -34.6, lng: -58.4 })),
   };
 
@@ -432,6 +435,8 @@ describe('MapViewComponent', () => {
         const marker = {
           _node: node,
           setStyle: vi.fn(),
+          setRadius: vi.fn(),
+          bringToFront: vi.fn(),
           getLatLng: () => ({ lat: 0, lng: 0 }),
         };
         const cluster = component['clusterGroup'] as unknown as {

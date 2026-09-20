@@ -26,10 +26,32 @@
 
   @if (cy) {
     <div class="graph-toolbar">
+      <label class="toolbar-label" for="graph-mode">Vista</label>
+      <select
+        id="graph-mode"
+        class="toolbar-select"
+        [value]="explorationMode"
+        (change)="setExplorationMode($any($event.target).value)"
+      >
+        <option value="result" [selected]="explorationMode === 'result'">Resultado completo</option>
+        <option
+          value="entity"
+          [selected]="explorationMode === 'entity'"
+          [disabled]="!isEntityMode && !canEnterEntityMode"
+        >Entidad seleccionada</option>
+      </select>
+      @if (canEnterEntityMode) {
+        <button
+          class="toolbar-btn toolbar-btn--primary"
+          type="button"
+          (click)="showStructure()"
+          [title]="'Ver la estructura RDF de ' + selectedEntityLabel"
+        >Ver estructura</button>
+      }
       <label class="toolbar-label" for="graph-layout">Layout</label>
       <select id="graph-layout" class="toolbar-select" [value]="currentLayout" (change)="setLayout($any($event.target).value)">
-        @for (option of layoutOptions; track option.value) {
-          <option [value]="option.value" [selected]="option.value === currentLayout">{{ option.label }}</option>
+        @for (option of availableLayoutOptions; track option.value) {
+          <option [value]="option.value" [selected]="option.value === currentLayout">{{ option.label }} — {{ option.description }}</option>
         }
       </select>
       <label class="toolbar-label" for="graph-detail">Nivel</label>
@@ -52,10 +74,180 @@
     </div>
   }
 
+  @if (isEntityMode) {
+    <aside class="entity-panel" role="region" aria-label="Estructura de la entidad seleccionada">
+      <header class="entity-panel__header">
+        <span class="entity-panel__eyebrow">Entidad seleccionada</span>
+        <h3 class="entity-panel__title" [title]="entityRootUri">{{ entityRootLabel }}</h3>
+        <span class="entity-panel__uri" [title]="entityRootUri">{{ entityRootShortUri }}</span>
+      </header>
+
+      @if (entityCrumbs.length > 1) {
+        <nav class="entity-breadcrumb" aria-label="Recorrido de exploración">
+          <ol>
+            @for (crumb of entityCrumbs; track crumb.uri) {
+              <li>
+                <button
+                  class="entity-crumb"
+                  type="button"
+                  [disabled]="crumb.current"
+                  [attr.aria-current]="crumb.current ? 'true' : null"
+                  [title]="crumb.uri"
+                  (click)="goToCrumb(crumb.uri)"
+                >{{ crumb.label }}</button>
+              </li>
+            }
+          </ol>
+        </nav>
+      }
+
+      <p class="entity-panel__metrics" aria-live="polite">{{ entityMetrics }}</p>
+
+      @if (entityWarnings) {
+        <p class="entity-panel__warning" role="status">{{ entityWarnings }}</p>
+      }
+
+      <div class="entity-panel__active">
+        <span class="entity-panel__label">Nodo activo</span>
+        <span class="entity-panel__value" [title]="entityActiveUri">
+          {{ entityActiveLabel }} <span class="entity-panel__uri">{{ entityActiveShortUri }}</span>
+        </span>
+      </div>
+
+      <div class="entity-actions">
+        <button
+          class="toolbar-btn"
+          type="button"
+          (click)="copyCurrentEntityView()"
+        >Copiar vista actual</button>
+        <button
+          class="toolbar-btn"
+          type="button"
+          (click)="copyFullEntityStructure()"
+        >Copiar estructura completa</button>
+        <button
+          class="toolbar-btn"
+          type="button"
+          (click)="togglePinActive()"
+        >{{ entityActivePinned ? 'Desfijar' : 'Fijar' }}</button>
+        <button
+          class="toolbar-btn"
+          type="button"
+          [disabled]="!canPromoteActive"
+          (click)="promoteActive()"
+        >Usar como raíz</button>
+        <button
+          class="toolbar-btn"
+          type="button"
+          [disabled]="!canGoToRoot"
+          (click)="backToRoot()"
+        >Volver a la raíz</button>
+        <button
+          class="toolbar-btn"
+          type="button"
+          [disabled]="!canGoBack"
+          (click)="stepBack()"
+        >Volver</button>
+        <button
+          class="toolbar-btn"
+          type="button"
+          [disabled]="!canResetExploration"
+          (click)="resetEntityExploration()"
+        >Restablecer</button>
+        <button
+          class="toolbar-btn toolbar-btn--primary"
+          type="button"
+          (click)="exitEntityMode()"
+        >Volver al resultado</button>
+      </div>
+
+      @if (copyFallbackText) {
+        <div class="entity-copy-fallback">
+          <label for="entity-copy-text">Texto listo para copiar manualmente</label>
+          <textarea id="entity-copy-text" readonly [value]="copyFallbackText"></textarea>
+          <button class="toolbar-btn" type="button" (click)="dismissCopyFallback()">Cerrar</button>
+        </div>
+      }
+
+      @if (entityRootCandidate; as candidate) {
+        <p class="entity-panel__candidate">
+          <span>{{ candidate.label }} no forma parte de esta estructura.</span>
+          <button
+            class="toolbar-btn"
+            type="button"
+            [title]="candidate.uri"
+            (click)="exploreSelectedAsRoot()"
+          >Explorar esta entidad</button>
+        </p>
+      }
+
+      <section class="entity-branches">
+        <h4>Relaciones del nodo activo</h4>
+        @if (entityBranches.length === 0) {
+          <p class="entity-branches__empty">El nodo activo no tiene relaciones en el resultado.</p>
+        } @else {
+          <ul>
+            @for (branch of entityBranches; track branch.id) {
+              <li class="entity-branch" [class.entity-branch--hub]="branch.reachesHub">
+                <button
+                  class="entity-branch__toggle"
+                  type="button"
+                  [disabled]="!branch.canExpand && !branch.canCollapse"
+                  [attr.aria-expanded]="branch.expanded"
+                  [attr.aria-label]="(branch.expanded ? 'Contraer. ' : 'Expandir. ') + branch.ariaLabel"
+                  (click)="toggleBranch(branch)"
+                >{{ branch.expanded ? '−' : '+' }}</button>
+                <span class="entity-branch__text">
+                  <span class="entity-branch__label">{{ branch.label }}</span>
+                  <span class="entity-branch__detail">{{ branch.detail }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      @if (entityOtherBranches.length > 0) {
+        <section class="entity-branches">
+          <h4>Otras ramas disponibles</h4>
+          <ul>
+            @for (branch of entityOtherBranches; track branch.id) {
+              <li class="entity-branch" [class.entity-branch--hub]="branch.reachesHub">
+                <button
+                  class="entity-branch__toggle"
+                  type="button"
+                  [attr.aria-expanded]="branch.expanded"
+                  [attr.aria-label]="'Expandir. ' + branch.ariaLabel"
+                  (click)="toggleBranch(branch)"
+                >+</button>
+                <span class="entity-branch__text">
+                  <span class="entity-branch__label">{{ branch.label }}</span>
+                  <span class="entity-branch__detail">{{ branch.detail }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      <p class="entity-panel__shortcuts">
+        Teclado: Esc vuelve al resultado · Retroceso deshace · Inicio va a la raíz ·
+        f fija · r usa como raíz · Supr restablece · ← / → contrae y expande
+      </p>
+    </aside>
+  }
+
+  @if (explorationMessage) {
+    <p class="entity-message" role="alert" aria-live="assertive">{{ explorationMessage }}</p>
+  }
+
   <div
     #cyContainer
     class="cy-container"
     [class.cy-container--hidden]="!cy"
+    tabindex="0"
+    [attr.role]="isEntityMode ? 'application' : null"
+    [attr.aria-label]="isEntityMode ? 'Estructura de ' + entityRootLabel : null"
   ></div>
 
   @if (tooltipVisible) {

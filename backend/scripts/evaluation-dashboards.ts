@@ -576,7 +576,7 @@ function gisPayload(artifacts: CaseArtifacts): Record<string, unknown> {
         rangeEnd: definition.rangeEnd,
       },
       table: { pageSize: 100 },
-      graph: { layout: 'cola' },
+      graph: { layout: 'dagre' },
     },
   };
 }

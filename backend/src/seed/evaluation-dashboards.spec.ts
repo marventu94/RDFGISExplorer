@@ -28,6 +28,15 @@ describe('evaluation dashboards seed', () => {
     ]);
     expect(rows.filter((row) => row.kind === 'gis')).toHaveLength(4);
     expect(rows.filter((row) => row.kind === 'explorer')).toHaveLength(5);
+    expect(
+      rows
+        .filter((row) => row.kind === 'gis')
+        .map(
+          (row) =>
+            (row.payload as { filters: { graph: { layout: string } } }).filters
+              .graph.layout,
+        ),
+    ).toEqual(['dagre', 'dagre', 'dagre', 'dagre']);
     expect(rows.map((row) => row.name)).toEqual([
       'C1 · Casas en venta en Berisso',
       'C2 · Producto típico de City Bell',

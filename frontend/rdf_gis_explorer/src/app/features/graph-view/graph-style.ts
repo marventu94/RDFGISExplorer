@@ -1,10 +1,11 @@
 import type cytoscape from 'cytoscape';
 import type { EntityColorService } from '@core/services/entity-color.service';
+import type { GraphDetailLevel } from './graph-layouts';
 
 export function createGraphStyle(
   colorService: EntityColorService,
   isDark: () => boolean,
-  detailLevel: () => 'summary' | 'exploration' | 'detail' = () => 'exploration',
+  detailLevel: () => GraphDetailLevel = () => 'exploration',
 ): cytoscape.StylesheetStyle[] {
   return [
     {
@@ -30,11 +31,11 @@ export function createGraphStyle(
           const isMotif = ele.data('aggregateKind') === 'repeated-component';
           return detailLevel() === 'summary' && !isMotif ? '' : (ele.data('label') as string);
         },
-        'font-size': '11px',
+        'font-size': () => (detailLevel() === 'summary' ? '9px' : '10px'),
         'text-valign': 'bottom',
         'text-margin-y': 5,
         'text-wrap': 'wrap',
-        'text-max-width': '120px',
+        'text-max-width': () => (detailLevel() === 'detail' ? '160px' : '140px'),
         'text-outline-color': () => (isDark() ? '#0f172a' : '#ffffff'),
         'text-outline-width': 2,
       } as cytoscape.Css.Node,
@@ -45,6 +46,7 @@ export function createGraphStyle(
         shape: 'round-rectangle',
         'border-width': 3,
         'font-weight': 'bold',
+        'font-size': '11px',
       } as cytoscape.Css.Node,
     },
     {
@@ -58,6 +60,12 @@ export function createGraphStyle(
         'line-color': () => (isDark() ? '#475569' : '#B0BEC5'),
         'target-arrow-color': () => (isDark() ? '#475569' : '#B0BEC5'),
         'target-arrow-shape': 'triangle',
+        'font-size': '9px',
+        'text-wrap': 'wrap',
+        'text-max-width': '140px',
+        'text-background-color': () => (isDark() ? '#0f172a' : '#ffffff'),
+        'text-background-opacity': 0.9,
+        'text-background-padding': '2px',
         // El backend emite una arista por predicado (el edgeId incluye el
         // predicado), así que dos entidades pueden tener varias entre sí. Bezier
         // las abanica solo; el default de 40 las deja muy juntas en un cuadrante.
@@ -79,7 +87,7 @@ export function createGraphStyle(
         width: 5,
         'line-style': 'solid',
         label: (ele: cytoscape.EdgeSingular) => ele.data('predicateLabel') as string,
-        'font-size': '12px',
+        'font-size': '11px',
         'font-weight': 'bold',
         'text-background-color': () => (isDark() ? '#0f172a' : '#ffffff'),
         'text-background-opacity': 0.9,
@@ -115,6 +123,7 @@ export function createGraphStyle(
         'border-color': '#1565C0',
         'text-outline-width': 3,
         'font-weight': 'bold',
+        'font-size': '11px',
       } as cytoscape.Css.Node,
     },
     {

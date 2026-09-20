@@ -2,6 +2,31 @@ import type cytoscape from 'cytoscape';
 import type { QueryResult } from '@shared/models';
 
 export type GraphLayout = 'cola' | 'dagre' | 'grid';
+export type GraphDetailLevel = 'summary' | 'exploration' | 'detail';
+
+export interface GraphLayoutOption {
+  value: GraphLayout;
+  label: string;
+  description: string;
+}
+
+export const GRAPH_LAYOUT_OPTIONS: readonly GraphLayoutOption[] = [
+  {
+    value: 'dagre',
+    label: 'Jerárquico',
+    description: 'Ordena relaciones dirigidas por niveles',
+  },
+  {
+    value: 'cola',
+    label: 'Orgánico',
+    description: 'Distribuye redes mediante fuerzas',
+  },
+  {
+    value: 'grid',
+    label: 'Cuadrícula',
+    description: 'Ordena nodos sin relaciones',
+  },
+];
 
 export interface LayoutConfig {
   name: string;
@@ -53,9 +78,7 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
       fit: false,
       padding: 50,
       rankDir: 'TB',
-      nodeSep: 30,
-      edgeSep: 10,
-      rankSep: 60,
+      nodeDimensionsIncludeLabels: true,
     } as cytoscape.LayoutOptions,
   },
   grid: {
@@ -71,27 +94,24 @@ export const LAYOUT_CONFIGS: Record<string, LayoutConfig> = {
   },
 };
 
+const DAGRE_SPACING: Record<GraphDetailLevel, Record<'nodeSep' | 'rankSep' | 'edgeSep', number>> = {
+  summary: { nodeSep: 34, rankSep: 70, edgeSep: 14 },
+  exploration: { nodeSep: 60, rankSep: 95, edgeSep: 24 },
+  detail: { nodeSep: 78, rankSep: 125, edgeSep: 36 },
+};
+
+export function layoutOptionsFor(
+  layout: GraphLayout,
+  detailLevel: GraphDetailLevel,
+): cytoscape.LayoutOptions {
+  const base = LAYOUT_CONFIGS[layout]?.options ?? LAYOUT_CONFIGS['dagre'].options;
+  if (layout !== 'dagre') return { ...base } as cytoscape.LayoutOptions;
+  return { ...base, ...DAGRE_SPACING[detailLevel] } as cytoscape.LayoutOptions;
+}
+
 export function chooseGraphLayout(result: Pick<QueryResult, 'nodes' | 'edges'>): GraphLayout {
   if (result.edges.length === 0) return 'grid';
-  const outgoing = new Map<string, string[]>();
-  for (const node of result.nodes) outgoing.set(node.uri, []);
-  for (const edge of result.edges) {
-    if (edge.source === edge.target) return 'cola';
-    outgoing.get(edge.source)?.push(edge.target);
-  }
-
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const hasCycle = (uri: string): boolean => {
-    if (visiting.has(uri)) return true;
-    if (visited.has(uri)) return false;
-    visiting.add(uri);
-    for (const target of outgoing.get(uri) ?? []) {
-      if (hasCycle(target)) return true;
-    }
-    visiting.delete(uri);
-    visited.add(uri);
-    return false;
-  };
-  return [...outgoing.keys()].some(hasCycle) ? 'cola' : 'dagre';
+  // Dagre tolera ciclos y self-loops: no son motivo para degradar el default a
+  // un layout de fuerzas menos predecible. Cola queda como alternativa manual.
+  return 'dagre';
 }

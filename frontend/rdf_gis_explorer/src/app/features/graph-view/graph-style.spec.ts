@@ -35,4 +35,28 @@ describe('createGraphStyle', () => {
       'about ×326',
     );
   });
+
+  it('reserva tipografía mayor para agregados y selección', () => {
+    const styles = createGraphStyle(colorService as never, () => false, () => 'detail');
+    const node = styles.find((style) => style.selector === 'node')!.style as Record<string, unknown>;
+    const aggregate = styles.find((style) => style.selector === 'node[aggregate]')!.style as Record<string, unknown>;
+    const selected = styles.find((style) => style.selector === 'node.is-selected')!.style as Record<string, unknown>;
+
+    expect((node['font-size'] as () => string)()).toBe('10px');
+    expect(node['text-wrap']).toBe('wrap');
+    expect((node['text-max-width'] as () => string)()).toBe('160px');
+    expect(aggregate['font-size']).toBe('11px');
+    expect(selected['font-size']).toBe('11px');
+    expect(selected['font-weight']).toBe('bold');
+  });
+
+  it('mantiene contraste de etiquetas en tema oscuro', () => {
+    const styles = createGraphStyle(colorService as never, () => true, () => 'detail');
+    const node = styles.find((style) => style.selector === 'node')!.style as Record<string, unknown>;
+    const edge = styles.find((style) => style.selector === 'edge')!.style as Record<string, unknown>;
+
+    expect((node['color'] as () => string)()).toBe('#f1f5f9');
+    expect((node['text-outline-color'] as () => string)()).toBe('#0f172a');
+    expect((edge['text-background-color'] as () => string)()).toBe('#0f172a');
+  });
 });
