@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -24,14 +24,14 @@ import { SparqlQueryStateService } from '@core/services/sparql-query-state.servi
 import { DashboardPersistenceService } from '@core/services/dashboard-persistence.service';
 import { DashboardApiClient, type Dashboard } from '@core/services/dashboard-api.client';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
+import type { VariableRole } from './mapping-overrides.util';
 import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
 import { ErrorDialogComponent, type ErrorDialogData } from './error-dialog.component';
-import { applyMappingOverrides, VariableRole } from './mapping-overrides.util';
+import { VariableMappingService } from '@core/services/variable-mapping.service';
 import {
   buildQueryLimitNotice,
   type QueryLimitNotice,
 } from '@shared/sparql/query-limit';
-import type { QueryResult } from '@shared/models';
 
 /** Espera antes de reparsear la query para el aviso de LIMIT. */
 const LIMIT_CHECK_DEBOUNCE_MS = 300;
@@ -67,6 +67,10 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly dashboardApi = inject(DashboardApiClient);
   private readonly persistence = inject(DashboardPersistenceService);
+  private readonly variableMapping = inject(VariableMappingService);
+
+  @ViewChild(FieldMappingPanelComponent)
+  private mappingPanel?: FieldMappingPanelComponent;
 
   private editorView: EditorView | null = null;
   private fallbackContent = '';
@@ -74,9 +78,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   protected readonly executing = signal(false);
   protected readonly hasContent = signal(false);
-  protected readonly lastResult = signal<QueryResult | null>(null);
-  protected readonly mappingOverrides = signal<Record<string, VariableRole>>({});
-  protected readonly overridesCount = signal(0);
+  protected readonly lastResult = this.variableMapping.sourceResult;
+  protected readonly mappingOverrides = this.variableMapping.overrides;
+  protected readonly overridesCount = () => Object.keys(this.mappingOverrides()).length;
 
   /** Tope de filas del backend; hasta que llega la config no se avisa nada. */
   private readonly maxLimit = signal<number | null>(null);
@@ -305,9 +309,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private clearForNewDashboard(): void {
     this.setEditorContent(this.buildPrefixBlock(this.appConfig.config()?.defaultPrefixes));
     this.queryState.query.set('');
-    this.lastResult.set(null);
-    this.mappingOverrides.set({});
-    this.overridesCount.set(0);
+    this.variableMapping.setSourceResult(null);
     this.persistence.clearCurrent();
   }
 
@@ -345,10 +347,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         this.executing.set(false);
         this.snackBar.dismiss();
         this.dashboardLayout.collapseEditor();
-        this.lastResult.set(result);
-
-        this.mappingOverrides.set({});
-        this.overridesCount.set(0);
+        this.variableMapping.setSourceResult(result);
 
         this.selectionService.setQueryResult(result);
 
@@ -427,26 +426,22 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   }
 
   protected onApplyMapping(overrides: Record<string, VariableRole>): void {
-    const result = this.lastResult();
-    if (!result) return;
-
-    const overrideEntries = Object.entries(overrides).filter(([_, role]) => role !== undefined);
-    this.mappingOverrides.set(overrides);
-    this.overridesCount.set(overrideEntries.length);
-
-    const remapped = applyMappingOverrides(result, overrides);
+    const remapped = this.variableMapping.apply(overrides);
+    if (!remapped) return;
     this.selectionService.setQueryResult(remapped);
     this.snackBar.open('Mapeo de variables aplicado', 'OK', { duration: 3000 });
   }
 
   protected onRestoreAuto(): void {
-    const result = this.lastResult();
+    const result = this.variableMapping.restore();
     if (!result) return;
-
-    this.mappingOverrides.set({});
-    this.overridesCount.set(0);
     this.selectionService.setQueryResult(result);
     this.snackBar.open('Mapeo restaurado a detección automática', 'OK', { duration: 3000 });
   }
-}
 
+  @HostListener('window:open-variable-mapping')
+  protected openVariableMapping(): void {
+    this.dashboardLayout.editorCollapsed.set(false);
+    queueMicrotask(() => this.mappingPanel?.open());
+  }
+}

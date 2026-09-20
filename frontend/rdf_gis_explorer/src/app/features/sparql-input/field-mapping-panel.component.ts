@@ -27,6 +27,7 @@ interface FieldMapping {
 export class FieldMappingPanelComponent {
   readonly variables = input<string[]>([]);
   readonly bindings = input<ResultBinding[]>([]);
+  readonly overrides = input<Record<string, VariableRole>>({});
   readonly overridesCount = input(0);
   readonly applyMapping = output<Record<string, VariableRole>>();
   readonly restoreAuto = output<void>();
@@ -41,12 +42,21 @@ export class FieldMappingPanelComponent {
     }
   }
 
+  open(): void {
+    if (this.expanded) return;
+    this.expanded = true;
+    this.buildFields();
+  }
+
   private buildFields(): void {
-    this.fields = this.variables().map((v) => ({
-      variable: v,
-      detectedType: this.detectType(v),
-      override: this.detectType(v) as VariableRole,
-    }));
+    this.fields = this.variables().map((v) => {
+      const detectedType = this.detectType(v);
+      return {
+        variable: v,
+        detectedType,
+        override: this.overrides()[v] ?? (detectedType as VariableRole),
+      };
+    });
   }
 
   private detectType(variable: string): string {

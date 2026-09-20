@@ -120,7 +120,7 @@
       }
 
       <section class="entity-data">
-        <h4>Datos del nodo activo</h4>
+        <h4>Datos literales</h4>
         @if (entityActiveAttributes.length === 0) {
           <p class="entity-data__empty">Este nodo no tiene datos literales en el resultado.</p>
         } @else {
@@ -132,6 +132,29 @@
               </div>
             }
           </dl>
+        }
+      </section>
+
+      <section class="entity-data entity-relations">
+        <h4>Relaciones</h4>
+        @if (entityActiveRelations.length === 0) {
+          <p class="entity-data__empty">Este nodo no tiene relaciones visibles.</p>
+        } @else {
+          <ul class="entity-relations__list">
+            @for (relation of entityActiveRelations; track relation.edgeId) {
+              <li class="entity-relations__item">
+                <span class="entity-relations__predicate" [title]="relation.predicateUri">
+                  {{ relation.direction === 'outgoing' ? '→' : '←' }} {{ relation.predicate }}
+                </span>
+                <span class="entity-relations__target" [title]="relation.relatedUri">
+                  {{ relation.relatedLabel }}
+                </span>
+                <span class="entity-relations__id" [title]="relation.relatedUri">
+                  {{ relation.relatedId }}
+                </span>
+              </li>
+            }
+          </ul>
         }
       </section>
 

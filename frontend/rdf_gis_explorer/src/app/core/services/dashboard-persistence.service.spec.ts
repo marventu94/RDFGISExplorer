@@ -11,6 +11,7 @@ import { SelectionService } from './selection.service';
 import { SparqlQueryStateService } from './sparql-query-state.service';
 import { DashboardViewStateService } from './dashboard-view-state.service';
 import { DashboardLoadProgressService } from './dashboard-load-progress.service';
+import { VariableMappingService } from './variable-mapping.service';
 import type { QueryResult, NormalizedNode } from '@shared/models';
 
 function makeNode(overrides: Partial<NormalizedNode> = {}): NormalizedNode {
@@ -45,6 +46,7 @@ describe('DashboardPersistenceService', () => {
   let queryState: SparqlQueryStateService;
   let viewState: DashboardViewStateService;
   let progress: DashboardLoadProgressService;
+  let variableMapping: VariableMappingService;
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -62,6 +64,7 @@ describe('DashboardPersistenceService', () => {
     queryState = TestBed.inject(SparqlQueryStateService);
     viewState = TestBed.inject(DashboardViewStateService);
     progress = TestBed.inject(DashboardLoadProgressService);
+    variableMapping = TestBed.inject(VariableMappingService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -136,6 +139,12 @@ describe('DashboardPersistenceService', () => {
       const payload = service.serialize();
       expect(payload.selection).toBeDefined();
       expect(payload.selection!.pinnedId).toBe('urn:pinned');
+    });
+
+    it('should persist variable mapping overrides', () => {
+      variableMapping.setSourceResult(makeQueryResult(), { o: 'date' });
+
+      expect(service.serialize().variableMapping).toEqual({ o: 'date' });
     });
   });
 
@@ -229,6 +238,32 @@ describe('DashboardPersistenceService', () => {
       expect(completed).toBe(true);
       const selected = selection.getSelectedNodeSnapshot();
       expect(selected.node?.uri).toBe('urn:selected');
+    });
+
+    it('should restore variable mapping against the loaded result', () => {
+      const payload: GisDashboardPayload = {
+        query: 'SELECT ?s ?when WHERE { ?s <urn:when> ?when }',
+        backend: 'wikidata',
+        layout: { slotsCount: 1, slots: [{ id: 'slot-0', view: 'timeline' }] },
+        filters: {},
+        variableMapping: { when: 'date' },
+      };
+      const mockResult = makeQueryResult({
+        variables: ['s', 'when'],
+        bindings: [{
+          s: { type: 'uri', value: 'urn:item' },
+          when: { type: 'literal', value: '2024-01-02' },
+        }],
+        nodes: [makeNode({ uri: 'urn:item' })],
+      });
+
+      service.deserialize(payload).subscribe();
+      flushConfig();
+      httpMock.expectOne('/api/query/execute').flush(mockResult);
+
+      expect(variableMapping.overrides()).toEqual({ when: 'date' });
+      expect(selection.getQueryResultSnapshot()?.nodes[0].temporalEvents?.[0].isoDate)
+        .toBe('2024-01-02T00:00:00.000Z');
     });
 
     it('should set isHydrating during execution and clear on success', () => {
@@ -508,6 +543,7 @@ describe('DashboardPersistenceService', () => {
       expect(progress.active()).toBe(true);
       expect(progress.stageStatus('fetch-dashboard')).toBe('active');
       expect(progress.stageStatus('execute-query')).toBe('pending');
+      expect(progress.stageStatus('summary')).toBeUndefined();
 
       flushDashboard();
       expect(progress.run()?.subtitle).toBe('Batallas WWII');

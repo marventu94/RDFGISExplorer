@@ -450,6 +450,38 @@
   }
 }
 
+.entity-relations {
+  &__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__item {
+    display: grid;
+    gap: 2px;
+    padding: 5px 0;
+    border-top: 1px solid #eceff1;
+    font-size: 11px;
+  }
+
+  &__predicate {
+    color: #607d8b;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  &__target,
+  &__id {
+    overflow-wrap: anywhere;
+  }
+
+  &__id {
+    color: #78909c;
+    font-size: 10px;
+  }
+}
+
 .entity-branch {
   display: flex;
   align-items: flex-start;

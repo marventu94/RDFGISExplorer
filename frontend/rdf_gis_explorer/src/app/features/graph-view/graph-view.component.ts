@@ -1378,6 +1378,15 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   entityActiveShortUri = '';
   entityActivePinned = false;
   entityActiveAttributes: Array<{ name: string; value: string }> = [];
+  entityActiveRelations: Array<{
+    edgeId: string;
+    direction: 'outgoing' | 'incoming';
+    predicate: string;
+    predicateUri: string;
+    relatedLabel: string;
+    relatedId: string;
+    relatedUri: string;
+  }> = [];
   entityMetrics = '';
   entityWarnings = '';
   entityCrumbs: EntityCrumb[] = [];
@@ -1726,6 +1735,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.entityActiveShortUri = '';
       this.entityActivePinned = false;
       this.entityActiveAttributes = [];
+      this.entityActiveRelations = [];
       this.entityMetrics = '';
       this.entityWarnings = '';
       this.entityCrumbs = [];
@@ -1752,8 +1762,29 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.entityActiveAttributes = Object.entries(
       activeNode?.directAttributes ?? activeNode?.attributes ?? {},
     )
+      .filter(([, value]) => value.type !== 'uri' && value.type !== 'bnode')
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([name, value]) => ({ name, value: entityAttributeValue(value) }));
+    this.entityActiveRelations = subgraph.edges
+      .filter((edge) => edge.source === subgraph.activeUri || edge.target === subgraph.activeUri)
+      .map((edge) => {
+        const outgoing = edge.source === subgraph.activeUri;
+        const relatedUri = outgoing ? edge.target : edge.source;
+        return {
+          edgeId: edge.id,
+          direction: outgoing ? 'outgoing' as const : 'incoming' as const,
+          predicate: edge.predicateLabel,
+          predicateUri: edge.predicate,
+          relatedLabel: labelOf(relatedUri),
+          relatedId: shortenUri(relatedUri),
+          relatedUri,
+        };
+      })
+      .sort((left, right) =>
+        left.direction.localeCompare(right.direction) ||
+        left.predicate.localeCompare(right.predicate) ||
+        left.relatedUri.localeCompare(right.relatedUri),
+      );
     this.entityMetrics = entityMetricsLabel(subgraph);
     this.entityWarnings = entityWarningsLabel(subgraph);
     this.entityCrumbs = entityBreadcrumb(explorationBreadcrumb(this.explorationState), labelOf);

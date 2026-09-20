@@ -7,9 +7,12 @@ export function applyMappingOverrides(
   raw: QueryResult,
   overrides: Record<string, VariableRole>,
 ): QueryResult {
+  if (Object.keys(overrides).length === 0) return raw;
+
+  const variables = raw.variables.filter((variable) => overrides[variable] !== 'ignore');
   const newBindings: ResultBinding[] = raw.bindings.map((row) => {
     const out: ResultBinding = {};
-    for (const v of raw.variables) {
+    for (const v of variables) {
       const original = row[v];
       const role = overrides[v];
       out[v] = role ? coerceTo(role, original) : original;
@@ -17,9 +20,9 @@ export function applyMappingOverrides(
     return out;
   });
 
-  const { nodes, edges } = rebuildGraph(newBindings, raw.variables);
+  const nodes = rebuildVisualFields(raw, newBindings, variables, overrides);
 
-  return { ...raw, bindings: newBindings, nodes, edges };
+  return { ...raw, variables, bindings: newBindings, nodes };
 }
 
 export function coerceTo(role: VariableRole, value: BindingValue): BindingValue {
@@ -84,59 +87,64 @@ function parseCoordinateValue(value: BindingValue): Coordinate | null {
   return null;
 }
 
-function rebuildGraph(
+function rebuildVisualFields(
+  raw: QueryResult,
   bindings: ResultBinding[],
   variables: string[],
-): { nodes: QueryResult['nodes']; edges: QueryResult['edges'] } {
-  const nodeMap = new Map<string, QueryResult['nodes'][0]>();
-  const edges: QueryResult['edges'] = [];
+  overrides: Record<string, VariableRole>,
+): QueryResult['nodes'] {
+  const ignored = new Set(
+    Object.entries(overrides)
+      .filter(([, role]) => role === 'ignore')
+      .map(([variable]) => variable),
+  );
+  const remapsVisualFields = Object.entries(overrides).some(([variable, role]) => {
+    const originalTypes = raw.bindings.map((row) => row[variable]?.type).filter(Boolean);
+    const introducesVisualRole = role === 'coordinate' || role === 'date';
+    const removesCoordinate = originalTypes.includes('coordinate') && role !== 'coordinate';
+    const removesDate = originalTypes.includes('date') && role !== 'date';
+    return introducesVisualRole || removesCoordinate || removesDate;
+  });
+
+  const nodeMap = new Map(
+    raw.nodes.map((node) => [
+      node.uri,
+      {
+        ...node,
+        attributes: omitAttributes(node.attributes, ignored),
+        ...(node.directAttributes
+          ? { directAttributes: omitAttributes(node.directAttributes, ignored) }
+          : {}),
+        ...(remapsVisualFields ? { coordinate: undefined, temporalEvents: [] } : {}),
+      },
+    ]),
+  );
+
+  if (!remapsVisualFields) return Array.from(nodeMap.values());
 
   for (const row of bindings) {
     const uriVars = variables.filter((v) => row[v]?.type === 'uri');
-    const nonUriVars = variables.filter((v) => row[v] && row[v]!.type !== 'uri' && v !== uriVars[0]);
-
     if (uriVars.length === 0) continue;
-
-    const primary = uriVars[0];
-    const nodeUri = (row[primary] as { value: string }).value;
-
-    if (!nodeMap.has(nodeUri)) {
-      const label =
-        row[`${primary}Label`]?.type === 'literal'
-          ? (row[`${primary}Label`] as { value: string }).value
-          : nodeUri.split('/').pop() ?? nodeUri;
-
-      const coord = findCoordinate(row, variables);
-      const temporalEvents = findTemporalEvents(row, variables);
-
-      const attributes: Record<string, BindingValue> = {};
-      for (const v of nonUriVars) {
-        if (row[v]) attributes[v] = row[v];
-      }
-
-      nodeMap.set(nodeUri, {
-        uri: nodeUri,
-        label,
-        attributes,
-        coordinate: coord ?? undefined,
-        temporalEvents,
-      });
-    }
-
-    for (let i = 1; i < uriVars.length; i++) {
-      const targetUri = (row[uriVars[i]] as { value: string }).value;
-      if (targetUri && targetUri !== nodeUri) {
-        edges.push({
-          id: `${nodeUri}_${uriVars[i]}_${targetUri}`,
-          source: nodeUri,
-          target: targetUri,
-          predicate: uriVars[i],
-        });
-      }
-    }
+    const nodeUri = (row[uriVars[0]] as { value: string }).value;
+    const node = nodeMap.get(nodeUri);
+    if (!node) continue;
+    const coordinate = findCoordinate(row, variables);
+    const temporalEvents = findTemporalEvents(row, variables);
+    nodeMap.set(nodeUri, {
+      ...node,
+      coordinate: coordinate ?? node.coordinate,
+      temporalEvents: [...(node.temporalEvents ?? []), ...temporalEvents],
+    });
   }
 
-  return { nodes: Array.from(nodeMap.values()), edges };
+  return Array.from(nodeMap.values());
+}
+
+function omitAttributes(
+  attributes: Record<string, BindingValue>,
+  ignored: ReadonlySet<string>,
+): Record<string, BindingValue> {
+  return Object.fromEntries(Object.entries(attributes).filter(([name]) => !ignored.has(name)));
 }
 
 function findCoordinate(

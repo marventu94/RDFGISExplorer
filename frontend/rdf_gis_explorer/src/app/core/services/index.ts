@@ -28,3 +28,4 @@ export type { FocusSource, FocusState } from './selection.service';
 export { SelectionService } from './selection.service';
 export { SparqlQueryStateService } from './sparql-query-state.service';
 export { SummaryStateService } from './summary-state.service';
+export { VariableMappingService } from './variable-mapping.service';

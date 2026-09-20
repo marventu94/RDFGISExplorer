@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import type { Dashboard } from '@rdfgis/contracts';
+import type { VariableRole } from '../../features/sparql-input/mapping-overrides.util';
 
 // Contrato compartido: la fuente de verdad vive en packages/contracts.
 export type { Dashboard } from '@rdfgis/contracts';
@@ -32,6 +33,7 @@ export interface GisDashboardPayload {
     };
   };
   selection?: { selectedIds: string[]; pinnedId?: string };
+  variableMapping?: Record<string, VariableRole>;
 }
 
 export interface CreateDashboardInput {

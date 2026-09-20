@@ -62,6 +62,7 @@
   <app-field-mapping-panel
     [variables]="lastResult()?.variables ?? []"
     [bindings]="lastResult()?.bindings ?? []"
+    [overrides]="mappingOverrides()"
     [overridesCount]="overridesCount()"
     (applyMapping)="onApplyMapping($event)"
     (restoreAuto)="onRestoreAuto()"

@@ -48,6 +48,7 @@ export function entityAttributeValue(value: BindingValue): string {
 /** Literales propios del nodo, sin heredar datos de nodos vecinos o ancestros. */
 export function entityAttributeLabel(node: NormalizedNode): string {
   return Object.entries(node.directAttributes ?? node.attributes ?? {})
+    .filter(([, value]) => value.type !== 'uri' && value.type !== 'bnode')
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => `${name}: ${entityAttributeValue(value)}`)
     .join('\n');

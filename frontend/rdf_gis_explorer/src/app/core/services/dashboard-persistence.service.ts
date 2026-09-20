@@ -17,6 +17,7 @@ import { SparqlQueryStateService } from './sparql-query-state.service';
 import { DashboardViewStateService } from './dashboard-view-state.service';
 import { ApiService } from './api.service';
 import { DashboardLoadProgressService } from './dashboard-load-progress.service';
+import { VariableMappingService } from './variable-mapping.service';
 import type { LoadStageId } from '@shared/progress/load-stages';
 import type { NormalizedNode, QueryResult } from '@shared/models';
 
@@ -32,7 +33,6 @@ const HYDRATION_STAGES: readonly LoadStageId[] = [
   'fetch-dashboard',
   'execute-query',
   'process-results',
-  'summary',
   'render-views',
 ];
 
@@ -56,6 +56,7 @@ export class DashboardPersistenceService {
   private readonly viewState = inject(DashboardViewStateService);
   private readonly apiService = inject(ApiService);
   private readonly progress = inject(DashboardLoadProgressService);
+  private readonly variableMapping = inject(VariableMappingService);
   private readonly snackBar = inject(MatSnackBar);
 
   readonly currentDashboardId = signal<string | null>(null);
@@ -116,6 +117,9 @@ export class DashboardPersistenceService {
             },
           }
         : {}),
+      ...(Object.keys(this.variableMapping.overrides()).length > 0
+        ? { variableMapping: this.variableMapping.overrides() }
+        : {}),
     };
 
     return Object.freeze(payload);
@@ -166,7 +170,11 @@ export class DashboardPersistenceService {
           // tablero; el fan-out de SelectionService es SINCRÓNICO, así que hay
           // que declararlas antes de publicar el resultado.
           this.progress.expectViews(this.layout.visibleSlots());
-          this.selection.setQueryResult(result);
+          const mappedResult = this.variableMapping.setSourceResult(
+            result,
+            payload.variableMapping ?? {},
+          );
+          this.selection.setQueryResult(mappedResult);
           // Si ninguna vista reportó (ningún slot montado), la etapa se cierra acá.
           this.progress.complete('process-results');
         }),

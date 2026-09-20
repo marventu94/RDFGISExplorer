@@ -1,9 +1,6 @@
-import { Component, inject, signal, ViewChild, OnInit } from '@angular/core';
-import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
+import { Component, inject, OnInit } from '@angular/core';
 import { DashboardComponent } from '@features/dashboard/dashboard.component';
 import { NavbarComponent } from '@features/dashboard/navbar/navbar.component';
-import { DetailPanelComponent } from '@features/detail-panel/detail-panel.component';
-import { SelectionService } from '@core/services/selection.service';
 import { AppConfigService } from '@core/services/app-config.service';
 import { LimitsService } from '@core/services/limits.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
@@ -20,38 +17,27 @@ ModuleRegistry.registerModules([AllCommunityModule]);
   selector: 'app-root',
   standalone: true,
   imports: [
-    MatSidenavModule,
     LoadProgressOverlayComponent,
     DashboardComponent,
     NavbarComponent,
-    DetailPanelComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  private readonly selectionService = inject(SelectionService);
   private readonly appConfig = inject(AppConfigService);
   private readonly limits = inject(LimitsService);
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly dashboardLayout = inject(DashboardLayoutService);
   protected readonly persistence = inject(DashboardPersistenceService);
   private readonly snackBar = inject(MatSnackBar);
-  protected readonly sidenavOpen = signal(false);
   protected readonly editorCollapsed = this.dashboardLayout.editorCollapsed;
-
-  @ViewChild('sidenav') sidenav!: MatSidenav;
 
   constructor() {
     // Publica en el canal compartido qué tablero/consulta hay abierto, para
     // que el RDF Explorer avise antes de pisarlo con un handoff.
     inject(GisSessionStateService);
 
-    this.selectionService.selectedNode$.subscribe((sel) => {
-      if (sel.node && !this.dashboardLayout.visibleSlots().includes('table')) {
-        this.sidenavOpen.set(true);
-      }
-    });
   }
 
   ngOnInit(): void {
@@ -99,10 +85,6 @@ export class App implements OnInit {
         error: () => this.queryState.backend.set('wikidata'),
       });
     }
-  }
-
-  protected onSidenavClosed(): void {
-    this.sidenavOpen.set(false);
   }
 
   private cleanLegacyLocalStorage(): void {

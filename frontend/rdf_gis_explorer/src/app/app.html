@@ -1,18 +1,5 @@
-<mat-sidenav-container class="app-shell">
-  <mat-sidenav
-    #sidenav
-    mode="over"
-    position="end"
-    [opened]="sidenavOpen()"
-    (closed)="onSidenavClosed()"
-    class="detail-sidenav"
-  >
-    <app-detail-panel (close)="sidenav.close()" />
-  </mat-sidenav>
-
-  <mat-sidenav-content>
-    <app-load-progress-overlay />
-    <app-navbar />
-    <app-dashboard [editorCollapsed]="editorCollapsed()" />
-  </mat-sidenav-content>
-</mat-sidenav-container>
+<main class="app-shell">
+  <app-load-progress-overlay />
+  <app-navbar />
+  <app-dashboard [editorCollapsed]="editorCollapsed()" />
+</main>

@@ -158,6 +158,21 @@ describe('literales por nodo', () => {
       'moneda: USD\nprecio: 125000',
     );
   });
+
+  it('no imprime referencias URI o blank node como literales debajo del nodo', () => {
+    const subgraph = subgraphOf();
+    const specification = subgraph.nodes[1];
+    specification.node.directAttributes = {
+      precio: { type: 'literal', value: '125000' },
+      priceTime: { type: 'bnode', value: 'node273935' },
+      about: { type: 'uri', value: 'https://example.test/estate' },
+    };
+
+    const graph = buildEntityModeElements(subgraph);
+    const element = graph.elements.find((candidate) => candidate.data['id'] === specification.uri);
+
+    expect(element?.data['attributeLabel']).toBe('precio: 125000');
+  });
 });
 
 describe('ramas', () => {

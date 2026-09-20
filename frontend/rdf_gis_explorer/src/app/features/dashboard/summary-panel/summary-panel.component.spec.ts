@@ -5,6 +5,7 @@ import { SummaryPanelComponent } from './summary-panel.component';
 import { ApiService } from '@core/services/api.service';
 import { SelectionService } from '@core/services/selection.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
+import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import type { BindingValue, QueryResult, QuerySummary } from '@shared/models';
 
 const USER_QUERY = 'SELECT ?item ?price ?city WHERE { ?item ?p ?price . ?item ?c ?city }';
@@ -73,6 +74,16 @@ describe('SummaryPanelComponent', () => {
   it('renders nothing before any query result', () => {
     const panel = fixture.nativeElement.querySelector('.summary-panel');
     expect(panel).toBeNull();
+  });
+
+  it('shows that the summary is pending while a dashboard is loading', () => {
+    const progress = TestBed.inject(DashboardLoadProgressService);
+    progress.begin('Cargando tablero', ['summary']);
+    fixture.detectChanges();
+
+    const panel = fixture.nativeElement.querySelector('.summary-panel');
+    expect(panel).not.toBeNull();
+    expect(panel.textContent).toContain('Calculando');
   });
 
   it('computes the summary locally when the result is not truncated (no backend call)', () => {

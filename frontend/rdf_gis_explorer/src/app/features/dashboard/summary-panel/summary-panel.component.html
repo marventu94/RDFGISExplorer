@@ -1,19 +1,20 @@
-@if (resolved(); as r) {
+@if (loading() || resolved()) {
   <div class="summary-panel">
     <button type="button" class="summary-header" (click)="toggleCollapsed()">
       <mat-icon>query_stats</mat-icon>
       <span class="summary-title">Resumen del resultado</span>
       @if (loading()) {
         <mat-spinner diameter="16" />
+        <span class="summary-total">Calculando…</span>
       } @else {
         <span class="summary-total">
-          {{ r.summary.totalRows === null ? '—' : r.summary.totalRows }} filas
+          {{ resolved()!.summary.totalRows === null ? '—' : resolved()!.summary.totalRows }} filas
         </span>
       }
       <mat-icon class="summary-toggle">{{ collapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
     </button>
 
-    @if (!collapsed()) {
+    @if (!loading() && !collapsed() && resolved(); as r) {
       <div class="summary-body">
         <p class="summary-scope">{{ scopeLabel(r.summary) }}</p>
 

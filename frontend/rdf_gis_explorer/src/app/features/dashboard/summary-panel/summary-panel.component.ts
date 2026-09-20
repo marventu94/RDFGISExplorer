@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -47,9 +47,18 @@ export class SummaryPanelComponent {
   protected readonly collapsed = signal(true);
   protected readonly loading = signal(false);
   protected readonly resolved = signal<ResolvedSummary | null>(null);
+  private loadRunStartedAt: number | null = null;
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    effect(() => {
+      const run = this.loadProgress.run();
+      if (!run || run.startedAt === this.loadRunStartedAt) return;
+      this.loadRunStartedAt = run.startedAt;
+      this.loading.set(true);
+      this.resolved.set(null);
+      this.summaryState.set(null);
+    });
     this.selectionService.queryResult$
       .pipe(
         takeUntilDestroyed(destroyRef),
