@@ -4,7 +4,9 @@
 # y corepack para habilitar pnpm en los frontends.
 #
 # Servicios levantados:
-#   - backend (NestJS)            :3000
+#   - shell backend (NestJS)      :3000
+#   - RDF backend (NestJS)        :3001
+#   - GIS backend (NestJS)        :3002
 #   - app_shell (Angular)         :4200
 #   - rdf_explorer (Angular)      :4201
 #   - rdf_gis_explorer (Angular)  :4202
@@ -94,5 +96,5 @@ else
 fi
 
 # 6. Arrancar todos los servicios con concurrently (Ctrl+C detiene todos)
-echo "${CYAN}>> Iniciando backend + 3 frontends (Ctrl+C para detener)${RESET}"
+echo "${CYAN}>> Iniciando 3 backends + 3 frontends (Ctrl+C para detener)${RESET}"
 exec npm run dev
