@@ -1,0 +1,19 @@
+{
+  "/api": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/rdf-api": {
+    "target": "http://localhost:3001/api",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/rdf-api": "" }
+  },
+  "/gis-api": {
+    "target": "http://localhost:3002/api",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/gis-api": "" }
+  }
+}

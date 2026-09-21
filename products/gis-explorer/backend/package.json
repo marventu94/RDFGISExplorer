@@ -1,0 +1,13 @@
+{
+  "name": "@rdfgis/gis-explorer-backend",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @rdfgis/explorer-backend build",
+    "start:dev": "BACKEND_PORT=${GIS_EXPLORER_BACKEND_PORT:-3002} pnpm --dir ../../../packages/explorer-backend start:dev",
+    "start:prod": "BACKEND_PORT=${GIS_EXPLORER_BACKEND_PORT:-3002} node ../../../packages/explorer-backend/dist/main.js"
+  },
+  "dependencies": {
+    "@rdfgis/explorer-backend": "workspace:*"
+  }
+}

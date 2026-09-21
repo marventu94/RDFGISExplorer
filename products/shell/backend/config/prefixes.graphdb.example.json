@@ -1,0 +1,17 @@
+{
+  "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+  "owl": "http://www.w3.org/2002/07/owl#",
+  "xsd": "http://www.w3.org/2001/XMLSchema#",
+  "skos": "http://www.w3.org/2004/02/skos/core#",
+  "geo": "http://www.opengis.net/ont/geosparql#",
+  "geof": "http://www.opengis.net/def/function/geosparql/",
+  "wgs84": "http://www.w3.org/2003/01/geo/wgs84_pos#",
+  "inm": "http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#",
+  "pronto": "https://raw.githubusercontent.com/fdioguardi/pronto/main/ontology/pronto.owl#",
+  "rec": "https://w3id.org/rec#",
+  "gr": "http://purl.org/goodrelations/v1#",
+  "sioc": "http://rdfs.org/sioc/ns#",
+  "time": "http://www.w3.org/2006/time#",
+  "dc": "http://purl.org/dc/elements/1.1/"
+}

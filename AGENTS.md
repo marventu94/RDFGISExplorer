@@ -12,13 +12,9 @@ AppShell (host, :4200)
 ├── /dashboards/:id → dashboardRedirectGuard → redirige según kind (gis/explorer)
 └── /**             → redirect a /
 
-Backend NestJS (:3000)
-├── /api/query/execute      → Ejecuta SPARQL vía adaptador (opción `raw`: solo bindings, sin grafo — la usa el export)
-├── /api/query/summary      → Agregados del resultado completo (COUNT/AVG/MIN/MAX, top valores)
-├── /api/dashboards (CRUD)  → SQLite (better-sqlite3)
-├── /api/suggestions        → Autocompletado predicados + búsqueda de entidades
-├── /api/config             → Configuración runtime (env + prefixes) para los frontends
-└── /api/health[/sparql]    → Health checks
+Shell backend (:3000) → `/api/dashboards` (CRUD exclusivo, SQLite)
+RDF backend (:3001)   → query, summary, suggestions, config y health
+GIS backend (:3002)   → query, summary, suggestions, config y health
 ```
 
 Los tipos compartidos entre backend y frontends viven en **`packages/contracts`**
@@ -32,10 +28,11 @@ Workspace **pnpm** (`pnpm-workspace.yaml` en la raíz): un solo `pnpm install` i
 |----------|------|-----------|-------------|--------|
 | Root | `/` | concurrently | — | — |
 | Contracts | `packages/contracts/` | TypeScript (solo tipos) | — | — |
-| Backend | `backend/` | NestJS 11 / Node.js 24.18.0 | Jest 30 | 3000 |
-| App Shell | `frontend/app_shell/` | Angular 21 | Vitest 4 (vía `ng test`) | 4200 |
-| RDF Explorer | `frontend/rdf_explorer/` | Angular 21 | Vitest 4 (vía `ng test`) | 4201 |
-| RDF GIS Explorer | `frontend/rdf_gis_explorer/` | Angular 21 | Vitest 4 (vía `ng test`) | 4202 |
+| Shell backend | `products/shell/backend/` | NestJS 11 | Jest 30 | 3000 |
+| Runtime explorers | `packages/explorer-backend/` | NestJS 11 | Jest 30 | 3001/3002 |
+| App Shell | `products/shell/frontend/` | Angular 21 | Vitest 4 (vía `ng test`) | 4200 |
+| RDF Explorer | `products/rdf-explorer/frontend/` | Angular 21 | Vitest 4 (vía `ng test`) | 4201 |
+| RDF GIS Explorer | `products/gis-explorer/frontend/` | Angular 21 | Vitest 4 (vía `ng test`) | 4202 |
 
 ## Comandos
 
@@ -43,12 +40,13 @@ Workspace **pnpm** (`pnpm-workspace.yaml` en la raíz): un solo `pnpm install` i
 ./start.sh                     # dev con hot reload; --env .env.graphdb para otro backend
 npm run dev                    # igual, sin el bootstrap de nvm/corepack
 
-cd backend && pnpm run start:dev   # backend solo
-cd backend && pnpm test            # unit tests (Jest)
-cd backend && pnpm run lint        # ESLint
-cd backend && pnpm run seed:demo-dashboards   # tableros demo (5 Explorer + 5 GIS) en data/<backend>.sqlite
+cd packages/explorer-backend && pnpm run start:dev   # backend solo
+cd packages/explorer-backend && pnpm test            # unit tests (Jest)
+cd packages/explorer-backend && pnpm run lint        # ESLint
+pnpm run dev:rdf-standalone       # RDF Explorer + backend propio
+pnpm run dev:gis-standalone       # GIS Explorer + backend propio
 
-cd frontend/<app> && pnpm test     # unit tests (Vitest vía ng test)
+cd products/<producto>/frontend && pnpm test
 ```
 
 ## Convenciones de Código
@@ -73,12 +71,12 @@ cd frontend/<app> && pnpm test     # unit tests (Vitest vía ng test)
 - **El host comparte `@angular/material` y `@angular/cdk` explícitamente con `includeSecondaries: { keepAll: true }`** aunque no los importe en su código. Motivo: con `ignoreUnusedDeps`, si el host no los provee, cada remote carga su PROPIA copia del CDK; con dos copias vivas aparecen los warnings NG0912 (Component ID collision) y `MatDialog` crashea (`this._portalOutlet is undefined`: el `viewChild(CdkPortalOutlet)` heredado no matchea la directiva de la otra copia). `keepAll: true` es lo que hace que la entrada sobreviva al filtro de `ignoreUnusedDeps`.
 - **AG Grid es privativo del remote GIS** (está en su `skip`): si se comparte, el host lo omite del import map y el remote no resuelve el specifier.
 - Leaflet, sparqljs, exceljs y otros CJS/UMD tampoco se comparten (skip en el remote GIS); `leaflet-global.ts` setea `window.L` para los plugins.
-- Patch de `@softarc/native-federation` (`frontend/rdf_gis_explorer/patches/`): resuelve package.json de deps transitivas no-hoisted en el store de pnpm. Referenciado en `pnpm-workspace.yaml`.
+- Patch de `@softarc/native-federation` (`products/gis-explorer/frontend/patches/`): resuelve package.json de deps transitivas no-hoisted en el store de pnpm. Referenciado en `pnpm-workspace.yaml`.
 
 ### Comunicación Shell ↔ Remotes
 - **QueryHandoffService** (duplicado deliberadamente en `rdf_explorer` y `rdf_gis_explorer`; los servicios de app no se pueden compartir por federation): `sessionStorage` + `CustomEvent('query-handoff')` + `storage` event. TTL 5 min. Semántica de un solo uso (`consume()`).
-- **Dashboards:** API REST `/api/dashboards`. El shell tiene `DashboardStoreService` reactivo; los remotes tienen sus propios API clients. Todos usan URLs **relativas** (`/api/...`) — nunca hardcodear `http://localhost:3000` (rompe Docker; el proxy dev y nginx ya rutean `/api`).
-- **Proxy dev:** cada frontend tiene `proxy.conf.json` que redirige `/api` → `http://localhost:3000`. En Docker, el `nginx.conf` de cada frontend hace lo mismo hacia `backend:3000`.
+- **Dashboards:** solo el Shell publica `/api/dashboards` y registra `DashboardHost` en `@rdfgis/platform-bridge`. Los remotes integrados usan esa mediación; standalone oculta persistencia.
+- **APIs de explorers:** standalone usa `/api`; el Shell configura `/rdf-api` y `/gis-api`, siempre como URLs relativas.
 
 ## Módulos del Backend
 
@@ -102,7 +100,7 @@ consumidores. Los defaults que necesita el Explorer viajan en `/api/config`.)
 
 ## Prefixes SPARQL
 
-- Fuente: `backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). El repo trae `prefixes.wikidata.json` y `prefixes.graphdb.example.json`; `prefixes.graphdb.json` real está gitignoreado.
+- Fuente: `packages/explorer-backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). El repo trae `prefixes.wikidata.json` y `prefixes.graphdb.example.json`; `prefixes.graphdb.json` real está gitignoreado.
 - Se exponen como `defaultPrefixes` en `GET /api/config`.
 - **rdf_explorer** los usa en la generación de queries y para abreviar URIs (describe panel).
 - **rdf_gis_explorer** precarga el bloque `PREFIX ...` en el editor CodeMirror (`SparqlInputComponent.seedDefaultPrefixes()`): al iniciar con editor vacío y al crear tablero nuevo. Nunca pisa un handoff ni un tablero cargado.
@@ -113,8 +111,8 @@ consumidores. Los defaults que necesita el Explorer viajan en `/api/config`.)
 
 La fuente de verdad única es **`packages/contracts/src/`** (`query-result.ts`,
 `query-summary.ts`, `app-config.ts`, `dashboard.ts`). Los archivos históricos
-(`backend/src/shared/dto/query-result.dto.ts`, `frontend/rdf_gis_explorer/src/app/shared/models/*`,
-`frontend/rdf_explorer/src/app/core/endpoint-adapter.ts`, etc.) son re-exports
+(`packages/explorer-backend/src/shared/dto/query-result.dto.ts`, `products/gis-explorer/frontend/src/app/shared/models/*`,
+`products/rdf-explorer/frontend/src/app/core/endpoint-adapter.ts`, etc.) son re-exports
 type-only — **los cambios de contrato se hacen SOLO en el paquete** y tsc los
 propaga/valida en las 4 apps. El paquete va en `devDependencies` (`workspace:*`):
 al ser solo tipos no entra en el `shareAll` de federation ni en el runtime.
@@ -181,12 +179,12 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 - **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro.
 - **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) para la preferencia de auto-ejecución.
 
-## Persistencia SQLite por backend
+## Persistencia SQLite de dashboards
 
-Cada backend tiene su propio archivo SQLite, derivado de `SPARQL_BACKEND`: `data/${SPARQL_BACKEND}.sqlite` (override: `DASHBOARDS_SQLITE_PATH`).
+El Shell mantiene su SQLite en `products/shell/backend/data/` (override: `DASHBOARDS_SQLITE_PATH`). Los backends de explorers no persisten dashboards.
 
 ```bash
-cd backend
+cd products/shell/backend
 pnpm run clean:unused-data          # reporta archivos SQLite sin uso, exit 1 si hay
 pnpm run clean:unused-data:force    # los borra (incluye -shm/-wal siblings)
 ```
@@ -213,7 +211,7 @@ AppConfig {
 
 **Canal de límites:** todos los límites de queries y visualización viven en env vars del backend (ver tabla del README) y viajan en `AppConfig.limits`. El GIS los consume con `LimitsService` (signal con defaults equivalentes hasta que la config llega; `App` lo actualiza en `ngOnInit`): grafo (`graphMaxNodes`), lotes (`lotDefaultSize`/`lotSizeOptions`, con clamp del tamaño actual si queda fuera de la nueva oferta), tabla (`tablePageSizeOptions`) y export (`exportMaxRows`/`exportMinPageSize`).
 
-Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros. Los colores por clase se cargan desde `backend/config/class-colors.${SPARQL_BACKEND}.json` (override: `CLASS_COLORS_PATH`) y quedan vacíos si el archivo no existe — el repo trae `class-colors.wikidata.json` y `class-colors.graphdb.example.json`; `class-colors.graphdb.json` real está gitignoreado.
+Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros. Los colores por clase se cargan desde `packages/explorer-backend/config/class-colors.${SPARQL_BACKEND}.json` (override: `CLASS_COLORS_PATH`) y quedan vacíos si el archivo no existe — el repo trae `class-colors.wikidata.json` y `class-colors.graphdb.example.json`; `class-colors.graphdb.json` real está gitignoreado.
 
 ## Variables de Entorno
 
@@ -234,7 +232,7 @@ Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa est
 - **El shell NO expone componentes** como remote; solo consume remotes. Su `app.config.ts` no tiene initializers (el ex-`SettingsService` del shell se eliminó: nadie consumía el resultado).
 - **Tests de frontends**: el target `test` de cada `angular.json` fija `buildTarget: <proyecto>:esbuild:development` + `runner: vitest` (el target `build` de native-federation no sirve para compilar tests). `tsconfig.spec.json` debe incluir `src/polyfills.ts`. En specs, las factories de `vi.mock` se hoistean: helpers compartidos entre factory y tests van dentro de `vi.hoisted()` (ver `graph-view` y `timeline-view` specs).
 - **Interpolación en SPARQL**: nunca interpolar input del usuario en un literal sin escapar `\`, `"`, `'` y saltos de línea (backend: `escapeSparqlLiteral` en `suggestions.service.ts`; explorer: `escapeKeyword`). Con `String.replace`, pasar el reemplazo como función para que `$&`/`$'` no se expandan. URIs externas se validan con `isValidUri` antes de entrar a `VALUES { <...> }`.
-- **Docker**: las 4 imágenes se buildean con contexto en la **raíz del repo** (`docker-compose.yml` usa `context: .` + `dockerfile: <dir>/Dockerfile`) para compartir el lockfile del workspace y `packages/contracts`. El patrón: copiar manifests de todo el workspace + patches, `pnpm install --frozen-lockfile --filter "{./<dir>}..."`, copiar el código de la app, buildear contracts y la app. El volumen de datos del backend monta en `/repo/backend/data`.
+- **Docker**: las imágenes se buildean con contexto en la **raíz del repo** (`docker-compose.yml` usa `context: .` + `dockerfile: <dir>/Dockerfile`) para compartir el lockfile del workspace y los paquetes comunes. El patrón copia manifests y patches, instala el filtro del workspace y compila sus dependencias. El volumen de dashboards monta en `/repo/products/shell/backend/data`.
 - **Cytoscape:** NO pasar `wheelSensitivity` en las opciones (ni siquiera `1.0`): el default ya es 1 y Cytoscape ≥3.31 normaliza el scroll por `deltaMode` (fix Firefox/Linux integrado); definir la opción solo dispara un warning.
 - **Warning benigno conocido:** `wrong event specified: touchleave` viene de Leaflet 1.9 + leaflet-draw (upstream), no es un bug nuestro.
 - **APP_INITIALIZER del remote GIS** (`rdf_gis_explorer/app.config.ts`) solo corre standalone; cargado como remote, la config se carga async (`App.ngOnInit` / `AppConfigService.load()` con `shareReplay`). No asumir config disponible sincrónicamente en componentes del GIS.

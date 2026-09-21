@@ -1,50 +1,52 @@
 services:
-  backend:
+  shell-backend:
     build:
-      # Contexto raíz: el workspace pnpm comparte lockfile y packages/contracts
       context: .
-      dockerfile: backend/Dockerfile
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
-    env_file: ${ENV_FILE:-.env}
+      dockerfile: products/shell/backend/Dockerfile
+    environment:
+      SHELL_BACKEND_PORT: 3000
+    ports: ["${SHELL_BACKEND_PORT:-3000}:3000"]
     volumes:
-      - sqlite-data:/repo/backend/data
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      - shell-data:/repo/products/shell/backend/data
 
-  frontend:
+  rdf-backend:
     build:
       context: .
-      dockerfile: frontend/app_shell/Dockerfile
-    ports:
-      - "${FRONTEND_PORT:-4200}:80"
-    depends_on:
-      backend:
-        condition: service_healthy
+      dockerfile: packages/explorer-backend/Dockerfile
+    env_file: ${RDF_ENV_FILE:-.env}
+    environment:
+      BACKEND_PORT: 3001
+    ports: ["${RDF_EXPLORER_BACKEND_PORT:-3001}:3001"]
+
+  gis-backend:
+    build:
+      context: .
+      dockerfile: packages/explorer-backend/Dockerfile
+    env_file: ${GIS_ENV_FILE:-.env}
+    environment:
+      BACKEND_PORT: 3002
+    ports: ["${GIS_EXPLORER_BACKEND_PORT:-3002}:3002"]
+
+  shell:
+    build:
+      context: .
+      dockerfile: products/shell/frontend/Dockerfile
+    ports: ["${FRONTEND_PORT:-4200}:80"]
+    depends_on: [shell-backend, rdf-backend, gis-backend]
 
   rdf-explorer:
     build:
       context: .
-      dockerfile: frontend/rdf_explorer/Dockerfile
-    ports:
-      - "${RDF_EXPLORER_PORT:-4201}:80"
-    depends_on:
-      backend:
-        condition: service_healthy
+      dockerfile: products/rdf-explorer/frontend/Dockerfile
+    ports: ["${RDF_EXPLORER_PORT:-4201}:80"]
+    depends_on: [rdf-backend]
 
-  rdf-gis-explorer:
+  gis-explorer:
     build:
       context: .
-      dockerfile: frontend/rdf_gis_explorer/Dockerfile
-    ports:
-      - "${RDF_GIS_EXPLORER_PORT:-4202}:80"
-    depends_on:
-      backend:
-        condition: service_healthy
+      dockerfile: products/gis-explorer/frontend/Dockerfile
+    ports: ["${RDF_GIS_EXPLORER_PORT:-4202}:80"]
+    depends_on: [gis-backend]
 
 volumes:
-  sqlite-data:
+  shell-data:

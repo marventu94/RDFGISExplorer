@@ -1,9 +1,7 @@
 packages:
   - 'packages/*'
-  - 'backend'
-  - 'frontend/app_shell'
-  - 'frontend/rdf_explorer'
-  - 'frontend/rdf_gis_explorer'
+  - 'products/*/backend'
+  - 'products/*/frontend'
 
 allowBuilds:
   '@nestjs/core': true
@@ -15,7 +13,7 @@ allowBuilds:
   msgpackr-extract: true
 
 patchedDependencies:
-  '@softarc/native-federation@3.5.5': 'frontend/rdf_gis_explorer/patches/@softarc__native-federation@3.5.5.patch'
+  '@softarc/native-federation@3.5.5': 'products/gis-explorer/frontend/patches/@softarc__native-federation@3.5.5.patch'
 
 # pnpm 11 corre un chequeo de dependencias antes de cada script (runDepsStatusCheck).
 # Aca ese chequeo decide que node_modules esta desactualizado, dispara un `pnpm install`
