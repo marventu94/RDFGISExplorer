@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { BindingValue, ResultBinding } from '@shared/models';
+import type { Language } from '@rdfgis/platform-bridge';
 
 /**
  * Serialización XLSX del export completo del resultado. Pensado para análisis
@@ -81,9 +82,9 @@ function columnWidth(header: string, cells: XlsxCellValue[]): number {
 function buildResultSheet(
   workbook: ExcelJS.Workbook,
   variables: string[],
-  rows: ResultBinding[],
+  rows: ResultBinding[], language: Language,
 ): void {
-  const sheet = workbook.addWorksheet(RESULT_SHEET_NAME);
+  const sheet = workbook.addWorksheet(language === 'es' ? RESULT_SHEET_NAME : 'Result');
   const cellRows = rows.map((row, i) =>
     variables.map((v) => bindingToCellValue(row[v], i + 1)),
   );
@@ -121,20 +122,21 @@ function buildResultSheet(
 
 function buildProvenanceSheet(
   workbook: ExcelJS.Workbook,
-  p: XlsxProvenance,
+  p: XlsxProvenance, language: Language,
 ): void {
-  const sheet = workbook.addWorksheet(PROVENANCE_SHEET_NAME);
+  const english = language === 'en';
+  const sheet = workbook.addWorksheet(english ? 'Provenance' : PROVENANCE_SHEET_NAME);
   sheet.getColumn(1).width = 110;
 
-  sheet.addRow(['Export del resultado completo de la query — RDF GIS Explorer'])
+  sheet.addRow([english ? 'Full query result export — RDF GIS Explorer' : 'Export del resultado completo de la query — RDF GIS Explorer'])
     .font = { bold: true, size: 12 };
   sheet.addRow([]);
   sheet.addRow([`backend: ${p.backend}`]);
-  sheet.addRow([`exportado: ${p.exportedAt}`]);
+  sheet.addRow([`${english ? 'exported' : 'exportado'}: ${p.exportedAt}`]);
   sheet.addRow([
     p.partial
-      ? `filas: ${p.rowCount} (PARCIAL: se alcanzó el tope de exportación)`
-      : `filas: ${p.rowCount}`,
+      ? `${english ? 'rows' : 'filas'}: ${p.rowCount} (${english ? 'PARTIAL: export limit reached' : 'PARCIAL: se alcanzó el tope de exportación'})`
+      : `${english ? 'rows' : 'filas'}: ${p.rowCount}`,
   ]);
   sheet.addRow([]);
   sheet.addRow(['query:']).font = { bold: true };
@@ -148,10 +150,11 @@ export async function buildXlsx(
   variables: string[],
   rows: ResultBinding[],
   provenance: XlsxProvenance,
+  language: Language = 'es',
 ): Promise<Blob> {
   const workbook = new ExcelJS.Workbook();
-  buildResultSheet(workbook, variables, rows);
-  buildProvenanceSheet(workbook, provenance);
+  buildResultSheet(workbook, variables, rows, language);
+  buildProvenanceSheet(workbook, provenance, language);
   const buffer = await workbook.xlsx.writeBuffer();
   return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

@@ -3,15 +3,18 @@ import { Router } from '@angular/router';
 import { DashboardStoreService } from '../../core/dashboard-store.service';
 import { SnackbarService } from '../../core/snackbar.service';
 import { relativeDate, type Dashboard } from '../../core/dashboard.model';
+import { TranslatePipe } from '../../core/translate.pipe';
+import { I18nService } from '../../core/i18n.service';
 
 @Component({
   selector: 'app-dashboard-card',
   standalone: true,
+  imports: [TranslatePipe],
   template: `
     <div
       class="card"
       role="listitem"
-      [attr.aria-label]="'Abrir ' + dashboard().name + ' (' + (dashboard().kind === 'gis' ? 'GIS' : 'Explorer') + ')'"
+      [attr.aria-label]="openLabel()"
       tabindex="0"
       (click)="navigate()"
       (keydown.enter)="navigate()"
@@ -22,15 +25,15 @@ import { relativeDate, type Dashboard } from '../../core/dashboard.model';
         <div class="card__menu" (click)="$event.stopPropagation()">
           <button
             class="card__menu-trigger"
-            [attr.aria-label]="'Más opciones para ' + dashboard().name"
+            [attr.aria-label]="menuLabel()"
             [attr.aria-expanded]="isMenuOpen()"
             (click)="toggleMenu()"
           >⋯</button>
           @if (isMenuOpen()) {
             <div class="card__dropdown" role="menu">
-              <button class="card__dropdown-item" role="menuitem" (click)="rename()">Renombrar</button>
-              <button class="card__dropdown-item" role="menuitem" (click)="duplicate()">Duplicar</button>
-              <button class="card__dropdown-item card__dropdown-item--danger" role="menuitem" (click)="deleteDashboard()">Eliminar</button>
+              <button class="card__dropdown-item" role="menuitem" (click)="rename()">{{ 'Renombrar' | translate }}</button>
+              <button class="card__dropdown-item" role="menuitem" (click)="duplicate()">{{ 'Duplicar' | translate }}</button>
+              <button class="card__dropdown-item card__dropdown-item--danger" role="menuitem" (click)="deleteDashboard()">{{ 'Eliminar' | translate }}</button>
             </div>
           }
         </div>
@@ -162,6 +165,15 @@ export class DashboardCardComponent {
   private readonly router = inject(Router);
   private readonly store = inject(DashboardStoreService);
   private readonly snackbar = inject(SnackbarService);
+  private readonly i18n = inject(I18nService);
+
+  protected openLabel(): string {
+    return `${this.i18n.text('Abrir')} ${this.dashboard().name} (${this.dashboard().kind === 'gis' ? 'GIS' : 'Explorer'})`;
+  }
+
+  protected menuLabel(): string {
+    return `${this.i18n.text('Más opciones para')} ${this.dashboard().name}`;
+  }
 
   toggleMenu(): void {
     this.isMenuOpen.update((v) => !v);
@@ -173,11 +185,11 @@ export class DashboardCardComponent {
 
   rename(): void {
     this.isMenuOpen.set(false);
-    const newName = window.prompt('Nuevo nombre:', this.dashboard().name);
+    const newName = window.prompt(this.i18n.text('Nuevo nombre:'), this.dashboard().name);
     if (newName && newName.trim()) {
       this.store.rename(this.dashboard().id, newName.trim()).subscribe({
-        next: () => this.snackbar.show('Tablero renombrado'),
-        error: () => this.snackbar.show('Error al renombrar'),
+        next: () => this.snackbar.show(this.i18n.text('Tablero renombrado')),
+        error: () => this.snackbar.show(this.i18n.text('Error al renombrar')),
       });
     }
   }
@@ -185,17 +197,18 @@ export class DashboardCardComponent {
   duplicate(): void {
     this.isMenuOpen.set(false);
     this.store.duplicate(this.dashboard().id).subscribe({
-      next: () => this.snackbar.show('Tablero duplicado'),
-      error: () => this.snackbar.show('Error al duplicar'),
+      next: () => this.snackbar.show(this.i18n.text('Tablero duplicado')),
+      error: () => this.snackbar.show(this.i18n.text('Error al duplicar')),
     });
   }
 
   deleteDashboard(): void {
     this.isMenuOpen.set(false);
-    if (window.confirm(`¿Eliminar "${this.dashboard().name}"?`)) {
+    const deletePrompt = `${this.i18n.text('Eliminar')} "${this.dashboard().name}"?`;
+    if (window.confirm(deletePrompt)) {
       this.store.delete(this.dashboard().id).subscribe({
-        next: () => this.snackbar.show('Tablero eliminado'),
-        error: () => this.snackbar.show('Error al eliminar'),
+        next: () => this.snackbar.show(this.i18n.text('Tablero eliminado')),
+        error: () => this.snackbar.show(this.i18n.text('Error al eliminar')),
       });
     }
   }

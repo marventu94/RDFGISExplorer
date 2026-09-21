@@ -1,10 +1,12 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LanguageSelectorComponent } from '../core/language-selector.component';
+import { TranslatePipe } from '../core/translate.pipe';
 
 @Component({
   selector: 'app-top-bar',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LanguageSelectorComponent, TranslatePipe],
   template: `
     <header class="top-bar">
       <div class="top-bar__left">
@@ -17,12 +19,13 @@ import { RouterLink } from '@angular/router';
       </div>
 
       <nav class="top-bar__breadcrumb">
-        <a routerLink="/" class="top-bar__crumb">Inicio</a>
+        <a routerLink="/" class="top-bar__crumb">{{ 'Inicio' | translate }}</a>
         @if (currentPath !== '/') {
           <span class="top-bar__separator">›</span>
           <span class="top-bar__crumb top-bar__crumb--active">{{ currentLabel }}</span>
         }
       </nav>
+      <app-language-selector />
     </header>
   `,
   styles: `

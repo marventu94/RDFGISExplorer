@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
 import {
   Component,
   input,
@@ -20,7 +21,7 @@ interface FieldMapping {
 @Component({
   selector: 'app-field-mapping-panel',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatSelectModule, MatIconModule, MatBadgeModule],
+  imports: [TranslatePipe, CommonModule, MatButtonModule, MatSelectModule, MatIconModule, MatBadgeModule],
   templateUrl: './field-mapping-panel.component.html',
   styleUrl: './field-mapping-panel.component.scss',
 })

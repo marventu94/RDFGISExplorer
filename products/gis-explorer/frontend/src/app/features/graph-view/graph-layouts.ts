@@ -1,5 +1,6 @@
 import type cytoscape from 'cytoscape';
 import type { QueryResult } from '@shared/models';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 
 export type GraphLayout = 'cola' | 'dagre' | 'grid';
 export type GraphDetailLevel =
@@ -11,8 +12,8 @@ export type GraphDetailLevel =
 
 export interface GraphLayoutOption {
   value: GraphLayout;
-  label: string;
-  description: string;
+  label: UiTextKey;
+  description: UiTextKey;
 }
 
 export const GRAPH_LAYOUT_OPTIONS: readonly GraphLayoutOption[] = [

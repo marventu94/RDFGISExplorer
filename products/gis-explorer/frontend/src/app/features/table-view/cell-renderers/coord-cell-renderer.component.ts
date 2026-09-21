@@ -6,11 +6,12 @@ import type { ICellRendererParams } from 'ag-grid-community';
 import type { BindingValue, Coordinate } from '@shared/models';
 import { SelectionService } from '@core/services/selection.service';
 import type { NormalizedNode } from '@shared/models';
+import { TranslatePipe } from '@core/services/translate.pipe';
 
 @Component({
   selector: 'app-coord-cell-renderer',
   standalone: true,
-  imports: [MatIconModule, MatButtonModule],
+  imports: [MatIconModule, MatButtonModule, TranslatePipe],
   template: `
     <div class="coord-cell">
       <span>{{ displayText }}</span>
@@ -19,8 +20,8 @@ import type { NormalizedNode } from '@shared/models';
           class="pin-btn"
           mat-icon-button
           (click)="onPinClick($event)"
-          aria-label="Centrar en el mapa"
-          title="Centrar en el mapa"
+          [attr.aria-label]="'Centrar en el mapa' | translate"
+          [attr.title]="'Centrar en el mapa' | translate"
         >
           <mat-icon>place</mat-icon>
         </button>

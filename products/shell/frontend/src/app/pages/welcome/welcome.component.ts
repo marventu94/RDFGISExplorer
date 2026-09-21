@@ -4,6 +4,8 @@ import { AsyncPipe } from '@angular/common';
 import { BehaviorSubject, combineLatest, map } from 'rxjs';
 import { DashboardStoreService } from '../../core/dashboard-store.service';
 import { DashboardCardComponent } from './dashboard-card.component';
+import { TranslatePipe } from '../../core/translate.pipe';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 
 type FilterKind = 'all' | 'gis' | 'explorer';
 
@@ -31,11 +33,11 @@ function storeFilter(filter: FilterKind): void {
 @Component({
   selector: 'app-welcome',
   standalone: true,
-  imports: [RouterLink, AsyncPipe, DashboardCardComponent],
+  imports: [RouterLink, AsyncPipe, DashboardCardComponent, TranslatePipe],
   template: `
     <div class="welcome">
-      <section class="welcome__ctas" aria-label="Acciones principales">
-        <a routerLink="/explorer" class="welcome__cta welcome__cta--explorer" aria-label="Abrir RDF Explorer para construir una query">
+      <section class="welcome__ctas" [attr.aria-label]="'Acciones principales' | translate">
+        <a routerLink="/explorer" class="welcome__cta welcome__cta--explorer" [attr.aria-label]="'Abrir RDF Explorer para construir una query' | translate">
           <div class="welcome__cta-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="10"/>
@@ -43,12 +45,12 @@ function storeFilter(filter: FilterKind): void {
             </svg>
           </div>
           <div class="welcome__cta-text">
-            <span class="welcome__cta-title">Construir query</span>
+            <span class="welcome__cta-title">{{ 'Construir query' | translate }}</span>
             <span class="welcome__cta-sub">RDF Explorer</span>
           </div>
         </a>
 
-        <a routerLink="/gis" class="welcome__cta welcome__cta--gis" aria-label="Abrir RDF GIS Explorer">
+        <a routerLink="/gis" class="welcome__cta welcome__cta--gis" [attr.aria-label]="'Abrir RDF GIS Explorer' | translate">
           <div class="welcome__cta-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
@@ -56,16 +58,16 @@ function storeFilter(filter: FilterKind): void {
             </svg>
           </div>
           <div class="welcome__cta-text">
-            <span class="welcome__cta-title">Explorar en GIS</span>
+            <span class="welcome__cta-title">{{ 'Explorar en GIS' | translate }}</span>
             <span class="welcome__cta-sub">RDF GIS Explorer</span>
           </div>
         </a>
       </section>
 
-      <section class="welcome__recent" aria-label="Tableros recientes">
+      <section class="welcome__recent" [attr.aria-label]="'Tableros recientes' | translate">
         <div class="welcome__recent-header">
-          <h2 class="welcome__recent-title">Recientes</h2>
-          <div class="welcome__filters" role="group" aria-label="Filtrar por tipo">
+          <h2 class="welcome__recent-title">{{ 'Recientes' | translate }}</h2>
+          <div class="welcome__filters" role="group" [attr.aria-label]="'Filtrar por tipo' | translate">
             @for (f of filters; track f.value) {
               <button
                 class="welcome__filter"
@@ -73,7 +75,7 @@ function storeFilter(filter: FilterKind): void {
                 [attr.aria-pressed]="activeFilter === f.value"
                 (click)="setFilter(f.value)"
               >
-                {{ f.label }}
+                {{ f.label | translate }}
               </button>
             }
           </div>
@@ -81,7 +83,7 @@ function storeFilter(filter: FilterKind): void {
 
         @if (filteredDashboards$ | async; as dashboards) {
           @if (dashboards.length > 0) {
-            <div class="welcome__grid" role="list" aria-label="Lista de tableros recientes">
+            <div class="welcome__grid" role="list" [attr.aria-label]="'Lista de tableros recientes' | translate">
               @for (d of dashboards; track d.id) {
                 <app-dashboard-card [dashboard]="d" />
               }
@@ -93,13 +95,13 @@ function storeFilter(filter: FilterKind): void {
                 <path d="M30 35h20M30 45h14"/>
                 <circle cx="58" cy="50" r="6"/>
               </svg>
-              <p class="welcome__empty-text">Empezá construyendo una query</p>
-              <a routerLink="/explorer" class="welcome__empty-cta">Ir a RDF Explorer</a>
+              <p class="welcome__empty-text">{{ 'Empezá construyendo una query' | translate }}</p>
+              <a routerLink="/explorer" class="welcome__empty-cta">{{ 'Ir a RDF Explorer' | translate }}</a>
             </div>
           }
         } @else {
           <div class="welcome__loading" role="status" aria-live="polite">
-            <span class="welcome__loading-text">Cargando recientes…</span>
+            <span class="welcome__loading-text">{{ 'Cargando recientes…' | translate }}</span>
           </div>
         }
       </section>
@@ -251,7 +253,7 @@ function storeFilter(filter: FilterKind): void {
 export class WelcomePageComponent implements OnInit {
   private readonly store = inject(DashboardStoreService);
 
-  readonly filters = [
+  readonly filters: ReadonlyArray<{ label: UiTextKey; value: FilterKind }> = [
     { label: 'Todos', value: 'all' as const },
     { label: 'Explorer', value: 'explorer' as const },
     { label: 'GIS', value: 'gis' as const },

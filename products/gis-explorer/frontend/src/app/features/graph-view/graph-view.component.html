@@ -2,13 +2,13 @@
   @if (queryState === 'no-query') {
     <div class="empty-state">
       <span class="empty-state__icon">&#x1F578;</span>
-      <span class="empty-state__text">Ejecutá una query para ver el grafo</span>
+      <span class="empty-state__text">{{ 'Ejecutá una query para ver el grafo' | translate }}</span>
     </div>
   }
 
   @if (queryState === 'filtered-zero') {
     <div class="empty-state">
-      <span class="chip">0 de {{ originalNodeCount }} nodos pasan los filtros activos</span>
+      <span class="chip">{{ emptyFilterMessage() }}</span>
     </div>
   }
 
@@ -23,19 +23,19 @@
   @if (cy) {
     <div class="graph-header">
     <div class="graph-toolbar">
-      <label class="toolbar-label" for="graph-mode">Vista</label>
+      <label class="toolbar-label" for="graph-mode">{{ 'Vista' | translate }}</label>
       <select
         id="graph-mode"
         class="toolbar-select"
         [value]="explorationMode"
         (change)="setExplorationMode($any($event.target).value)"
       >
-        <option value="result" [selected]="explorationMode === 'result'">Resultado completo</option>
+        <option value="result" [selected]="explorationMode === 'result'">{{ 'Resultado completo' | translate }}</option>
         <option
           value="entity"
           [selected]="explorationMode === 'entity'"
           [disabled]="!isEntityMode && !canEnterEntityMode"
-        >Entidad seleccionada</option>
+        >{{ 'Entidad seleccionada' | translate }}</option>
       </select>
       @if (canEnterEntityMode) {
         <button
@@ -43,7 +43,7 @@
           type="button"
           (click)="showStructure()"
           [title]="'Ver la estructura RDF de ' + selectedEntityLabel"
-        >Ver estructura</button>
+        >{{ 'Ver estructura' | translate }}</button>
       }
       @if (isEntityMode) {
         <button
@@ -51,27 +51,27 @@
           type="button"
           (click)="toggleEntityPanel()"
           [attr.aria-expanded]="entityPanelVisible"
-        >{{ entityPanelVisible ? 'Ocultar detalles' : 'Ver detalles' }}</button>
+        >{{ (entityPanelVisible ? 'Ocultar detalles' : 'Ver detalles') | translate }}</button>
         <button
           class="toolbar-btn toolbar-btn--primary"
           type="button"
           (click)="exitEntityMode()"
-        >Volver al resultado</button>
+        >{{ 'Volver al resultado' | translate }}</button>
       }
-      <label class="toolbar-label" for="graph-layout">Layout</label>
+      <label class="toolbar-label" for="graph-layout">{{ 'Layout' | translate }}</label>
       <select id="graph-layout" class="toolbar-select" [value]="currentLayout" (change)="setLayout($any($event.target).value)">
         @for (option of availableLayoutOptions; track option.value) {
-          <option [value]="option.value" [selected]="option.value === currentLayout">{{ option.label }} — {{ option.description }}</option>
+          <option [value]="option.value" [selected]="option.value === currentLayout">{{ option.label | translate }} — {{ option.description | translate }}</option>
         }
       </select>
-      <label class="toolbar-label" for="graph-detail">Nivel</label>
+      <label class="toolbar-label" for="graph-detail">{{ 'Nivel' | translate }}</label>
       <select id="graph-detail" class="toolbar-select" [value]="detailLevel" (change)="setDetailLevel($any($event.target).value)">
         @for (option of availableDetailLevels; track option.value) {
-          <option [value]="option.value" [selected]="option.value === detailLevel">{{ option.label }}</option>
+          <option [value]="option.value" [selected]="option.value === detailLevel">{{ option.label | translate }}</option>
         }
       </select>
-      <button class="toolbar-btn" (click)="fit()">fit</button>
-      <button class="toolbar-btn" (click)="resetZoom()">reset zoom</button>
+      <button class="toolbar-btn" (click)="fit()">{{ 'fit' | translate }}</button>
+      <button class="toolbar-btn" (click)="resetZoom()">{{ 'reset zoom' | translate }}</button>
     </div>
     @if (coverageLabel) {
       <app-coverage-chip [text]="coverageLabel" />
@@ -81,23 +81,23 @@
 
   @if (cy) {
     <div class="graph-legend">
-      <span><i class="legend-dot legend-dot--node"></i>Entidad</span>
-      <span><i class="legend-dot legend-dot--motif"></i>Motivo repetido</span>
-      <span><i class="legend-dot legend-dot--aggregate"></i>Super-arista</span>
-      <span><i class="legend-line"></i>Relación RDF</span>
+      <span><i class="legend-dot legend-dot--node"></i>{{ 'Entidad' | translate }}</span>
+      <span><i class="legend-dot legend-dot--motif"></i>{{ 'Motivo repetido' | translate }}</span>
+      <span><i class="legend-dot legend-dot--aggregate"></i>{{ 'Super-arista' | translate }}</span>
+      <span><i class="legend-line"></i>{{ 'Relación RDF' | translate }}</span>
     </div>
   }
 
   @if (isEntityMode && entityPanelVisible) {
-    <aside class="entity-panel" role="region" aria-label="Estructura de la entidad seleccionada">
+    <aside class="entity-panel" role="region" [attr.aria-label]="'Estructura de la entidad seleccionada' | translate">
       <header class="entity-panel__header">
-        <span class="entity-panel__eyebrow">Entidad seleccionada</span>
+        <span class="entity-panel__eyebrow">{{ 'Entidad seleccionada' | translate }}</span>
         <h3 class="entity-panel__title" [title]="entityRootUri">{{ entityRootLabel }}</h3>
         <span class="entity-panel__uri" [title]="entityRootUri">{{ entityRootShortUri }}</span>
       </header>
 
       <div class="entity-panel__active">
-        <span class="entity-panel__label">Nodo activo</span>
+        <span class="entity-panel__label">{{ 'Nodo activo' | translate }}</span>
         <span class="entity-panel__value" [title]="entityActiveUri">
           {{ entityActiveLabel }} <span class="entity-panel__uri">{{ entityActiveShortUri }}</span>
         </span>
@@ -108,21 +108,21 @@
           class="toolbar-btn"
           type="button"
           (click)="copyCurrentEntityView()"
-        >Copiar vista actual</button>
+        >{{ 'Copiar vista actual' | translate }}</button>
       </div>
 
       @if (copyFallbackText) {
         <div class="entity-copy-fallback">
-          <label for="entity-copy-text">Texto listo para copiar manualmente</label>
+          <label for="entity-copy-text">{{ 'Texto listo para copiar manualmente' | translate }}</label>
           <textarea id="entity-copy-text" readonly [value]="copyFallbackText"></textarea>
-          <button class="toolbar-btn" type="button" (click)="dismissCopyFallback()">Cerrar</button>
+          <button class="toolbar-btn" type="button" (click)="dismissCopyFallback()">{{ 'Cerrar' | translate }}</button>
         </div>
       }
 
       <section class="entity-data">
-        <h4>Datos literales</h4>
+        <h4>{{ 'Datos literales' | translate }}</h4>
         @if (entityActiveAttributes.length === 0) {
-          <p class="entity-data__empty">Este nodo no tiene datos literales en el resultado.</p>
+          <p class="entity-data__empty">{{ 'Este nodo no tiene datos literales en el resultado.' | translate }}</p>
         } @else {
           <dl>
             @for (attribute of entityActiveAttributes; track attribute.name) {
@@ -136,9 +136,9 @@
       </section>
 
       <section class="entity-data entity-relations">
-        <h4>Relaciones</h4>
+        <h4>{{ 'Relaciones' | translate }}</h4>
         @if (entityActiveRelations.length === 0) {
-          <p class="entity-data__empty">Este nodo no tiene relaciones visibles.</p>
+          <p class="entity-data__empty">{{ 'Este nodo no tiene relaciones visibles.' | translate }}</p>
         } @else {
           <ul class="entity-relations__list">
             @for (relation of entityActiveRelations; track relation.edgeId) {

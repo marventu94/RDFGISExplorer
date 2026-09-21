@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, inject, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
@@ -16,7 +17,7 @@ import { Property } from '../../graph/domain';
   templateUrl: './sparql-panel.component.html',
   styleUrl: './sparql-panel.component.scss',
   standalone: true,
-  imports: [SparqlViewerComponent],
+  imports: [SparqlViewerComponent, TranslatePipe],
 })
 export class SparqlPanelComponent {
   private readonly graph = inject(PropertyGraphService);

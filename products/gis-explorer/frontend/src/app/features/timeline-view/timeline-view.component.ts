@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
 import {
   Component,
   OnInit,
@@ -28,6 +29,7 @@ import { EntityColorService } from '@core/services/entity-color.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { computeCoverageStats } from '@shared/stats/coverage-stats';
 import { CoverageChipComponent } from '@shared/components/coverage-chip/coverage-chip.component';
+import { I18nService } from '@core/services/i18n.service';
 
 type QueryState = 'no-query' | 'no-dates' | 'no-dates-lot' | 'filtered-zero' | 'normal';
 
@@ -50,11 +52,12 @@ enum ZoomLevel {
 @Component({
   selector: 'app-timeline-view',
   standalone: true,
-  imports: [CoverageChipComponent],
+  imports: [TranslatePipe, CoverageChipComponent],
   templateUrl: './timeline-view.component.html',
   styleUrls: ['./timeline-view.component.scss'],
 })
 export class TimelineViewComponent implements OnInit, OnDestroy {
+  private readonly i18n = inject(I18nService);
   @ViewChild('tlContainer', { static: true }) tlContainer!: ElementRef<HTMLDivElement>;
 
   protected readonly ZoomLevel = ZoomLevel;
@@ -65,6 +68,12 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   filteredNodeCount = 0;
   canApplyRange = false;
   activeFilterCount = 0;
+
+  emptyRangeMessage(): string {
+    return this.i18n.language() === 'es'
+      ? `0 de ${this.originalNodeCount} eventos en el rango activo`
+      : `0 of ${this.originalNodeCount} events in the active range`;
+  }
   /** Texto del chip de cobertura; vacío cuando la timeline muestra todos los nodos. */
   coverageLabel = '';
 
@@ -398,7 +407,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       kind: 'temporal',
       from: this.pendingRange.start.toISOString(),
       to: this.pendingRange.end.toISOString(),
-      label: `${this.pendingRange.start.toLocaleDateString('es-AR')} – ${this.pendingRange.end.toLocaleDateString('es-AR')}`,
+      label: `${this.i18n.formatDate(this.pendingRange.start)} – ${this.i18n.formatDate(this.pendingRange.end)}`,
     };
 
     this.selectionService.addFilter(filter);
@@ -641,7 +650,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     const lines = [`<strong>${this.escapeHtml(node.label)}</strong>`];
 
     if (!isNaN(start.getTime())) {
-      const formatted = start.toLocaleDateString('es-AR', {
+      const formatted = this.i18n.formatDate(start, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -654,7 +663,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     for (const [field, value] of this.collectNumericAttributes(node)) {
       lines.push(
         `${this.escapeHtml(this.humanizeLabel(field))}: ${this.escapeHtml(
-          value.toLocaleString('es-AR'),
+          this.i18n.formatNumber(value),
         )}`,
       );
     }

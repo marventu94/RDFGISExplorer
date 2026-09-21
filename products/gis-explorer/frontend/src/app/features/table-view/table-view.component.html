@@ -2,7 +2,7 @@
   @if (!hasData()) {
     <div class="empty-state">
       <div class="empty-state-icon">&#x1F4CA;</div>
-      <p>Ejecut&#xE1; una query para ver resultados</p>
+      <p>{{ 'Ejecutá una query para ver resultados' | translate }}</p>
     </div>
   } @else {
     @if (isTruncated()) {
@@ -15,19 +15,19 @@
         <mat-icon class="search-icon">search</mat-icon>
         <input
           class="search-input"
-          placeholder="Buscar en todas las columnas…"
+          [attr.placeholder]="'Buscar en todas las columnas…' | translate"
           [ngModel]="quickFilter()"
           (ngModelChange)="onQuickFilterChange($event)"
         />
         @if (quickFilter()) {
-          <button class="search-clear" mat-icon-button (click)="onQuickFilterChange('')" aria-label="Limpiar">
+          <button class="search-clear" mat-icon-button (click)="onQuickFilterChange('')" [attr.aria-label]="'Limpiar' | translate">
             <mat-icon>close</mat-icon>
           </button>
         }
       </div>
 
       <div class="page-size-selector">
-        <span>Filas:</span>
+        <span>{{ 'Filas:' | translate }}</span>
         <select [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
           @for (size of pageSizeOptions(); track size) {
             <option [value]="size">{{ size }}</option>
@@ -49,6 +49,7 @@
         [suppressPaginationPanel]="false"
         [domLayout]="'normal'"
         [quickFilterText]="quickFilter()"
+        [localeText]="gridLocale()"
         [tooltipShowDelay]="300"
         [tooltipInteraction]="true"
         (gridReady)="onGridReady($event)"

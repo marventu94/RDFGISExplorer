@@ -12,7 +12,7 @@
           class="navbar-btn lot-nav-btn"
           [disabled]="lot.currentLot <= 1"
           (click)="previousLot()"
-          aria-label="Lote anterior"
+          [attr.aria-label]="'Lote anterior' | translate"
         >
           <mat-icon>chevron_left</mat-icon>
         </button>
@@ -24,7 +24,7 @@
           class="navbar-btn lot-nav-btn"
           [disabled]="lot.currentLot >= lot.lotCount"
           (click)="nextLot()"
-          aria-label="Lote siguiente"
+          [attr.aria-label]="'Lote siguiente' | translate"
         >
           <mat-icon>chevron_right</mat-icon>
         </button>
@@ -32,8 +32,8 @@
           class="lot-size-select"
           [ngModel]="lot.lotSize"
           (ngModelChange)="onLotSizeChange($event)"
-          title="Filas por lote"
-          aria-label="Filas por lote"
+          [attr.title]="'Filas por lote' | translate"
+          [attr.aria-label]="'Filas por lote' | translate"
         >
           @for (size of lotSizeOptions(); track size) {
             <option [value]="size">{{ size }}</option>
@@ -49,7 +49,7 @@
   <div class="navbar-actions">
     <button type="button" class="navbar-btn" (click)="toggleEditor()">
       <mat-icon>{{ layout.editorCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
-      <span>Editor</span>
+      <span>{{ 'Editor' | translate }}</span>
     </button>
 
     @let currentLayout = currentLayoutOption();
@@ -59,7 +59,7 @@
       } @else {
         <mat-icon>{{ currentLayout.icon }}</mat-icon>
       }
-      <span>Layout</span>
+      <span>{{ 'Layout' | translate }}</span>
     </button>
     <mat-menu #layoutMenu="matMenu">
       @for (opt of layoutOptions; track opt.preset) {
@@ -69,7 +69,7 @@
           } @else {
             <mat-icon>{{ opt.icon }}</mat-icon>
           }
-          <span>{{ opt.label }}</span>
+          <span>{{ opt.label | translate }}</span>
         </button>
       }
     </mat-menu>
@@ -82,7 +82,7 @@
       (click)="toggleCoordinatedView()"
     >
       <mat-icon>hub</mat-icon>
-      <span>Coordinada</span>
+      <span>{{ 'Coordinada' | translate }}</span>
     </button>
 
     <button
@@ -90,16 +90,16 @@
       class="navbar-btn"
       [disabled]="!hasResult()"
       (click)="exportFullXlsx()"
-      title="Exportar TODAS las filas del resultado completo a Excel (no solo el lote visible)"
+      [attr.title]="'Exportar TODAS las filas del resultado completo a Excel (no solo el lote visible)' | translate"
     >
       <mat-icon>file_download</mat-icon>
-      <span>Exportar Excel</span>
+      <span>{{ 'Exportar Excel' | translate }}</span>
     </button>
 
     @if (dashboardsAvailable) {
       <button type="button" class="navbar-btn" (click)="openSaveDialog()">
         <mat-icon>save</mat-icon>
-        <span>Guardar tablero</span>
+        <span>{{ 'Guardar tablero' | translate }}</span>
       </button>
     }
   </div>

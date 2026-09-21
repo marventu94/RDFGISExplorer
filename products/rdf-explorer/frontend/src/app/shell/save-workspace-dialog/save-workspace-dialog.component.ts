@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, inject } from '@angular/core';
 import { DialogModule, DialogRef, DIALOG_DATA } from '@angular/cdk/dialog';
 import { FormsModule } from '@angular/forms';
@@ -6,7 +7,7 @@ import type { SaveWorkspaceDialogData, SaveWorkspaceDialogResult } from './save-
 @Component({
   selector: 'app-save-workspace-dialog',
   standalone: true,
-  imports: [DialogModule, FormsModule],
+  imports: [TranslatePipe, DialogModule, FormsModule],
   templateUrl: './save-workspace-dialog.component.html',
   styleUrl: './save-workspace-dialog.component.scss',
 })

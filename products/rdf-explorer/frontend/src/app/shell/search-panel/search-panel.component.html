@@ -6,7 +6,7 @@
         type="text"
         class="search-input"
         id="search-input"
-        placeholder="Search..."
+        [attr.placeholder]="'Search...' | translate"
         autocomplete="off"
         name="searchInput"
         [(ngModel)]="searchInput"
@@ -23,11 +23,11 @@
     <div class="search-results-panel" id="search-results-panel">
       @if (noResults && searchResults().length === 0) {
         <div class="alert alert-warning" role="alert">
-          <strong>No results found!</strong>
+          <strong>{{ 'No results found!' | translate }}</strong>
         </div>
       }
       @if (searchWait) {
-        <div class="search-wait">Searching...</div>
+        <div class="search-wait">{{ 'Searching...' | translate }}</div>
       }
       @for (result of searchResults(); track result.uri; let idx = $index) {
         <div

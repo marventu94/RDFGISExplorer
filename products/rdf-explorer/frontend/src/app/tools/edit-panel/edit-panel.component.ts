@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, computed, inject, effect, signal, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PropertyGraphService } from '../../graph/property-graph.service';
@@ -24,7 +25,7 @@ const DEFAULT_RESULTS_PER_PAGE = 10;
   templateUrl: './edit-panel.component.html',
   styleUrl: './edit-panel.component.scss',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
 })
 export class EditPanelComponent implements OnDestroy {
   readonly graph = inject(PropertyGraphService);

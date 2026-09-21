@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, inject, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EntitySearchService } from '../../tools/search-panel/entity-search.service';
@@ -8,7 +9,7 @@ import type { WikidataSearchResult } from '../../tools/search-panel/search-resul
   selector: 'app-search-panel',
   templateUrl: './search-panel.component.html',
   styleUrl: './search-panel.component.scss',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
 })
 export class SearchPanelComponent {
   private readonly searchService = inject(EntitySearchService);

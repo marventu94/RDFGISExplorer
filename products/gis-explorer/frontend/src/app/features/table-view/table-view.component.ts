@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
 import { Component, inject, signal, computed, effect, OnDestroy } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -22,6 +23,7 @@ import { SelectionService } from '@core/services/selection.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { LimitsService } from '@core/services/limits.service';
+import { I18nService } from '@core/services/i18n.service';
 import type {
   QueryResult,
   ResultBinding,
@@ -37,8 +39,7 @@ import { CoordCellRendererComponent } from './cell-renderers/coord-cell-renderer
 @Component({
   selector: 'app-table-view',
   standalone: true,
-  imports: [
-    AgGridAngular,
+  imports: [TranslatePipe,    AgGridAngular,
     MatIconModule,
     MatButtonModule,
     MatSnackBarModule,
@@ -53,6 +54,7 @@ export class TableViewComponent implements OnDestroy {
   private readonly viewState = inject(DashboardViewStateService);
   private readonly limits = inject(LimitsService);
   private readonly loadProgress = inject(DashboardLoadProgressService);
+  private readonly i18n = inject(I18nService);
   private readonly destroy$ = new Subject<void>();
 
   readonly agThemeClass = 'ag-theme-alpine';
@@ -73,6 +75,33 @@ export class TableViewComponent implements OnDestroy {
   /** Opciones de paginación: config-driven (limits.tablePageSizeOptions). */
   readonly pageSizeOptions = computed(() => this.limits.limits().tablePageSizeOptions);
   readonly quickFilter = signal('');
+  readonly gridLocale = computed<Record<string, string>>(() =>
+    this.i18n.language() === 'es'
+      ? {
+          page: 'Página',
+          more: 'Más',
+          to: 'a',
+          of: 'de',
+          next: 'Siguiente',
+          last: 'Última',
+          first: 'Primera',
+          previous: 'Anterior',
+          loadingOoo: 'Cargando…',
+          noRowsToShow: 'No hay filas para mostrar',
+          filterOoo: 'Filtrar…',
+          equals: 'Igual a',
+          notEqual: 'Distinto de',
+          contains: 'Contiene',
+          notContains: 'No contiene',
+          startsWith: 'Comienza con',
+          endsWith: 'Termina con',
+          applyFilter: 'Aplicar',
+          resetFilter: 'Restablecer',
+          clearFilter: 'Limpiar',
+          cancelFilter: 'Cancelar',
+        }
+      : ({} as Record<string, string>),
+  );
 
   readonly columnDefs = signal<ColDef[]>([]);
   readonly rowData = signal<ResultBinding[]>([]);

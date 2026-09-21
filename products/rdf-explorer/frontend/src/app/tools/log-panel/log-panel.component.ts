@@ -1,8 +1,10 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, computed, inject } from '@angular/core';
 import { LogService } from '../../core/log.service';
 
 @Component({
   selector: 'app-log-panel',
+  imports: [TranslatePipe],
   templateUrl: './log-panel.component.html',
   standalone: true,
 })

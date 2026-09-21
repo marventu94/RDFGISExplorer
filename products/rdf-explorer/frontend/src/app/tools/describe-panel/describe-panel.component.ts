@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DescribeService } from './describe.service';
@@ -19,7 +20,7 @@ function abbreviateUri(uri: string, prefixes: Record<string, string>): string | 
   selector: 'app-describe-panel',
   templateUrl: './describe-panel.component.html',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   styles: [
     `.c-img { width: 100%; height: auto; display: block; }`,
     `.desc-uri-link, .ell { word-break: break-all; white-space: normal; }`,

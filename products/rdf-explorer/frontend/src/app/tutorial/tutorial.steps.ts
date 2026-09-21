@@ -1,3 +1,9 @@
+import {
+  getLanguage,
+  translateUiText,
+  type UiTextKey,
+} from '@rdfgis/platform-bridge';
+
 export interface TutorialStepOptions {
   id?: string;
   attachTo?: { element: string; on: string };
@@ -17,6 +23,14 @@ export interface TutorialStepOptions {
   arrow?: boolean;
 }
 
+type TutorialStepSource = Omit<TutorialStepOptions, 'text' | 'title' | 'buttons'> & {
+  text: UiTextKey;
+  title?: UiTextKey;
+  buttons?: Array<Omit<NonNullable<TutorialStepOptions['buttons']>[number], 'text'> & {
+    text: UiTextKey;
+  }>;
+};
+
 export interface TutorialContext {
   simulateTyping(input: string, onDone: () => void): void;
   simulateSearchDrag(): void;
@@ -28,7 +42,7 @@ export interface TutorialContext {
 }
 
 export function buildSteps(ctx: TutorialContext): TutorialStepOptions[] {
-  return [
+  const steps: TutorialStepSource[] = [
     // Step 0 — Welcome
     {
       id: 'step-0',
@@ -220,4 +234,14 @@ export function buildSteps(ctx: TutorialContext): TutorialStepOptions[] {
       ],
     },
   ];
+  const language = getLanguage();
+  return steps.map((step) => ({
+    ...step,
+    text: translateUiText(step.text, language),
+    title: step.title ? translateUiText(step.title, language) : undefined,
+    buttons: step.buttons?.map((button) => ({
+      ...button,
+      text: translateUiText(button.text, language),
+    })),
+  }));
 }

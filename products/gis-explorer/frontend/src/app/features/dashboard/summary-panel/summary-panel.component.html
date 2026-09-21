@@ -2,10 +2,10 @@
   <div class="summary-panel">
     <button type="button" class="summary-header" (click)="toggleCollapsed()">
       <mat-icon>query_stats</mat-icon>
-      <span class="summary-title">Resumen del resultado</span>
+      <span class="summary-title">{{ 'Resumen del resultado' | translate }}</span>
       @if (loading()) {
         <mat-spinner diameter="16" />
-        <span class="summary-total">Calculando…</span>
+        <span class="summary-total">{{ 'Calculando…' | translate }}</span>
       } @else {
         <span class="summary-total">
           {{ resolved()!.summary.totalRows === null ? '—' : resolved()!.summary.totalRows }} filas

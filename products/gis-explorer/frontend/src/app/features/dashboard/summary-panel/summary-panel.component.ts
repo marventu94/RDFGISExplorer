@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../../core/services/translate.pipe';
 import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +11,7 @@ import { SummaryStateService } from '@core/services/summary-state.service';
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { classifyVariables, computeLocalSummary } from '@shared/stats/result-summary';
 import type { QueryResult, QuerySummary } from '@shared/models';
+import { I18nService } from '@core/services/i18n.service';
 
 /** De dónde salieron los números del resumen. */
 export type SummarySource = 'local' | 'backend';
@@ -33,7 +35,7 @@ interface ResolvedSummary {
 @Component({
   selector: 'app-summary-panel',
   standalone: true,
-  imports: [MatIconModule, MatProgressSpinnerModule],
+  imports: [TranslatePipe, MatIconModule, MatProgressSpinnerModule],
   templateUrl: './summary-panel.component.html',
   styleUrl: './summary-panel.component.scss',
 })
@@ -43,6 +45,7 @@ export class SummaryPanelComponent {
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly summaryState = inject(SummaryStateService);
   private readonly loadProgress = inject(DashboardLoadProgressService);
+  private readonly i18n = inject(I18nService);
 
   protected readonly collapsed = signal(true);
   protected readonly loading = signal(false);
@@ -139,12 +142,12 @@ export class SummaryPanelComponent {
 
   protected formatNumber(n: number | null): string {
     if (n === null) return '—';
-    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+    return this.i18n.formatNumber(n, { maximumFractionDigits: 2 });
   }
 
   protected formatDate(iso: string | null): string {
     if (!iso) return '—';
     const d = new Date(iso);
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString();
+    return isNaN(d.getTime()) ? iso : this.i18n.formatDate(d);
   }
 }

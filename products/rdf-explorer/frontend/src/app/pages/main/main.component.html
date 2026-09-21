@@ -18,7 +18,7 @@
             }
           </div>
         }
-        <button class="tab-add" (click)="addPanel()" type="button" title="Nuevo panel">+</button>
+        <button class="tab-add" (click)="addPanel()" type="button" [attr.title]="'Nuevo panel' | translate">+</button>
       </div>
       <div class="tabs-actions">
         <button
@@ -26,10 +26,10 @@
           [disabled]="!canHandoff()"
           (click)="handoffToGis()"
           type="button"
-          title="Explorar en GIS"
-        >Explorar en GIS</button>
+          [attr.title]="'Explorar en GIS' | translate"
+        >{{ 'Explorar en GIS' | translate }}</button>
         @if (dashboardsAvailable) {
-          <button class="save-btn" (click)="openSaveDialog()" type="button" title="Guardar workspace">
+          <button class="save-btn" (click)="openSaveDialog()" type="button" [attr.title]="'Guardar workspace' | translate">
             &#128190; Guardar
           </button>
         }

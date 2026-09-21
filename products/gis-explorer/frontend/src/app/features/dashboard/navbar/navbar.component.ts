@@ -1,3 +1,5 @@
+import { TranslatePipe } from '../../../core/services/translate.pipe';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
@@ -31,6 +33,7 @@ import {
 } from '../export-cap-dialog.component';
 import { DashboardSaveFlowService } from '../dashboard-save-flow.service';
 import { isDashboardHostAvailable } from '@rdfgis/platform-bridge';
+import { I18nService } from '@core/services/i18n.service';
 
 /**
  * Íconos propios para los presets de 3 y 4 vistas, dibujados en estilo
@@ -58,7 +61,7 @@ const LAYOUT_SVG_ICONS: Record<string, string> = {
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [
+  imports: [TranslatePipe,
     FilterBadgesComponent,
     SummaryPanelComponent,
     FormsModule,
@@ -82,6 +85,7 @@ export class NavbarComponent {
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly summaryState = inject(SummaryStateService);
   private readonly exportService = inject(ResultExportService);
+  private readonly i18n = inject(I18nService);
 
   private readonly _coordinatedViewEnabled = signal(true);
   protected readonly coordinatedViewEnabled = this._coordinatedViewEnabled.asReadonly();
@@ -122,7 +126,7 @@ export class NavbarComponent {
 
   protected readonly layoutOptions: {
     preset: LayoutPreset;
-    label: string;
+    label: UiTextKey;
     icon?: string;
     svgIcon?: string;
   }[] = [
@@ -268,17 +272,17 @@ export class NavbarComponent {
             );
           } else if (action === 'copy') {
             void navigator.clipboard.writeText(query).then(() =>
-              this.snackBar.open('Query copiada al portapapeles', 'OK', { duration: 3000 }),
+              this.snackBar.open(this.i18n.text('Query copiada al portapapeles'), 'OK', { duration: 3000 }),
             );
           }
         });
         break;
       }
       case 'cancelled':
-        this.snackBar.open('Exportación cancelada', 'OK', { duration: 3000 });
+        this.snackBar.open(this.i18n.text('Exportación cancelada'), 'OK', { duration: 3000 });
         break;
       case 'error':
-        this.snackBar.open(`No se pudo exportar: ${outcome.error}`, 'Cerrar', {
+        this.snackBar.open(`${this.i18n.text('No se pudo exportar')}: ${outcome.error}`, this.i18n.text('Cerrar'), {
           duration: 8000,
           panelClass: 'snackbar-error',
         });

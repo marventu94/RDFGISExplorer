@@ -1,3 +1,5 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
+import { I18nService } from '@core/services/i18n.service';
 import {
   Component,
   OnInit,
@@ -45,11 +47,12 @@ const SELECTED_WEIGHT = 3;
 @Component({
   selector: 'app-map-view',
   standalone: true,
-  imports: [CoverageChipComponent],
+  imports: [TranslatePipe, CoverageChipComponent],
   templateUrl: './map-view.component.html',
   styleUrl: './map-view.component.scss',
 })
 export class MapViewComponent implements OnInit, OnDestroy {
+  readonly i18n = inject(I18nService);
   @ViewChild('mapContainer', { static: true }) container!: ElementRef<HTMLDivElement>;
 
   private map?: L.Map;

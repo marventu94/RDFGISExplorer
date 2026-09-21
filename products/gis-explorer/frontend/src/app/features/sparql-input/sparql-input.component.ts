@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
 import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -22,6 +23,7 @@ import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
+import { I18nService } from '@core/services/i18n.service';
 import type { Dashboard } from '@rdfgis/contracts';
 import { dashboardHost, isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
@@ -40,7 +42,7 @@ const LIMIT_CHECK_DEBOUNCE_MS = 300;
 @Component({
   selector: 'app-sparql-input',
   standalone: true,
-  imports: [
+  imports: [TranslatePipe,
     CommonModule,
     FormsModule,
     MatButtonModule,
@@ -69,6 +71,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly dashboardState = inject(DashboardStateService);
   private readonly variableMapping = inject(VariableMappingService);
+  private readonly i18n = inject(I18nService);
 
   @ViewChild(FieldMappingPanelComponent)
   private mappingPanel?: FieldMappingPanelComponent;
@@ -319,8 +322,8 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const sparql = this.sparqlText;
     if (!sparql) {
       this.showError({
-        title: 'No hay query para ejecutar',
-        message: 'El editor está vacío. Escribí una query o cargá un tablero.',
+        title: this.i18n.text('No hay query para ejecutar'),
+        message: this.i18n.text('El editor está vacío. Escribí una query o cargá un tablero.'),
       });
       return;
     }
@@ -330,8 +333,8 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       parser.parse(sparql);
     } catch (e) {
       this.showError({
-        title: 'SPARQL inválido',
-        message: 'La query no se pudo parsear, así que no se envió al backend.',
+        title: this.i18n.text('SPARQL inválido'),
+        message: this.i18n.text('La query no se pudo parsear, así que no se envió al backend.'),
         detail: e instanceof Error ? e.message : String(e),
       });
       return;
@@ -342,7 +345,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     // Este endpoint puede tardar minutos (GraphDB con FILTER sobre cientos de
     // miles de instancias). Sin un cartel persistente, la pantalla queda igual
     // que antes de apretar y parece que el botón no hizo nada.
-    this.snackBar.open('Ejecutando la query… puede tardar', undefined, {});
+    this.snackBar.open(this.i18n.text('Ejecutando la query… puede tardar'), undefined, {});
 
     this.apiService.executeQuery({ sparql }).subscribe({
       next: (result) => {
@@ -381,7 +384,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   private handleHttpError(err: HttpErrorResponse): void {
     this.showError({
-      title: 'La query no se pudo ejecutar',
+      title: this.i18n.text('La query no se pudo ejecutar'),
       message: this.mapErrorMessage(err),
       detail: this.errorDetail(err),
     });
@@ -404,7 +407,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const body = err.error;
 
     if (err.status === 400) {
-      return body?.message ? `SPARQL inválido: ${body.message}` : 'Error: query SPARQL inválida.';
+      return body?.message
+        ? `${this.i18n.text('SPARQL inválido')}: ${body.message}`
+        : this.i18n.text('Error: query SPARQL inválida.');
     }
 
     if (err.status === 408) {
@@ -421,7 +426,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
 
     if (err.status === 0) {
-      return 'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:3000.';
+      return this.i18n.text('No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:3000.');
     }
 
     return `Error del servidor (${err.status}). ${body?.message ?? ''}`;
@@ -431,14 +436,14 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const remapped = this.variableMapping.apply(overrides);
     if (!remapped) return;
     this.selectionService.setQueryResult(remapped);
-    this.snackBar.open('Mapeo de variables aplicado', 'OK', { duration: 3000 });
+    this.snackBar.open(this.i18n.text('Mapeo de variables aplicado'), 'OK', { duration: 3000 });
   }
 
   protected onRestoreAuto(): void {
     const result = this.variableMapping.restore();
     if (!result) return;
     this.selectionService.setQueryResult(result);
-    this.snackBar.open('Mapeo restaurado a detección automática', 'OK', { duration: 3000 });
+    this.snackBar.open(this.i18n.text('Mapeo restaurado a detección automática'), 'OK', { duration: 3000 });
   }
 
   @HostListener('window:open-variable-mapping')

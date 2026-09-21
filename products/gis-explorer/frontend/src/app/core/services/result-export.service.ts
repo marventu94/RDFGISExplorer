@@ -9,6 +9,7 @@ import {
 } from '@shared/export/result-exporter';
 import { buildXlsx, type XlsxProvenance } from '@shared/export/xlsx';
 import type { ResultBinding } from '@shared/models';
+import { I18nService } from './i18n.service';
 
 /**
  * Export completo del resultado a XLSX: recorre TODAS las filas de la query
@@ -21,6 +22,7 @@ import type { ResultBinding } from '@shared/models';
 export class ResultExportService {
   private readonly api = inject(ApiService);
   private readonly appConfig = inject(AppConfigService);
+  private readonly i18n = inject(I18nService);
 
   /** Recorre el resultado completo página a página (solo para resultados truncados). */
   exportAll(params: {
@@ -57,7 +59,7 @@ export class ResultExportService {
       rowCount: params.rows.length,
       partial: params.partial,
     };
-    const blob = await buildXlsx(params.variables, params.rows, provenance);
+    const blob = await buildXlsx(params.variables, params.rows, provenance, this.i18n.language());
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;

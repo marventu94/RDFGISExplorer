@@ -1,11 +1,11 @@
 <div class="dialog-container">
-  <h3>Guardar workspace</h3>
+  <h3>{{ 'Guardar workspace' | translate }}</h3>
 
   <label class="field">
-    <span>Nombre</span>
-    <input type="text" [(ngModel)]="name" placeholder="Mi consulta" [class.input-error]="hasNameConflict" />
+    <span>{{ 'Nombre' | translate }}</span>
+    <input type="text" [(ngModel)]="name" [attr.placeholder]="'Mi consulta' | translate" [class.input-error]="hasNameConflict" />
     @if (hasNameConflict) {
-      <span class="field-error">Ya existe un workspace con ese nombre.</span>
+      <span class="field-error">{{ 'Ya existe un workspace con ese nombre.' | translate }}</span>
     }
   </label>
 
@@ -17,13 +17,13 @@
       </label>
       <label>
         <input type="radio" name="saveMode" value="copy" [(ngModel)]="mode" />
-        Guardar como copia
+        {{ 'Guardar como copia' | translate }}
       </label>
     </div>
   }
 
   <div class="actions">
-    <button class="btn-secondary" (click)="cancel()" type="button">Cancelar</button>
-    <button class="btn-primary" (click)="save()" [disabled]="!canSave" type="button">Guardar</button>
+    <button class="btn-secondary" (click)="cancel()" type="button">{{ 'Cancelar' | translate }}</button>
+    <button class="btn-primary" (click)="save()" [disabled]="!canSave" type="button">{{ 'Guardar' | translate }}</button>
   </div>
 </div>

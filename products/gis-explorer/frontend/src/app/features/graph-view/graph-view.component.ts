@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
 import {
   Component,
   OnInit,
@@ -13,6 +14,8 @@ import {
 } from '@angular/core';
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
+import { I18nService } from '@core/services/i18n.service';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
 import cytoscape from 'cytoscape';
@@ -99,11 +102,12 @@ const FOCUS_MIN_ZOOM = 0.8;
 @Component({
   selector: 'app-graph-view',
   standalone: true,
-  imports: [CoverageChipComponent],
+  imports: [TranslatePipe, CoverageChipComponent],
   templateUrl: './graph-view.component.html',
   styleUrls: ['./graph-view.component.scss'],
 })
 export class GraphViewComponent implements OnInit, OnDestroy {
+  private readonly i18n = inject(I18nService);
   @ViewChild('cyContainer', { static: true }) container!: ElementRef<HTMLDivElement>;
 
   cy?: cytoscape.Core;
@@ -111,12 +115,18 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   detailLevel: GraphDetailLevel = 'summary';
   private expandedSuperEdgeIds = new Set<string>();
   private expandedMotifIds = new Set<string>();
-  private readonly resultDetailLevels = [
+  private readonly resultDetailLevels: ReadonlyArray<{
+    value: GraphDetailLevel;
+    label: UiTextKey;
+  }> = [
     { value: 'summary' as const, label: 'Resumen' },
     { value: 'exploration' as const, label: 'Entidades' },
     { value: 'detail' as const, label: 'Entidades + relaciones' },
   ];
-  private readonly entityDetailLevels = [
+  private readonly entityDetailLevels: ReadonlyArray<{
+    value: GraphDetailLevel;
+    label: UiTextKey;
+  }> = [
     ...this.resultDetailLevels,
     { value: 'literals' as const, label: 'Literales' },
     { value: 'literals-detail' as const, label: 'Literales + relaciones' },
@@ -137,6 +147,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   originalNodeCount = 0;
   filteredNodeCount = 0;
   activeFilterCount = 0;
+
+  emptyFilterMessage(): string {
+    return this.i18n.language() === 'es'
+      ? `0 de ${this.originalNodeCount} nodos pasan los filtros activos`
+      : `0 of ${this.originalNodeCount} nodes pass the active filters`;
+  }
 
   private activeView = false;
 

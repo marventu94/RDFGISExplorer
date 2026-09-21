@@ -1,8 +1,8 @@
-<h3 class="ta-center">SPARQL queries</h3>
+<h3 class="ta-center">{{ 'SPARQL queries' | translate }}</h3>
 <hr class="desc-hr" />
 
 @if (queries().length === 0) {
-  <h4>Current configuration generates no queries!</h4>
+  <h4>{{ 'Current configuration generates no queries!' | translate }}</h4>
 }
 
 @for (query of queries(); track $index; let i = $index) {
@@ -19,7 +19,7 @@
         }
         <span> )</span>
       </div>
-      <button class="gis-btn" (click)="handoffQuery(query)" type="button" title="Explorar en GIS">
+      <button class="gis-btn" (click)="handoffQuery(query)" type="button" [attr.title]="'Explorar en GIS' | translate">
         &#9654; GIS
       </button>
     </div>

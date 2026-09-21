@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/services/translate.pipe';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
@@ -22,8 +23,7 @@ export interface SaveDashboardDialogResult {
 @Component({
   selector: 'app-save-dashboard-dialog',
   standalone: true,
-  imports: [
-    MatDialogModule,
+  imports: [TranslatePipe,    MatDialogModule,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,

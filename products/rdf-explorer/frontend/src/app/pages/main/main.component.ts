@@ -1,3 +1,4 @@
+import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, inject, OnInit, DestroyRef, computed, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -20,7 +21,7 @@ import { dashboardHost, isDashboardHostAvailable } from '@rdfgis/platform-bridge
 
 @Component({
   selector: 'app-main',
-  imports: [SearchPanelComponent, CanvasPanelComponent, ToolsPanelComponent],
+  imports: [TranslatePipe, SearchPanelComponent, CanvasPanelComponent, ToolsPanelComponent],
   templateUrl: './main.component.html',
   styleUrl: './main.component.scss',
 })

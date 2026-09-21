@@ -6,19 +6,19 @@
       @if (dashboardsAvailable) {
         <button mat-button [matMenuTriggerFor]="tablerosMenu" (click)="loadDashboards()">
           <mat-icon>arrow_drop_down</mat-icon>
-          Tableros
+          {{ 'Tableros' | translate }}
         </button>
         <mat-menu #tablerosMenu="matMenu" class="library-menu">
-        <div class="menu-section-label">Mis tableros</div>
+        <div class="menu-section-label">{{ 'Mis tableros' | translate }}</div>
         @if (loadingDashboards()) {
           <button mat-menu-item disabled>
             <mat-icon>hourglass_empty</mat-icon>
-            <span>Cargando...</span>
+            <span>{{ 'Cargando...' | translate }}</span>
           </button>
         } @else if (gisDashboards().length === 0) {
           <button mat-menu-item disabled>
             <mat-icon>info</mat-icon>
-            <span>No hay tableros guardados</span>
+            <span>{{ 'No hay tableros guardados' | translate }}</span>
           </button>
         } @else {
           @for (d of gisDashboards(); track d.id) {
@@ -31,7 +31,7 @@
         <mat-divider />
         <button mat-menu-item (click)="newDashboard()">
           <mat-icon>add_circle</mat-icon>
-          <span>Generar tablero nuevo</span>
+          <span>{{ 'Generar tablero nuevo' | translate }}</span>
         </button>
         </mat-menu>
       }
@@ -56,7 +56,7 @@
         (click)="execute()"
       >
         <mat-icon>play_arrow</mat-icon>
-        Ejecutar
+        {{ 'Ejecutar' | translate }}
       </button>
     </div>
   </div>

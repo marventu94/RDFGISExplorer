@@ -1,8 +1,8 @@
-<h2 mat-dialog-title>Guardar tablero</h2>
+<h2 mat-dialog-title>{{ 'Guardar tablero' | translate }}</h2>
 <mat-dialog-content>
   <mat-form-field appearance="outline" class="full-width">
-    <mat-label>Nombre del tablero</mat-label>
-    <input matInput [ngModel]="name()" (ngModelChange)="onNameChange($event)" placeholder="Ej: Mis ciudades argentinas" />
+    <mat-label>{{ 'Nombre del tablero' | translate }}</mat-label>
+    <input matInput [ngModel]="name()" (ngModelChange)="onNameChange($event)" [attr.placeholder]="'Ej: Mis ciudades argentinas' | translate" />
     @if (checking()) {
       <mat-icon matSuffix>hourglass_empty</mat-icon>
     }
@@ -30,15 +30,15 @@
           [checked]="mode() === 'copy'"
           (change)="mode.set('copy')"
         >
-          Guardar como copia
+          {{ 'Guardar como copia' | translate }}
         </mat-radio-button>
       </mat-radio-group>
     </div>
   }
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close>Cancelar</button>
+  <button mat-button mat-dialog-close>{{ 'Cancelar' | translate }}</button>
   <button mat-flat-button [disabled]="!canSave" (click)="onSave()">
-    Guardar
+    {{ 'Guardar' | translate }}
   </button>
 </mat-dialog-actions>

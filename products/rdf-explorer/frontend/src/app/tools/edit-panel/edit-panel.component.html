@@ -1,17 +1,17 @@
 @if (selected(); as sel) {
-  <h3 class="ta-center ell">Editing {{ sel.variable.toString() }} {{ isVariable ? '' : '(const)' }}</h3>
+  <h3 class="ta-center ell">{{ 'Editar' | translate }} {{ sel.variable.toString() }} {{ isVariable ? '' : '(const)' }}</h3>
 
   <ul class="nav nav-tabs nav-justified edit-tabs">
     <li class="nav-item clickable">
       <div class="nav-link" [class.active]="isVariable" (click)="mkVariable()">
         <input type="checkbox" [checked]="isVariable" />
-        <span class="ml-1">Variable</span>
+        <span class="ml-1">{{ 'Variable' | translate }}</span>
       </div>
     </li>
     <li class="nav-item clickable">
       <div class="nav-link" [class.active]="!isVariable" [class.tab-hl]="added > 0" (click)="mkConst()">
         <input type="checkbox" [checked]="isConst" />
-        <span class="ml-1">Constraint</span>
+        <span class="ml-1">{{ 'Constraint' | translate }}</span>
         @if (added > 0) {
           <b class="ml-2">[+{{ added }}]</b>
         }
@@ -21,14 +21,14 @@
 
   @if (!isVariable) {
     <div class="constraint-section">
-      <div class="custom-container-title no-select mt-2 active">Constraints</div>
+      <div class="custom-container-title no-select mt-2 active">{{ 'Constraints' | translate }}</div>
       <div class="custom-container-content active">
         <div class="input-group input-group-sm mt-1 mb-1">
           <input class="form-control" [type]="newValueType" [placeholder]="newValuePlaceholder" [(ngModel)]="newValue" />
-          <button id="edit-button-add" class="btn btn-outline-secondary btn-sm" type="button" (click)="addValue()">add</button>
+          <button id="edit-button-add" class="btn btn-outline-secondary btn-sm" type="button" (click)="addValue()">{{ 'add' | translate }}</button>
         </div>
         @if (!sel.hasUris()) {
-          <div class="alert alert-danger alert-sm mb-1">To use this resource as constraint you need to add at least one value</div>
+          <div class="alert alert-danger alert-sm mb-1">{{ 'Para usar este recurso como restricción necesitás agregar al menos un valor' | translate }}</div>
         }
         @for (value of sel.uris; track value) {
           <div class="row uri-row">
@@ -49,7 +49,7 @@
       @if (selIsProperty()) {
         <div class="form-check form-check-inline mt-1">
           <input class="form-check-input" id="prop-star" type="checkbox" [checked]="sel.star" (change)="onStarChange($event)" />
-          <label class="form-check-label" for="prop-star">Wildcard property</label>
+          <label class="form-check-label" for="prop-star">{{ 'Wildcard property' | translate }}</label>
         </div>
         <div class="form-check form-check-inline mt-1">
           <input class="form-check-input" id="prop-optional" type="checkbox" [checked]="sel.optional" (change)="onOptionalChange($event)" />
@@ -63,7 +63,7 @@
     <div class="variable-section mt-3">
       <div class="form-row">
         <div class="input-group col-md-12">
-          <span class="input-group-text">Variable name</span>
+          <span class="input-group-text">{{ 'Variable name' | translate }}</span>
           <span class="edit-var-name-prefix">?</span>
           <input id="edit-var-name" class="form-control" type="text" autocomplete="off"
             [ngModel]="sel.variable.alias"
@@ -74,13 +74,13 @@
 
       <div class="form-row mt-2">
         <div class="input-group" id="edit-filter-group">
-          <span class="input-group-text">Possible results</span>
+          <span class="input-group-text">{{ 'Possible results' | translate }}</span>
           <input id="edit-filter-results" class="form-control" type="text" autocomplete="off"
             [ngModel]="resultFilterValue" (ngModelChange)="resultFilterValue = $event; onFilterValueChange()"
             [disabled]="resultFilterLoading()" />
           <span class="input-group-text result-status" [class.loading]="resultFilterLoading()">
             @if (resultFilterLoading()) {
-              <span class="edit-spinner" role="status" aria-label="Loading..."></span>
+              <span class="edit-spinner" role="status" [attr.aria-label]="'Loading...' | translate"></span>
             } @else {
               @if (results().length === 0) {
                 &#9888;
@@ -97,10 +97,10 @@
           <div class="alert alert-danger alert-sm mt-2 mb-1">{{ err }}</div>
         }
         @if (resultFilterLoading() && results().length === 0) {
-          <div class="result-loading-msg mt-2 mb-1">Running query...</div>
+          <div class="result-loading-msg mt-2 mb-1">{{ 'Running query...' | translate }}</div>
         }
         @if (!resultFilterLoading() && results().length === 0) {
-          <div class="alert alert-warning alert-sm mt-2 mb-1">Currently this variable has no partial results!</div>
+          <div class="alert alert-warning alert-sm mt-2 mb-1">{{ 'Currently this variable has no partial results!' | translate }}</div>
         }
         @for (elem of results(); track elem.value) {
           <div class="row result-row" [title]="elem.value">
@@ -114,7 +114,7 @@
         }
         <div class="result-footer mt-1">
           @if (results().length > 0) {
-            <span class="result-count">Showing {{ results().length }} results</span>
+            <span class="result-count">{{ 'Mostrando' | translate }} {{ results().length }} {{ 'resultados' | translate }}</span>
           }
           @if (hasMoreResults() || resultFilterLoading()) {
             <button class="load-more-btn"
@@ -122,7 +122,7 @@
               (click)="loadMoreResults()">
               @if (resultFilterLoading()) {
                 <span class="edit-spinner edit-spinner-sm" role="status"></span>
-                <span class="ml-1">Loading...</span>
+                <span class="ml-1">{{ 'Loading...' | translate }}</span>
               } @else {
                 Load more results
               }
@@ -144,7 +144,7 @@
           <div class="form-row mt-1">
             <div class="input-group input-group-sm">
               <select class="custom-select" [ngModel]="newFilterType" (ngModelChange)="onNewFilterTypeChange($event)">
-                <option value="">-- Select a new filter --</option>
+                <option value="">{{ '-- Select a new filter --' | translate }}</option>
                 @for (item of getFilterTypeOptions(); track item.key) {
                   <option [value]="item.key">{{ item.metadata.name }}</option>
                 }
@@ -163,7 +163,7 @@
                     (ngModelChange)="updateNewFilterData(field.key, $event)" />
                 }
               }
-              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="newFilter()">Add</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="newFilter()">{{ 'Add' | translate }}</button>
             </div>
           </div>
 

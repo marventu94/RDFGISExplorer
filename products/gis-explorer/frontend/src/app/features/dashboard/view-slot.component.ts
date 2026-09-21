@@ -7,10 +7,12 @@ import { TableViewComponent } from '@features/table-view/table-view.component';
 import { GraphViewComponent } from '@features/graph-view/graph-view.component';
 import { MapViewComponent } from '@features/map-view/map-view.component';
 import { TimelineViewComponent } from '@features/timeline-view/timeline-view.component';
+import { TranslatePipe } from '@core/services/translate.pipe';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 
 interface ViewOption {
   type: ViewType;
-  label: string;
+  label: UiTextKey;
   icon: string;
 }
 
@@ -26,6 +28,7 @@ interface ViewOption {
     GraphViewComponent,
     MapViewComponent,
     TimelineViewComponent,
+    TranslatePipe,
   ],
   template: `
     <div class="view-slot">
@@ -34,7 +37,7 @@ interface ViewOption {
           mat-icon-button
           class="slot-picker"
           [matMenuTriggerFor]="viewMenu"
-          aria-label="Cambiar vista"
+          [attr.aria-label]="'Cambiar vista' | translate"
         >
           <mat-icon>{{ currentIcon() }}</mat-icon>
         </button>
@@ -42,7 +45,7 @@ interface ViewOption {
           @for (opt of options; track opt.type) {
             <button mat-menu-item (click)="select(opt.type)">
               <mat-icon>{{ opt.icon }}</mat-icon>
-              <span>{{ opt.label }}</span>
+              <span>{{ opt.label | translate }}</span>
             </button>
           }
         </mat-menu>

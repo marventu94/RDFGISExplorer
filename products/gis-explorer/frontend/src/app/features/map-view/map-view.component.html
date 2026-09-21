@@ -2,17 +2,17 @@
   @if (queryState === 'no-query') {
     <div class="map-overlay">
       <span class="overlay-icon">&#x1F5FA;</span>
-      <span class="overlay-text">Ejecutá una query para ver datos georeferenciados</span>
+      <span class="overlay-text">{{ 'Ejecutá una query para ver datos georeferenciados' | translate }}</span>
     </div>
   }
 
   @if (queryState === 'no-coords') {
     <div class="map-overlay map-overlay--info">
       <span class="overlay-text">
-        Esta query no devolvió coordenadas. Asegurate de incluir una variable con
-        <code>wdt:P625</code> (Wikidata) o un literal <code>wktLiteral</code>, o ajustá el
-        <button type="button" class="overlay-link" (click)="scrollToEditor()">Mapeo de Variables</button>
-        en el panel SPARQL.
+        {{ 'Esta query no devolvió coordenadas. Asegurate de incluir una variable con' | translate }}
+        <code>wdt:P625</code> (Wikidata) {{ i18n.language() === 'es' ? 'o un literal' : 'or a literal' }} <code>wktLiteral</code>, {{ 'o ajustá el' | translate }}
+        <button type="button" class="overlay-link" (click)="scrollToEditor()">{{ 'Mapeo de Variables' | translate }}</button>
+        {{ 'en el panel SPARQL.' | translate }}
       </span>
     </div>
   }
@@ -20,7 +20,7 @@
   @if (queryState === 'filtered-zero') {
     <div class="map-overlay map-overlay--warning">
       <span class="overlay-text">
-        0 de {{ originalNodeCount }} nodos pasan los filtros activos
+        {{ i18n.language() === 'es' ? '0 de ' : '0 of ' }}{{ originalNodeCount }}{{ i18n.language() === 'es' ? ' nodos pasan los filtros activos' : ' nodes pass the active filters' }}
       </span>
     </div>
   }
