@@ -1,10 +1,8 @@
 node_modules/
-backend/node_modules/
 dist/
 *.db
 data/
-.env.graphdb
-.env.evaluation.local
+.env.custom
 .env.local
 .angular/cache/
 coverage/
@@ -15,8 +13,8 @@ opencode.json
 .kimi-code/
 skills-lock.json
 .node-version-built
-packages/explorer-backend/config/prefixes.graphdb.json
-packages/explorer-backend/config/class-colors.graphdb.json
+packages/explorer-backend/config/prefixes.custom.json
+packages/explorer-backend/config/class-colors.custom.json
 
 # Worktrees y estado local de Claude Code
 .claude/

@@ -1,33 +1,33 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
-const DEFAULT_DATA_DIR = path.resolve('./data');
-const DEFAULT_PROTECTED = 'wikidata,graphdb';
+const DEFAULT_DATA_DIR = path.resolve("./data");
+const DEFAULT_PROTECTED = "wikidata";
 
 interface CleanupCandidate {
   path: string;
   basename: string;
-  reason: 'orphan-backend' | 'legacy-path' | 'unknown';
+  reason: "orphan-backend" | "legacy-path" | "unknown";
   siblings: string[];
 }
 function normalizeBackend(backend: string | undefined): string {
-  if (!backend) return 'wikidata';
-  const safe = backend.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  return safe || 'wikidata';
+  if (!backend) return "wikidata";
+  const safe = backend.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return safe || "wikidata";
 }
 
 function resolveDashboardsPath(): string {
-  const explicit = process.env['DASHBOARDS_SQLITE_PATH'];
-  if (explicit && explicit.trim() !== '') return path.resolve(explicit);
-  const backend = normalizeBackend(process.env['SPARQL_BACKEND']);
+  const explicit = process.env["DASHBOARDS_SQLITE_PATH"];
+  if (explicit && explicit.trim() !== "") return path.resolve(explicit);
+  const backend = normalizeBackend(process.env["SPARQL_BACKEND"]);
   return path.resolve(`./data/${backend}.sqlite`);
 }
 
 function protectedBackends(): Set<string> {
-  const raw = process.env['SPARQL_PROTECTED_BACKENDS'] ?? DEFAULT_PROTECTED;
+  const raw = process.env["SPARQL_PROTECTED_BACKENDS"] ?? DEFAULT_PROTECTED;
   return new Set(
     raw
-      .split(',')
+      .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean)
       .map(normalizeBackend),
@@ -35,7 +35,7 @@ function protectedBackends(): Set<string> {
 }
 
 function isLegacyDefaultName(basename: string): boolean {
-  return basename === 'dashboards.sqlite' || basename === 'settings.sqlite';
+  return basename === "dashboards.sqlite" || basename === "settings.sqlite";
 }
 
 function listSqliteFiles(dataDir: string): string[] {
@@ -44,16 +44,16 @@ function listSqliteFiles(dataDir: string): string[] {
     .readdirSync(dataDir)
     .filter(
       (f) =>
-        (f.endsWith('.sqlite') || f.endsWith('.db')) &&
-        !f.endsWith('-shm') &&
-        !f.endsWith('-wal'),
+        (f.endsWith(".sqlite") || f.endsWith(".db")) &&
+        !f.endsWith("-shm") &&
+        !f.endsWith("-wal"),
     )
     .map((f) => path.join(dataDir, f));
 }
 
 function findSiblings(filePath: string): string[] {
   const out: string[] = [];
-  for (const suffix of ['-shm', '-wal', '-journal']) {
+  for (const suffix of ["-shm", "-wal", "-journal"]) {
     const sib = `${filePath}${suffix}`;
     if (fs.existsSync(sib)) out.push(sib);
   }
@@ -69,13 +69,13 @@ function classify(
   const basename = path.basename(filePath);
   if (resolved === activePath) return null;
 
-  const stem = basename.replace(/\.(sqlite|db)$/, '');
+  const stem = basename.replace(/\.(sqlite|db)$/, "");
 
   if (isLegacyDefaultName(basename)) {
     return {
       path: filePath,
       basename,
-      reason: 'legacy-path',
+      reason: "legacy-path",
       siblings: findSiblings(filePath),
     };
   }
@@ -86,7 +86,7 @@ function classify(
     return {
       path: filePath,
       basename,
-      reason: 'orphan-backend',
+      reason: "orphan-backend",
       siblings: findSiblings(filePath),
     };
   }
@@ -94,7 +94,7 @@ function classify(
   return {
     path: filePath,
     basename,
-    reason: 'unknown',
+    reason: "unknown",
     siblings: findSiblings(filePath),
   };
 }
@@ -152,7 +152,7 @@ export function run(force: boolean): number {
 
   process.stdout.write(`Active dashboards SQLite: ${relActive}\n`);
   process.stdout.write(
-    `Protected backends:        ${result.protectedBackends.join(', ')}\n`,
+    `Protected backends:        ${result.protectedBackends.join(", ")}\n`,
   );
   process.stdout.write(`\n`);
 
@@ -166,11 +166,11 @@ export function run(force: boolean): number {
   );
   for (const c of result.candidates) {
     const tag =
-      c.reason === 'legacy-path'
-        ? 'legacy default path (pre-refactor)'
-        : c.reason === 'orphan-backend'
-          ? 'orphan backend'
-          : 'unknown';
+      c.reason === "legacy-path"
+        ? "legacy default path (pre-refactor)"
+        : c.reason === "orphan-backend"
+          ? "orphan backend"
+          : "unknown";
     process.stdout.write(
       `  - ${path.relative(process.cwd(), c.path)}  [${tag}]\n`,
     );
@@ -195,8 +195,8 @@ export function run(force: boolean): number {
 
 if (
   require.main === module ||
-  process.argv[1]?.endsWith('clean-unused-data.ts')
+  process.argv[1]?.endsWith("clean-unused-data.ts")
 ) {
-  const force = process.argv.includes('--force');
+  const force = process.argv.includes("--force");
   process.exit(run(force));
 }

@@ -941,7 +941,7 @@ describe('GenericSparqlAdapter.searchEntities', () => {
   let adapter: GenericSparqlAdapter;
 
   beforeEach(() => {
-    adapter = new GenericSparqlAdapter('graphdb');
+    adapter = new GenericSparqlAdapter('custom');
     process.env['SPARQL_USER'] = 'test-agent/1.0';
     process.env['SPARQL_ENDPOINT_URL'] =
       'http://localhost:7200/repositories/test';

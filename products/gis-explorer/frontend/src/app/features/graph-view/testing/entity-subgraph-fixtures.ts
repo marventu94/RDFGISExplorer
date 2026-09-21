@@ -49,7 +49,7 @@ export function result(
     bindings,
     nodes,
     edges,
-    meta: { durationMs: 0, truncated: false, limitApplied: 500, backend: 'graphdb' },
+    meta: { durationMs: 0, truncated: false, limitApplied: 500, backend: 'custom' },
   };
 }
 
@@ -73,7 +73,7 @@ export interface RealEstateFixture {
 }
 
 /**
- * Forma de C1 (avisos inmobiliarios), reducida pero estructuralmente fiel:
+ * Forma de un resultado inmobiliario, reducida pero estructuralmente fiel:
  *
  * ```text
  * listingN ──about──▶ estateN ──address──▶ addressN ──locality──▶ partido
@@ -170,11 +170,7 @@ export function multiRowFixture(): QueryResult {
   const b = `${EX}b`;
   const c = `${EX}c`;
   const nodes = [root, a, b, c].map((n) => node(n));
-  const edges = [
-    edge(root, a, P.knows),
-    edge(root, b, P.knows),
-    edge(root, c, P.knows),
-  ];
+  const edges = [edge(root, a, P.knows), edge(root, b, P.knows), edge(root, c, P.knows)];
   const bindings: ResultBinding[] = [
     { s: uri(root), o: uri(a) },
     { s: uri(root), o: uri(b), extra: uri(a) },
@@ -293,11 +289,7 @@ export function trimmedPathFixture(): QueryResult {
   const mid2 = `${EX}trim/mid2`;
   const far = `${EX}trim/far`;
   const nodes = [root, mid1, mid2, far].map((n) => node(n));
-  const edges = [
-    edge(root, mid1, P.knows),
-    edge(mid1, mid2, P.knows),
-    edge(mid2, far, P.knows),
-  ];
+  const edges = [edge(root, mid1, P.knows), edge(mid1, mid2, P.knows), edge(mid2, far, P.knows)];
   const bindings: ResultBinding[] = [{ s: uri(root), o: uri(far) }];
   return result(nodes, edges, bindings, ['s', 'o']);
 }

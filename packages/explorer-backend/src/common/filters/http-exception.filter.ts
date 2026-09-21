@@ -10,7 +10,6 @@ import { Request, Response } from 'express';
 import {
   TimeoutError,
   UpstreamError,
-  NotImplementedError,
 } from '../../adapters/sparql-endpoint.interface';
 
 @Catch()
@@ -41,9 +40,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof UpstreamError) {
       status = HttpStatus.BAD_GATEWAY;
       body = { error: 'UPSTREAM_ERROR', message: exception.message };
-    } else if (exception instanceof NotImplementedError) {
-      status = HttpStatus.SERVICE_UNAVAILABLE;
-      body = { error: 'NOT_IMPLEMENTED', message: exception.message };
     } else if (exception instanceof Error) {
       body = { error: 'INTERNAL_ERROR', message: exception.message };
     }

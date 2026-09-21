@@ -1,299 +1,149 @@
 # RDF GIS Explorer
 
-> El monorepo está separado en tres productos desplegables bajo `products/`:
-> Shell, RDF Explorer y GIS Explorer. Véase
-> [docs/product-architecture.md](docs/product-architecture.md) para los límites,
-> backends independientes y modos standalone/integrado.
+Plataforma de exploración de datos para bases de datos de grafos accesibles
+mediante SPARQL 1.1. Integra tres productos desplegables:
 
-Plataforma unificada para exploración visual de grafos de conocimiento (KG) con dimensiones geo-espaciales y temporales. Combina dos herramientas — **RDF Explorer** (construcción visual de queries SPARQL) y **RDF GIS Explorer** (dashboard de vistas coordinadas: tabla, grafo, mapa, línea de tiempo) — bajo un único *AppShell* con Module Federation.
+- **Shell**: navegación, integración y persistencia de tableros.
+- **RDF Explorer**: construcción visual de consultas SPARQL.
+- **GIS Explorer**: análisis coordinado en tabla, grafo, mapa y línea temporal.
 
-El backend actúa como proxy configurable hacia **cualquier endpoint SPARQL 1.1**: se valida hoy contra Wikidata y una instancia de GraphDB, y se adapta a otros endpoints configurando la URL, credenciales y prefixes por variables de entorno (ver [Configuración de backends SPARQL](#configuración-de-backends-sparql)).
+La plataforma no depende del dominio de los datos ni de un motor concreto. El
+backend de los explorers usa un cliente SPARQL configurable por URL,
+credenciales, prefixes y límites. La configuración incluida apunta a Wikidata
+para ofrecer una demostración inmediata.
 
-Tesis de Maestría en Ingeniería de Software — Venturino, Martín M., 2025.
-
----
-
-## Documentación de diseño
-
-Las decisiones de arquitectura y diseño de la plataforma (vistas coordinadas,
-alcance exploración/análisis, panel de resumen, export, límites, Adapter
-domain-agnostic, Native Federation) están documentadas y fundamentadas en
-[`docs/design-decisions.md`](./docs/design-decisions.md), cada una derivada
-de los hallazgos del paper DECISIONING 2026.
-
----
+La separación de procesos y responsabilidades está detallada en
+[docs/product-architecture.md](docs/product-architecture.md). Las decisiones de
+diseño se documentan en [docs/design-decisions.md](docs/design-decisions.md) y
+[docs/graph-rendering-decisions.md](docs/graph-rendering-decisions.md).
 
 ## Stack
 
-- **Frontend:** Angular 21 (Native Federation vía `@angular-architects/native-federation`)
-  - `products/shell/frontend/` — Host en `:4200`
-  - `products/rdf-explorer/frontend/` — Remote en `:4201`
-  - `products/gis-explorer/frontend/` — Remote en `:4202`
-- **Backends:** NestJS 11 sobre Node.js 24.18.0 (Shell `:3000`, RDF `:3001`, GIS `:3002`)
-- **DB:** SQLite vía `better-sqlite3`, exclusivo del Shell (`products/shell/backend/data/`)
-- **Endpoint SPARQL:** genérico SPARQL 1.1 (URL configurable) / Wikidata / MillenniumDB (stub) — patrón Adapter
-- **Testing:** Jest (backend), Vitest (frontends — ver [Tests](#tests))
-- **Package manager:** pnpm (workspace único en la raíz, `pnpm-workspace.yaml`)
+- Angular 21 con Native Federation para el Shell y los dos remotes.
+- NestJS 11 para los tres procesos backend.
+- SQLite para los tableros del Shell.
+- Cytoscape, Leaflet, vis-timeline y AG Grid en GIS Explorer.
+- pnpm workspaces, Jest y Vitest.
 
----
+## Ejecución local
 
-## Cómo levantar el proyecto
-
-La configuración por defecto (`.env`) apunta al endpoint público de
-**Wikidata**, que no requiere credenciales: el proyecto está pensado para
-levantarse de inmediato y hacer pruebas sin configuración adicional. Para
-apuntar a otro endpoint ver
-[Configuración de backends SPARQL](#configuración-de-backends-sparql).
-
-### Desarrollo local
-
-#### Requisitos previos
-
-- **nvm** (`https://github.com/nvm-sh/nvm`) — `start.sh` lo usa para leer `.nvmrc` y activar la versión correcta de Node.
-- **Node.js 24.18.0** — `start.sh` corre `nvm install` / `nvm use` automáticamente; si no usás `start.sh`, asegurate de tener Node 24 activo.
-- **corepack / pnpm** — el script habilita `pnpm` vía corepack. Si no usás `start.sh`, necesitás `pnpm` instalado globalmente.
-
-#### `start.sh`
-
-`start.sh` es el entrypoint recomendado para levantar todo el stack en modo dev con hot reload. Se encarga de:
-
-1. Leer el archivo `.env` indicado (default `.env`).
-2. Activar la versión de Node definida en `.nvmrc` mediante `nvm`.
-3. Habilitar `pnpm` vía corepack.
-4. Instalar dependencias del workspace si no están presentes.
-5. Recompilar módulos nativos (p. ej. `better-sqlite3`) si cambió la major version de Node.
-6. Arrancar los 3 backends + 3 frontends con `concurrently` (Ctrl+C detiene todo).
+Requisitos: Node.js 24.18.0, corepack/pnpm y, para el bootstrap completo, nvm.
 
 ```bash
-# Uso básico — levanta con .env (Wikidata por defecto)
 ./start.sh
 
-# Levantar con otro archivo de entorno, por ejemplo GraphDB
-./start.sh .env.graphdb
-./start.sh --env .env.graphdb
+# Usar una configuración SPARQL propia
+./start.sh --env .env.custom
 ```
 
-> La variable `DOTENV_CONFIG_PATH` se exporta con el path absoluto del `.env` elegido, así que backend y frontends la leen consistentemente.
+`start.sh` activa la versión de Node, instala dependencias cuando hace falta y
+levanta los tres frontends y los tres backends con recarga en caliente.
 
 | Servicio | URL |
-|----------|-----|
-| App Shell (host) | http://localhost:4200 |
-| RDF Explorer (remote) | http://localhost:4200/explorer |
-| RDF GIS Explorer (remote) | http://localhost:4200/gis |
-| Shell API (dashboards) | http://localhost:3000/api |
+| --- | --- |
+| Shell | http://localhost:4200 |
+| RDF Explorer integrado | http://localhost:4200/explorer |
+| GIS Explorer integrado | http://localhost:4200/gis |
+| Shell API | http://localhost:3000/api |
 | RDF API | http://localhost:3001/api |
 | GIS API | http://localhost:3002/api |
 
-### Docker / Podman
-
-Las imágenes se buildean con **contexto en la raíz del repo** (los Dockerfiles
-comparten el lockfile del workspace pnpm y el paquete `packages/contracts`).
+También se puede ejecutar cada explorer con su runtime propio:
 
 ```bash
-# Wikidata (default, sin credenciales)
+pnpm run dev:rdf-standalone
+pnpm run dev:gis-standalone
 docker compose up
-
-# GraphDB local (requiere credenciales)
-cp .env.graphdb.example .env.graphdb
-# editá .env.graphdb con tus credenciales
-ENV_FILE=.env.graphdb docker compose up
 ```
 
----
+## Estructura
 
-## Flujo principal de la plataforma
-
-1. **Welcome** (`/`) — Tableros recientes guardados (mix de Explorer y GIS) con filtros y CTAs.
-2. **RDF Explorer** (`/explorer`) — Construcción visual de queries SPARQL; guardar workspace.
-3. **Handoff** — Botón "Explorar en GIS" migra la query generada al dashboard GIS.
-4. **RDF GIS Explorer** (`/gis`) — Ejecutar query, explorar resultados en 1-4 vistas coordinadas, guardar dashboard.
-5. **Persistencia** — Los dashboards se guardan sólo en el backend del Shell; recargar y abrir desde Welcome restaura el estado idéntico.
-
----
-
-## Estructura del repo
-
-```
+```text
 packages/
-  contracts/          # tipos compartidos back↔front
-  platform-bridge/    # contratos browser Shell↔remotes
-  explorer-backend/  # implementación Nest transversal, sin dashboards
+  contracts/          tipos compartidos entre backend y frontends
+  platform-bridge/    contratos de integración Shell-remotes
+  explorer-backend/   runtime SPARQL común, sin persistencia de tableros
 products/
-  shell/
-    frontend/         # host, welcome, navegación y mediación de tableros
-    backend/          # CRUD /api/dashboards + SQLite
-  rdf-explorer/
-    frontend/         # app standalone y remote Native Federation
-    backend/          # entrypoint del runtime SPARQL propio (:3001)
-  gis-explorer/
-    frontend/         # app standalone y remote Native Federation
-    backend/          # entrypoint del runtime SPARQL propio (:3002)
+  shell/              host y API exclusiva de tableros
+  rdf-explorer/       constructor visual de consultas y runtime propio
+  gis-explorer/       vistas coordinadas y runtime propio
 ```
 
----
+Los remotes usan `/api` en modo standalone. Integrados en el Shell, el bridge
+configura `/rdf-api` y `/gis-api`. Solo el Shell publica `/api/dashboards` y
+accede a SQLite.
 
-## API Endpoints
+## API
 
-**Prefijo global:** `/api`. Query, suggestions, config y health pertenecen a
-cada backend de explorer; dashboards pertenece exclusivamente al Shell.
+Los runtimes de los explorers publican ejecución y resumen de consultas,
+sugerencias, configuración y health checks bajo `/api`. El Shell publica el
+CRUD `/api/dashboards` y `/api/dashboards/recent?limit=N`.
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/api/query/execute` | Ejecuta consulta SPARQL `{ sparql, limit? }` |
-| GET | `/api/suggestions/predicates` | Lista predicados disponibles (cache 1h) |
-| GET | `/api/suggestions/entities?q=&limit=&classUri=` | Búsqueda de entidades |
-| GET | `/api/config` | Configuración pública del backend (incluye `defaultPrefixes`) |
-| GET | `/api/dashboards` | Lista todos los dashboards |
-| GET | `/api/dashboards/recent?limit=10` | Lista los N más recientes |
-| GET | `/api/dashboards/:id` | Obtiene un dashboard |
-| POST | `/api/dashboards` | Crea dashboard `{ kind, name, payload }` |
-| PUT | `/api/dashboards/:id` | Actualiza dashboard |
-| DELETE | `/api/dashboards/:id` | Elimina dashboard |
-| GET | `/api/health` | Health check básico (usado por Docker healthcheck) |
-| GET | `/api/health/sparql` | Health check del endpoint SPARQL upstream |
+## Configuración SPARQL
 
----
+La configuración es fuente única de verdad en el backend y llega a los
+frontends mediante `GET /api/config`.
 
-## Tests
-
-```bash
-# Backend (Jest)
-cd packages/explorer-backend && pnpm test
-cd products/shell/backend && pnpm test
-
-# Frontends (Vitest vía ng test)
-cd products/shell/frontend && pnpm test
-cd products/rdf-explorer/frontend && pnpm test
-cd products/gis-explorer/frontend && pnpm test
+```env
+SPARQL_BACKEND=custom
+SPARQL_ENDPOINT_URL=https://example.org/sparql
+SPARQL_USERNAME=
+SPARQL_PASSWORD=
+SPARQL_PREFIXES_PATH=packages/explorer-backend/config/prefixes.custom.json
+CLASS_COLORS_PATH=packages/explorer-backend/config/class-colors.custom.json
 ```
 
-> El builder `unit-test` de Angular se configura en cada `angular.json` con
-> `esbuild:development` como `buildTarget`: el target `build` provisto por
-> Native Federation no es apto para la compilación de tests.
+Todo valor de `SPARQL_BACKEND` distinto de `wikidata` usa el adaptador SPARQL
+genérico. El modo `wikidata` añade únicamente las integraciones públicas
+propias de ese servicio, como su API de búsqueda y `wikibase:label`.
 
----
-
-## Tableros demo (seed)
-
-El repo incluye `products/shell/backend/data/wikidata.sqlite` con tableros de ejemplo (5
-workspaces del RDF Explorer + sus 5 equivalentes GIS, validados contra
-Wikidata). Para regenerarlos:
-
-```bash
-cd products/shell/backend && pnpm run seed:demo-dashboards                 # construye, valida y escribe data/wikidata.sqlite
-pnpm run seed:demo-dashboards -- --dry-run               # solo construye y valida, no escribe
-pnpm run seed:demo-dashboards -- --no-validate           # escribe sin consultar el endpoint
-```
-
-El script (`products/shell/backend/scripts/seed-demo-dashboards.ts`) construye los grafos con
-las clases reales del dominio del Explorer, valida volumen y cobertura
-espaciotemporal contra el endpoint configurado y escribe en el SQLite del
-Shell (idempotente: reemplaza por nombre). Como `data/` está en
-`.gitignore`, para versionar el archivo se usa `git add -f`.
-
-### Entorno aislado para el ensayo C1–C5
-
-El entorno de evaluación contiene cuatro workspaces RDF Explorer marcados como
-`DRAFT` para C1–C4, sus cuatro tableros GIS derivados y el workspace C5. Los
-grafos C1–C4 se construyen en `products/shell/backend/scripts/evaluation-dashboards.ts`; la
-consulta de cada GIS se genera desde el mismo grafo con la proyección completa
-del handoff. No hay consultas GIS paralelas mantenidas a mano.
-
-```bash
-cp .env.evaluation.example .env.evaluation.local  # completar credenciales locales
-cd products/shell/backend && pnpm run seed:evaluation-dashboards
-cd ../../.. && ./start.sh --env .env.evaluation.local
-```
-
-El seed recrea `products/shell/backend/data/evaluation.sqlite` desde cero con IDs estables para
-los nueve tableros; conviene ejecutarlo antes de cada ensayo manual.
-
----
-
-## Variables de entorno
+Los archivos de prefixes son JSON `{ "prefijo": "uri" }`. El backend no los
+inyecta al ejecutar: cada consulta debe ser autocontenida.
 
 | Variable | Default | Uso |
-|----------|---------|-----|
-| `SPARQL_BACKEND` | `wikidata` | Nombre del backend SPARQL. `millenniumdb` usa su stub; cualquier otro valor (`wikidata`, `graphdb`, `generic`, ...) usa el adaptador genérico y define el archivo de prefixes. |
-| `SPARQL_ENDPOINT_URL` | `https://query.wikidata.org/sparql` | URL del endpoint SPARQL. Para GraphDB: `http://<host>:7200/repositories/<repoId>` |
-| `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Basic Auth (GraphDB protegido) |
-| `SPARQL_ENTITY_SEARCH_QUERY` | — | Query opcional para `/api/suggestions/entities`. Reemplaza `$keyword` y `$limit`. |
-| `SPARQL_USER` | `rdf-gis-explorer/0.1` | User-Agent (obligatorio para Wikidata) |
-| `SPARQL_TIMEOUT_MS` | `30000` | Timeout de consultas (ms) |
-| `SPARQL_DEFAULT_LIMIT` | `500` | Límite por defecto |
-| `SPARQL_MAX_LIMIT` | `2000` | Límite máximo |
-| `SPARQL_PREDICATE_CACHE_TTL_MS` | `3600000` | TTL del cache de predicados del adaptador (ms) |
-| `SUMMARY_TOP_CATEGORICAL_LIMIT` | `12` | Tope de valores en el top categórico de `/api/query/summary` |
-| `DASHBOARD_MAX_PAYLOAD_BYTES` | `1048576` | Tope del payload serializado de dashboards (bytes) |
-| `GIS_GRAPH_MAX_NODES` | `300` | Cap de nodos de la vista de grafo del GIS (vía `/api/config` → `limits`) |
-| `GIS_LOT_DEFAULT_SIZE` | `300` | Tamaño de lote por defecto de las vistas coordinadas (`limits`) |
-| `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Opciones del selector de tamaño de lote, CSV (`limits`) |
-| `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Opciones de paginación de la tabla, CSV (`limits`) |
-| `EXPORT_MAX_ROWS` | `50000` | Tope de filas del export completo a Excel (`limits`) |
-| `EXPORT_MIN_PAGE_SIZE` | `250` | Piso del reintento adaptativo de página del export (`limits`) |
-| `SPARQL_PREFIXES_PATH` | `packages/explorer-backend/config/prefixes.${SPARQL_BACKEND}.json` | Archivo JSON `{ prefix: uri }` con los prefixes del backend |
-| `CLASS_COLORS_PATH` | `packages/explorer-backend/config/class-colors.${SPARQL_BACKEND}.json` | Archivo JSON `{ "uriDeClase": "#color" }` con los colores por clase RDF |
-| `SHELL_BACKEND_PORT` | `3000` | Puerto del backend de dashboards |
-| `RDF_EXPLORER_BACKEND_PORT` / `GIS_EXPLORER_BACKEND_PORT` | `3001` / `3002` | Puertos de los backends SPARQL |
-| `FRONTEND_PORT` / `RDF_EXPLORER_PORT` / `RDF_GIS_EXPLORER_PORT` | `4200` / `4201` / `4202` | Puertos de los frontends (Docker/Podman) |
-| `CORS_ORIGINS` | `http://localhost:4200` | Orígenes CORS (separados por coma) |
-| `DASHBOARDS_SQLITE_PATH` | `products/shell/backend/data/wikidata.sqlite` | Override del SQLite de dashboards del Shell |
-| `SPARQL_PROTECTED_BACKENDS` | `wikidata,graphdb` | Backends cuyos SQLite se preservan en `clean:unused-data` |
+| --- | --- | --- |
+| `SPARQL_BACKEND` | `wikidata` | Identificador de la configuración |
+| `SPARQL_ENDPOINT_URL` | endpoint público de Wikidata | URL SPARQL 1.1 |
+| `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Basic Auth opcional |
+| `SPARQL_ENTITY_SEARCH_QUERY` | búsqueda por `rdfs:label` | Búsqueda personalizable |
+| `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
+| `SPARQL_DEFAULT_LIMIT` / `SPARQL_MAX_LIMIT` | `500` / `2000` | Límites de consulta |
+| `SPARQL_PREFIXES_PATH` | `config/prefixes.${SPARQL_BACKEND}.json` | Prefixes |
+| `CLASS_COLORS_PATH` | `config/class-colors.${SPARQL_BACKEND}.json` | Colores RDF |
+| `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | SQLite del Shell |
+| `SPARQL_PROTECTED_BACKENDS` | `wikidata` | Bases preservadas por la limpieza |
+| `GIS_GRAPH_MAX_NODES` | `300` | Tope de nodos del grafo |
+| `GIS_LOT_DEFAULT_SIZE` | `300` | Tamaño de lote inicial |
+| `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Tamaños disponibles |
+| `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Paginación de tabla |
+| `EXPORT_MAX_ROWS` | `50000` | Tope del export completo |
+| `EXPORT_MIN_PAGE_SIZE` | `250` | Página mínima al reintentar |
+| `SUMMARY_TOP_CATEGORICAL_LIMIT` | `12` | Valores del top categórico |
 
----
+## Tableros demo
 
-## Configuración de backends SPARQL
+Se conserva `seed:demo-dashboards` porque genera ejemplos funcionales del
+producto: workspaces del constructor visual y sus tableros GIS equivalentes.
+Usa el endpoint público configurado por defecto, no escenarios de evaluación
+ni extensiones propietarias.
 
-La configuración del endpoint SPARQL es **single source of truth** en el backend. Los frontends la obtienen vía `GET /api/config` al iniciar.
-
-### Wikidata
-
-```env
-SPARQL_BACKEND=wikidata
-SPARQL_ENDPOINT_URL=https://query.wikidata.org/sparql
-SPARQL_USER=mi-app/1.0 (mailto:mi@email.com)
+```bash
+cd products/shell/backend
+pnpm run seed:demo-dashboards -- --dry-run
+pnpm run seed:demo-dashboards
 ```
 
-El frontend detecta `supportsWikibaseLabel: true` y usa `wbsearchentities` para la búsqueda de entidades en RDF Explorer.
+No se deben ejecutar seeds sobre una base persistente sin revisar antes
+`DASHBOARDS_SQLITE_PATH`.
 
-### GraphDB local con autenticación
+## Calidad
 
-```env
-SPARQL_BACKEND=graphdb
-SPARQL_ENDPOINT_URL=http://localhost:7200/repositories/<repo-id>
-SPARQL_USERNAME=<usuario>
-SPARQL_PASSWORD=<contraseña>
-
-# Opcional: query personalizada para búsqueda de entidades
-# SPARQL_ENTITY_SEARCH_QUERY=SELECT DISTINCT ?uri ?label WHERE { ?uri <http://www.w3.org/2000/01/rdf-schema#label> ?label . FILTER regex(?label, "$keyword", "i") } LIMIT $limit
+```bash
+pnpm -r --if-present test
+pnpm -r --if-present build
+docker compose config --quiet
+git diff --check
 ```
-
-El frontend detecta `supportsWikibaseLabel: false` y delega la búsqueda de entidades al backend (`GET /api/suggestions/entities`), que ejecuta `SPARQL_ENTITY_SEARCH_QUERY` (default: `rdfs:label` + `FILTER regex`).
-
-### Prefixes
-
-Los prefixes se configuran por backend en `packages/explorer-backend/config/prefixes.<backend>.json`
-(o en la ruta que indique `SPARQL_PREFIXES_PATH`):
-
-```json
-{ "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#", "wd": "http://www.wikidata.org/entity/" }
-```
-
-- El repo trae `prefixes.wikidata.json`; para GraphDB copiá `prefixes.graphdb.example.json` a `prefixes.graphdb.json` y ajustá (está gitignoreado por si contiene namespaces internos).
-- Viajan a los frontends como `defaultPrefixes` en `GET /api/config`.
-- **RDF Explorer** los usa para generar queries y abreviar URIs.
-- **RDF GIS Explorer** los precarga como bloque `PREFIX ...` en el editor SPARQL (editor vacío o tablero nuevo).
-- El backend **no** inyecta prefixes en las queries: la query enviada a `/api/query/execute` debe ser autocontenida.
-
-### Agregar un nuevo backend
-
-1. Crear `.env.mibackend` con `SPARQL_BACKEND=mibackend` y la URL/credenciales del endpoint. El adaptador genérico (`GenericSparqlAdapter`) se usa automáticamente.
-2. Crear `packages/explorer-backend/config/prefixes.mibackend.json` con los prefixes del dataset.
-3. Opcionalmente definir `SPARQL_ENTITY_SEARCH_QUERY` si el default no aplica.
-4. Solo si el endpoint necesita lógica propia (protocolo no estándar), crear un adaptador `SparqlEndpoint` en `packages/explorer-backend/src/adapters/` y agregar el caso en `sparql-endpoint.factory.ts`.
-5. Los frontends se adaptan automáticamente vía `/api/config`.
-
----
 
 ## Contacto
 

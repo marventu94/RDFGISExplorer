@@ -85,7 +85,7 @@ export interface SparqlEndpoint {
   ): Promise<EntitySearchResult[]>;
   /** Capacidades y vocabulario de este backend, para `GET /api/config`. */
   describeEndpoint(): EndpointDescriptor;
-  /** Nombre del backend configurado (SPARQL_BACKEND): wikidata, graphdb, generic, millenniumdb, ... */
+  /** Identificador configurado para el endpoint SPARQL. */
   readonly backendName: string;
 }
 
@@ -103,13 +103,6 @@ export class UpstreamError extends Error {
   ) {
     super(message);
     this.name = 'UpstreamError';
-  }
-}
-
-export class NotImplementedError extends Error {
-  constructor(feature: string) {
-    super(`Not implemented: ${feature}`);
-    this.name = 'NotImplementedError';
   }
 }
 

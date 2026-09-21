@@ -2,7 +2,7 @@
  * Modelo puro del progreso de carga de un tablero (sin Angular, testeable).
  *
  * El spinner único de "Cargando tablero…" no distinguía entre esperar al
- * endpoint SPARQL (minutos en GraphDB) y pintar las vistas (milisegundos). Acá
+ * endpoint SPARQL (potencialmente minutos) y pintar las vistas (milisegundos). Acá
  * se modelan las etapas reales del pipeline de hidratación para que el cartel
  * diga en qué se está yendo el tiempo.
  *
@@ -11,11 +11,7 @@
  */
 
 export type LoadStageId =
-  | 'fetch-dashboard'
-  | 'execute-query'
-  | 'process-results'
-  | 'summary'
-  | 'render-views';
+  'fetch-dashboard' | 'execute-query' | 'process-results' | 'summary' | 'render-views';
 
 /**
  * `background`: la etapa seguía corriendo cuando el tablero ya era usable y se
@@ -87,12 +83,7 @@ function patchStage(
 }
 
 /** Arranca la etapa. Si ya estaba corriendo o terminada no la reinicia. */
-export function startStage(
-  run: LoadRun,
-  id: LoadStageId,
-  now: number,
-  detail?: string,
-): LoadRun {
+export function startStage(run: LoadRun, id: LoadStageId, now: number, detail?: string): LoadRun {
   return patchStage(run, id, (stage) =>
     stage.status === 'pending'
       ? { ...stage, status: 'active', startedAt: now, ...(detail ? { detail } : {}) }
@@ -129,12 +120,7 @@ export function completeStage(
   });
 }
 
-export function failStage(
-  run: LoadRun,
-  id: LoadStageId,
-  now: number,
-  detail?: string,
-): LoadRun {
+export function failStage(run: LoadRun, id: LoadStageId, now: number, detail?: string): LoadRun {
   return patchStage(run, id, (stage) => ({
     ...stage,
     status: 'failed',

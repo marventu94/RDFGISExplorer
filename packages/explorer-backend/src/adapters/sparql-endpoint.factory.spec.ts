@@ -1,7 +1,7 @@
 import { createSparqlEndpoint } from './sparql-endpoint.factory';
 import { GenericSparqlAdapter } from './generic-sparql.adapter';
-import { MillenniumDBAdapter } from './millenniumdb.adapter';
 import { SparqlEndpoint } from './sparql-endpoint.interface';
+import { WikidataAdapter } from './wikidata.adapter';
 
 describe('createSparqlEndpoint', () => {
   const originalEnv = process.env['SPARQL_BACKEND'];
@@ -14,17 +14,17 @@ describe('createSparqlEndpoint', () => {
     }
   });
 
-  it('returns GenericSparqlAdapter when SPARQL_BACKEND is not set (default)', () => {
+  it('returns WikidataAdapter when SPARQL_BACKEND is not set', () => {
     delete process.env['SPARQL_BACKEND'];
     const endpoint: SparqlEndpoint = createSparqlEndpoint();
-    expect(endpoint).toBeInstanceOf(GenericSparqlAdapter);
+    expect(endpoint).toBeInstanceOf(WikidataAdapter);
     expect(endpoint.backendName).toBe('wikidata');
   });
 
-  it('returns GenericSparqlAdapter when SPARQL_BACKEND=wikidata', () => {
+  it('returns WikidataAdapter when SPARQL_BACKEND=wikidata', () => {
     process.env['SPARQL_BACKEND'] = 'wikidata';
     const endpoint: SparqlEndpoint = createSparqlEndpoint();
-    expect(endpoint).toBeInstanceOf(GenericSparqlAdapter);
+    expect(endpoint).toBeInstanceOf(WikidataAdapter);
     expect(endpoint.backendName).toBe('wikidata');
   });
 
@@ -40,13 +40,6 @@ describe('createSparqlEndpoint', () => {
     const endpoint: SparqlEndpoint = createSparqlEndpoint();
     expect(endpoint).toBeInstanceOf(GenericSparqlAdapter);
     expect(endpoint.backendName).toBe('generic');
-  });
-
-  it('returns MillenniumDBAdapter when SPARQL_BACKEND=millenniumdb', () => {
-    process.env['SPARQL_BACKEND'] = 'millenniumdb';
-    const endpoint: SparqlEndpoint = createSparqlEndpoint();
-    expect(endpoint).toBeInstanceOf(MillenniumDBAdapter);
-    expect(endpoint.backendName).toBe('millenniumdb');
   });
 
   it('returns a fresh instance each call', () => {

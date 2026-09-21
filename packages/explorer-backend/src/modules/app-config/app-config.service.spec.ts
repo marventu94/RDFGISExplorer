@@ -178,7 +178,7 @@ describe('AppConfigService', () => {
         JSON.stringify({ 'http://example.org/Clase': '#112233' }),
       );
       const service = await buildService({
-        SPARQL_BACKEND: 'graphdb',
+        SPARQL_BACKEND: 'custom',
         CLASS_COLORS_PATH: overridePath,
       });
       expect(service.getConfig().classColors).toEqual({
@@ -189,7 +189,7 @@ describe('AppConfigService', () => {
     it('returns empty classColors when the JSON file is invalid', async () => {
       writeFileSync(invalidPath, '{ not json');
       const service = await buildService({
-        SPARQL_BACKEND: 'graphdb',
+        SPARQL_BACKEND: 'custom',
         CLASS_COLORS_PATH: invalidPath,
       });
       expect(service.getConfig().classColors).toEqual({});

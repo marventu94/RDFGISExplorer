@@ -1,37 +1,14 @@
-# RDFExplorer
+# RDF Explorer Frontend
 
-SPARQL visual query builder and RDF explorer.
-
-Angular 17+ standalone application with cytoscape.js graph visualisation.
-
-## Local development
+Aplicación Angular standalone para construir consultas SPARQL mediante un
+grafo visual. Puede ejecutarse sola o como remote del Shell y entregar la
+consulta completa a GIS Explorer.
 
 ```bash
-cd app && npm install && npm start
+pnpm run dev:rdf-standalone
+pnpm --dir products/rdf-explorer/frontend test
+pnpm --dir products/rdf-explorer/frontend build
 ```
 
-Open http://localhost:4200.
-
-## Production build
-
-```bash
-cd app && npm run build
-```
-
-The output in `app/dist/app/browser/` is a static SPA — serve it with any web server (Nginx, Caddy, Vercel, Netlify, etc.).
-
-## Custom endpoints
-
-The SPARQL endpoint is configurable from the **Settings** panel (click the gear icon in the toolbar). Supports Virtuoso, Fuseki, and generic SPARQL endpoints.
-
-## Project structure
-
-```
-app/         Angular application (src/app/)
-SPECS.md     Full feature specification
-license.txt  CC-BY-NC-SA 4.0
-```
-
-## License
-
-<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.
+En standalone usa `/api` y escucha en `:4201`. Integrada, el Shell configura
+`/rdf-api` y ofrece persistencia mediante el platform bridge.

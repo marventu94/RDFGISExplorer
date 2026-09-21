@@ -8,11 +8,10 @@
     "start:prod": "node dist/main.js",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:scripts": "jest --rootDir . --testRegex '(scripts/clean-unused-data|src/seed/evaluation-dashboards)\\.spec\\.ts$'",
+    "test:scripts": "jest --rootDir . --testRegex 'scripts/clean-unused-data\\.spec\\.ts$'",
     "clean:unused-data": "ts-node scripts/clean-unused-data.ts",
     "clean:unused-data:force": "ts-node scripts/clean-unused-data.ts --force",
-    "seed:demo-dashboards": "ts-node --transpile-only scripts/seed-demo-dashboards.ts",
-    "seed:evaluation-dashboards": "ts-node --transpile-only scripts/seed-evaluation-dashboards.ts"
+    "seed:demo-dashboards": "ts-node --transpile-only scripts/seed-demo-dashboards.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

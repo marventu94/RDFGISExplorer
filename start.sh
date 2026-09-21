@@ -11,8 +11,8 @@
 #
 # Uso:
 #   ./start.sh                  # usa .env (Wikidata por defecto)
-#   ./start.sh .env.graphdb     # usa .env.graphdb
-#   ./start.sh --env .env.graphdb
+#   ./start.sh .env.custom
+#   ./start.sh --env .env.custom
 #
 # Ctrl+C detiene todos los servicios (concurrently propaga la senal).
 

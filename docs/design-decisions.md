@@ -167,8 +167,7 @@ spatio-temporal KG visualization remain an open research challenge"* (§5).
 
 **Decisión.** El backend es un proxy SPARQL 1.1 genérico (patrón Adapter):
 URL, credenciales, prefixes y límites por variables de entorno; el frontend
-no asume nada del dominio. Validado hoy contra Wikidata y GraphDB; nuevos
-endpoints se suman por configuración.
+no asume nada del dominio. Los endpoints se incorporan por configuración.
 
 ## 10. Stack web estándar y activamente mantenido
 
@@ -224,5 +223,3 @@ separadas sin shell (que perdería la integración del flujo).
   Visualization." SEMANTICS 2020.
 - [Vargas et al. 2019] "RDF Explorer: A Visual SPARQL Query Builder."
   ISWC 2019.
-- [Mulholland et al. 2024] "Supporting the End-User Curation of Cultural
-  Heritage Knowledge Graphs." ACM HT 2024.

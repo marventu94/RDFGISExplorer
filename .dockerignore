@@ -3,7 +3,7 @@ node_modules
 **/node_modules
 **/dist
 **/.angular
-backend/data
+products/shell/backend/data
 docs
 .env
 .env.*

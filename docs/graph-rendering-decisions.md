@@ -273,7 +273,7 @@ geográficos agregados se representan exclusivamente en el mapa.
 **Fundamento.** Una visualización clara de datos incorrectamente clasificados
 resulta inferior a una representación menos elaborada de datos correctos
 (criterio propio del proyecto). La tolerancia a datos imperfectos —bucles,
-relaciones duplicadas, asimetrías— constituye un requisito documentado en
+relaciones repetidas, asimetrías— constituye un requisito documentado en
 grafos de conocimiento reales (Sheng et al., 2019), y la marcación visual de
 los datos agregados o proyectados es obligatoria para no confundirlos con
 datos recolectados (Schulz et al., 2013).
@@ -303,9 +303,8 @@ que la forma en que un conjunto de datos guarda un valor no es deducible del
 valor. La literatura trata a esos nodos como material de primera clase —TGV
 colapsa nodos estructurales para volver legible la topología (Orlando et al.,
 2024) y KGNav resume por firma estructural de predicados (Wang, Wang, Li y Han,
-2023)—, la tolerancia a la irregularidad de los grafos de conocimiento reales
-es un requisito documentado (Sheng et al., 2019) y la curación de grafos por
-usuarios de dominio aparece como tarea propia (Mulholland et al., 2024).
+2023)—, y la tolerancia a la irregularidad de los grafos de conocimiento
+reales es un requisito documentado (Sheng et al., 2019).
 
 **Decisión (criterio propio del proyecto).** La vista de grafo no es una
 representación alternativa de las filas: es la única vista que muestra **el
@@ -574,9 +573,6 @@ todas disponen de copia pública archivada.
   Glyphs to Support the Visual Exploration of Hierarchical Spatio-Temporal
   Data*. INTERACT 2023, LNCS, 325-329.
   <https://doi.org/10.1007/978-3-031-42293-5_31>
-- Mulholland, P., Van Kranenburg, P., Carvalho, J. y Daga, E. (2024).
-  *Supporting the End-User Curation of Cultural Heritage Knowledge Graphs*.
-  ACM HT '24. <https://doi.org/10.1145/3648188.3675132>
 - Orlando, D., Ormachea, J., Soliani, V. y Vaisman, A. (2024). *TGV: A
   Visualization Tool for Temporal Property Graph Databases*. Information
   Systems Frontiers, 26(4), 1543-1564.

@@ -187,7 +187,7 @@ describe('buildEntitySubgraph', () => {
   });
 
   describe('hub compartido', () => {
-    it('no incorpora otros inmuebles al seleccionar uno (C1)', () => {
+    it('no incorpora otros inmuebles al seleccionar uno', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -467,7 +467,11 @@ describe('buildEntitySubgraph', () => {
     });
 
     it('un resultado sin aristas deja la raíz sola y sin ramas', () => {
-      const isolated = result([makeNode(`${EX}solo`)], [], [{ s: { type: 'uri', value: `${EX}solo` } }]);
+      const isolated = result(
+        [makeNode(`${EX}solo`)],
+        [],
+        [{ s: { type: 'uri', value: `${EX}solo` } }],
+      );
       const subgraph = buildEntitySubgraph({ visibleResult: isolated, rootUri: `${EX}solo` });
 
       expect(subgraph.metrics.nodeCount).toBe(1);

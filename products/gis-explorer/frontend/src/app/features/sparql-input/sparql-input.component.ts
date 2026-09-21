@@ -1,5 +1,15 @@
 import { TranslatePipe } from '../../core/services/translate.pipe';
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, effect, HostListener } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  ElementRef,
+  ViewChild,
+  effect,
+  HostListener,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -31,10 +41,7 @@ import type { VariableRole } from './mapping-overrides.util';
 import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
 import { ErrorDialogComponent, type ErrorDialogData } from './error-dialog.component';
 import { VariableMappingService } from '@core/services/variable-mapping.service';
-import {
-  buildQueryLimitNotice,
-  type QueryLimitNotice,
-} from '@shared/sparql/query-limit';
+import { buildQueryLimitNotice, type QueryLimitNotice } from '@shared/sparql/query-limit';
 
 /** Espera antes de reparsear la query para el aviso de LIMIT. */
 const LIMIT_CHECK_DEBOUNCE_MS = 300;
@@ -42,7 +49,8 @@ const LIMIT_CHECK_DEBOUNCE_MS = 300;
 @Component({
   selector: 'app-sparql-input',
   standalone: true,
-  imports: [TranslatePipe,
+  imports: [
+    TranslatePipe,
     CommonModule,
     FormsModule,
     MatButtonModule,
@@ -268,23 +276,27 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   protected loadDashboards(): void {
     this.loadingDashboards.set(true);
-    dashboardHost().list('gis').then(
-      (dashboards) => {
-        this.gisDashboards.set(dashboards);
-        this.loadingDashboards.set(false);
-      },
-      () => {
-        this.gisDashboards.set([]);
-        this.loadingDashboards.set(false);
-      },
-    );
+    dashboardHost()
+      .list('gis')
+      .then(
+        (dashboards) => {
+          this.gisDashboards.set(dashboards);
+          this.loadingDashboards.set(false);
+        },
+        () => {
+          this.gisDashboards.set([]);
+          this.loadingDashboards.set(false);
+        },
+      );
   }
 
   protected loadDashboard(dashboard: Dashboard): void {
     const current = this.sparqlText;
     const doLoad = () => {
       this.dashboardState.beginLoad();
-      dashboardHost().load(dashboard.id).catch(() => this.dashboardState.failLoad());
+      dashboardHost()
+        .load(dashboard.id)
+        .catch(() => this.dashboardState.failLoad());
     };
     if (current.length > 0) {
       setTimeout(() => {
@@ -342,7 +354,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
     this.queryState.query.set(sparql);
     this.executing.set(true);
-    // Este endpoint puede tardar minutos (GraphDB con FILTER sobre cientos de
+    // Este endpoint puede tardar minutos (un FILTER sobre cientos de
     // miles de instancias). Sin un cartel persistente, la pantalla queda igual
     // que antes de apretar y parece que el botón no hizo nada.
     this.snackBar.open(this.i18n.text('Ejecutando la query… puede tardar'), undefined, {});
@@ -426,7 +438,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
 
     if (err.status === 0) {
-      return this.i18n.text('No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:3000.');
+      return this.i18n.text(
+        'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:3000.',
+      );
     }
 
     return `Error del servidor (${err.status}). ${body?.message ?? ''}`;
@@ -443,7 +457,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     const result = this.variableMapping.restore();
     if (!result) return;
     this.selectionService.setQueryResult(result);
-    this.snackBar.open(this.i18n.text('Mapeo restaurado a detección automática'), 'OK', { duration: 3000 });
+    this.snackBar.open(this.i18n.text('Mapeo restaurado a detección automática'), 'OK', {
+      duration: 3000,
+    });
   }
 
   @HostListener('window:open-variable-mapping')

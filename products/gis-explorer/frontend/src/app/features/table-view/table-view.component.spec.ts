@@ -138,11 +138,7 @@ describe('TableViewComponent', () => {
     selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
 
     const defs = component.columnDefs();
-    const values = [
-      'http://example.org/Q1',
-      'Buenos Aires',
-      '-34.6037, -58.3816',
-    ];
+    const values = ['http://example.org/Q1', 'Buenos Aires', '-34.6037, -58.3816'];
 
     defs.forEach((definition, index) => {
       expect(definition.headerTooltip).toBe(mockQueryResult.variables[index]);
@@ -171,7 +167,9 @@ describe('TableViewComponent', () => {
     fixture.detectChanges();
 
     const rowData = mockQueryResult.bindings[0] as Record<string, BindingValue>;
-    (selectionServiceMock.select as ReturnType<typeof vi.fn>).mockImplementation((_node, _source) => {});
+    (selectionServiceMock.select as ReturnType<typeof vi.fn>).mockImplementation(
+      (_node, _source) => {},
+    );
 
     expect(selectionServiceMock.select).toBeDefined();
 
@@ -204,7 +202,7 @@ describe('TableViewComponent', () => {
       bindings: [{ listing, casa } as ResultBinding],
       nodes: [listingNode, casaNode],
       edges: [],
-      meta: { durationMs: 1, truncated: false, limitApplied: 500, backend: 'graphdb' },
+      meta: { durationMs: 1, truncated: false, limitApplied: 500, backend: 'custom' },
     };
 
     let selectedRows: Array<{ uri: string; selected: boolean }>;

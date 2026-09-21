@@ -6,7 +6,6 @@ import {
   SPARQL_ENDPOINT,
   TimeoutError,
   UpstreamError,
-  NotImplementedError,
 } from '../../adapters/sparql-endpoint.interface';
 import { QueryResult } from '../../shared/dto/query-result.dto';
 
@@ -135,22 +134,6 @@ describe('QueryService', () => {
       expect(httpEx.getStatus()).toBe(502);
       const body = httpEx.getResponse() as Record<string, unknown>;
       expect(body.error).toBe('UPSTREAM_ERROR');
-    }
-  });
-
-  it('should throw 503 NOT_IMPLEMENTED on NotImplementedError', async () => {
-    mockSparqlEndpoint.execute.mockRejectedValueOnce(
-      new NotImplementedError('MillenniumDB'),
-    );
-    try {
-      await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 500);
-      fail('Expected HttpException');
-    } catch (e) {
-      expect(e).toBeInstanceOf(HttpException);
-      const httpEx = e as HttpException;
-      expect(httpEx.getStatus()).toBe(503);
-      const body = httpEx.getResponse() as Record<string, unknown>;
-      expect(body.error).toBe('NOT_IMPLEMENTED');
     }
   });
 });

@@ -87,7 +87,7 @@ describe('GisHandoffService', () => {
   function publish(overwriteConfirmed = false): void {
     handoff.publish({
       query: 'SELECT ?x WHERE { ?x ?p ?o } LIMIT 10',
-      backend: 'graphdb',
+      backend: 'custom',
       overwriteConfirmed,
       source: {},
     });
@@ -108,7 +108,7 @@ describe('GisHandoffService', () => {
 
     expect(dialogMock.open).not.toHaveBeenCalled();
     expect(target.setQuery).toHaveBeenCalledWith('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
-    expect(target.setBackend).toHaveBeenCalledWith('graphdb');
+    expect(target.setBackend).toHaveBeenCalledWith('custom');
     // El handoff se consume: no queda pendiente para el próximo ingreso.
     expect(handoff.peek()).toBeNull();
   });

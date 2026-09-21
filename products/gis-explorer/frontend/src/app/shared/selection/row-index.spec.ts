@@ -16,7 +16,7 @@ function makeResult(bindings: ResultBinding[]): QueryResult {
     bindings,
     nodes: [],
     edges: [],
-    meta: { durationMs: 1, truncated: false, limitApplied: 500, backend: 'graphdb' },
+    meta: { durationMs: 1, truncated: false, limitApplied: 500, backend: 'custom' },
   };
 }
 

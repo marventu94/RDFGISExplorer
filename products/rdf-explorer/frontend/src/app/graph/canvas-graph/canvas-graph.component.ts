@@ -16,11 +16,17 @@ import contextMenus from 'cytoscape-context-menus';
 
 import { PropertyGraphService } from '../property-graph.service';
 import { GraphInteractionService } from './interaction.service';
-import { CYTOSCAPE_STYLES, CHILD_HEIGHT, CHILD_PADDING, NODE_TITLE_HEIGHT } from './canvas-graph.styles';
+import {
+  CYTOSCAPE_STYLES,
+  CHILD_HEIGHT,
+  CHILD_PADDING,
+  NODE_TITLE_HEIGHT,
+} from './canvas-graph.styles';
 import { parseDropPayload } from './canvas-graph.drop';
 import { buildCanvasElements } from './canvas-graph.elements';
 import { buildContextMenuConfig } from './canvas-graph.context-menus';
 import { Node, Property, type Edge, type RDFResource } from '../domain';
+import { TranslatePipe } from '../../core/translate.pipe';
 
 cytoscape.use(edgehandles);
 cytoscape.use(contextMenus);
@@ -44,6 +50,7 @@ cytoscape.use(contextMenus);
 @Component({
   selector: 'canvas-graph',
   standalone: true,
+  imports: [TranslatePipe],
   templateUrl: './canvas-graph.component.html',
   styleUrl: './canvas-graph.component.scss',
 })
@@ -111,24 +118,24 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       effect(() => {
         this.graph.revision();
         this.syncCytoscape();
-      })
+      }),
     );
     this.destroyRef.onDestroy(() => fx.destroy());
   }
 
   private syncCytoscape(): void {
     const desired = this.computeElements();
-    const desiredIds = new Set<string>(desired.map(e => e.data.id as string));
+    const desiredIds = new Set<string>(desired.map((e) => e.data.id as string));
 
     this.cy.batch(() => {
       const existing = this.cy.elements();
-      const toRemove = existing.filter(el => !desiredIds.has(el.id()));
+      const toRemove = existing.filter((el) => !desiredIds.has(el.id()));
 
       toRemove.edges().remove();
 
       const removeNodes = toRemove.nodes();
-      const children = removeNodes.filter(n => n.isChild());
-      const parents = removeNodes.filter(n => !n.isChild());
+      const children = removeNodes.filter((n) => n.isChild());
+      const parents = removeNodes.filter((n) => !n.isChild());
       children.remove();
       parents.remove();
 
@@ -181,9 +188,11 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     if (!vp) return;
     const cyZoom = this.cy.zoom();
     const cyPan = this.cy.pan();
-    if (Math.abs(cyZoom - vp.zoom) > 0.01 ||
-        Math.abs(cyPan.x - vp.pan.x) > 1 ||
-        Math.abs(cyPan.y - vp.pan.y) > 1) {
+    if (
+      Math.abs(cyZoom - vp.zoom) > 0.01 ||
+      Math.abs(cyPan.x - vp.pan.x) > 1 ||
+      Math.abs(cyPan.y - vp.pan.y) > 1
+    ) {
       this.cy.viewport({ zoom: vp.zoom, pan: vp.pan });
     }
   }
@@ -221,9 +230,11 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       canConnect: (sourceNode: cytoscape.NodeSingular, targetNode: cytoscape.NodeSingular) => {
         const sourceKind = sourceNode.data('kind');
         const targetKind = targetNode.data('kind');
-        return (sourceKind === 'node' || sourceKind === 'property')
-          && (targetKind === 'node' || targetKind === 'property')
-          && !sourceNode.same(targetNode);
+        return (
+          (sourceKind === 'node' || sourceKind === 'property') &&
+          (targetKind === 'node' || targetKind === 'property') &&
+          !sourceNode.same(targetNode)
+        );
       },
       snap: false,
       hoverDelay: 150,
@@ -231,19 +242,22 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       disableBrowserGestures: true,
     });
 
-    this.cy.on('ehcomplete', (_evt: unknown, sourceNode: cytoscape.NodeSingular, targetNode: cytoscape.NodeSingular) => {
-      const srcDomain = sourceNode.data('domain') as Node | Property | undefined;
-      const tgtDomain = targetNode.data('domain') as Node | Property | undefined;
-      if (!srcDomain || !tgtDomain) return;
+    this.cy.on(
+      'ehcomplete',
+      (_evt: unknown, sourceNode: cytoscape.NodeSingular, targetNode: cytoscape.NodeSingular) => {
+        const srcDomain = sourceNode.data('domain') as Node | Property | undefined;
+        const tgtDomain = targetNode.data('domain') as Node | Property | undefined;
+        if (!srcDomain || !tgtDomain) return;
 
-      if (srcDomain instanceof Property && tgtDomain instanceof Node) {
-        this.graph.addEdge(srcDomain, tgtDomain);
-      } else if (srcDomain instanceof Node && tgtDomain instanceof Property) {
-        this.graph.addEdge(tgtDomain, srcDomain);
-      } else if (srcDomain instanceof Node && tgtDomain instanceof Node) {
-        this.graph.addEdge(srcDomain, tgtDomain);
-      }
-    });
+        if (srcDomain instanceof Property && tgtDomain instanceof Node) {
+          this.graph.addEdge(srcDomain, tgtDomain);
+        } else if (srcDomain instanceof Node && tgtDomain instanceof Property) {
+          this.graph.addEdge(tgtDomain, srcDomain);
+        } else if (srcDomain instanceof Node && tgtDomain instanceof Node) {
+          this.graph.addEdge(srcDomain, tgtDomain);
+        }
+      },
+    );
 
     this.cmApi = (this.cy as any).contextMenus({
       menuItems: buildContextMenuConfig({
@@ -263,8 +277,12 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
   /* ------------------------------------------------------------------ */
 
   private installInteractions(): void {
-    this.cy.on('mouseover', () => { this.cyFocused = true; });
-    this.cy.on('mouseout', () => { this.cyFocused = false; });
+    this.cy.on('mouseover', () => {
+      this.cyFocused = true;
+    });
+    this.cy.on('mouseout', () => {
+      this.cyFocused = false;
+    });
 
     this.cy.on('tap', (evt) => {
       if (evt.target === this.cy && (evt.originalEvent as MouseEvent)?.shiftKey) {
@@ -372,10 +390,13 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     };
 
     // If dropped on a compound node, select it and place the target node to its right
-    const nodeUnder = this.cy.nodes('[kind="node"]').filter(n => {
-      const bb = n.boundingBox({});
-      return at.x >= bb.x1 && at.x <= bb.x2 && at.y >= bb.y1 && at.y <= bb.y2;
-    }).first();
+    const nodeUnder = this.cy
+      .nodes('[kind="node"]')
+      .filter((n) => {
+        const bb = n.boundingBox({});
+        return at.x >= bb.x1 && at.x <= bb.x2 && at.y >= bb.y1 && at.y <= bb.y2;
+      })
+      .first();
 
     if (nodeUnder.nonempty()) {
       const domain = nodeUnder.data('domain') as RDFResource | undefined;

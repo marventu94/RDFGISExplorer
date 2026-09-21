@@ -37,7 +37,7 @@ Workspace **pnpm** (`pnpm-workspace.yaml` en la raíz): un solo `pnpm install` i
 ## Comandos
 
 ```bash
-./start.sh                     # dev con hot reload; --env .env.graphdb para otro backend
+./start.sh                     # dev con hot reload; --env .env.custom para otro endpoint
 npm run dev                    # igual, sin el bootstrap de nvm/corepack
 
 cd packages/explorer-backend && pnpm run start:dev   # backend solo
@@ -52,10 +52,10 @@ cd products/<producto>/frontend && pnpm test
 ## Convenciones de Código
 
 ### Backend (NestJS)
-- **Patrón:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto; `GenericSparqlAdapter` / `MillenniumDBAdapter` son adaptadores. El factory (`sparql-endpoint.factory.ts`) elige por `SPARQL_BACKEND` y le pasa el nombre al adaptador (`backendName` refleja el valor configurado, se reporta en `/api/health` y `QueryResult.meta.backend`).
+- **Patrón:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto; `GenericSparqlAdapter` atiende endpoints SPARQL configurables y `WikidataAdapter` agrega sus integraciones públicas. El factory pasa el valor de `SPARQL_BACKEND` como `backendName`, reportado en `/api/health` y `QueryResult.meta.backend`.
 - **DI tokens:** Symbols (`SPARQL_ENDPOINT`, `DASHBOARDS_DB`), no strings.
 - **DTOs:** `class-validator` + `class-transformer`. Validación global con `ValidationPipe({ transform: true, whitelist: true })`.
-- **Errores:** `HttpExceptionFilter` global mapea `TimeoutError`→408, `UpstreamError`→502, `NotImplementedError`→503.
+- **Errores:** `HttpExceptionFilter` global mapea `TimeoutError`→408 y `UpstreamError`→502.
 - **DB:** `better-sqlite3` sincrónico, WAL mode. Tabla `dashboards` con JSON opaco en columna `payload`.
 - **Tests:** Jest con `nock` para mock HTTP, `supertest` para endpoints, `@nestjs/testing` para modules.
 
@@ -94,13 +94,13 @@ consumidores. Los defaults que necesita el Explorer viajan en `/api/config`.)
 
 ## Adaptadores SPARQL
 
-- **`GenericSparqlAdapter`** (completo): cliente SPARQL 1.1 genérico (POST form-urlencoded). URL vía `SPARQL_ENDPOINT_URL`, Basic Auth opcional (`SPARQL_USERNAME`/`SPARQL_PASSWORD`), retry con backoff en 429, normalización de tipos (uri, literal, coordinate WKT, date, bnode), construcción de grafo (nodes+edges), cache de predicados 1h. Se usa para cualquier `SPARQL_BACKEND` distinto de `millenniumdb`.
-- **`MillenniumDBAdapter`** (stub): lanza `NotImplementedError`. Pendiente fase 2.
+- **`GenericSparqlAdapter`**: cliente SPARQL 1.1 genérico (POST form-urlencoded). URL vía `SPARQL_ENDPOINT_URL`, Basic Auth opcional (`SPARQL_USERNAME`/`SPARQL_PASSWORD`), retry con backoff en 429, normalización de tipos (uri, literal, coordinate WKT, date, bnode), construcción de grafo (nodes+edges) y cache de predicados 1h. Se usa para cualquier `SPARQL_BACKEND` distinto de `wikidata`.
+- **`WikidataAdapter`**: extiende el adaptador genérico con búsqueda pública de entidades y descriptor `wikibase:label`.
 - **Interfaz:** `SparqlEndpoint { execute(), getPredicates(), backendName }` (`backendName: string` = valor de `SPARQL_BACKEND`).
 
 ## Prefixes SPARQL
 
-- Fuente: `packages/explorer-backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). El repo trae `prefixes.wikidata.json` y `prefixes.graphdb.example.json`; `prefixes.graphdb.json` real está gitignoreado.
+- Fuente: `packages/explorer-backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). El repo trae `prefixes.wikidata.json`; las configuraciones privadas usan archivos locales ignorados.
 - Se exponen como `defaultPrefixes` en `GET /api/config`.
 - **rdf_explorer** los usa en la generación de queries y para abreviar URIs (describe panel).
 - **rdf_gis_explorer** precarga el bloque `PREFIX ...` en el editor CodeMirror (`SparqlInputComponent.seedDefaultPrefixes()`): al iniciar con editor vacío y al crear tablero nuevo. Nunca pisa un handoff ni un tablero cargado.
@@ -189,7 +189,7 @@ pnpm run clean:unused-data          # reporta archivos SQLite sin uso, exit 1 si
 pnpm run clean:unused-data:force    # los borra (incluye -shm/-wal siblings)
 ```
 
-`SPARQL_PROTECTED_BACKENDS` (default `wikidata,graphdb`) controla qué archivos en `data/` se preservan aunque no sean el activo.
+`SPARQL_PROTECTED_BACKENDS` (default `wikidata`) controla qué archivos en `data/` se preservan aunque no sean el activo.
 
 ## Configuración runtime — `GET /api/config`
 
@@ -211,11 +211,11 @@ AppConfig {
 
 **Canal de límites:** todos los límites de queries y visualización viven en env vars del backend (ver tabla del README) y viajan en `AppConfig.limits`. El GIS los consume con `LimitsService` (signal con defaults equivalentes hasta que la config llega; `App` lo actualiza en `ngOnInit`): grafo (`graphMaxNodes`), lotes (`lotDefaultSize`/`lotSizeOptions`, con clamp del tamaño actual si queda fuera de la nueva oferta), tabla (`tablePageSizeOptions`) y export (`exportMaxRows`/`exportMinPageSize`).
 
-Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, searchClass Q5) viven en el `AppConfigService` del backend y solo se emiten cuando `backend === 'wikidata'`; para otros backends se emiten defaults RDF neutros. Los colores por clase se cargan desde `packages/explorer-backend/config/class-colors.${SPARQL_BACKEND}.json` (override: `CLASS_COLORS_PATH`) y quedan vacíos si el archivo no existe — el repo trae `class-colors.wikidata.json` y `class-colors.graphdb.example.json`; `class-colors.graphdb.json` real está gitignoreado.
+Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, searchClass Q5) viven en el descriptor de su adaptador; para otros endpoints se emiten defaults RDF neutros. Los colores por clase se cargan desde `packages/explorer-backend/config/class-colors.${SPARQL_BACKEND}.json` (override: `CLASS_COLORS_PATH`) y quedan vacíos si el archivo no existe.
 
 ## Variables de Entorno
 
-Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa está en `README.md#variables-de-entorno`. No hay `LOG_LEVEL` ni `SQLITE_PATH` (obsoletas, eliminadas).
+Ver `.env` (Wikidata, trackeado) y `README.md#configuración-sparql`. No hay `LOG_LEVEL` ni `SQLITE_PATH`.
 
 ## Path Aliases (TypeScript)
 
@@ -240,7 +240,6 @@ Ver `.env` (Wikidata, trackeado) y `.env.graphdb.example`. La tabla completa est
 - **`sparqljs`** se usa en backend (validación) y en GIS (validación en el frontend).
 - **Límites unificados (resuelto el acoplamiento histórico):** ya no hay `@Max(2000)` hardcodeado en el DTO ni caps fijos en front/back: todos los límites son env del backend y llegan a los frontends vía `AppConfig.limits` (ver "Canal de límites" en la sección de `/api/config`). El GIS **no manda límite propio**: `ApiService.executeQuery` sin `limit` explícito pide el `maxLimit` que publica el backend (el volumen se pagina en cliente con los lotes).
 - **WKT inválido no aborta la query:** si un literal `wktLiteral` no parsea como Point (datos sucios, p.ej. `POINT(None None)`), el adaptador lo degrada a literal plano en vez de lanzar error (`generic-sparql.adapter.ts` `normalizeValue`).
-- **Fases futuras:** MillenniumDB adapter, curation records, duplicate detection (tablas en `db/migrations.sql`, hoy sin uso).
 
 ## Regla de git
 

@@ -59,7 +59,6 @@ export interface NormalizedNode {
   flags?: {
     hasAnomaly?: boolean;
     hasPendingReview?: boolean;
-    isConfirmedDuplicate?: boolean;
   };
 }
 

@@ -184,7 +184,7 @@ export function makeDenseSmall(nodeCount = 100, edgesPerNode = 30): QueryResult 
 /** Varias clases y una entidad multi-tipo (`classes` con 2 URIs). */
 export function makeMultiClass(): QueryResult {
   const person = makeNode(`${EX}p1`, { classes: [CLASS_PERSON] });
-  const city = makeNode(`${EX}c1`, { classes: [CLASS_CITY] });
+  const city = makeNode(`${EX}city-1`, { classes: [CLASS_CITY] });
   const multi = makeNode(`${EX}m1`, { classes: [CLASS_PERSON, CLASS_CITY] });
   const unclassified = makeNode(`${EX}u1`, { queryVariable: 'item' });
   const edges = [

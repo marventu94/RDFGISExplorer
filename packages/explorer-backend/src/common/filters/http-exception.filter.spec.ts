@@ -3,7 +3,6 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import {
   TimeoutError,
   UpstreamError,
-  NotImplementedError,
 } from '../../adapters/sparql-endpoint.interface';
 
 function createMockHost() {
@@ -63,18 +62,6 @@ describe('HttpExceptionFilter', () => {
     expect(host.status).toHaveBeenCalledWith(502);
     expect(host.json).toHaveBeenCalledWith(
       expect.objectContaining({ error: 'UPSTREAM_ERROR' }),
-    );
-  });
-
-  it('should handle NotImplementedError → 503', () => {
-    const host = createMockHost();
-    const exception = new NotImplementedError('MillenniumDB');
-
-    filter.catch(exception, host as never);
-
-    expect(host.status).toHaveBeenCalledWith(503);
-    expect(host.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'NOT_IMPLEMENTED' }),
     );
   });
 

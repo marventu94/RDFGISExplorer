@@ -11,7 +11,6 @@ import {
   SPARQL_ENDPOINT,
   TimeoutError,
   UpstreamError,
-  NotImplementedError,
 } from '../../adapters/sparql-endpoint.interface';
 import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
 import type { QueryResult } from '../../shared/dto/query-result.dto';
@@ -108,12 +107,6 @@ export class QueryService {
         throw new HttpException(
           { error: 'UPSTREAM_ERROR', message: e.message },
           HttpStatus.BAD_GATEWAY,
-        );
-      }
-      if (e instanceof NotImplementedError) {
-        throw new HttpException(
-          { error: 'NOT_IMPLEMENTED', message: e.message },
-          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
       throw e;
