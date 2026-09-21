@@ -25,25 +25,25 @@ function subgraphOf(
 }
 
 describe('shortenUri', () => {
-  it('conserva los bnodes opacos tal cual', () => {
+  it('retains opaque bnodes unchanged', () => {
     expect(shortenUri('_:b0')).toBe('_:b0');
   });
 
-  it('abrevia por fragmento cuando lo hay', () => {
+  it('abbreviates by fragment when present', () => {
     expect(shortenUri('http://example.org/ontology#Listing')).toBe('…#Listing');
   });
 
-  it('deja los dos últimos segmentos de la ruta', () => {
+  it('retains the last two path segments', () => {
     expect(shortenUri('http://example.org/resource/listing/0')).toBe('…/listing/0');
   });
 
-  it('no abrevia lo que ya es corto', () => {
+  it('does not abbreviate an already short value', () => {
     expect(shortenUri('urn:x')).toBe('urn:x');
   });
 });
 
 describe('buildEntityModeElements', () => {
-  it('dibuja todos los nodos y aristas del subgrafo, sin recortar', () => {
+  it('draws every subgraph node and edge without trimming', () => {
     const subgraph = subgraphOf();
     const built = buildEntityModeElements(subgraph);
 
@@ -60,7 +60,7 @@ describe('buildEntityModeElements', () => {
     expect(built.edgeCount).toBe(subgraph.edges.length);
   });
 
-  it('marca la raíz con su papel y su clase de estilo', () => {
+  it('marks the root with its role and style class', () => {
     const fixture = realEstateFixture();
     const subgraph = subgraphOf();
     const built = buildEntityModeElements(subgraph);
@@ -70,7 +70,7 @@ describe('buildEntityModeElements', () => {
     expect(root.classes).toContain('entity-role-root');
   });
 
-  it('distingue nodo activo, fijado y hub', () => {
+  it('distinguishes active, pinned, and hub nodes', () => {
     const fixture = realEstateFixture();
     const subgraph = buildEntitySubgraph({
       visibleResult: fixture.result,
@@ -90,7 +90,7 @@ describe('buildEntityModeElements', () => {
     }
   });
 
-  it('anota cuántos vecinos pendientes tiene cada nodo expandible', () => {
+  it('records pending-neighbor counts for expandable nodes', () => {
     const subgraph = buildEntitySubgraph({
       visibleResult: wideStarFixture(12),
       rootUri: 'http://example.org/star/root',
@@ -105,7 +105,7 @@ describe('buildEntityModeElements', () => {
     expect(hub.classes).toContain('entity-expandable');
   });
 
-  it('entrega posiciones semilla deterministas para el layout incremental', () => {
+  it('provides deterministic seed positions for incremental layout', () => {
     const first = buildEntityModeElements(subgraphOf());
     const second = buildEntityModeElements(subgraphOf());
 
@@ -115,7 +115,7 @@ describe('buildEntityModeElements', () => {
     expect(first.elements[0].position).toBeDefined();
   });
 
-  it('cuenta el grado dibujado por nodo', () => {
+  it('counts drawn degree per node', () => {
     const fixture = realEstateFixture();
     const subgraph = subgraphOf();
     const built = buildEntityModeElements(subgraph);
@@ -129,15 +129,15 @@ describe('buildEntityModeElements', () => {
 });
 
 describe('entityNodeRole', () => {
-  it('resuelve la raíz por encima de cualquier otro papel', () => {
+  it('resolves the root above every other role', () => {
     const subgraph = subgraphOf();
     const root = subgraph.nodes.find((node) => node.isRoot)!;
     expect(entityNodeRole({ ...root, isPinned: true, isHub: true })).toBe('root');
   });
 });
 
-describe('literales por nodo', () => {
-  it('muestra cada atributo sólo en el nodo que lo posee', () => {
+describe('literals by node', () => {
+  it('shows each attribute only on its owning node', () => {
     const subgraph = subgraphOf();
     const listing = subgraph.nodes[0];
     const specification = subgraph.nodes[1];
@@ -159,7 +159,7 @@ describe('literales por nodo', () => {
     );
   });
 
-  it('no imprime referencias URI o blank node como literales debajo del nodo', () => {
+  it('does not print URI or blank-node references as node literals', () => {
     const subgraph = subgraphOf();
     const specification = subgraph.nodes[1];
     specification.node.directAttributes = {
@@ -176,7 +176,7 @@ describe('literales por nodo', () => {
 });
 
 describe('ramas', () => {
-  it('lista las ramas del nodo activo con sus conteos', () => {
+  it('lists active-node branches with their counts', () => {
     const fixture = realEstateFixture();
     const subgraph = buildEntitySubgraph({
       visibleResult: fixture.result,
@@ -192,7 +192,7 @@ describe('ramas', () => {
     expect(items[0].detail).toContain('tripleta');
   });
 
-  it('marca las ramas que llegan a un recurso compartido', () => {
+  it('marks branches that reach a shared resource', () => {
     const fixture = realEstateFixture();
     const subgraph = buildEntitySubgraph({
       visibleResult: fixture.result,
@@ -206,7 +206,7 @@ describe('ramas', () => {
     for (const branch of hubBranches) expect(branch.detail).toContain('recurso compartido');
   });
 
-  it('las otras ramas excluyen al nodo activo y se acotan', () => {
+  it('bounds other branches and excludes the active node from them', () => {
     const subgraph = subgraphOf();
     const items = otherBranchItems(subgraph, 2);
 
@@ -214,11 +214,11 @@ describe('ramas', () => {
     expect(items.every((item) => item.nodeUri !== subgraph.activeUri)).toBe(true);
     expect(items.every((item) => item.pendingCount > 0)).toBe(true);
     expect(items.every((item) => item.revealedUri !== null)).toBe(true);
-    // Con nodo en el texto: hace falta para saber de dónde sale la rama.
+    // Include the node in text to identify where the branch originates.
     for (const item of items) expect(item.label).toContain(item.nodeLabel);
   });
 
-  it('una rama sin pendientes no se ofrece para expandir', () => {
+  it('does not offer a branch without pending nodes for expansion', () => {
     const subgraph = subgraphOf();
     const items = activeBranchItems(subgraph);
     for (const item of items) {
@@ -226,15 +226,15 @@ describe('ramas', () => {
     }
   });
 
-  it('produce siempre el mismo orden para el mismo subgrafo', () => {
+  it('always produces the same order for the same subgraph', () => {
     expect(otherBranchItems(subgraphOf()).map((item) => item.id)).toEqual(
       otherBranchItems(subgraphOf()).map((item) => item.id),
     );
   });
 });
 
-describe('breadcrumb y métricas', () => {
-  it('marca sólo la última raíz como vigente', () => {
+describe('breadcrumb and metrics', () => {
+  it('marks only the latest root as current', () => {
     const crumbs = entityBreadcrumb(['http://example.org/a', 'http://example.org/b'], (uri) => uri);
 
     expect(crumbs.map((crumb) => crumb.current)).toEqual([false, true]);
@@ -255,12 +255,12 @@ describe('breadcrumb y métricas', () => {
     if (subgraph.omitted.nodes.length > 0) expect(label).toContain('omitidos');
   });
 
-  it('no inventa texto sin subgrafo', () => {
+  it('does not invent text without a subgraph', () => {
     expect(entityMetricsLabel(null)).toBe('');
     expect(entityWarningsLabel(null)).toBe('');
   });
 
-  it('expone las advertencias del subgrafo en un solo texto', () => {
+  it('exposes subgraph warnings in a single text', () => {
     const fixture = realEstateFixture();
     const subgraph = buildEntitySubgraph({
       visibleResult: { ...fixture.result, nodes: [], edges: [], bindings: [] },
@@ -271,7 +271,7 @@ describe('breadcrumb y métricas', () => {
     expect(entityWarningsLabel(subgraph)).toContain('resultado completo');
   });
 
-  it('resuelve etiquetas con la URI como último recurso', () => {
+  it('falls back to the URI when resolving labels', () => {
     const labelOf = entityLabelResolver(subgraphOf());
     expect(labelOf('http://example.org/listing/0')).toBe('Aviso 0');
     expect(labelOf('http://example.org/desconocido')).toBe('http://example.org/desconocido');

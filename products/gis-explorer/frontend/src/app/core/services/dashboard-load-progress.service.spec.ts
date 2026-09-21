@@ -38,7 +38,7 @@ describe('DashboardLoadProgressService', () => {
   });
 
   it('opens a run with every stage pending', () => {
-    service.begin('Cargando tablero', STAGES, 'WWII battles');
+    service.begin('Loading dashboard', STAGES, 'WWII battles');
 
     expect(service.active()).toBe(true);
     expect(service.run()?.subtitle).toBe('WWII battles');
@@ -105,7 +105,7 @@ describe('DashboardLoadProgressService', () => {
     service.begin('t', STAGES);
     service.expectViews(['table']);
     service.reportSummaryStart('local');
-    service.reportSummaryDone('120 filas · en el navegador');
+    service.reportSummaryDone('120 rows · in the browser');
 
     expect(service.stageStatus('summary')).toBe('done');
   });
@@ -123,7 +123,7 @@ describe('DashboardLoadProgressService', () => {
   it('fails the next pending stage when nothing was running', () => {
     service.begin('t', STAGES);
 
-    service.failActive('no se pudo cargar el tablero');
+    service.failActive('dashboard could not be loaded');
 
     expect(service.stageStatus('fetch-dashboard')).toBe('failed');
     expect(service.active()).toBe(false);
@@ -135,7 +135,7 @@ describe('DashboardLoadProgressService', () => {
     service.begin('t2', STAGES);
     service.expectViews(['table']);
 
-    // El reporte de la corrida anterior no cuenta para la nueva.
+    // The previous run's report does not count toward the new run.
     service.reportViewRendered('map');
     expect(service.active()).toBe(true);
 

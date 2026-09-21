@@ -33,8 +33,8 @@ const mockNodeNoCoord: NormalizedNode = {
   attributes: { occupationLabel: { type: 'literal', value: 'escritor' } },
 };
 
-// Nodo estructural (sin datos propios): nunca tiene coordenada y no debe
-// disparar el chip de cobertura.
+// A structural node without its own data never has coordinates and must not
+// trigger the coverage chip.
 const mockStructuralNode: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/QSTRUCT',
   label: 'Feature',
@@ -441,9 +441,8 @@ describe('MapViewComponent', () => {
     });
 
     /**
-     * La tabla y la timeline seleccionan entidades que casi nunca tienen
-     * geometría propia (el aviso, la ficha temporal). Sin resolver por fila el
-     * mapa se quedaba sin resaltar nada.
+     * Table and timeline select entities that rarely own geometry. Resolving by
+     * row ensures the map can still highlight the related marker.
      */
     describe('external selection', () => {
       /** Marcador falso: `eachLayer` del cluster mockeado no recorre nada solo. */
@@ -476,7 +475,7 @@ describe('MapViewComponent', () => {
           relatedUris: new Set([mockNodeNoCoord.uri, mockNode.uri]),
         });
 
-        // Se resalta el marcador relacionado con el estilo de seleccionado.
+        // The related marker receives the selected style.
         expect(marker.setStyle).toHaveBeenCalledWith(
           expect.objectContaining({ fillColor: '#2196f3' }),
         );

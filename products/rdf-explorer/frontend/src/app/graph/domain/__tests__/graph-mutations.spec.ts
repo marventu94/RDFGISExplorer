@@ -82,8 +82,8 @@ describe('PropertyGraph mutations', () => {
       const first = graph.addEdge(s, o);
       const second = graph.addEdge(s, o);
 
-      // `newProp()` crea una property nueva por llamada: son dos variables
-      // SPARQL distintas apuntando al mismo nodo, y las dos son legitimas.
+      // Each `newProp()` call creates a new property: two legitimate distinct
+      // SPARQL variables point to the same node.
       expect(graph.edges.length).toBe(2);
       expect(s.properties.length).toBe(2);
       expect(second).not.toBe(first);

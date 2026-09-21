@@ -82,7 +82,7 @@ describe('SparqlInputComponent', () => {
       currentDashboardId: vi.fn().mockReturnValue(null),
       clearCurrent: vi.fn(),
     };
-    // Sin prefixes: el editor arranca vacío igual que antes de mockear la config.
+    // Without prefixes, the editor starts empty just as before mocking configuration.
     appConfigMock = {
       load: vi.fn().mockReturnValue(of({ maxLimit: 1000, defaultPrefixes: {} })),
       config: vi.fn().mockReturnValue({ maxLimit: 1000, defaultPrefixes: {} }),
@@ -123,18 +123,18 @@ describe('SparqlInputComponent', () => {
     return component as any;
   }
 
-  describe('aviso de LIMIT propio en la consulta', () => {
+  describe('query-owned LIMIT notice', () => {
     function noticeEl(): HTMLElement | null {
       return (fixture.nativeElement as HTMLElement).querySelector('.limit-notice');
     }
 
-    it('no muestra nada con una consulta sin LIMIT', () => {
+    it('shows nothing for a query without LIMIT', () => {
       asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o }');
       fixture.detectChanges();
       expect(noticeEl()).toBeNull();
     });
 
-    it('avisa cuando la consulta trae un LIMIT bajo el tope del backend', () => {
+    it('warns when the query LIMIT is below the backend cap', () => {
       asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 500');
       fixture.detectChanges();
 
@@ -144,14 +144,14 @@ describe('SparqlInputComponent', () => {
       expect(el!.getAttribute('title')).toContain('no se marca');
     });
 
-    it('avisa que el backend recorta igual cuando el LIMIT supera el tope', () => {
+    it('warns that the backend still truncates when LIMIT exceeds the cap', () => {
       asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 9000');
       fixture.detectChanges();
 
       expect(noticeEl()!.textContent).toContain('recorta a 1000 filas');
     });
 
-    it('saca el aviso al borrar el LIMIT de la consulta', () => {
+    it('removes the notice when query LIMIT is deleted', () => {
       asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 500');
       fixture.detectChanges();
       expect(noticeEl()).not.toBeNull();
@@ -170,7 +170,7 @@ describe('SparqlInputComponent', () => {
     expect(asAny().hasContent()).toBe(false);
   });
 
-  it('should render the tableros button', () => {
+  it('renders the dashboards button', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const buttons = compiled.querySelectorAll('button');
     const tablerosBtn = Array.from(buttons).find(

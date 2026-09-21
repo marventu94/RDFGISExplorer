@@ -11,8 +11,8 @@ import { GisSessionStateService } from './gis-session-state.service';
 import { DashboardStateService } from './dashboard-state.service';
 import { SparqlQueryStateService } from './sparql-query-state.service';
 
-// La clave viaja duplicada en el remote del Explorer (los servicios no se
-// comparten entre remotes): si cambia acá, hay que cambiarla allá.
+// The key is duplicated in the Explorer remote because services cannot be
+// shared across remotes): if it changes here, it must change there too.
 const CHANNEL_KEY = '__rdfgisGisSession_v1';
 
 function windowKey(): unknown {
@@ -24,7 +24,7 @@ describe('canal de estado del GIS', () => {
     clearGisSessionState();
   });
 
-  it('publica el estado en la clave compartida de window', () => {
+  it('publishes state under the shared window key', () => {
     publishGisSessionState({
       dashboardId: 'esc-e01',
       dashboardName: 'E01',
@@ -41,7 +41,7 @@ describe('canal de estado del GIS', () => {
     expect(readGisSessionState()?.dashboardName).toBe('E01');
   });
 
-  it('devuelve null si no hay nada publicado o el contenido no sirve', () => {
+  it('returns null when nothing is published or the content is unusable', () => {
     clearGisSessionState();
     expect(readGisSessionState()).toBeNull();
 
@@ -80,7 +80,7 @@ describe('GisSessionStateService', () => {
     vi.clearAllMocks();
   });
 
-  it('publica hasWorkAtRisk=false con el GIS vacío', () => {
+  it('publishes hasWorkAtRisk=false when GIS is empty', () => {
     TestBed.tick();
     expect(readGisSessionState()).toMatchObject({
       dashboardId: null,
@@ -89,7 +89,7 @@ describe('GisSessionStateService', () => {
     });
   });
 
-  it('publica el tablero abierto', () => {
+  it('publishes the open dashboard', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     persistenceMock.currentDashboardName.set('E01 · Berisso');
     TestBed.tick();
@@ -101,14 +101,14 @@ describe('GisSessionStateService', () => {
     });
   });
 
-  it('marca riesgo con una consulta sin guardar (sin tablero)', () => {
+  it('marks an unsaved query without a dashboard as at risk', () => {
     queryState.query.set('SELECT ?x WHERE { ?x ?p ?o }');
     TestBed.tick();
 
     expect(readGisSessionState()).toMatchObject({ dashboardId: null, hasWorkAtRisk: true });
   });
 
-  it('no marca riesgo si la vista es tal cual la última importación', () => {
+  it('does not mark risk when the view matches the latest import', () => {
     const imported = 'SELECT ?x WHERE { ?x ?p ?o } LIMIT 100';
     TestBed.inject(GisSessionStateService).markImported(imported);
     queryState.query.set(imported);
@@ -117,7 +117,7 @@ describe('GisSessionStateService', () => {
     expect(readGisSessionState()?.hasWorkAtRisk).toBe(false);
   });
 
-  it('vuelve a marcar riesgo si la query importada se editó', () => {
+  it('marks risk again when the imported query is edited', () => {
     TestBed.inject(GisSessionStateService).markImported('SELECT ?x WHERE { ?x ?p ?o }');
     queryState.query.set('SELECT ?x WHERE { ?x ?p ?o } LIMIT 5');
     TestBed.tick();

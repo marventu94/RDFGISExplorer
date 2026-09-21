@@ -147,8 +147,8 @@ describe('GenericSparqlAdapter', () => {
           return FIXTURE;
         });
 
-      // Query con intermedios no proyectados: en modo normal el adaptador la
-      // reescribiría agregándolos al SELECT y construiría el grafo.
+      // Query with unprojected intermediates: in normal mode the adapter would
+      // rewrite it by adding them to SELECT and would build the graph.
       const query =
         'SELECT ?city WHERE { ?city <http://www.wikidata.org/prop/direct/P17> ?country }';
       const result = await adapter.execute(query, {
@@ -449,7 +449,7 @@ describe('GenericSparqlAdapter', () => {
       };
     }
 
-    it('crea la arista con el predicado y la direccion que declara la consulta', async () => {
+    it('creates the edge with the predicate and direction declared by the query', async () => {
       mockWikidata(personCityFixture());
       const result = await adapter.execute(
         `SELECT ?person ?city WHERE { ?person <${P31}> ?city }`,
@@ -464,7 +464,7 @@ describe('GenericSparqlAdapter', () => {
       });
     });
 
-    it('respeta un path inverso dando vuelta la arista', async () => {
+    it('honors an inverse path by reversing the edge', async () => {
       mockWikidata(personCityFixture());
       const result = await adapter.execute(
         `SELECT ?person ?city WHERE { ?person ^<${P31}> ?city }`,
@@ -474,9 +474,9 @@ describe('GenericSparqlAdapter', () => {
       expect(result.edges[0]).toMatchObject({ source: Q1486, target: Q123 });
     });
 
-    it('no inventa aristas entre variables que la consulta no relaciona', async () => {
+    it('does not invent edges between variables that the query does not relate', async () => {
       mockWikidata(personCityFixture());
-      // Las dos variables se proyectan pero no hay ningun patron que las una.
+      // Both variables are projected, but no pattern connects them.
       const result = await adapter.execute(
         `SELECT ?person ?city WHERE { ?person <${P31}> ?otro . ?city <${P31}> ?otro2 }`,
         defaultOpts,
@@ -498,7 +498,7 @@ describe('GenericSparqlAdapter', () => {
       expect(result.edges).toHaveLength(1);
     });
 
-    it('resuelve el predicado por fila cuando la consulta usa ?s ?p ?o', async () => {
+    it('resolves the predicate per row when the query uses ?s ?p ?o', async () => {
       mockWikidata({
         head: { vars: ['s', 'p', 'o'] },
         results: {
@@ -523,9 +523,9 @@ describe('GenericSparqlAdapter', () => {
       });
     });
 
-    it('dibuja los nodos intermedios y no los agrega a la tabla', async () => {
-      // El endpoint devuelve el intermedio porque el adapter lo agrego al SELECT.
-      // nock parsea el body urlencoded a objeto, asi que la query viene en body.query.
+    it('draws intermediate nodes without adding them to the table', async () => {
+      // The endpoint returns the intermediate because the adapter added it to SELECT.
+      // nock parses the URL-encoded body into an object, so the query is in body.query.
       const scope = nock(WIKIDATA_BASE)
         .post(WIKIDATA_PATH, (body: unknown) => {
           const enviada =
@@ -553,10 +553,10 @@ describe('GenericSparqlAdapter', () => {
       );
 
       expect(scope.isDone()).toBe(true);
-      // La tabla no ve la columna intermedia...
+      // The table does not see the intermediate column...
       expect(result.variables).toEqual(['person', 'city']);
       expect(Object.keys(result.bindings[0])).toEqual(['person', 'city']);
-      // ...pero el grafo si tiene el nodo, encadenado en dos aristas.
+      // ...but the graph does contain the node, chained through two edges.
       expect(result.nodes.map((n) => n.uri)).toContain('_:b0');
       expect(result.edges).toHaveLength(2);
       expect(result.edges.map((e) => `${e.source}->${e.target}`)).toEqual([
@@ -565,7 +565,7 @@ describe('GenericSparqlAdapter', () => {
       ]);
     });
 
-    it('cuelga coordenada y fechas del nodo ancla, no del intermedio', async () => {
+    it('attaches coordinates and dates to the anchor node, not the intermediate', async () => {
       nock(WIKIDATA_BASE)
         .post(WIKIDATA_PATH)
         .reply(200, {
@@ -592,12 +592,12 @@ describe('GenericSparqlAdapter', () => {
     });
   });
 
-  describe('clasificación de nodos y atribución multi-entidad', () => {
+  describe('node classification and multi-entity attribution', () => {
     const Q_PERSONA = 'http://example.org/persona/1';
     const Q_CIUDAD = 'http://example.org/ciudad/1';
     const XSD_DT = 'http://www.w3.org/2001/XMLSchema#date';
 
-    it('el nodo lleva queryVariable con la variable de origen y no existe el campo type', async () => {
+    it('stores the source variable in queryVariable and has no type field', async () => {
       mockWikidata({
         head: { vars: ['persona'] },
         results: {
@@ -614,7 +614,7 @@ describe('GenericSparqlAdapter', () => {
       expect(node).not.toHaveProperty('type');
     });
 
-    it('?x a <Clase> → classes contiene la URI y classification.source es rdf-type', async () => {
+    it('?x a <Class> stores the URI in classes and uses rdf-type as classification.source', async () => {
       mockWikidata({
         head: { vars: ['persona'] },
         results: {
@@ -633,7 +633,7 @@ describe('GenericSparqlAdapter', () => {
       });
     });
 
-    it('entidad sin afirmación de clase → classification.source es query-variable', async () => {
+    it('uses query-variable as classification.source for an entity without a class assertion', async () => {
       mockWikidata({
         head: { vars: ['persona'] },
         results: {
@@ -652,7 +652,7 @@ describe('GenericSparqlAdapter', () => {
       });
     });
 
-    it('multi-tipo: dos `a` para la misma variable → ambas clases', async () => {
+    it('records both classes when two `a` assertions target the same variable', async () => {
       mockWikidata({
         head: { vars: ['persona'] },
         results: {
@@ -674,7 +674,7 @@ describe('GenericSparqlAdapter', () => {
       expect(node!.classification?.source).toBe('rdf-type');
     });
 
-    it('fila multi-entidad: cada fecha cuelga de su entidad según los links', async () => {
+    it('attaches each date to its linked entity in a multi-entity row', async () => {
       mockWikidata({
         head: { vars: ['persona', 'ciudad', 'fechaNac', 'fundacion'] },
         results: {
@@ -712,14 +712,14 @@ describe('GenericSparqlAdapter', () => {
       expect(ciudad!.temporalEvents?.map((e) => e.field)).toEqual([
         'fundacion',
       ]);
-      // Los atributos siguen la misma regla.
+      // Attributes follow the same rule.
       expect(persona!.attributes['fechaNac']).toBeDefined();
       expect(persona!.attributes['fundacion']).toBeUndefined();
       expect(ciudad!.attributes['fundacion']).toBeDefined();
       expect(ciudad!.attributes['fechaNac']).toBeUndefined();
     });
 
-    it('atribuye fecha y coordenada al blank node que es sujeto del triple', async () => {
+    it('attributes the date and coordinate to the blank node used as triple subject', async () => {
       mockWikidata({
         head: { vars: ['inmueble', 'wkt', 'fecha', 'f'] },
         results: {
@@ -750,8 +750,8 @@ describe('GenericSparqlAdapter', () => {
         (n) => n.uri === 'http://example.org/inmueble/1',
       );
       const intermedio = result.nodes.find((n) => n.uri === '_:b0');
-      // El ancla conserva los datos consumidos por mapa/timeline, mientras el
-      // blank node registra la propiedad directa para inspeccionar la topología.
+      // The anchor retains data consumed by map/timeline, while the blank node
+      // records the direct property for topology inspection.
       expect(inmueble!.coordinate).toEqual({ lat: -34.6037, lng: -58.3816 });
       expect(inmueble!.temporalEvents?.map((e) => e.field)).toEqual(['fecha']);
       expect(inmueble!.attributes['wkt']).toBeDefined();
@@ -761,7 +761,7 @@ describe('GenericSparqlAdapter', () => {
       expect(intermedio!.directAttributes?.['fecha']).toBeDefined();
     });
 
-    it('un bnode con label ya prefijado no queda doblemente prefijado', async () => {
+    it('does not prefix an already prefixed bnode label twice', async () => {
       mockWikidata({
         head: { vars: ['x'] },
         results: {
@@ -968,7 +968,7 @@ describe('GenericSparqlAdapter.searchEntities', () => {
     return { get: () => sent, scope };
   }
 
-  it('busca por regex sobre los labels y mapea los resultados', async () => {
+  it('searches labels by regex and maps the results', async () => {
     nock('http://localhost:7200')
       .post('/repositories/test')
       .reply(200, {
@@ -990,7 +990,7 @@ describe('GenericSparqlAdapter.searchEntities', () => {
     expect(results[0].label).toBe('Entity One');
   });
 
-  it('inyecta el filtro de clase cuando se pide', async () => {
+  it('injects the class filter when requested', async () => {
     const captured = captureQuery();
 
     await adapter.searchEntities('entity', {
@@ -1001,24 +1001,24 @@ describe('GenericSparqlAdapter.searchEntities', () => {
     expect(captured.get()).toContain('?uri a <http://example.org/Class>');
   });
 
-  it('escapa intentos de inyeccion en el keyword', async () => {
+  it('escapes injection attempts in the keyword', async () => {
     const captured = captureQuery();
 
-    // keyword malicioso: corta el literal, inyecta un patron y usa $& de replace
+    // Malicious keyword: closes the literal, injects a pattern, and uses replace's $&.
     await adapter.searchEntities('x\\" } UNION { ?s ?p ?o } #$&', {
       limit: 10,
     });
 
     const sentQuery = captured.get();
-    // el literal queda cerrado: backslash y comilla escapados
+    // The literal remains closed: backslash and quote are escaped.
     expect(sentQuery).toContain('x\\\\\\" } UNION');
-    // no quedo una comilla sin escapar que corte el string
+    // No unescaped quote remains to terminate the string.
     expect(sentQuery).not.toContain('x\\" }');
-    // $& no se expandio como patron de reemplazo (quedaria el query duplicado)
+    // $& was not expanded as a replacement pattern, which would duplicate the query.
     expect(sentQuery).toContain('#$&');
   });
 
-  it('respeta una plantilla propia y NO le inyecta el filtro de clase', async () => {
+  it('honors a custom template and does NOT inject the class filter', async () => {
     process.env['SPARQL_ENTITY_SEARCH_QUERY'] =
       'SELECT ?uri ?label WHERE { ?uri ?p "$keyword" } LIMIT $limit';
     const captured = captureQuery();

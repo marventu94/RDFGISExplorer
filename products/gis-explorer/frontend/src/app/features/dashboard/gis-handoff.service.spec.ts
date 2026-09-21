@@ -46,7 +46,7 @@ describe('GisHandoffService', () => {
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
-    // Sin auto-run el flujo es sincrónico: alcanza para verificar qué se aplica.
+    // Without auto-run the flow is synchronous, which is enough to verify applied state.
     setAutoRunHandoff(false);
 
     persistenceMock = {
@@ -94,7 +94,7 @@ describe('GisHandoffService', () => {
     });
   }
 
-  it('avisa con un popup si no hay query para importar', () => {
+  it('shows a dialog when there is no query to import', () => {
     const target = makeTarget();
     service.consumeInto(asTarget(target));
 
@@ -118,7 +118,7 @@ describe('GisHandoffService', () => {
     TestBed.inject(I18nService).set('es');
   });
 
-  it('aplica sin preguntar cuando no hay nada que perder', () => {
+  it('applies without asking when nothing can be lost', () => {
     publish();
     const target = makeTarget();
     service.consumeInto(asTarget(target));
@@ -126,7 +126,7 @@ describe('GisHandoffService', () => {
     expect(dialogMock.open).not.toHaveBeenCalled();
     expect(target.setQuery).toHaveBeenCalledWith('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
     expect(target.setBackend).toHaveBeenCalledWith('custom');
-    // El handoff se consume: no queda pendiente para el próximo ingreso.
+    // The handoff is consumed and is not pending on the next entry.
     expect(handoff.peek()).toBeNull();
   });
 
@@ -143,7 +143,7 @@ describe('GisHandoffService', () => {
     TestBed.inject(I18nService).set('es');
   });
 
-  it('desvincula el tablero abierto al aplicar, para que Guardar no lo sobrescriba', () => {
+  it('detaches the open dashboard so Save does not overwrite it', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     persistenceMock.currentDashboardName.set('E01');
     publish(true);
@@ -153,7 +153,7 @@ describe('GisHandoffService', () => {
     expect(persistenceMock.clearCurrent).toHaveBeenCalled();
   });
 
-  it('no vuelve a preguntar si el Explorer ya confirmó', () => {
+  it('does not ask again when Explorer already confirmed', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     persistenceMock.currentDashboardName.set('E01');
     publish(true);
@@ -165,7 +165,7 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).toHaveBeenCalled();
   });
 
-  it('pregunta antes de pisar un tablero abierto y respeta "reemplazar"', () => {
+  it('asks before replacing an open dashboard and honors replace', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     persistenceMock.currentDashboardName.set('E01 · Berisso');
     publish();
@@ -183,7 +183,7 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).toHaveBeenCalled();
   });
 
-  it('no pregunta si en el GIS está tal cual la exportación anterior', () => {
+  it('does not ask when GIS still matches the previous export', () => {
     const imported = 'SELECT ?x WHERE { ?x ?p ?o } LIMIT 10';
     TestBed.inject(GisSessionStateService).markImported(imported);
     queryState.query.set(imported);
@@ -196,7 +196,7 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).toHaveBeenCalled();
   });
 
-  it('pregunta también cuando hay una consulta sin guardar (sin tablero)', () => {
+  it('also asks for an unsaved query without a dashboard', () => {
     queryState.query.set('SELECT ?viejo WHERE { ?viejo ?p ?o }');
     publish();
     dialogResult = 'cancel';
@@ -211,7 +211,7 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).not.toHaveBeenCalled();
   });
 
-  it('cancelar deja el tablero intacto y descarta la importación', () => {
+  it('leaves the dashboard intact and discards the import on cancel', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     publish();
     dialogResult = 'cancel';
@@ -229,7 +229,7 @@ describe('GisHandoffService', () => {
     );
   });
 
-  it('"guardar y reemplazar" guarda primero y después aplica', () => {
+  it('saves before applying when save and replace is chosen', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     publish();
     dialogResult = 'save-first';
@@ -242,7 +242,7 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).toHaveBeenCalled();
   });
 
-  it('si el guardado se cancela, no importa nada', () => {
+  it('does not import anything when saving is canceled', () => {
     persistenceMock.currentDashboardId.set('esc-e01');
     publish();
     dialogResult = 'save-first';

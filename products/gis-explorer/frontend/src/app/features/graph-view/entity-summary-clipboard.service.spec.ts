@@ -14,9 +14,8 @@ import {
 } from './testing/entity-subgraph-fixtures';
 
 /**
- * Etapa 6: el servicio es la única pieza con dependencias de plataforma. Se
- * instancia a mano (no tiene inyecciones) y se prueban los cuatro caminos de
- * copia: API async, fallback, entorno sin soporte y error.
+ * Stage 6: this service is the only platform-dependent piece. It is manually
+ * instantiated and tests async API, fallback, unsupported environment, and error paths.
  */
 
 const SHARED_ROOT = `${EX}shared/root`;
@@ -38,7 +37,7 @@ function stubClipboard(writeText: ((text: string) => Promise<void>) | null): voi
 
 function stubExecCommand(impl: (() => boolean) | null): void {
   // `lib.dom` declara `execCommand` como obligatorio, pero jsdom no lo
-  // implementa: el cast permite borrarlo para probar el entorno sin soporte.
+  // The cast allows deleting it to test an unsupported environment.
   const target = document as unknown as { execCommand?: (command: string) => boolean };
   if (impl) target.execCommand = impl;
   else delete target.execCommand;
@@ -54,7 +53,7 @@ describe('EntitySummaryClipboardService', () => {
   });
 
   describe('alcances', () => {
-    it('copia la vista actual con su encabezado y sus métricas', async () => {
+    it('copies the current view with its heading and metrics', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       stubClipboard(writeText);
 
@@ -77,7 +76,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(result.message).toContain(`${result.metrics?.triples} tripleta(s)`);
     });
 
-    it('la estructura completa incluye lo que la vista dejó sin expandir', async () => {
+    it('includes content left unexpanded by the view in complete structure', async () => {
       stubClipboard(vi.fn().mockResolvedValue(undefined));
       const request = {
         context: contextOf(sharedTargetFixture()),
@@ -94,7 +93,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(structure.metrics!.nodes).toBeGreaterThan(view.metrics!.nodes);
     });
 
-    it('la estructura completa no atraviesa recursos compartidos', async () => {
+    it('does not traverse shared resources in complete structure', async () => {
       stubClipboard(vi.fn().mockResolvedValue(undefined));
       const fixture = realEstateFixture();
 
@@ -108,7 +107,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(structure.status).toBe('copied');
     });
 
-    it('reutiliza el subgrafo que ya calculó la vista', async () => {
+    it('reuses the subgraph already computed by the view', async () => {
       stubClipboard(vi.fn().mockResolvedValue(undefined));
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
@@ -126,7 +125,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(result.text).toContain(`Nodo activo: Inmueble 0 — ${fixture.estate}`);
     });
 
-    it('sin exploración activa devuelve no-entity y no toca el portapapeles', async () => {
+    it('returns no-entity without touching the clipboard when exploration is inactive', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       stubClipboard(writeText);
       const request = {
@@ -147,7 +146,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(service.buildFullStructureDocument(request)).toBeNull();
     });
 
-    it('una raíz ausente del resultado devuelve empty sin copiar', async () => {
+    it('returns empty without copying when the root is absent from the result', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       stubClipboard(writeText);
 
@@ -165,7 +164,7 @@ describe('EntitySummaryClipboardService', () => {
   });
 
   describe('portapapeles', () => {
-    it('usa el fallback cuando navigator.clipboard no existe', async () => {
+    it('uses the fallback when navigator.clipboard is unavailable', async () => {
       stubClipboard(null);
       const captured: string[] = [];
       stubExecCommand(() => {
@@ -186,7 +185,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(document.querySelector('textarea[aria-hidden="true"]')).toBeNull();
     });
 
-    it('usa el fallback cuando navigator.clipboard rechaza', async () => {
+    it('uses the fallback when navigator.clipboard rejects', async () => {
       stubClipboard(vi.fn().mockRejectedValue(new Error('NotAllowedError')));
       stubExecCommand(() => true);
 
@@ -199,7 +198,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(result.copied).toBe(true);
     });
 
-    it('sin ningún mecanismo devuelve unsupported y conserva el texto', async () => {
+    it('returns unsupported and retains text when no mechanism exists', async () => {
       stubClipboard(null);
       stubExecCommand(null);
 
@@ -214,7 +213,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(result.message).toContain('copiarlo a mano');
     });
 
-    it('informa el error cuando el mecanismo existía y falló', async () => {
+    it('reports an error when an available mechanism fails', async () => {
       stubClipboard(vi.fn().mockRejectedValue(new Error('NotAllowedError')));
       stubExecCommand(() => false);
 
@@ -230,7 +229,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(result.text).toContain('Entidad raíz:');
     });
 
-    it('copyText rechaza un texto vacío', async () => {
+    it('makes copyText reject empty text', async () => {
       stubClipboard(vi.fn().mockResolvedValue(undefined));
 
       const result = await service.copyText('', 'structure');
@@ -240,7 +239,7 @@ describe('EntitySummaryClipboardService', () => {
       expect(result.message).toContain('estructura disponible');
     });
 
-    it('copyText copia texto arbitrario con el mismo contrato', async () => {
+    it('copies arbitrary text through the same copyText contract', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       stubClipboard(writeText);
 
@@ -254,7 +253,7 @@ describe('EntitySummaryClipboardService', () => {
   });
 
   describe('determinismo', () => {
-    it('dos copias seguidas producen el mismo texto', async () => {
+    it('produces the same text for two consecutive copies', async () => {
       stubClipboard(vi.fn().mockResolvedValue(undefined));
       const request = {
         context: contextOf(realEstateFixture().result),

@@ -7,7 +7,7 @@ import { GisOverwriteGuardService } from './gis-overwrite-guard.service';
 import { MessageDialogComponent } from '../shell/message-dialog/message-dialog.component';
 import type { GisSessionState } from './gis-session-channel';
 
-// Misma clave que publica el remote del GIS (contrato duplicado a propósito).
+// Same key published by the GIS remote; the contract is deliberately duplicated.
 const CHANNEL_KEY = '__rdfgisGisSession_v1';
 
 function publishGisState(state: Partial<GisSessionState>): void {
@@ -48,18 +48,18 @@ describe('GisOverwriteGuardService', () => {
     vi.clearAllMocks();
   });
 
-  it('no pregunta si el GIS nunca se abrió en esta página', async () => {
+  it('does not ask when GIS was never opened on this page', async () => {
     await expect(service.askBeforeHandoff()).resolves.toBe('proceed');
     expect(dialogMock.open).not.toHaveBeenCalled();
   });
 
-  it('no pregunta si el GIS está vacío', async () => {
+  it('does not ask when GIS is empty', async () => {
     publishGisState({ hasWorkAtRisk: false });
     await expect(service.askBeforeHandoff()).resolves.toBe('proceed');
     expect(dialogMock.open).not.toHaveBeenCalled();
   });
 
-  it('avisa nombrando el tablero abierto y devuelve la confirmación', async () => {
+  it('warns with the open dashboard name and returns confirmation', async () => {
     publishGisState({ hasWorkAtRisk: true, dashboardId: 'esc-e01', dashboardName: 'E01 · Berisso' });
     choice = 'export';
 
@@ -74,7 +74,7 @@ describe('GisOverwriteGuardService', () => {
     );
   });
 
-  it('avisa también con una vista sin guardar', async () => {
+  it('also warns for an unsaved view', async () => {
     publishGisState({ hasWorkAtRisk: true });
     choice = 'export';
 
@@ -83,13 +83,13 @@ describe('GisOverwriteGuardService', () => {
     expect(data.message).toContain('sin guardar');
   });
 
-  it('devuelve go-save cuando el usuario elige ir a guardar', async () => {
+  it('returns go-save when the user chooses to save', async () => {
     publishGisState({ hasWorkAtRisk: true, dashboardName: 'E01' });
     choice = 'go-save';
     await expect(service.askBeforeHandoff()).resolves.toBe('go-save');
   });
 
-  it('cancela si se cierra el popup sin elegir', async () => {
+  it('cancels when the dialog closes without a choice', async () => {
     publishGisState({ hasWorkAtRisk: true, dashboardName: 'E01' });
     choice = undefined;
     await expect(service.askBeforeHandoff()).resolves.toBe('cancel');

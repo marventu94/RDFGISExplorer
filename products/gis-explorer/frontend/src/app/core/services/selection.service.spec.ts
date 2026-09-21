@@ -116,9 +116,9 @@ describe('SelectionService', () => {
     });
 
     /**
-     * Cada vista dibuja una entidad distinta de la misma fila, así que la
-     * selección viaja con el grupo de entidades de esas filas: es lo que deja
-     * que un click en el mapa se vea en la tabla, la timeline y el grafo.
+     * Each view draws a different entity from the same row, so selection travels
+     * with that row's entity group. This makes a map click visible in the table,
+     * timeline, and graph.
      */
     it('should publish the entities that share a row with the selection', () => {
       const casa = makeNode({ uri: 'urn:casa/1' });
@@ -143,10 +143,10 @@ describe('SelectionService', () => {
     });
 
     /**
-     * Regresión de performance: `visibleQueryResult$` y `lotState$` dependen de
-     * la selección por el pinning. Si reemiten en cada click, las 4 vistas se
-     * redibujan enteras (grilla, mapa, timeline y grafo) y con lotes grandes la
-     * app se traba. Solo tienen que reemitir si lo visible cambió de verdad.
+     * Performance regression: `visibleQueryResult$` and `lotState$` depend on
+     * selection because of pinning. If they re-emit on every click, all four views
+     * redraw completely and large batches freeze the app. They must re-emit only
+     * when visible content actually changes.
      */
     it('should not re-emit the visible result when selecting a node already visible', () => {
       const a = makeNode({ uri: 'urn:a' });
@@ -169,7 +169,7 @@ describe('SelectionService', () => {
     });
 
     it('should still re-emit when the selected node lives outside the current lot', () => {
-      // Lote de 1 fila: seleccionar la entidad de la otra fila la inyecta.
+      // One-row batch: selecting the entity from the other row injects it.
       const a = makeNode({ uri: 'urn:a' });
       const b = makeNode({ uri: 'urn:b' });
       service.setQueryResult(
@@ -427,8 +427,8 @@ describe('SelectionService', () => {
       });
 
       it('should keep bnode neighbors and the rows that reference them (raw ids in bindings)', () => {
-        // Los bindings traen el bnode crudo ('b0') pero nodes/edges usan '_:b0':
-        // sin normalizar, el filtrado dejaba las filas del bnode afuera.
+        // Bindings contain raw bnode 'b0', while nodes and edges use '_:b0':
+        // Without normalization, filtering excluded the bnode rows.
         const nodeInside = makeNode({
           uri: 'urn:inside',
           label: 'Inside',
@@ -828,13 +828,13 @@ describe('SelectionService', () => {
     });
   });
 
-  describe('lotes (visibleQueryResult$ / lotState$)', () => {
+  describe('batches (visibleQueryResult$ / lotState$)', () => {
     function makeLotResult(rowCount: number): QueryResult {
       const nodes = Array.from({ length: rowCount }, (_, i) =>
         makeNode({ uri: `urn:n${i}`, label: `N${i}` }),
       );
-      // Cada fila referencia su nodo ancla; los lotes cortan estas filas en el
-      // orden original de la query.
+      // Each row references its anchor node; batches slice these rows in
+      // original query order.
       const bindings = nodes.map((n) => ({
         s: { type: 'uri' as const, value: n.uri },
       }));
@@ -857,8 +857,8 @@ describe('SelectionService', () => {
     });
 
     it('should slice the filtered result into lots by rows, in query order', () => {
-      // 10 filas, lotSize 4 → 3 lotes. El lote 1 son las primeras 4 filas tal
-      // cual; los nodos visibles son sus URIs más los vecinos a 1 salto.
+      // 10 rows with lotSize 4 produce 3 batches. Batch 1 contains the first
+      // four rows; visible nodes are their URIs plus one-hop neighbors.
       const qr = makeLotResult(10);
       qr.edges = [
         { id: 'e0x', source: 'urn:n0', target: 'urn:mid', predicate: 'p' },
@@ -881,7 +881,7 @@ describe('SelectionService', () => {
         'urn:n2',
         'urn:n3',
       ]);
-      // urn:mid no está en los bindings: entra como vecino de urn:n0.
+      // urn:mid is absent from bindings and enters as a neighbor of urn:n0.
       expect(visible?.nodes.map((n) => n.uri)).toContain('urn:mid');
       expect(visible?.nodes.map((n) => n.uri)).not.toContain('urn:n4');
 
@@ -914,8 +914,8 @@ describe('SelectionService', () => {
     });
 
     it('should clamp the current lot when filters reduce lotCount', () => {
-      // Filtro temporal que solo pasan 2 nodos (n0 y n1) → las filas visibles
-      // quedan por debajo del tamaño de lote y lotCount baja a 1.
+      // Only n0 and n1 pass the temporal filter, reducing visible rows below
+      // batch size and lotCount to 1.
       const dated = ['urn:n0', 'urn:n1'];
       const qr = makeLotResult(10);
       qr.nodes = qr.nodes.map((n) =>
@@ -933,7 +933,7 @@ describe('SelectionService', () => {
     });
 
     it('should inject the selected node into the visible lot (pinning)', () => {
-      // n9 no está referenciado por las filas del lote 1 ni es vecino de sus URIs.
+      // n9 is neither referenced by batch 1 rows nor adjacent to their URIs.
       const qr = makeLotResult(10);
       qr.edges = [{ id: 'e89', source: 'urn:n8', target: 'urn:n9', predicate: 'p' }];
       service.setQueryResult(qr);
@@ -945,12 +945,12 @@ describe('SelectionService', () => {
 
       service.select(makeNode({ uri: 'urn:n9', label: 'N9' }), 'table');
       expect(visible?.nodes.map((n) => n.uri)).toContain('urn:n9');
-      // La edge e89 no entra: urn:n8 no es visible en el lote 1.
+      // Edge e89 is excluded because urn:n8 is hidden in batch 1.
       expect(visible?.edges.map((e) => e.id)).not.toContain('e89');
-      // El pinning no agrega filas al lote.
+      // Pinning adds no rows to the batch.
       expect(visible?.bindings.length).toBe(4);
 
-      // Al deseleccionar, el nodo pineado deja de inyectarse.
+      // Deselecting stops injecting the pinned node.
       service.clearSelection();
       expect(visible?.nodes.map((n) => n.uri)).not.toContain('urn:n9');
     });
@@ -965,14 +965,14 @@ describe('SelectionService', () => {
     });
   });
 
-  describe('límites config-driven (LimitsService)', () => {
-    it('emite las opciones de lote por defecto hasta que llega la config', () => {
+  describe('config-driven limits (LimitsService)', () => {
+    it('emits default batch options until configuration arrives', () => {
       let options: readonly number[] | undefined;
       service.lotSizeOptions$.subscribe((o) => (options = o));
       expect(options).toEqual([100, 300, 500]);
     });
 
-    it('aplica las nuevas opciones cuando llega la config', () => {
+    it('applies new options when configuration arrives', () => {
       const limits = TestBed.inject(LimitsService);
       limits.apply({ ...DEFAULT_LIMITS, lotDefaultSize: 200, lotSizeOptions: [200, 400] });
       TestBed.tick();
@@ -982,7 +982,7 @@ describe('SelectionService', () => {
       expect(options).toEqual([200, 400]);
     });
 
-    it('clampea el lotSize actual si quedó fuera de la nueva oferta', () => {
+    it('clamps the current lotSize when it falls outside the new offering', () => {
       service.setLotSize(500);
       const limits = TestBed.inject(LimitsService);
       limits.apply({ ...DEFAULT_LIMITS, lotDefaultSize: 200, lotSizeOptions: [200, 400] });
@@ -991,7 +991,7 @@ describe('SelectionService', () => {
       expect(service.getLotSizeSnapshot()).toBe(200);
     });
 
-    it('conserva el lotSize si sigue siendo una opción válida', () => {
+    it('retains lotSize when it remains a valid option', () => {
       service.setLotSize(300);
       const limits = TestBed.inject(LimitsService);
       limits.apply({ ...DEFAULT_LIMITS, lotDefaultSize: 100 });

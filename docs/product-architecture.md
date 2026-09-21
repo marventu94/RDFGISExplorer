@@ -1,30 +1,30 @@
-# Arquitectura por productos
+# Product architecture
 
-El workspace contiene tres productos desplegables:
+The workspace contains three deployable products:
 
-| Producto | Frontend | Backend propio | Responsabilidad |
+| Product | Frontend | Dedicated backend | Responsibility |
 | --- | --- | --- | --- |
-| Shell | `products/shell/frontend` | `products/shell/backend` (`:3000`) | navegación, pantalla y persistencia exclusiva de tableros |
-| RDF Explorer | `products/rdf-explorer/frontend` | `products/rdf-explorer/backend` (`:3001`) | edición RDF, consultas, sugerencias y configuración |
-| GIS Explorer | `products/gis-explorer/frontend` | `products/gis-explorer/backend` (`:3002`) | consultas y visualizaciones GIS |
+| Shell | `products/shell/frontend` | `products/shell/backend` (`:3000`) | navigation, home screen, and exclusive dashboard persistence |
+| RDF Explorer | `products/rdf-explorer/frontend` | `products/rdf-explorer/backend` (`:3001`) | RDF editing, queries, suggestions, and configuration |
+| GIS Explorer | `products/gis-explorer/frontend` | `products/gis-explorer/backend` (`:3002`) | queries and GIS visualizations |
 
-Los procesos de explorer usan la implementación transversal
-`packages/explorer-backend`; son procesos y configuraciones independientes y no
-contienen rutas ni almacenamiento de dashboards. `packages/contracts` contiene
-tipos compartidos y `packages/platform-bridge` los contratos de integración.
+The explorer processes use the cross-cutting implementation in
+`packages/explorer-backend`; they are independent processes and configurations and
+contain neither dashboard routes nor dashboard storage. `packages/contracts`
+contains shared types, while `packages/platform-bridge` contains integration contracts.
 
-## Modos de ejecución
+## Runtime modes
 
-- `pnpm dev`: Shell, ambos remotes y los tres backends.
-- `pnpm dev:rdf-standalone`: RDF Explorer con su backend en `:3001`.
-- `pnpm dev:gis-standalone`: GIS Explorer con su backend en `:3002`.
+- `pnpm dev`: Shell, both remotes, and all three backends.
+- `pnpm dev:rdf-standalone`: RDF Explorer with its backend on `:3001`.
+- `pnpm dev:gis-standalone`: GIS Explorer with its backend on `:3002`.
 
-En standalone cada frontend usa `/api`. Montados en el Shell, el bridge configura
-`/rdf-api` y `/gis-api`, dirigidos por el proxy al runtime correspondiente. Todas
-las URLs son relativas.
+In standalone mode, each frontend uses `/api`. When mounted in the
+Shell, the bridge configures `/rdf-api` and `/gis-api`, which the
+proxy routes to the corresponding runtime. All URLs are relative.
 
-## Propiedad de dashboards
+## Dashboard ownership
 
-Solo el Shell publica `/api/dashboards` y accede a SQLite. Al arrancar registra
-un `DashboardHost`; los remotes invocan esa mediación para persistir su estado.
-En standalone el host no existe y los controles de guardado no se muestran.
+Only the Shell exposes `/api/dashboards` and accesses SQLite. At startup, it
+registers a `DashboardHost`; the remotes use this mediation to persist their
+state. In standalone mode the host is absent, so save controls are hidden.

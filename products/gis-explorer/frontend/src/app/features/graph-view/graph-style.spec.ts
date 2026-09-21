@@ -10,7 +10,7 @@ describe('createGraphStyle', () => {
     colorForClass: () => '#90a4ae',
   };
 
-  it('muestra las etiquetas del motivo agregado en Resumen', () => {
+  it('shows aggregate motif labels in Summary', () => {
     const styles = createGraphStyle(colorService as never, () => false, () => 'summary');
     const nodeStyle = styles.find((style) => style.selector === 'node')!.style as Record<
       string,
@@ -24,7 +24,7 @@ describe('createGraphStyle', () => {
     expect(label(element({ label: 'listing_site1_1' }))).toBe('');
   });
 
-  it('muestra el predicado y la multiplicidad del motivo en Resumen', () => {
+  it('shows motif predicate and multiplicity in Summary', () => {
     const styles = createGraphStyle(colorService as never, () => false, () => 'summary');
     const motifStyle = styles.find(
       (style) => style.selector === 'edge[aggregateKind = "repeated-component-edge"]',
@@ -36,7 +36,7 @@ describe('createGraphStyle', () => {
     );
   });
 
-  it('reserva tipografía mayor para agregados y selección', () => {
+  it('reserves larger typography for aggregates and selection', () => {
     const styles = createGraphStyle(colorService as never, () => false, () => 'detail');
     const node = styles.find((style) => style.selector === 'node')!.style as Record<string, unknown>;
     const aggregate = styles.find((style) => style.selector === 'node[aggregate]')!.style as Record<string, unknown>;
@@ -50,7 +50,7 @@ describe('createGraphStyle', () => {
     expect(selected['font-weight']).toBe('bold');
   });
 
-  it('mantiene contraste de etiquetas en tema oscuro', () => {
+  it('maintains label contrast in the dark theme', () => {
     const styles = createGraphStyle(colorService as never, () => true, () => 'detail');
     const node = styles.find((style) => style.selector === 'node')!.style as Record<string, unknown>;
     const edge = styles.find((style) => style.selector === 'edge')!.style as Record<string, unknown>;
@@ -60,7 +60,7 @@ describe('createGraphStyle', () => {
     expect((edge['text-background-color'] as () => string)()).toBe('#0f172a');
   });
 
-  it('mantiene visibles los nodos no seleccionados', () => {
+  it('keeps unselected nodes visible', () => {
     const styles = createGraphStyle(colorService as never, () => false, () => 'detail');
     const dimmed = styles.find((style) => style.selector === '.is-dimmed')!.style as Record<string, unknown>;
     const muted = styles.find((style) => style.selector === '.is-muted')!.style as Record<string, unknown>;

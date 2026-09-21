@@ -29,8 +29,8 @@ describe('dashboardRedirectGuard', () => {
     updatedAt: '2025-01-01T00:00:00Z',
   };
 
-  // El aviso de "vas a pisar lo que hay en GIS" se stubea: su contenido se
-  // prueba en gis-open-guard.service.spec.ts. Acá importa a dónde se navega.
+  // The overwrite-GIS warning is stubbed; its content is tested in
+  // gis-open-guard.service.spec.ts. This spec covers navigation destination.
   let decision: OpenDecision;
   let asked: { id: string; name: string } | null;
 
@@ -108,7 +108,7 @@ describe('dashboardRedirectGuard', () => {
     const promise = getGuardResult('dash-1');
     httpMock.expectOne('/api/dashboards/dash-1').flush(gisDashboard);
     const urlTree = await promise;
-    // Sin dashboardId no se rehidrata nada: el tablero abierto sigue en pantalla.
+    // Without dashboardId nothing rehydrates, so the open dashboard remains visible.
     expect(router.serializeUrl(urlTree as UrlTree)).toBe('/gis');
   });
 

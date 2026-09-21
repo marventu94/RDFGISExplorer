@@ -148,7 +148,7 @@ describe('Query.toSparqlFullProjection()', () => {
     return sparql.split('\n').find(l => l.startsWith('SELECT'))!;
   }
 
-  it('proyecta todas las variables y recorta los ?<literal>Label vacíos', () => {
+  it('projects every variable and removes empty ?<literal>Label variables', () => {
     const graph = createWikidataGraph();
     const seed = createMosquitoExample(graph, 0, 0);
     const q = seed.createQuery()!;
@@ -161,7 +161,7 @@ describe('Query.toSparqlFullProjection()', () => {
     expect(sparql).toContain('SERVICE wikibase:label');
   });
 
-  it('no muta la proyección original de la query', () => {
+  it('does not mutate the original query projection', () => {
     const graph = createWikidataGraph();
     const seed = createMosquitoExample(graph, 0, 0);
     const q = seed.createQuery()!;
@@ -171,7 +171,7 @@ describe('Query.toSparqlFullProjection()', () => {
     expect(q.select.length).toBe(1);
   });
 
-  it('respeta las variables ocultas (hide)', () => {
+  it('honors hidden variables', () => {
     const graph = createWikidataGraph();
     const seed = createCancerExample(graph, 0, 0);
     const q = seed.createQuery()!;

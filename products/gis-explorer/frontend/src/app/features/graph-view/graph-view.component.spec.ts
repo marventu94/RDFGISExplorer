@@ -76,11 +76,9 @@ function createRepeatedPairResult(count = 2): QueryResult {
   };
 }
 
-// vi.hoisted: la factory de vi.mock se hoistea y no ve el scope del módulo;
-// esto hace que los helpers existan tanto para la factory como para los tests.
-// El mock guarda estado real (elementos, clases, posiciones, handlers) porque los
-// tests que importan —cuántas veces se instancia, qué se agrega/quita, qué pasa al
-// clickear— no se pueden escribir contra un vi.fn() vacío.
+// vi.hoisted: the vi.mock factory is hoisted and cannot see module scope, so
+// helpers must exist for both the factory and tests. The mock keeps real state
+// because instantiation, element changes, and click behavior need more than vi.fn().
 const { createMockCy, cyRegistry } = vi.hoisted(() => {
   interface El {
     id: string;
@@ -170,8 +168,8 @@ const { createMockCy, cyRegistry } = vi.hoisted(() => {
           }
           return items[0]?.position ?? { x: 0, y: 0 };
         },
-        // Unión de las cajas de TODOS los elementos: el encuadre de la vista
-        // coordinada se calcula sobre la colección enfocada, no sobre uno.
+        // Union of ALL element boxes: coordinated framing uses the focused
+        // collection rather than one element.
         boundingBox: () => {
           const points = items.length ? items.map((it) => it.position) : [{ x: 0, y: 0 }];
           const x1 = Math.min(...points.map((p) => p.x)) - 5;
@@ -237,8 +235,8 @@ const { createMockCy, cyRegistry } = vi.hoisted(() => {
       },
       destroy: vi.fn(),
       resize: vi.fn(),
-      // Viewport: el encuadre de la vista coordinada calcula el zoom a mano
-      // (piso de zoom), así que necesita medidas y el tope de zoom reales.
+      // Coordinated framing computes zoom manually and needs real dimensions
+      // and the actual maximum zoom.
       width: () => 800,
       height: () => 600,
       maxZoom: () => 5,
@@ -274,7 +272,7 @@ const { createMockCy, cyRegistry } = vi.hoisted(() => {
         const stopHandlers: (() => void)[] = [];
         const handle = {
           run: vi.fn(() => {
-            // Una simulación infinita no termina sola: solo la para stop().
+            // An infinite simulation ends only when stop() is called.
             if (!opts['infinite']) stopHandlers.forEach((h) => h());
             return handle;
           }),
@@ -320,7 +318,7 @@ vi.mock('cytoscape', () => {
   };
 });
 
-/** Última instancia de cytoscape creada por el componente. */
+/** Latest cytoscape instance created by the component. */
 function lastCy() {
   return cyRegistry.instances[cyRegistry.instances.length - 1];
 }
@@ -449,7 +447,7 @@ describe('GraphViewComponent', () => {
     expect(component.currentLayout).toBe('dagre');
   });
 
-  it('oculta Cuadrícula cuando hay relaciones', () => {
+  it('hides Grid when relationships exist', () => {
     emitResult([mockNode, mockNode2], [mockEdge]);
     fixture.detectChanges();
 
@@ -463,7 +461,7 @@ describe('GraphViewComponent', () => {
     ]);
   });
 
-  it('usa y ofrece Cuadrícula automáticamente cuando no hay relaciones', () => {
+  it('automatically uses and offers Grid when there are no relationships', () => {
     emitResult([mockNode, mockNode2], []);
     fixture.detectChanges();
 
@@ -471,7 +469,7 @@ describe('GraphViewComponent', () => {
     expect(component.availableLayoutOptions.map((option) => option.value)).toContain('grid');
   });
 
-  it('calcula la disposición inicial sin animar desde posiciones superpuestas', () => {
+  it('computes the initial layout without animating from overlapping positions', () => {
     emitResult([mockNode, mockNode2], [mockEdge]);
 
     const cy = lastCy();
@@ -481,7 +479,7 @@ describe('GraphViewComponent', () => {
     expect(cy._layoutRuns[0]?.['animate']).toBe(false);
   });
 
-  it('inicia Cola desde posiciones deterministas sin bloquear el hilo principal', () => {
+  it('starts Cola from deterministic positions without blocking the main thread', () => {
     TestBed.inject(DashboardViewStateService).graphState.set({ layout: 'cola' });
     const reverseEdge: NormalizedEdge = {
       id: 'edge-2',
@@ -498,7 +496,7 @@ describe('GraphViewComponent', () => {
     expect(initialLayout?.['randomize']).toBe(false);
   });
 
-  it('inicia en Resumen y el selector refleja el nivel activo', () => {
+  it('starts in Summary and reflects the active level in the selector', () => {
     emitResult([mockNode, mockNode2], [mockEdge]);
     fixture.detectChanges();
 
@@ -512,7 +510,7 @@ describe('GraphViewComponent', () => {
     ]);
   });
 
-  it('Resumen construye un único motivo para pares estructuralmente repetidos', () => {
+  it('builds a single motif for structurally repeated pairs in Summary', () => {
     const nodes = Array.from({ length: 3 }, (_, index) => [
       { uri: `listing-${index}`, label: `listing-${index}`, queryVariable: 'listing', attributes: {} },
       { uri: `estate-${index}`, label: `estate-${index}`, queryVariable: 'realEstate', attributes: {} },
@@ -540,7 +538,7 @@ describe('GraphViewComponent', () => {
     expect(component.coverageLabel).toBe('6 nodos representados en 1 motivo repetido');
   });
 
-  it('Exploración reemplaza el motivo por sus entidades originales', () => {
+  it('replaces the motif with its original entities in Exploration', () => {
     const nodes = Array.from({ length: 2 }, (_, index) => [
       { uri: `listing-${index}`, label: `listing-${index}`, queryVariable: 'listing', attributes: {} },
       { uri: `estate-${index}`, label: `estate-${index}`, queryVariable: 'realEstate', attributes: {} },
@@ -576,18 +574,18 @@ describe('GraphViewComponent', () => {
   });
 
   /**
-   * Una entidad colapsada dentro de un motivo no existe como nodo propio en el
+   * An entity collapsed into a motif does not exist as its own canvas node;
    * lienzo: antes, seleccionarla desde otra vista no resaltaba nada. Ahora se
-   * resalta el nodo resumen que la contiene ("está acá adentro").
+   * the summary node containing it is highlighted instead.
    */
-  it('resalta el nodo resumen que contiene a la entidad seleccionada en otra vista', () => {
+  it('highlights the summary node containing an entity selected in another view', () => {
     const result = createRepeatedPairResult();
     queryResultSubject.next(result);
     visibleQueryResultSubject.next(result);
     fixture.detectChanges();
 
     const cy = lastCy();
-    expect(cy._ids()).not.toContain('listing-0'); // quedó colapsada en el motivo
+    expect(cy._ids()).not.toContain('listing-0'); // It remains collapsed into the motif.
 
     selectedNodeSubject.next({
       node: { uri: 'listing-0', label: 'listing-0', attributes: {} },
@@ -601,14 +599,14 @@ describe('GraphViewComponent', () => {
       .filter((id: string) => cy._classesOf(id).includes('is-selected'));
     expect(seleccionados).toHaveLength(1);
     expect(seleccionados[0]).toContain('component-motif');
-    // Y el resumen resaltado es justamente el que agrupa a listing-0.
+    // The highlighted summary is the one grouping listing-0.
     const miembros = (cy._els as Array<{ id: string; data: Record<string, unknown> }>).find(
       (el) => el.id === seleccionados[0],
     )?.data['memberNodeIds'] as string[] | undefined;
     expect(miembros).toContain('listing-0');
   });
 
-  it('no resalta nada si ni la entidad ni su fila están en el lienzo', () => {
+  it('highlights nothing when neither the entity nor its row is on the canvas', () => {
     const result = createRepeatedPairResult();
     queryResultSubject.next(result);
     visibleQueryResultSubject.next(result);
@@ -627,7 +625,7 @@ describe('GraphViewComponent', () => {
     );
   });
 
-  it('expande reversiblemente un motivo al pulsar su arista agregada', () => {
+  it('reversibly expands a motif when its aggregate edge is clicked', () => {
     const result = createRepeatedPairResult();
     queryResultSubject.next(result);
     visibleQueryResultSubject.next(result);
@@ -738,7 +736,7 @@ describe('GraphViewComponent', () => {
     expect(component.queryState).toBe('no-query');
   });
 
-  /** Helper: publica un resultado y deja el grafo instanciado. */
+  /** Publishes a result and leaves the graph instantiated. */
   function emitResult(nodes: NormalizedNode[], edges: NormalizedEdge[]): QueryResult {
     const result = createMockQueryResult(nodes, edges);
     queryResultSubject.next(result);
@@ -747,11 +745,10 @@ describe('GraphViewComponent', () => {
     return result;
   }
 
-  describe('actualización incremental', () => {
-    // Este es el guard de la regresión central: visibleQueryResult$ y lotState$
-    // dependen de _selectedNode$, así que cada click re-emite. Antes eso destruía
-    // la instancia y re-corría el layout, y los nodos se reacomodaban.
-    it('instancia cytoscape una sola vez aunque la selección re-emita', () => {
+  describe('incremental updates', () => {
+    // Core regression guard: visibleQueryResult$ and lotState$ depend on
+    // _selectedNode$, so every click re-emits. It must not recreate or relayout.
+    it('instantiates cytoscape only once even when selection re-emits', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       expect(cyRegistry.instances.length).toBe(1);
 
@@ -769,19 +766,19 @@ describe('GraphViewComponent', () => {
       expect(cyRegistry.instances.length).toBe(1);
     });
 
-    it('no re-corre el layout cuando la topología no cambió', () => {
+    it('does not rerun layout when topology has not changed', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
       const runsAfterCreate = cy._layoutRuns.length;
 
-      // Mismo conjunto de elementos, otra emisión.
+      // Same element set, another emission.
       visibleQueryResultSubject.next(createMockQueryResult([mockNode, mockNode2], [mockEdge]));
       fixture.detectChanges();
 
       expect(cy._layoutRuns.length).toBe(runsAfterCreate);
     });
 
-    it('no toca la cámara al re-emitir con la misma topología', () => {
+    it('does not change the camera when the same topology re-emits', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
       cy.fit.mockClear();
@@ -794,7 +791,7 @@ describe('GraphViewComponent', () => {
       expect(cy.animate).not.toHaveBeenCalled();
     });
 
-    it('agrega solo el nodo nuevo y deja bloqueados los que ya estaban', () => {
+    it('adds only the new node and locks existing nodes', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
       expect(cy._ids()).toEqual([mockNode.uri, mockNode2.uri, mockEdge.id]);
@@ -811,15 +808,15 @@ describe('GraphViewComponent', () => {
 
       expect(cyRegistry.instances.length).toBe(1);
       expect(cy._ids()).toContain(extra.uri);
-      // El layout incremental corre sin centerGraph para no mover los bloqueados.
+      // Incremental layout runs without centerGraph to preserve locked nodes.
       const lastRun = cy._layoutRuns[cy._layoutRuns.length - 1];
       expect(lastRun['centerGraph']).toBe(false);
-      // Y los desbloquea al terminar.
+      // It unlocks them when finished.
       const kept = cy.getElementById(mockNode.uri) as { locked: () => boolean };
       expect(kept.locked()).toBe(false);
     });
 
-    it('quita del grafo los nodos que salieron del resultado', () => {
+    it('removes nodes that left the result from the graph', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
 
@@ -831,7 +828,7 @@ describe('GraphViewComponent', () => {
   });
 
   describe('click', () => {
-    it('selecciona el nodo y atenúa lo que no es su vecindario', () => {
+    it('selects the node and dims everything outside its neighborhood', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
       const selectionService = TestBed.inject(SelectionService);
@@ -840,11 +837,11 @@ describe('GraphViewComponent', () => {
 
       expect(selectionService.select).toHaveBeenCalledWith(mockNode, 'graph');
       expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
-      // mockNode2 es vecino por mockEdge, así que no se atenúa.
+      // mockNode2 is adjacent through mockEdge, so it is not dimmed.
       expect(cy._classesOf(mockNode2.uri)).not.toContain('is-dimmed');
     });
 
-    it('atenúa un nodo que no es vecino del seleccionado', () => {
+    it('dims a node that is not adjacent to the selected node', () => {
       const lonely: NormalizedNode = {
         uri: 'http://www.wikidata.org/entity/Q888',
         label: 'Aislado',
@@ -858,7 +855,7 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(lonely.uri)).toContain('is-dimmed');
     });
 
-    it('no mueve la cámara al clickear un nodo', () => {
+    it('does not move the camera when a node is clicked', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
       cy.fit.mockClear();
@@ -870,7 +867,7 @@ describe('GraphViewComponent', () => {
       expect(cy.animate).not.toHaveBeenCalled();
     });
 
-    it('el click en el fondo limpia la selección y el atenuado', () => {
+    it('clears selection and dimming when the background is clicked', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
       const selectionService = TestBed.inject(SelectionService);
@@ -883,9 +880,9 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(mockNode2.uri)).toEqual([]);
     });
 
-    it('resuelve nodos que solo están en el resultado visible', () => {
-      // Los intermedios que agrega query-topology pueden no estar en original.nodes;
-      // antes el tap sobre ellos no seleccionaba nada.
+    it('resolves nodes that exist only in the visible result', () => {
+      // Intermediates added by query-topology may be absent from original.nodes;
+      // previously tapping them selected nothing.
       const intermediate: NormalizedNode = {
         uri: '_:b0',
         label: 'bnode',
@@ -903,8 +900,8 @@ describe('GraphViewComponent', () => {
     });
   });
 
-  describe('clear externo y foco vacío', () => {
-    it('un clearSelection externo limpia is-selected e is-dimmed', () => {
+  describe('external clear and empty focus', () => {
+    it('clears is-selected and is-dimmed on external clearSelection', () => {
       const lonely: NormalizedNode = {
         uri: 'http://www.wikidata.org/entity/Q888',
         label: 'Aislado',
@@ -913,12 +910,12 @@ describe('GraphViewComponent', () => {
       emitResult([mockNode, mockNode2, lonely], [mockEdge]);
       const cy = lastCy();
 
-      // Selección propia: pinta is-selected en el nodo e is-dimmed en el aislado.
+      // Local selection marks the node is-selected and the isolated one is-dimmed.
       cy._emit('tap', 'node', { target: cy.getElementById(mockNode.uri) });
       expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
       expect(cy._classesOf(lonely.uri)).toContain('is-dimmed');
 
-      // Clear desde otra vista (source externo, sin nodo).
+      // Clear from another view with an external source and no node.
       selectedNodeSubject.next({ node: null, source: 'external' });
       fixture.detectChanges();
 
@@ -926,7 +923,7 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(lonely.uri)).toEqual([]);
     });
 
-    /** El mock tipa las colecciones como índice, así que posicionar pide cast. */
+    /** The mock types collections as an index, so positioning requires a cast. */
     function placeNode(cy: ReturnType<typeof lastCy>, id: string, x: number, y: number): void {
       (cy.getElementById(id) as { position: (p: { x: number; y: number }) => unknown }).position({
         x,
@@ -934,7 +931,7 @@ describe('GraphViewComponent', () => {
       });
     }
 
-    it('un foco externo vacío limpia el dimming y las is-focus-edge', () => {
+    it('clears dimming and is-focus-edge for empty external focus', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
 
@@ -951,11 +948,10 @@ describe('GraphViewComponent', () => {
     });
 
     /**
-     * Antes, el foco coordinado limpiaba las clases y se llevaba puesto el
-     * resaltado del nodo seleccionado: con decenas de nodos enfocados, todos
-     * iguales, no se veía cuál estaba seleccionado.
+     * Coordinated focus used to clear classes and selected highlighting, making
+     * the selection indistinguishable among many focused nodes.
      */
-    it('conserva el resaltado del seleccionado y atenúa el resto del foco', () => {
+    it('keeps selected highlighting and dims the rest of the focus', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
 
@@ -968,12 +964,12 @@ describe('GraphViewComponent', () => {
 
       expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
       expect(cy._classesOf(mockNode.uri)).not.toContain('is-muted');
-      // El otro nodo del foco se ve, pero deja de competir con el seleccionado.
+      // The other focused node remains visible without competing with selection.
       expect(cy._classesOf(mockNode2.uri)).toContain('is-muted');
       expect(cy._classesOf(mockNode2.uri)).not.toContain('is-dimmed');
     });
 
-    it('no atenúa el foco cuando no hay nada seleccionado', () => {
+    it('does not dim focus when nothing is selected', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
 
@@ -985,11 +981,10 @@ describe('GraphViewComponent', () => {
     });
 
     /**
-     * El foco que mandan el mapa y la timeline abarca todo lo que entra en SU
-     * viewport: encuadrarlo con `fit` dejaba el grafo tan lejos que los nodos
-     * eran puntos. El encuadre no baja de `FOCUS_MIN_ZOOM`.
+     * Map and timeline focus covers their entire viewport. Using `fit` made graph
+     * nodes tiny, so framing never goes below `FOCUS_MIN_ZOOM`.
      */
-    it('no se aleja por debajo del piso de zoom al encuadrar un foco amplio', () => {
+    it('does not zoom below the floor when framing a broad focus', () => {
       const nodes: NormalizedNode[] = Array.from({ length: 6 }, (_, i) => ({
         uri: `Q${i}`,
         label: `N${i}`,
@@ -997,7 +992,7 @@ describe('GraphViewComponent', () => {
       }));
       emitResult(nodes, []);
       const cy = lastCy();
-      // Nodos bien separados: encuadrarlos a todos exigiría alejarse mucho.
+      // Widely spaced nodes would require zooming far out to frame them all.
       nodes.forEach((n, i) => placeNode(cy, n.uri, i * 4000, i * 4000));
       cy.animate.mockClear();
 
@@ -1010,7 +1005,7 @@ describe('GraphViewComponent', () => {
       expect(Number.isFinite(opts.pan.x)).toBe(true);
     });
 
-    it('respeta el encuadre ajustado cuando el foco entra sin alejarse', () => {
+    it('honors a tight frame when focus fits without zooming out', () => {
       const nodes: NormalizedNode[] = Array.from({ length: 3 }, (_, i) => ({
         uri: `P${i}`,
         label: `N${i}`,
@@ -1026,14 +1021,14 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
 
       const opts = cy.animate.mock.calls[0][0] as { zoom: number };
-      // Cabe de sobra: el zoom lo decide el encuadre (tope 5), no el piso.
+      // It fits comfortably, so framing chooses zoom up to 5 rather than the floor.
       expect(opts.zoom).toBeGreaterThan(0.8);
       expect(opts.zoom).toBeLessThanOrEqual(5);
     });
   });
 
-  describe('límite reactivo', () => {
-    it('un cambio runtime de graphMaxNodes reconstruye la vista una sola vez', () => {
+  describe('reactive limit', () => {
+    it('rebuilds the view once after a runtime graphMaxNodes change', () => {
       const nodes: NormalizedNode[] = Array.from({ length: 5 }, (_, i) => ({
         uri: `Q${i}`,
         label: `N${i}`,
@@ -1049,13 +1044,13 @@ describe('GraphViewComponent', () => {
       expect(cyRegistry.instances.length).toBe(2);
       expect(lastCy()._ids()).toHaveLength(3);
 
-      // Re-aplicar el mismo valor no reconstruye de nuevo.
+      // Reapplying the same value does not rebuild again.
       limits.apply({ ...DEFAULT_LIMITS, graphMaxNodes: 3 });
       fixture.detectChanges();
       expect(cyRegistry.instances.length).toBe(2);
     });
 
-    it('sin grafo dibujado solo actualiza MAX_NODES, sin instanciar cytoscape', () => {
+    it('updates only MAX_NODES without instantiating cytoscape when no graph is drawn', () => {
       const limits = TestBed.inject(LimitsService);
       limits.apply({ ...DEFAULT_LIMITS, graphMaxNodes: 42 });
       fixture.detectChanges();
@@ -1079,8 +1074,8 @@ describe('GraphViewComponent', () => {
       ).buildElements(result);
     }
 
-    it('deja los MAX_NODES de mayor grado', () => {
-      // Q1 sin aristas; Q2..Q4 conectados entre sí.
+    it('retains the highest-degree MAX_NODES nodes', () => {
+      // Q1 has no edges; Q2 through Q4 are connected.
       const nodes: NormalizedNode[] = ['Q1', 'Q2', 'Q3', 'Q4'].map((id) => ({
         uri: id,
         label: id,
@@ -1102,7 +1097,7 @@ describe('GraphViewComponent', () => {
       expect(ids).not.toContain('Q1');
     });
 
-    it('descarta las aristas con un extremo fuera y las cuenta', () => {
+    it('drops and counts edges with an excluded endpoint', () => {
       const nodes: NormalizedNode[] = ['Q1', 'Q2', 'Q3'].map((id) => ({
         uri: id,
         label: id,
@@ -1117,12 +1112,12 @@ describe('GraphViewComponent', () => {
       const built = build(createMockQueryResult(nodes, edges));
       const edgeIds = built.elements.filter((e) => 'source' in e.data).map((e) => e.data['id']);
 
-      // Q1 (grado 2) y uno de Q2/Q3 sobreviven; la arista al descartado se va.
+      // Q1 (degree 2) and one of Q2/Q3 survive; the dropped endpoint edge is removed.
       expect(edgeIds.length).toBe(1);
       expect(built.edgesHiddenByTruncation).toBe(1);
     });
 
-    it('emite el grado dibujado y el total por separado', () => {
+    it('emits drawn and total degree separately', () => {
       const nodes: NormalizedNode[] = ['Q1', 'Q2', 'Q3'].map((id) => ({
         uri: id,
         label: id,
@@ -1137,15 +1132,15 @@ describe('GraphViewComponent', () => {
       const built = build(createMockQueryResult(nodes, edges));
       const q1 = built.elements.find((e) => e.data['id'] === 'Q1');
 
-      // El tamaño del nodo se calcula del grado dibujado, no del total.
+      // Node size uses drawn degree rather than total degree.
       expect(q1?.data['totalDegree']).toBe(2);
       expect(q1?.data['degree']).toBe(1);
     });
   });
 
-  describe('sin auto-colapso', () => {
-    it('no esconde vecinos ni altera labels de nodos muy conectados', () => {
-      // 25 vecinos de un hub: antes, con grado > 20, se colapsaba solo.
+  describe('without automatic collapse', () => {
+    it('does not hide neighbors or alter labels of highly connected nodes', () => {
+      // A 25-neighbor hub used to collapse automatically above degree 20.
       const hub: NormalizedNode = { uri: 'hub', label: 'Hub', attributes: {} };
       const neighbors: NormalizedNode[] = Array.from({ length: 25 }, (_, i) => ({
         uri: `n${i}`,
@@ -1170,7 +1165,7 @@ describe('GraphViewComponent', () => {
   });
 
   describe('chip de cobertura', () => {
-    it('compone en inglés todas las ramas y pluraliza batch, rows, nodes, motifs, prioritized y hidden edges', () => {
+    it('composes every branch in English and pluralizes batch, rows, nodes, motifs, prioritized, and hidden edges', () => {
       const i18n = TestBed.inject(I18nService);
       i18n.set('en');
       const buildLabel = (built: BuiltGraph, rows: number) =>
@@ -1206,7 +1201,7 @@ describe('GraphViewComponent', () => {
       i18n.set('es');
     });
 
-    it('muestra lote y truncado juntos', () => {
+    it('shows batch and truncation together', () => {
       const manyNodes: NormalizedNode[] = Array.from({ length: 301 }, (_, i) => ({
         uri: `Q${i + 1}`,
         label: `Nodo ${i + 1}`,
@@ -1230,7 +1225,7 @@ describe('GraphViewComponent', () => {
       );
     });
 
-    it('informa las aristas que el truncado dejó afuera', () => {
+    it('reports edges omitted by truncation', () => {
       const nodes: NormalizedNode[] = ['Q1', 'Q2', 'Q3'].map((id) => ({
         uri: id,
         label: id,
@@ -1249,7 +1244,7 @@ describe('GraphViewComponent', () => {
   });
 
   describe('layout persistido', () => {
-    it('instancia con el layout guardado, no con el default', () => {
+    it('instantiates with the saved layout instead of the default', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({ layout: 'dagre' });
 
@@ -1260,7 +1255,7 @@ describe('GraphViewComponent', () => {
       expect(cy._layoutRuns[0]?.['name']).toBe('dagre');
     });
 
-    it.each(['cola', 'dagre', 'grid'] as const)('acepta el identificador histórico %s', (layout) => {
+    it.each(['cola', 'dagre', 'grid'] as const)('accepts historical identifier %s', (layout) => {
       TestBed.inject(DashboardViewStateService).graphState.set({ layout });
 
       emitResult([mockNode, mockNode2], [mockEdge]);
@@ -1272,7 +1267,7 @@ describe('GraphViewComponent', () => {
       }
     });
 
-    it('restaura la cámara guardada en vez de encuadrar', () => {
+    it('restores the saved camera instead of framing', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({ layout: 'cola', pan: { x: 15, y: 25 }, zoom: 2 });
 
@@ -1285,7 +1280,7 @@ describe('GraphViewComponent', () => {
       expect(cy.fit).not.toHaveBeenCalled();
     });
 
-    it('encuadra una sola vez cuando no hay cámara guardada', () => {
+    it('frames only once when there is no saved camera', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
 
@@ -1331,18 +1326,18 @@ describe('GraphViewComponent', () => {
       return cy._layoutRuns.filter((o) => o['infinite'] === true);
     }
 
-    it('enciende la simulación de cola al agarrar un nodo', () => {
+    it('starts the Cola simulation when a node is grabbed', () => {
       const cy = chain();
       cy._emit('grab', 'node', { target: cy.getElementById('A'), originalEvent: {} });
 
       const live = liveRuns(cy);
       expect(live).toHaveLength(1);
-      // No debe reencuadrar ni recentrar mientras acomodás.
+      // It must not reframe or recenter during manual placement.
       expect(live[0]['fit']).toBe(false);
       expect(live[0]['centerGraph']).toBe(false);
     });
 
-    it('apaga la simulación al soltar', () => {
+    it('stops the simulation on release', () => {
       const cy = chain();
       cy._emit('grab', 'node', { target: cy.getElementById('A'), originalEvent: {} });
       cy._emit('free', 'node', { target: cy.getElementById('A') });
@@ -1350,7 +1345,7 @@ describe('GraphViewComponent', () => {
       expect(cy._layoutStops.filter((o) => o['infinite'] === true)).toHaveLength(1);
     });
 
-    it('no la enciende dos veces si llega otro grab', () => {
+    it('does not start it twice when another grab arrives', () => {
       const cy = chain();
       cy._emit('grab', 'node', { target: cy.getElementById('A'), originalEvent: {} });
       cy._emit('grab', 'node', { target: cy.getElementById('B'), originalEvent: {} });
@@ -1358,7 +1353,7 @@ describe('GraphViewComponent', () => {
       expect(liveRuns(cy)).toHaveLength(1);
     });
 
-    it('con Shift no enciende la simulación: mueve solo ese nodo', () => {
+    it('moves only that node without starting simulation when Shift is held', () => {
       const cy = chain();
       cy._emit('grab', 'node', {
         target: cy.getElementById('A'),
@@ -1368,7 +1363,7 @@ describe('GraphViewComponent', () => {
       expect(liveRuns(cy)).toHaveLength(0);
     });
 
-    it('no la enciende con un layout estructural como dagre', () => {
+    it('does not start it for a structural layout such as dagre', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({ layout: 'dagre' });
       const cy = chain('dagre');
@@ -1378,7 +1373,7 @@ describe('GraphViewComponent', () => {
       expect(liveRuns(cy)).toHaveLength(0);
     });
 
-    it('clava los nodos ya acomodados y los libera al soltar', () => {
+    it('locks arranged nodes and releases them on drop', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({
         layout: 'cola',
@@ -1388,7 +1383,7 @@ describe('GraphViewComponent', () => {
 
       cy._emit('grab', 'node', { target: cy.getElementById('A'), originalEvent: {} });
       expect(isLocked(cy, 'B')).toBe(true);
-      // El nodo que estás moviendo no se bloquea, aunque ya lo hubieras acomodado.
+      // The node being moved is not locked even after prior placement.
       expect(isLocked(cy, 'A')).toBe(false);
       expect(isLocked(cy, 'C')).toBe(false);
 
@@ -1396,7 +1391,7 @@ describe('GraphViewComponent', () => {
       expect(isLocked(cy, 'B')).toBe(false);
     });
 
-    it('guarda solo la posición del nodo que soltaste, no la de los vecinos', () => {
+    it('saves only the dropped node position, not neighboring positions', () => {
       const cy = chain();
       const viewState = TestBed.inject(DashboardViewStateService);
 
@@ -1406,12 +1401,12 @@ describe('GraphViewComponent', () => {
 
       const manual = viewState.graphState()?.manualPositions;
       expect(manual?.['A']).toEqual({ x: 30, y: 40 });
-      // A B lo acomodó la física, no el usuario: un layout futuro puede moverlo.
+      // Physics placed B, not the user, so a future layout may move it.
       expect(manual?.['B']).toBeUndefined();
       expect(nodeAt(cy, 'A')).toEqual({ x: 30, y: 40 });
     });
 
-    it('reaplica el acomodo guardado después del layout', () => {
+    it('reapplies saved placement after layout', () => {
       const viewState = TestBed.inject(DashboardViewStateService);
       viewState.graphState.set({
         layout: 'cola',
@@ -1425,7 +1420,7 @@ describe('GraphViewComponent', () => {
       expect(nodeAt(cy, mockNode.uri)).toEqual({ x: 77, y: 88 });
     });
 
-    it('cambiar el layout descarta el acomodo manual', () => {
+    it('discards manual placement when layout changes', () => {
       const cy = chain();
       const viewState = TestBed.inject(DashboardViewStateService);
 
@@ -1444,7 +1439,7 @@ describe('GraphViewComponent', () => {
   // Etapa 5: interfaz del modo entidad
   // ---------------------------------------------------------------------------
   describe('modo entidad', () => {
-    it('traduce al inglés todos los mensajes visibles de modelos puros y preserva errores crudos', () => {
+    it('translates all visible pure-model messages to English and preserves raw errors', () => {
       const i18n = TestBed.inject(I18nService);
       i18n.set('en');
       const translate = (message: string) =>
@@ -1525,7 +1520,7 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
     }
 
-    /** Entra al modo entidad con `listing/0` como raíz, desde la tabla. */
+    /** Enters entity mode from the table with `listing/0` as root. */
     function enter(): void {
       emitEstate();
       select(estate.root);
@@ -1537,7 +1532,7 @@ describe('GraphViewComponent', () => {
       return lastCy()._ids();
     }
 
-    /** Sólo nodos: `_ids()` incluye también las aristas. */
+    /** Nodes only: `_ids()` also includes edges. */
     function drawnNodeIds(): string[] {
       return lastCy()
         ._els.filter((element) => element.isNode)
@@ -1557,7 +1552,7 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
     }
 
-    it('no ofrece Ver estructura sin una selección explícita', () => {
+    it('does not offer View structure without an explicit selection', () => {
       emitEstate();
 
       expect(component.canEnterEntityMode).toBe(false);
@@ -1566,7 +1561,7 @@ describe('GraphViewComponent', () => {
       expect(labels).not.toContain('Ver estructura');
     });
 
-    it('ofrece Ver estructura cuando hay una selección de otra vista', () => {
+    it('offers View structure for a selection from another view', () => {
       emitEstate();
       select(estate.root, 'map');
 
@@ -1577,7 +1572,7 @@ describe('GraphViewComponent', () => {
     });
 
     it.each(['table', 'map', 'timeline', 'graph'] as const)(
-      'entra desde una selección de %s y dibuja sólo la estructura de la raíz',
+      'enters from a %s selection and draws only the root structure',
       (source) => {
         emitEstate();
         select(estate.root, source);
@@ -1590,13 +1585,13 @@ describe('GraphViewComponent', () => {
         expect(ids).toContain(estate.root);
         expect(ids).toContain(estate.estate);
         expect(ids).toContain(estate.geometry);
-        // El hairball no vuelve: los otros avisos no entran por el hub.
+        // The hairball does not return: other notices do not enter through the hub.
         expect(ids).not.toContain(estate.otherListing);
         expect(ids).not.toContain(estate.otherEstate);
       },
     );
 
-    it('usa Jerárquico y Literales como nivel inicial de la entidad', () => {
+    it('uses Hierarchical and Literals as the initial entity level', () => {
       expect(component.detailLevel).toBe('summary');
 
       enter();
@@ -1613,7 +1608,7 @@ describe('GraphViewComponent', () => {
       expect(lastCy()._layoutRuns[0]?.['name']).toBe('dagre');
     });
 
-    it('copia una versión básica de la vista actual y anuncia el resultado', async () => {
+    it('copies a basic version of the current view and announces the result', async () => {
       enter();
       const clipboard = TestBed.inject(EntitySummaryClipboardService);
       const view = vi.spyOn(clipboard, 'copyBasicView').mockResolvedValue({
@@ -1629,7 +1624,7 @@ describe('GraphViewComponent', () => {
       expect(component.explorationMessage).toBe('Vista copiada.');
     });
 
-    it('expone el texto para copia manual cuando no hay API disponible', async () => {
+    it('exposes text for manual copying when no API is available', async () => {
       enter();
       vi.spyOn(TestBed.inject(EntitySummaryClipboardService), 'copyBasicView').mockResolvedValue({
         status: 'unsupported',
@@ -1649,7 +1644,7 @@ describe('GraphViewComponent', () => {
       );
     });
 
-    it('el selector de vista refleja y cambia el modo', () => {
+    it('reflects and changes mode in the view selector', () => {
       emitEstate();
       select(estate.root);
       expect(component.explorationMode).toBe('result');
@@ -1663,7 +1658,7 @@ describe('GraphViewComponent', () => {
       expect(component.explorationMode).toBe('result');
     });
 
-    it('el foco coordinado no inicia la exploración', () => {
+    it('does not start exploration from coordinated focus', () => {
       emitEstate();
       select(estate.root);
 
@@ -1676,7 +1671,7 @@ describe('GraphViewComponent', () => {
       expect(component.isEntityMode).toBe(false);
     });
 
-    it('el foco coordinado no reencuadra ni altera el subgrafo explorado', () => {
+    it('does not reframe or alter the explored subgraph from coordinated focus', () => {
       enter();
       const cy = lastCy();
       const before = drawnIds();
@@ -1693,7 +1688,7 @@ describe('GraphViewComponent', () => {
       expect(cy.animate).not.toHaveBeenCalled();
     });
 
-    it('expandir un recurso compartido agrega sólo sus vecinos, sin recrear el lienzo', () => {
+    it('adds only shared-resource neighbors without recreating the canvas', () => {
       enter();
       const instances = cyRegistry.instances.length;
       const before = drawnNodeIds().length;
@@ -1704,13 +1699,13 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
 
       expect(drawnNodeIds().length).toBeGreaterThan(before);
-      // Ni se reconstruye el grafo global ni se recrea la instancia: patch.
+      // Neither the global graph nor the instance is recreated; this is a patch.
       expect(drawnNodeIds().length).toBeLessThan(estate.result.nodes.length);
       expect(cyRegistry.instances.length).toBe(instances);
       expect(component.explorationMessage).toBe('');
     });
 
-    it('contraer devuelve la vista al estado anterior', () => {
+    it('restores the previous view state on collapse', () => {
       enter();
       const before = drawnNodeIds().length;
       const branch = branchOf(estate.partido);
@@ -1724,7 +1719,7 @@ describe('GraphViewComponent', () => {
       expect(component.explorationState.expandedBranchIds).toEqual([]);
     });
 
-    it('una expansión que no entra en el presupuesto se rechaza con explicación accesible', () => {
+    it('rejects an over-budget expansion with an accessible explanation', () => {
       TestBed.inject(LimitsService).apply({ ...DEFAULT_LIMITS, graphMaxNodes: 8 });
       fixture.detectChanges();
       enter();
@@ -1739,14 +1734,14 @@ describe('GraphViewComponent', () => {
       expect(alert?.textContent).toContain('presupuesto');
     });
 
-    it('el panel omite las métricas técnicas', () => {
+    it('omits technical metrics from the panel', () => {
       enter();
       expect(
         (fixture.nativeElement as HTMLElement).querySelector('.entity-panel__metrics'),
       ).toBeNull();
     });
 
-    it('deja sólo las acciones principales y omite la ayuda de teclado', () => {
+    it('keeps only primary actions and omits keyboard help', () => {
       enter();
       fixture.detectChanges();
       const panel = (fixture.nativeElement as HTMLElement).querySelector('.entity-panel')!;
@@ -1763,7 +1758,7 @@ describe('GraphViewComponent', () => {
       expect(panel.querySelector('.entity-panel__warning')).toBeNull();
     });
 
-    it('permite ocultar y volver a mostrar el panel sin salir del modo entidad', () => {
+    it('allows hiding and restoring the panel without leaving entity mode', () => {
       enter();
       fixture.detectChanges();
 
@@ -1777,7 +1772,7 @@ describe('GraphViewComponent', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.entity-panel')).not.toBeNull();
     });
 
-    it('no duplica los atributos literales dentro del panel', () => {
+    it('does not duplicate literal attributes in the panel', () => {
       enter();
       fixture.detectChanges();
       expect(
@@ -1785,7 +1780,7 @@ describe('GraphViewComponent', () => {
       ).toBeNull();
     });
 
-    it('fija y desfija el nodo activo', () => {
+    it('pins and unpins the active node', () => {
       enter();
 
       component.togglePinActive();
@@ -1795,7 +1790,7 @@ describe('GraphViewComponent', () => {
       expect(component.explorationState.pinnedUris).toEqual([]);
     });
 
-    it('usa el nodo activo como nueva raíz y el breadcrumb recuerda la anterior', () => {
+    it('uses the active node as the new root and remembers the previous root in breadcrumbs', () => {
       enter();
       select(estate.estate);
 
@@ -1813,7 +1808,7 @@ describe('GraphViewComponent', () => {
       expect(component.entityCrumbs[1].current).toBe(true);
     });
 
-    it('el breadcrumb vuelve a una raíz anterior', () => {
+    it('returns to a previous root through breadcrumbs', () => {
       enter();
       select(estate.estate);
       component.promoteActive();
@@ -1825,7 +1820,7 @@ describe('GraphViewComponent', () => {
       expect(component.entityRootUri).toBe(estate.root);
     });
 
-    it('volver a la raíz y restablecer no salen del modo entidad', () => {
+    it('stays in entity mode when returning to root or resetting', () => {
       enter();
       select(estate.estate);
       component.expandBranchById(branchOf(estate.partido).id);
@@ -1841,7 +1836,7 @@ describe('GraphViewComponent', () => {
       expect(component.isEntityMode).toBe(true);
     });
 
-    it('una selección posterior fuera de la estructura pasa a ser la nueva entidad', () => {
+    it('uses a later selection outside the structure as the new entity', () => {
       enter();
 
       select(estate.otherListing, 'map');
@@ -1849,7 +1844,7 @@ describe('GraphViewComponent', () => {
       expect(component.entityRootUri).toBe(estate.otherListing);
     });
 
-    it('una selección dentro de la estructura sólo mueve el nodo activo', () => {
+    it('moves only the active node for a selection within the structure', () => {
       enter();
 
       select(estate.address, 'timeline');
@@ -1859,7 +1854,7 @@ describe('GraphViewComponent', () => {
       expect(component.entityRootCandidate).toBeNull();
     });
 
-    it('el tap en el lienzo mueve el nodo activo sin reemplazar la selección global', () => {
+    it('moves the active node on canvas tap without replacing global selection', () => {
       enter();
       const cy = lastCy();
       const selectionService = TestBed.inject(SelectionService);
@@ -1872,7 +1867,7 @@ describe('GraphViewComponent', () => {
       expect(component.entityRootUri).toBe(estate.root);
     });
 
-    it('mostrar otra relación activa y centra el nodo recién incorporado', () => {
+    it('activates and centers a newly added node when another relationship is shown', () => {
       enter();
       const branch = branchOf(estate.partido);
       const revealedUri = branch.revealedUri!;
@@ -1886,7 +1881,7 @@ describe('GraphViewComponent', () => {
       expect(selectionService.select).not.toHaveBeenCalled();
     });
 
-    it('volver al resultado recupera cámara, layout y nivel previos', () => {
+    it('restores the previous camera, layout, and level when returning to the result', () => {
       emitEstate();
       component.setDetailLevel('detail');
       component.setLayout('cola');
@@ -1911,11 +1906,11 @@ describe('GraphViewComponent', () => {
       expect(restored.zoom).toHaveBeenCalledWith(2);
       expect(restored.pan()).toEqual({ x: 15, y: 25 });
       expect(restored.fit).not.toHaveBeenCalled();
-      // El resultado completo vuelve a estar dibujado.
+      // The complete result is drawn again.
       expect(drawnIds()).toContain(estate.otherListing);
     });
 
-    it('el estado de exploración es transitorio: no se persiste en el tablero', () => {
+    it('keeps exploration state transient instead of persisting it in the dashboard', () => {
       emitEstate();
       component.setLayout('cola');
       const viewState = TestBed.inject(DashboardViewStateService);
@@ -1931,7 +1926,7 @@ describe('GraphViewComponent', () => {
       expect(viewState.graphState()?.layout).toBe('cola');
     });
 
-    it('se maneja con teclado: Esc sale, Retroceso deshace, Inicio vuelve a la raíz', () => {
+    it('supports keyboard control: Escape exits, Backspace undoes, and Home returns to root', () => {
       enter();
       select(estate.estate);
       expect(component.entityActiveUri).toBe(estate.estate);
@@ -1946,7 +1941,7 @@ describe('GraphViewComponent', () => {
       expect(component.isEntityMode).toBe(false);
     });
 
-    it('las flechas expanden y contraen la rama del nodo activo', () => {
+    it('expands and collapses the active-node branch with arrow keys', () => {
       enter();
       select(estate.partido);
       const before = drawnNodeIds().length;
@@ -1958,7 +1953,7 @@ describe('GraphViewComponent', () => {
       expect(drawnNodeIds().length).toBe(before);
     });
 
-    it('el teclado no interfiere fuera del modo entidad', () => {
+    it('does not intercept the keyboard outside entity mode', () => {
       emitEstate();
       select(estate.root);
 
@@ -1968,7 +1963,7 @@ describe('GraphViewComponent', () => {
       expect(component.canEnterEntityMode).toBe(true);
     });
 
-    it('sigue explorando cuando la raíz sale del lote pero está en el resultado completo', () => {
+    it('continues exploring when the root leaves the batch but remains in the full result', () => {
       enter();
 
       visibleQueryResultSubject.next({
@@ -1982,7 +1977,7 @@ describe('GraphViewComponent', () => {
       expect(component.entityWarnings).toContain('resultado completo');
     });
 
-    it('vuelve al resultado con aviso si la raíz desaparece del resultado', () => {
+    it('returns to the result with a warning when the root disappears', () => {
       enter();
 
       const without = {
@@ -1998,7 +1993,7 @@ describe('GraphViewComponent', () => {
       expect(component.explorationMessage).toContain('resultado completo');
     });
 
-    it('un resultado vacío descarta la exploración sin dejar estado colgado', () => {
+    it('discards exploration without stale state when the result becomes empty', () => {
       enter();
 
       queryResultSubject.next(null);

@@ -1,77 +1,79 @@
 # RDF GIS Explorer
 
-Plataforma de exploración de datos para bases de datos de grafos accesibles
-mediante SPARQL 1.1. Integra tres productos desplegables:
+A data exploration platform for graph databases accessible through SPARQL 1.1.
+It integrates three deployable products:
 
-- **Shell**: navegación, integración y persistencia de tableros.
-- **RDF Explorer**: construcción visual de consultas SPARQL.
-- **GIS Explorer**: análisis coordinado en tabla, grafo, mapa y línea temporal.
+- **Shell**: navigation, integration, and dashboard persistence.
+- **RDF Explorer**: visual SPARQL query construction.
+- **GIS Explorer**: coordinated analysis through table, graph, map, and timeline views.
 
-La plataforma no depende del dominio de los datos ni de un motor concreto. El
-backend de los explorers usa un cliente SPARQL configurable por URL,
-credenciales, prefixes y límites. La configuración incluida apunta a Wikidata
-para ofrecer una demostración inmediata.
+The platform is independent of both the data domain and any specific engine.
+The explorers' backend uses a SPARQL client configurable by URL, credentials,
+prefixes, and limits. The bundled configuration targets Wikidata to provide an
+immediately usable demo.
 
-La separación de procesos y responsabilidades está detallada en
-[docs/product-architecture.md](docs/product-architecture.md). Las decisiones de
-diseño se documentan en [docs/design-decisions.md](docs/design-decisions.md) y
+Process and responsibility boundaries are detailed in
+[docs/product-architecture.md](docs/product-architecture.md). Design decisions
+are documented in [docs/design-decisions.md](docs/design-decisions.md) and
 [docs/graph-rendering-decisions.md](docs/graph-rendering-decisions.md).
 
-## Recorrido visual
+## Visual tour
 
 ### Shell
 
-El punto de entrada reúne los exploradores y permite abrir, administrar y
-retomar tableros guardados.
+The entry point brings the explorers together and lets users open, manage, and
+resume saved dashboards.
 
-![Shell con los tableros recientes de Wikidata](docs/assets/01-shell-dashboard.png)
+![Shell showing recent Wikidata dashboards](docs/assets/01-shell-dashboard.png)
 
 ### RDF Explorer
 
-El constructor visual permite modelar una consulta como grafo y generar su
-representación SPARQL sin depender de un dominio específico.
+The visual builder models a query as a graph and generates its SPARQL
+representation without relying on a specific domain.
 
-![Construcción visual de una consulta en RDF Explorer](docs/assets/02-rdf-explorer.png)
+![Visual query construction in RDF Explorer](docs/assets/02-rdf-explorer.png)
 
 ### GIS Explorer
 
-Los resultados se exploran mediante cuatro vistas coordinadas: mapa, línea de
-tiempo, tabla y grafo.
+Results are explored through four coordinated views: map, timeline, table, and
+graph.
 
-![Exploración coordinada de resultados en GIS Explorer](docs/assets/03-gis-explorer.png)
+![Coordinated result exploration in GIS
+Explorer](docs/assets/03-gis-explorer.png)
 
 ## Stack
 
-- Angular 21 con Native Federation para el Shell y los dos remotes.
-- NestJS 11 para los tres procesos backend.
-- SQLite para los tableros del Shell.
-- Cytoscape, Leaflet, vis-timeline y AG Grid en GIS Explorer.
-- pnpm workspaces, Jest y Vitest.
+- Angular 21 with Native Federation for the Shell and both remotes.
+- NestJS 11 for the three backend processes.
+- SQLite for Shell dashboards.
+- Cytoscape, Leaflet, vis-timeline, and AG Grid in GIS Explorer.
+- pnpm workspaces, Jest, and Vitest.
 
-## Ejecución local
+## Local development
 
-Requisitos: Node.js 24.18.0, corepack/pnpm y, para el bootstrap completo, nvm.
+Requirements: Node.js 24.18.0, corepack/pnpm, and nvm for the complete
+bootstrap flow.
 
 ```bash
 ./start.sh
 
-# Usar una configuración SPARQL propia
+# Use a custom SPARQL configuration
 ./start.sh --env .env.custom
 ```
 
-`start.sh` activa la versión de Node, instala dependencias cuando hace falta y
-levanta los tres frontends y los tres backends con recarga en caliente.
+`start.sh` activates the Node version, installs dependencies when
+necessary, and starts all three frontends and backends with hot reload.
 
-| Servicio | URL |
+| Service | URL |
 | --- | --- |
 | Shell | http://localhost:4200 |
-| RDF Explorer integrado | http://localhost:4200/explorer |
-| GIS Explorer integrado | http://localhost:4200/gis |
+| Integrated RDF Explorer | http://localhost:4200/explorer |
+| Integrated GIS Explorer | http://localhost:4200/gis |
 | Shell API | http://localhost:3000/api |
 | RDF API | http://localhost:3001/api |
 | GIS API | http://localhost:3002/api |
 
-También se puede ejecutar cada explorer con su runtime propio:
+Each explorer can also run with its own runtime:
 
 ```bash
 pnpm run dev:rdf-standalone
@@ -79,33 +81,33 @@ pnpm run dev:gis-standalone
 docker compose up
 ```
 
-## Estructura
+## Structure
 
 ```text
 packages/
-  contracts/          tipos compartidos entre backend y frontends
-  platform-bridge/    contratos de integración Shell-remotes
-  explorer-backend/   runtime SPARQL común, sin persistencia de tableros
+  contracts/          types shared by backends and frontends
+  platform-bridge/    Shell-to-remote integration contracts
+  explorer-backend/   shared SPARQL runtime, without dashboard persistence
 products/
-  shell/              host y API exclusiva de tableros
-  rdf-explorer/       constructor visual de consultas y runtime propio
-  gis-explorer/       vistas coordinadas y runtime propio
+  shell/              host and dashboard-only API
+  rdf-explorer/       visual query builder and its own runtime
+  gis-explorer/       coordinated views and its own runtime
 ```
 
-Los remotes usan `/api` en modo standalone. Integrados en el Shell, el bridge
-configura `/rdf-api` y `/gis-api`. Solo el Shell publica `/api/dashboards` y
-accede a SQLite.
+The remotes use `/api` in standalone mode. When integrated into the
+Shell, the bridge configures `/rdf-api` and `/gis-api`. Only the
+Shell exposes `/api/dashboards` and accesses SQLite.
 
 ## API
 
-Los runtimes de los explorers publican ejecución y resumen de consultas,
-sugerencias, configuración y health checks bajo `/api`. El Shell publica el
-CRUD `/api/dashboards` y `/api/dashboards/recent?limit=N`.
+The explorer runtimes expose query execution and summaries, suggestions,
+configuration, and health checks under `/api`. The Shell exposes
+CRUD operations at `/api/dashboards` and `/api/dashboards/recent?limit=N`.
 
-## Configuración SPARQL
+## SPARQL configuration
 
-La configuración es fuente única de verdad en el backend y llega a los
-frontends mediante `GET /api/config`.
+The backend configuration is the single source of truth and reaches the
+frontends through `GET /api/config`.
 
 ```env
 SPARQL_BACKEND=custom
@@ -116,39 +118,39 @@ SPARQL_PREFIXES_PATH=packages/explorer-backend/config/prefixes.custom.json
 CLASS_COLORS_PATH=packages/explorer-backend/config/class-colors.custom.json
 ```
 
-Todo valor de `SPARQL_BACKEND` distinto de `wikidata` usa el adaptador SPARQL
-genérico. El modo `wikidata` añade únicamente las integraciones públicas
-propias de ese servicio, como su API de búsqueda y `wikibase:label`.
+Every `SPARQL_BACKEND` value other than `wikidata` uses the generic
+SPARQL adapter. The `wikidata` mode adds only that service's public
+integrations, such as its search API and `wikibase:label`.
 
-Los archivos de prefixes son JSON `{ "prefijo": "uri" }`. El backend no los
-inyecta al ejecutar: cada consulta debe ser autocontenida.
+Prefix files are JSON objects of the form `{ "prefix": "uri" }`. The backend does
+not inject them at execution time: every query must be self-contained.
 
-| Variable | Default | Uso |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `SPARQL_BACKEND` | `wikidata` | Identificador de la configuración |
-| `SPARQL_ENDPOINT_URL` | endpoint público de Wikidata | URL SPARQL 1.1 |
-| `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Basic Auth opcional |
-| `SPARQL_ENTITY_SEARCH_QUERY` | búsqueda por `rdfs:label` | Búsqueda personalizable |
-| `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
-| `SPARQL_DEFAULT_LIMIT` / `SPARQL_MAX_LIMIT` | `500` / `2000` | Límites de consulta |
+| `SPARQL_BACKEND` | `wikidata` | Configuration identifier |
+| `SPARQL_ENDPOINT_URL` | public Wikidata endpoint | SPARQL 1.1 URL |
+| `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Optional Basic Auth |
+| `SPARQL_ENTITY_SEARCH_QUERY` | search by `rdfs:label` | Customizable search |
+| `SPARQL_TIMEOUT_MS` | `30000` | Timeout in ms |
+| `SPARQL_DEFAULT_LIMIT` / `SPARQL_MAX_LIMIT` | `500` / `2000` | Query limits |
 | `SPARQL_PREFIXES_PATH` | `config/prefixes.${SPARQL_BACKEND}.json` | Prefixes |
-| `CLASS_COLORS_PATH` | `config/class-colors.${SPARQL_BACKEND}.json` | Colores RDF |
-| `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | SQLite del Shell |
-| `SPARQL_PROTECTED_BACKENDS` | `wikidata` | Bases preservadas por la limpieza |
-| `GIS_GRAPH_MAX_NODES` | `300` | Tope de nodos del grafo |
-| `GIS_LOT_DEFAULT_SIZE` | `300` | Tamaño de lote inicial |
-| `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Tamaños disponibles |
-| `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Paginación de tabla |
-| `EXPORT_MAX_ROWS` | `50000` | Tope del export completo |
-| `EXPORT_MIN_PAGE_SIZE` | `250` | Página mínima al reintentar |
-| `SUMMARY_TOP_CATEGORICAL_LIMIT` | `12` | Valores del top categórico |
+| `CLASS_COLORS_PATH` | `config/class-colors.${SPARQL_BACKEND}.json` | RDF colors |
+| `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | Shell SQLite database |
+| `SPARQL_PROTECTED_BACKENDS` | `wikidata` | Databases preserved during cleanup |
+| `GIS_GRAPH_MAX_NODES` | `300` | Graph node cap |
+| `GIS_LOT_DEFAULT_SIZE` | `300` | Initial batch size |
+| `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Available batch sizes |
+| `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Table page sizes |
+| `EXPORT_MAX_ROWS` | `50000` | Full-export cap |
+| `EXPORT_MIN_PAGE_SIZE` | `250` | Minimum retry page size |
+| `SUMMARY_TOP_CATEGORICAL_LIMIT` | `12` | Number of top categorical values |
 
-## Tableros demo
+## Demo dashboards
 
-Se conserva `seed:demo-dashboards` porque genera ejemplos funcionales del
-producto: workspaces del constructor visual y sus tableros GIS equivalentes.
-Usa el endpoint público configurado por defecto, no escenarios de evaluación
-ni extensiones propietarias.
+`seed:demo-dashboards` is retained because it generates functional product examples:
+visual-builder workspaces and their equivalent GIS dashboards. It uses the
+public endpoint configured by default, not evaluation scenarios or proprietary
+extensions.
 
 ```bash
 cd products/shell/backend
@@ -156,10 +158,10 @@ pnpm run seed:demo-dashboards -- --dry-run
 pnpm run seed:demo-dashboards
 ```
 
-No se deben ejecutar seeds sobre una base persistente sin revisar antes
+Do not run seeds against a persistent database without first checking
 `DASHBOARDS_SQLITE_PATH`.
 
-## Calidad
+## Quality checks
 
 ```bash
 pnpm -r --if-present test
@@ -168,6 +170,6 @@ docker compose config --quiet
 git diff --check
 ```
 
-## Contacto
+## Contact
 
 Martín M. Venturino — `marventurino@gmail.com`

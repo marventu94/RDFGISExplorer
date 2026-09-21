@@ -90,17 +90,17 @@ describe('computeCoverageStats', () => {
 
   it('counts as primary only nodes carrying their own data (attributes, coordinate or temporal events)', () => {
     const result = makeResult([
-      // Entidad principal completa (ancla con atributos, coordenada y fecha).
+      // Complete main entity: anchor with attributes, coordinate, and date.
       makeNode({
         uri: 'anchor',
         attributes: { precio: { type: 'literal', value: '100' } },
         coordinate: { lat: -34.9, lng: -57.9 },
         temporalEvents: [{ field: 'fecha', isoDate: '2024-01-01T00:00:00Z' }],
       }),
-      // Entidad principal sin coordenada ni fecha (solo atributos): alerta real.
+      // Main entity without coordinate or date, only attributes: a real alert.
       makeNode({ uri: 'rich', attributes: { precio: { type: 'literal', value: '200' } } }),
-      // Nodos estructurales del modelo (features, direcciones, geometrías):
-      // nunca tienen coordenada/fecha y no deben contar como "sin coordenada".
+      // Structural model nodes never have coordinates or dates and must not
+      // count as lacking coordinates.
       makeNode({ uri: 'feature' }),
       makeNode({ uri: 'geom' }),
     ]);

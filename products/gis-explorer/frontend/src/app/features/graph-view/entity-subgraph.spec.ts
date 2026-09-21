@@ -28,8 +28,8 @@ const reasonOf = (subgraph: EntitySubgraph, uri: string) =>
 const warningCodes = (subgraph: EntitySubgraph) => subgraph.warnings.map((w) => w.code);
 
 describe('buildEntitySubgraph', () => {
-  describe('resolución de la raíz', () => {
-    it('devuelve un subgrafo vacío y advierte cuando la raíz no está en ningún resultado', () => {
+  describe('root resolution', () => {
+    it('returns an empty subgraph and warns when the root is absent from every result', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: multiRowFixture(),
         rootUri: `${EX}ausente`,
@@ -43,7 +43,7 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.metrics.nodeCount).toBe(0);
     });
 
-    it('cae al resultado completo cuando la raíz quedó fuera del lote visible', () => {
+    it('falls back to the complete result when the root left the visible batch', () => {
       const fixture = realEstateFixture();
       const visible = restrictResultToUris(
         fixture.result,
@@ -61,7 +61,7 @@ describe('buildEntitySubgraph', () => {
       expect(uris(subgraph)).toContain(fixture.estate);
     });
 
-    it('vuelve a la raíz cuando el nodo activo pedido no existe', () => {
+    it('falls back to the root when the requested active node does not exist', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: multiRowFixture(),
         rootUri: `${EX}root`,
@@ -73,8 +73,8 @@ describe('buildEntitySubgraph', () => {
     });
   });
 
-  describe('entidad presente en una y varias filas', () => {
-    it('ordena las entidades de co-fila por multiplicidad, luego por fila y por URI', () => {
+  describe('entity present in one or multiple rows', () => {
+    it('orders same-row entities by multiplicity, then row and URI', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: multiRowFixture(),
         rootUri: `${EX}root`,
@@ -88,7 +88,7 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.nodes.find((n) => n.uri === `${EX}root`)?.rowCount).toBe(3);
     });
 
-    it('una sola fila produce sólo las entidades de esa fila', () => {
+    it('produces only that row entities for a single row', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -99,7 +99,7 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.metrics.coRowEntityCount).toBe(5);
     });
 
-    it('desempata por URI de forma estable ante multiplicidad y grado idénticos', () => {
+    it('breaks equal-multiplicity and equal-degree ties stably by URI', () => {
       const fixture = tieBreakFixture();
       const first = buildEntitySubgraph({ visibleResult: fixture, rootUri: `${EX}root` });
       const second = buildEntitySubgraph({ visibleResult: fixture, rootUri: `${EX}root` });
@@ -109,8 +109,8 @@ describe('buildEntitySubgraph', () => {
     });
   });
 
-  describe('caminos con nodos intermedios', () => {
-    it('incorpora los intermedios que la query no proyecta', () => {
+  describe('paths with intermediate nodes', () => {
+    it('includes intermediates not projected by the query', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: trimmedPathFixture(),
         rootUri: `${EX}trim/root`,
@@ -129,7 +129,7 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.nodes.find((n) => n.uri === `${EX}trim/far`)?.depth).toBe(3);
     });
 
-    it('no corta el cálculo ante ciclos y deja el ciclo a un salto', () => {
+    it('does not stop at cycles and leaves the cycle one hop away', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: cycleFixture(4),
         rootUri: `${EX}cycle/0`,
@@ -140,7 +140,7 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.metrics.maxDepth).toBe(1);
     });
 
-    it('marca como desconectada la entidad de co-fila sin camino en el resultado', () => {
+    it('marks a same-row entity without a result path as disconnected', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: disconnectedCoRowFixture(),
         rootUri: `${EX}root`,
@@ -156,7 +156,7 @@ describe('buildEntitySubgraph', () => {
   });
 
   describe('blank nodes', () => {
-    it('reconoce el bnode crudo de la fila (b0) como el nodo del grafo (_:b0)', () => {
+    it('recognizes the raw row bnode (b0) as the graph node (_:b0)', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: bnodeFixture(),
         rootUri: `${EX}entity`,
@@ -170,7 +170,7 @@ describe('buildEntitySubgraph', () => {
   });
 
   describe('relaciones paralelas', () => {
-    it('agrupa las ramas por URI de predicado, nunca por etiqueta', () => {
+    it('groups branches by predicate URI and never by label', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: parallelRelationsFixture(),
         rootUri: `${EX}a`,
@@ -178,10 +178,10 @@ describe('buildEntitySubgraph', () => {
 
       const rootBranches = subgraph.branches.filter((b) => b.nodeUri === `${EX}a`);
       expect(rootBranches.map((b) => b.predicate)).toEqual([P.knows, P.tag, P.worksWith]);
-      // `knows` y `tag` comparten etiqueta: agrupar por label las fusionaría.
+      // `knows` and `tag` share a label; grouping by label would merge them.
       expect(rootBranches.filter((b) => b.predicateLabel === 'conoce')).toHaveLength(2);
       expect(subgraph.metrics.tripleCount).toBe(4);
-      // El self-loop cuenta como tripleta y vive en la rama de su predicado.
+      // The self-loop counts as a triple and belongs to its predicate branch.
       expect(rootBranches.find((b) => b.predicate === P.knows)?.tripleCount).toBe(2);
     });
   });
@@ -206,7 +206,7 @@ describe('buildEntitySubgraph', () => {
       expect(uris(subgraph)).not.toContain(fixture.otherEstate);
     });
 
-    it('conserva dirección, geometría y el recurso compartido como frontera', () => {
+    it('preserves direction, geometry, and the shared resource as frontier', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -215,7 +215,7 @@ describe('buildEntitySubgraph', () => {
 
       expect(uris(subgraph)).toContain(fixture.address);
       expect(uris(subgraph)).toContain(fixture.geometry);
-      // Precio y fecha son atributos de la raíz: viajan con el nodo.
+      // Price and date are root attributes and travel with the node.
       const root = subgraph.nodes.find((n) => n.uri === fixture.root)!;
       expect(Object.keys(root.node.attributes)).toEqual(['precio', 'fecha']);
 
@@ -231,18 +231,18 @@ describe('buildEntitySubgraph', () => {
       expect(warningCodes(subgraph)).toContain('hub-not-traversed');
     });
 
-    it('la raíz nunca se trata como hub aunque supere el umbral', () => {
+    it('never treats the root as a hub even above the threshold', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: wideStarFixture(12),
         rootUri: `${EX}star/hub`,
       });
 
       expect(subgraph.nodes.find((n) => n.uri === `${EX}star/hub`)?.isHub).toBe(false);
-      // Como raíz, sus 13 vecinos directos son el contexto legítimo.
+      // As root, its 13 direct neighbors are legitimate context.
       expect(subgraph.metrics.nodeCount).toBe(14);
     });
 
-    it('mide el grado sobre el resultado completo: un hub sigue siendo hub en un lote chico', () => {
+    it('measures degree over the complete result so a hub remains a hub in a small batch', () => {
       const fixture = realEstateFixture();
       const lot = restrictResultToUris(
         fixture.result,
@@ -268,15 +268,15 @@ describe('buildEntitySubgraph', () => {
       expect(withFull.sourceScope).toBe('visible');
     });
 
-    it('no usa un hub como atajo entre entidades', () => {
+    it('does not use a hub as a shortcut between entities', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
         rootUri: fixture.root,
       });
 
-      // La rama entrante del partido existe y tiene 9 vecinos pendientes,
-      // pero ninguno entró solo al subgrafo.
+      // The incoming party branch exists and has nine pending neighbors,
+      // but neither entered the subgraph independently.
       const branch = subgraph.branches.find(
         (b) => b.nodeUri === fixture.partido && b.predicate === P.locality,
       )!;
@@ -288,8 +288,8 @@ describe('buildEntitySubgraph', () => {
     });
   });
 
-  describe('expansión explícita', () => {
-    it('incorpora sólo los vecinos de la rama pedida', () => {
+  describe('explicit expansion', () => {
+    it('includes only neighbors from the requested branch', () => {
       const fixture = realEstateFixture();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
       const subgraph = buildEntitySubgraph({
@@ -301,12 +301,12 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.metrics.nodeCount).toBe(15); // 6 + 9 direcciones
       expect(uris(subgraph)).toContain(`${EX}address/5`);
       expect(reasonOf(subgraph, `${EX}address/5`)).toBe('expanded');
-      // Las direcciones ajenas no arrastran sus inmuebles.
+      // Unrelated addresses do not pull in their properties.
       expect(uris(subgraph)).not.toContain(fixture.otherEstate);
       expect(subgraph.branches.find((b) => b.id === branchId)?.expanded).toBe(true);
     });
 
-    it('resuelve expansiones encadenadas sobre nodos recién admitidos', () => {
+    it('resolves chained expansions over newly admitted nodes', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -321,7 +321,7 @@ describe('buildEntitySubgraph', () => {
       expect(reasonOf(subgraph, `${EX}estate/5`)).toBe('expanded');
     });
 
-    it('advierte cuando una rama expandida ya no existe', () => {
+    it('warns when an expanded branch no longer exists', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: multiRowFixture(),
         rootUri: `${EX}root`,
@@ -346,12 +346,12 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.omitted.nodeBudgetExceeded).toBe(true);
       expect(subgraph.omitted.nodes.length).toBeGreaterThan(0);
       expect(warningCodes(subgraph)).toContain('node-budget-exhausted');
-      // Raíz y camino mínimo sobreviven al recorte.
+      // Root and minimum path survive trimming.
       expect(uris(subgraph)).toContain(fixture.root);
       expect(uris(subgraph)).toContain(fixture.estate);
     });
 
-    it('respeta el tope de aristas y reporta las que no dibujó', () => {
+    it('honors the edge cap and reports undrawn edges', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -364,7 +364,7 @@ describe('buildEntitySubgraph', () => {
       expect(warningCodes(subgraph)).toContain('edge-budget-exhausted');
     });
 
-    it('no recorre caminos más largos que maxPathLength', () => {
+    it('does not traverse paths longer than maxPathLength', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: trimmedPathFixture(),
         rootUri: `${EX}trim/root`,
@@ -373,13 +373,13 @@ describe('buildEntitySubgraph', () => {
 
       expect(warningCodes(subgraph)).toContain('disconnected-co-row');
       expect(subgraph.metrics.intermediateCount).toBe(0);
-      // `mid1` entra igual como contexto a un salto.
+      // `mid1` still enters as one-hop context.
       expect(reasonOf(subgraph, `${EX}trim/mid1`)).toBe('context');
     });
   });
 
-  describe('lotes, filtros y pinning', () => {
-    it('prioriza los nodos fijados por encima del contexto', () => {
+  describe('batches, filters, and pinning', () => {
+    it('prioritizes pinned nodes over context', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -389,11 +389,11 @@ describe('buildEntitySubgraph', () => {
 
       expect(reasonOf(subgraph, fixture.otherEstate)).toBe('pinned');
       expect(subgraph.nodes.find((n) => n.uri === fixture.otherEstate)?.isPinned).toBe(true);
-      // El pin entra inmediatamente después de la raíz y el nodo activo.
+      // The pin enters immediately after root and active node.
       expect(uris(subgraph)[1]).toBe(fixture.otherEstate);
     });
 
-    it('opera sobre el resultado filtrado sin tocarlo', () => {
+    it('operates on the filtered result without mutating it', () => {
       const fixture = realEstateFixture();
       const snapshot = JSON.stringify(fixture.result);
       const lot = restrictResultToUris(
@@ -410,7 +410,7 @@ describe('buildEntitySubgraph', () => {
   });
 
   describe('determinismo', () => {
-    it('produce exactamente el mismo subgrafo para el mismo input', () => {
+    it('produces exactly the same subgraph for the same input', () => {
       const fixture = realEstateFixture();
       const input = {
         visibleResult: fixture.result,
@@ -431,7 +431,7 @@ describe('buildEntitySubgraph', () => {
       expect(a.warnings).toEqual(b.warnings);
     });
 
-    it('el orden de los URIs fijados no altera el resultado final', () => {
+    it('does not change the final result when pinned URI order changes', () => {
       const fixture = realEstateFixture();
       const a = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -448,7 +448,7 @@ describe('buildEntitySubgraph', () => {
     });
   });
 
-  describe('métricas y frontera', () => {
+  describe('metrics and frontier', () => {
     it('cuenta tripletas, frontera y estructura disponible', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
@@ -466,7 +466,7 @@ describe('buildEntitySubgraph', () => {
       expect(subgraph.budget).toEqual(DEFAULT_SUBGRAPH_BUDGET);
     });
 
-    it('un resultado sin aristas deja la raíz sola y sin ramas', () => {
+    it('leaves only the root without branches for an edgeless result', () => {
       const isolated = result(
         [makeNode(`${EX}solo`)],
         [],
@@ -483,7 +483,7 @@ describe('buildEntitySubgraph', () => {
 });
 
 describe('ids de rama', () => {
-  it('sobreviven a URIs con separadores', () => {
+  it('survives URIs containing separators', () => {
     const nodeUri = 'http://example.org/a:b/c?d=1';
     const predicate = 'http://example.org/p:q';
     const id = makeBranchId(nodeUri, 'incoming', predicate);
@@ -491,7 +491,7 @@ describe('ids de rama', () => {
     expect(parseBranchId(id)).toEqual({ nodeUri, predicate, direction: 'incoming' });
   });
 
-  it('devuelve null ante un id ajeno', () => {
+  it('returns null for an unrelated id', () => {
     expect(parseBranchId('no-es-una-rama')).toBeNull();
     expect(parseBranchId('branch:sideways:a:b')).toBeNull();
   });

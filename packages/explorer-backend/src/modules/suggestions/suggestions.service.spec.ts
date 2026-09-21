@@ -8,9 +8,9 @@ const mockPredicates = [
   'http://www.w3.org/2000/01/rdf-schema#label',
 ];
 
-// El servicio es capa HTTP: valida la entrada y delega. Como se resuelve la
-// busqueda se testea en los specs de cada adapter (wikidata.adapter.spec.ts,
-// generic-sparql.adapter.spec.ts), que es donde vive esa decision.
+// The service is an HTTP layer: it validates input and delegates. Search
+// resolution is tested in each adapter spec (wikidata.adapter.spec.ts,
+// generic-sparql.adapter.spec.ts), where that decision belongs.
 describe('SuggestionsService', () => {
   let service: SuggestionsService;
   let endpoint: {
@@ -45,12 +45,12 @@ describe('SuggestionsService', () => {
     expect(service).toBeDefined();
   });
 
-  it('delega los predicados en el adapter', async () => {
+  it('delegates predicates to the adapter', async () => {
     await expect(service.getPredicates()).resolves.toEqual(mockPredicates);
     expect(endpoint.getPredicates).toHaveBeenCalled();
   });
 
-  it('delega la busqueda en el adapter y devuelve su resultado', async () => {
+  it('delegates search to the adapter and returns its result', async () => {
     endpoint.searchEntities.mockResolvedValue([
       { uri: 'http://example.org/1', label: 'Uno' },
     ]);
@@ -64,7 +64,7 @@ describe('SuggestionsService', () => {
     expect(results).toEqual([{ uri: 'http://example.org/1', label: 'Uno' }]);
   });
 
-  it('pasa el classUri al adapter cuando es un IRI valido', async () => {
+  it('passes classUri to the adapter when it is a valid IRI', async () => {
     await service.searchEntities('uno', 10, 'http://example.org/Class');
 
     expect(endpoint.searchEntities).toHaveBeenCalledWith('uno', {
@@ -73,7 +73,7 @@ describe('SuggestionsService', () => {
     });
   });
 
-  it('recorta el limite con SPARQL_MAX_LIMIT', async () => {
+  it('clamps the limit with SPARQL_MAX_LIMIT', async () => {
     configGet.mockImplementation((key: string) =>
       key === 'SPARQL_MAX_LIMIT' ? '25' : undefined,
     );
@@ -86,7 +86,7 @@ describe('SuggestionsService', () => {
     });
   });
 
-  it('usa un limite por defecto cuando no se pide uno', async () => {
+  it('uses a default limit when none is requested', async () => {
     await service.searchEntities('uno');
 
     expect(endpoint.searchEntities).toHaveBeenCalledWith('uno', {
@@ -101,7 +101,7 @@ describe('SuggestionsService', () => {
     ).rejects.toMatchObject({
       message: expect.stringContaining('classUri is not a valid IRI'),
     });
-    // No debe llegar al adapter: se corta en el borde.
+    // It must not reach the adapter: it is rejected at the boundary.
     expect(endpoint.searchEntities).not.toHaveBeenCalled();
   });
 });

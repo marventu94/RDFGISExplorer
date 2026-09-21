@@ -25,7 +25,7 @@ describe('WikidataAdapter.searchEntities', () => {
     delete process.env['SPARQL_ENDPOINT_URL'];
   });
 
-  it('busca por la API de Wikidata y mapea los resultados', async () => {
+  it('searches through the Wikidata API and maps the results', async () => {
     mockSearch([
       {
         concepturi: 'http://www.wikidata.org/entity/Q1486',
@@ -42,7 +42,7 @@ describe('WikidataAdapter.searchEntities', () => {
     expect(results[0].description).toBe('Capital city');
   });
 
-  it('cae en la concepturi cuando no hay label', async () => {
+  it('falls back to concepturi when no label exists', async () => {
     mockSearch([{ concepturi: 'http://www.wikidata.org/entity/Q42' }]);
 
     const results = await adapter.searchEntities('x', { limit: 5 });
@@ -50,7 +50,7 @@ describe('WikidataAdapter.searchEntities', () => {
     expect(results[0].label).toBe('http://www.wikidata.org/entity/Q42');
   });
 
-  it('post-filtra por P31 cuando se pide una clase', async () => {
+  it('post-filters by P31 when a class is requested', async () => {
     mockSearch([
       { concepturi: 'http://www.wikidata.org/entity/Q5', label: 'human' },
       { concepturi: 'http://www.wikidata.org/entity/Q515', label: 'city' },
@@ -85,11 +85,11 @@ describe('WikidataAdapter.searchEntities', () => {
     expect(sentQuery).toContain('http://www.wikidata.org/prop/direct/P31');
   });
 
-  it('trata owl#Thing como "sin filtro" y no consulta el endpoint', async () => {
+  it('treats owl#Thing as no filter and does not query the endpoint', async () => {
     mockSearch([
       { concepturi: 'http://www.wikidata.org/entity/Q5', label: 'human' },
     ]);
-    // Sin nock para query.wikidata.org: si intentara filtrar, fallaria la request.
+    // No nock for query.wikidata.org: attempting to filter would fail the request.
     const results = await adapter.searchEntities('human', {
       limit: 10,
       classUri: OWL_THING,
@@ -98,7 +98,7 @@ describe('WikidataAdapter.searchEntities', () => {
     expect(results).toHaveLength(1);
   });
 
-  it('si el filtro por clase falla, devuelve todos los candidatos', async () => {
+  it('returns all candidates when class filtering fails', async () => {
     mockSearch([
       { concepturi: 'http://www.wikidata.org/entity/Q5', label: 'human' },
       { concepturi: 'http://www.wikidata.org/entity/Q515', label: 'city' },
@@ -110,11 +110,11 @@ describe('WikidataAdapter.searchEntities', () => {
       classUri: 'http://www.wikidata.org/entity/Q5',
     });
 
-    // Degradar a una lista mas amplia es mejor que no sugerir nada.
+    // Falling back to a broader list is better than returning no suggestions.
     expect(results).toHaveLength(2);
   });
 
-  it('no interpola candidatos con URIs que cortarian el VALUES', async () => {
+  it('does not interpolate candidates whose URIs would terminate VALUES', async () => {
     mockSearch([{ concepturi: 'http://example.org/a>b', label: 'roto' }]);
 
     const results = await adapter.searchEntities('x', {
@@ -122,8 +122,8 @@ describe('WikidataAdapter.searchEntities', () => {
       classUri: 'http://www.wikidata.org/entity/Q5',
     });
 
-    // Ningun candidato pasa la validacion: se devuelven sin filtrar en vez de
-    // construir un VALUES invalido.
+    // No candidate passes validation: return them unfiltered instead of
+    // building an invalid VALUES clause.
     expect(results).toHaveLength(1);
   });
 });

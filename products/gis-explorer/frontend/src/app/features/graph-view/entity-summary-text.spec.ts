@@ -25,18 +25,16 @@ import {
 } from './testing/entity-subgraph-fixtures';
 
 /**
- * Etapa 6: tests del generador de texto. Son asserts explícitos (no snapshots
- * automáticos) para que el "golden" quede legible en el propio spec y no se
- * regenere por accidente.
+ * Stage 6: text-generator tests use explicit assertions instead of snapshots so
+ * the golden remains readable in the spec and cannot regenerate accidentally.
  */
 
 const A = `${EX}a`;
 const B = `${EX}b`;
 
 /**
- * Fixture mínimo y autocontenido del golden: dos nodos unidos por **dos**
- * predicados distintos (super-arista de multiplicidad 2) y una raíz con
- * atributos sin predicado.
+ * Minimal self-contained golden fixture: two nodes joined by two distinct
+ * predicates (a multiplicity-2 superedge) and a root with predicate-less attributes.
  */
 function goldenSubgraph(): EntitySubgraph {
   const nodes = [
@@ -97,7 +95,7 @@ const GOLDEN_VIEW_TEXT = [
   `- <${A}> -> <${B}>: 2 tripletas · 2 predicado(s): <${P.knows}>, <${P.worksWith}>`,
 ].join('\n');
 
-/** Líneas de una sección, sin su encabezado, hasta la línea en blanco. */
+/** Section lines excluding its heading, through the blank line. */
 function section(text: string, heading: string): string[] {
   const lines = text.split('\n');
   const start = lines.findIndex((line) => line === heading || line.startsWith(`${heading} (`));
@@ -112,7 +110,7 @@ function section(text: string, heading: string): string[] {
 
 describe('buildEntitySummary', () => {
   describe('texto estable', () => {
-    it('produce exactamente el texto esperado para la vista explorada', () => {
+    it('produces exactly the expected text for the explored view', () => {
       const text = renderEntitySummaryText(goldenSubgraph(), {
         scope: 'view',
         lot: { currentLot: 1, lotCount: 2, totalRows: 10, visibleRows: 5 },
@@ -121,7 +119,7 @@ describe('buildEntitySummary', () => {
       expect(text).toBe(GOLDEN_VIEW_TEXT);
     });
 
-    it('es determinista: dos corridas del mismo input dan el mismo texto', () => {
+    it('is deterministic for repeated runs of the same input', () => {
       const options = { scope: 'view' as const, lot: { currentLot: 1, lotCount: 1 } };
       const first = renderEntitySummaryText(goldenSubgraph(), options);
       const second = renderEntitySummaryText(goldenSubgraph(), options);
@@ -129,14 +127,14 @@ describe('buildEntitySummary', () => {
       expect(second).toBe(first);
     });
 
-    it('respeta el separador de línea configurado', () => {
+    it('honors the configured line separator', () => {
       const text = renderEntitySummaryText(goldenSubgraph(), { scope: 'view', eol: '\r\n' });
 
       expect(text).toContain('\r\n');
       expect(text.split('\r\n')[0]).toBe('Entidad raíz: A');
     });
 
-    it('expone las mismas líneas que el texto', () => {
+    it('exposes the same lines as the text', () => {
       const document = buildEntitySummary(goldenSubgraph(), { scope: 'view' });
 
       expect(document.lines.join('\n')).toBe(document.text);
@@ -156,7 +154,7 @@ describe('buildEntitySummary', () => {
       expect(summaryScopeLabel('structure')).toBe('estructura disponible');
     });
 
-    it('marca la estructura incompleta cuando se agotó el presupuesto', () => {
+    it('marks structure as incomplete when the budget is exhausted', () => {
       const text = renderEntitySummaryText(goldenSubgraph(), {
         scope: 'structure',
         structureComplete: false,
@@ -165,7 +163,7 @@ describe('buildEntitySummary', () => {
       expect(text).toContain('Alcance: estructura disponible (incompleta: se agotó el presupuesto');
     });
 
-    it('anuncia cuando la estructura se calculó sobre el resultado completo', () => {
+    it('reports when structure was computed over the complete result', () => {
       const fixture = realEstateFixture();
       const visible = restrictResultToUris(
         fixture.result,
@@ -182,7 +180,7 @@ describe('buildEntitySummary', () => {
       expect(text).toContain('Origen: resultado completo (la raíz no está en el lote visible)');
     });
 
-    it('describe el lote único y el resultado truncado', () => {
+    it('describes the single batch and truncated result', () => {
       const text = renderEntitySummaryText(goldenSubgraph(), {
         scope: 'view',
         lot: { currentLot: 1, lotCount: 1, totalRows: 12, truncated: true },
@@ -192,13 +190,13 @@ describe('buildEntitySummary', () => {
       expect(text).toContain('Resultado: truncado por el backend');
     });
 
-    it('omite la línea de lote cuando no se informa contexto de lotes', () => {
+    it('omits the batch line when no batch context is provided', () => {
       const text = renderEntitySummaryText(goldenSubgraph(), { scope: 'view' });
 
       expect(text).not.toContain('Lote:');
     });
 
-    it('informa el nodo activo sólo cuando difiere de la raíz', () => {
+    it('reports the active node only when it differs from the root', () => {
       const fixture = realEstateFixture();
       const withActive = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -215,8 +213,8 @@ describe('buildEntitySummary', () => {
     });
   });
 
-  describe('métricas exactas', () => {
-    it('declara los mismos números que el subgrafo', () => {
+  describe('exact metrics', () => {
+    it('declares the same numbers as the subgraph', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -235,7 +233,7 @@ describe('buildEntitySummary', () => {
       expect(document.text).toContain(`- Tripletas representadas: ${subgraph.edges.length}`);
     });
 
-    it('la multiplicidad de las super-aristas suma exactamente las tripletas', () => {
+    it('makes superedge multiplicity add up to the exact triple count', () => {
       const subgraph = goldenSubgraph();
       const document = buildEntitySummary(subgraph, { scope: 'view' });
       const superEdges = aggregateParallelEdges(subgraph.edges.map((edge) => edge.edge));
@@ -247,7 +245,7 @@ describe('buildEntitySummary', () => {
       expect(document.text).toContain('2 tripletas · 2 predicado(s)');
     });
 
-    it('cuenta una línea de tripleta por relación RDF incluida', () => {
+    it('counts one triple line per included RDF relationship', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -258,7 +256,7 @@ describe('buildEntitySummary', () => {
       expect(section(document.text, 'Relaciones')).toHaveLength(subgraph.edges.length);
     });
 
-    it('informa la multiplicidad cuando la misma tripleta aparece repetida', () => {
+    it('reports multiplicity when the same triple is repeated', () => {
       const nodes = [makeNode(A, { label: 'A' }), makeNode(B, { label: 'B' })];
       const edges = [
         { id: 'e1', source: A, target: B, predicate: P.knows },
@@ -274,7 +272,7 @@ describe('buildEntitySummary', () => {
       expect(relations).toEqual([`- <${A}> <${P.knows}> <${B}>  # ×2`]);
     });
 
-    it('cuenta las ramas sin expandir disponibles', () => {
+    it('counts available unexpanded branches', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: wideStarFixture(12),
         rootUri: `${EX}star/root`,
@@ -291,8 +289,8 @@ describe('buildEntitySummary', () => {
     });
   });
 
-  describe('identificadores inequívocos', () => {
-    it('usa URIs completas entre <> en las tripletas', () => {
+  describe('unambiguous identifiers', () => {
+    it('uses full URIs inside angle brackets in triples', () => {
       const relations = section(
         renderEntitySummaryText(goldenSubgraph(), { scope: 'view' }),
         'Relaciones',
@@ -301,7 +299,7 @@ describe('buildEntitySummary', () => {
       expect(relations[0].startsWith(`- <${A}> <${P.knows}> <${B}>`)).toBe(true);
     });
 
-    it('mantiene los blank nodes opacos y sin <>', () => {
+    it('keeps blank nodes opaque and outside angle brackets', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: bnodeFixture(),
         rootUri: `${EX}entity`,
@@ -312,14 +310,14 @@ describe('buildEntitySummary', () => {
       expect(text).not.toContain('<_:b0>');
     });
 
-    it('expone los helpers de formato de término', () => {
+    it('exposes term-formatting helpers', () => {
       expect(isBlankNode('_:b0')).toBe(true);
       expect(isBlankNode(`${EX}x`)).toBe(false);
       expect(formatTerm('_:b0')).toBe('_:b0');
       expect(formatTerm(`${EX}x`)).toBe(`<${EX}x>`);
     });
 
-    it('las etiquetas acompañan pero no reemplazan al identificador', () => {
+    it('uses labels alongside identifiers without replacing them', () => {
       const nodes = section(
         renderEntitySummaryText(goldenSubgraph(), { scope: 'view' }),
         'Nodos',
@@ -329,7 +327,7 @@ describe('buildEntitySummary', () => {
       expect(nodes[0]).toContain(`<${A}>`);
     });
 
-    it('no duplica el identificador cuando la etiqueta es la propia URI', () => {
+    it('does not duplicate the identifier when the label is the URI itself', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: disconnectedCoRowFixture(),
         rootUri: `${EX}root`,
@@ -341,8 +339,8 @@ describe('buildEntitySummary', () => {
     });
   });
 
-  describe('atributos sin predicado', () => {
-    it('lista los atributos de la raíz fuera de las tripletas', () => {
+  describe('attributes without predicates', () => {
+    it('lists root attributes outside triples', () => {
       const document = buildEntitySummary(goldenSubgraph(), { scope: 'view' });
 
       expect(document.text).toContain('  - precio: "100000"');
@@ -350,7 +348,7 @@ describe('buildEntitySummary', () => {
       expect(document.text).toContain('no se cuentan como tripletas');
     });
 
-    it('no inventa tripletas: las relaciones sólo salen de las aristas del resultado', () => {
+    it('does not invent triples and derives relationships only from result edges', () => {
       const subgraph = goldenSubgraph();
       const relations = section(
         renderEntitySummaryText(subgraph, { scope: 'view' }),
@@ -363,7 +361,7 @@ describe('buildEntitySummary', () => {
       }
     });
 
-    it('con attributes: "none" no lista atributos ni la nota', () => {
+    it('lists neither attributes nor the note with attributes set to none', () => {
       const text = renderEntitySummaryText(goldenSubgraph(), {
         scope: 'view',
         attributes: 'none',
@@ -373,7 +371,7 @@ describe('buildEntitySummary', () => {
       expect(text).not.toContain('no se cuentan como tripletas');
     });
 
-    it('con attributes: "all" lista también los atributos de los otros nodos', () => {
+    it('also lists other-node attributes with attributes set to all', () => {
       const nodes = [
         makeNode(A, { label: 'A', attributes: { precio: literal('100000') } }),
         makeNode(B, { label: 'B', attributes: { color: literal('rojo') } }),
@@ -396,7 +394,7 @@ describe('buildEntitySummary', () => {
       );
     });
 
-    it('formatea cada tipo de valor de binding de forma inequívoca', () => {
+    it('formats every binding-value type unambiguously', () => {
       expect(formatBindingValue({ type: 'uri', value: `${EX}x` })).toBe(`<${EX}x>`);
       expect(formatBindingValue({ type: 'bnode', value: 'b0' })).toBe('_:b0');
       expect(formatBindingValue({ type: 'literal', value: 'hola', lang: 'es' })).toBe('"hola"@es');
@@ -415,7 +413,7 @@ describe('buildEntitySummary', () => {
       ).toBe('"POINT(-57.9 -34.9)"');
     });
 
-    it('escapa comillas y saltos de línea de los literales', () => {
+    it('escapes quotes and line breaks in literals', () => {
       expect(formatBindingValue({ type: 'literal', value: 'di "hola"\nchau' })).toBe(
         '"di \\"hola\\"\\nchau"',
       );
@@ -423,7 +421,7 @@ describe('buildEntitySummary', () => {
   });
 
   describe('recursos compartidos, omisiones y advertencias', () => {
-    it('lista los hubs con sus vecinos no incorporados', () => {
+    it('lists hubs with their omitted neighbors', () => {
       const fixture = realEstateFixture();
       const subgraph = buildEntitySubgraph({
         visibleResult: fixture.result,
@@ -437,7 +435,7 @@ describe('buildEntitySummary', () => {
       expect(hubs.join('\n')).toContain(fixture.commercialFunction);
     });
 
-    it('lista los nodos omitidos por presupuesto y recorta con un aviso', () => {
+    it('lists budget-omitted nodes and truncates with a warning', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: wideStarFixture(12),
         rootUri: `${EX}star/root`,
@@ -455,7 +453,7 @@ describe('buildEntitySummary', () => {
       expect(omitted[2]).toBe(`- … y ${subgraph.omitted.nodes.length - 2} más`);
     });
 
-    it('reproduce las advertencias del subgrafo', () => {
+    it('reproduces subgraph warnings', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: disconnectedCoRowFixture(),
         rootUri: `${EX}root`,
@@ -470,8 +468,8 @@ describe('buildEntitySummary', () => {
     });
   });
 
-  describe('raíz sin estructura', () => {
-    it('devuelve un documento vacío, con la advertencia y sin secciones', () => {
+  describe('root without structure', () => {
+    it('returns an empty document with the warning and no sections', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: disconnectedCoRowFixture(),
         rootUri: `${EX}ausente`,
@@ -486,7 +484,7 @@ describe('buildEntitySummary', () => {
       expect(document.text).not.toContain('Relaciones (');
     });
 
-    it('informa la raíz aunque no haya estructura', () => {
+    it('reports the root even when there is no structure', () => {
       const subgraph = buildEntitySubgraph({
         visibleResult: disconnectedCoRowFixture(),
         rootUri: `${EX}ausente`,

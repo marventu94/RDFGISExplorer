@@ -113,7 +113,7 @@ describe('TableViewComponent', () => {
     fixture.detectChanges();
 
     expect(component.pageSizeOptions()).toEqual([25, 75]);
-    // pageSize 50 quedó fuera de la nueva oferta: se clampea a la primera.
+    // pageSize 50 left the new offering, so it clamps to the first option.
     expect(component.pageSize()).toBe(25);
   });
 
@@ -178,12 +178,11 @@ describe('TableViewComponent', () => {
   });
 
   /**
-   * Una fila de una consulta espacio-temporal menciona varias entidades y cada
-   * vista dibuja la suya: el mapa la que tiene coordenada, la tabla la fila.
-   * Estos casos cubren que un click en cualquier vista se vea acá.
+   * A spatiotemporal row mentions multiple entities and each view draws its own.
+   * These cases ensure a click in any view is reflected here.
    */
-  describe('selección cruzada con las otras vistas', () => {
-    /** Fila donde la entidad con coordenada NO es la primera columna. */
+  describe('cross-selection with other views', () => {
+    /** Row where the coordinate-bearing entity is NOT the first column. */
     const listing: BindingValue = { type: 'uri', value: 'urn:listing/1' };
     const casa: BindingValue = { type: 'uri', value: 'urn:casa/1' };
     const casaNode: NormalizedNode = {
@@ -208,8 +207,8 @@ describe('TableViewComponent', () => {
     let selectedRows: Array<{ uri: string; selected: boolean }>;
 
     /**
-     * Los row nodes de AG Grid se recrean en cada `rowData` nuevo, así que el
-     * fake también los recrea: es justo lo que borraba la selección.
+     * AG Grid row nodes are recreated for every new `rowData`, so the fake does
+     * the same; this is what used to clear selection.
      */
     function makeRows(): Array<{ selected: boolean } & Record<string, unknown>> {
       return result.bindings.map((binding) => {
@@ -249,7 +248,7 @@ describe('TableViewComponent', () => {
       component.onGridReady({ api } as never);
     }
 
-    /** La grilla rehace sus filas (lote nuevo, filtro, o la propia selección). */
+    /** The grid rebuilds rows after a new batch, filter, or selection. */
     function rebuildRows(): void {
       rows = makeRows();
       component.onRowDataUpdated();
@@ -299,9 +298,8 @@ describe('TableViewComponent', () => {
     });
 
     /**
-     * Regresión: seleccionar reemite `visibleQueryResult$` (el lote inyecta el
-     * nodo pineado), la grilla rehace sus filas y la selección recién aplicada
-     * se apagaba sola. Pasaba con cualquier origen, incluido el click acá.
+     * Regression: selection re-emits `visibleQueryResult$` because the batch
+     * injects the pin. Row rebuilding must not clear the new selection.
      */
     it('keeps the row selected after the grid rebuilds its rows', () => {
       selectionServiceMock.selectedNode$.next({
@@ -322,7 +320,7 @@ describe('TableViewComponent', () => {
         node: { isSelected: () => true },
         data: result.bindings[0],
       } as never);
-      // El servicio real responde publicando la selección con origen 'table'.
+      // The real service responds by publishing selection with source 'table'.
       selectionServiceMock.selectedNode$.next({
         node: casaNode,
         source: 'table',
@@ -355,8 +353,7 @@ describe('TableViewComponent', () => {
         data: result.bindings[0],
       } as never);
 
-      // No la primera URI de la fila (el aviso), sino la que las otras vistas
-      // saben dibujar.
+      // Use the entity selected by other views, not the row's first URI.
       expect(selectionServiceMock.select).toHaveBeenCalledWith(casaNode, 'table');
     });
   });

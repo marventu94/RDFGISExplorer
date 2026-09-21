@@ -68,7 +68,7 @@ describe('LoadProgressOverlayComponent', () => {
     expect(el.querySelector('.stage--active .stage-detail')?.textContent).toContain(
       'endpoint SPARQL',
     );
-    // La que sigue todavía no arrancó: se muestra apagada y sin tiempo.
+    // The next stage has not started, so it appears inactive without a duration.
     expect(el.querySelector('.stage--pending .stage-time')?.textContent?.trim()).toBe('');
   });
 

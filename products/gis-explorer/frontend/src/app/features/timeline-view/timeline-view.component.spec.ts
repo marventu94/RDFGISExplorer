@@ -40,7 +40,7 @@ const nodeWithoutDates: NormalizedNode = {
   temporalEvents: [],
 };
 
-/** Magnitudes numéricas mezcladas con literales de texto, como las devuelve una query real. */
+/** Numeric magnitudes mixed with text literals, as returned by a real query. */
 const nodeWithNumericAttrs: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q123',
   label: 'Depósito Norte',
@@ -71,8 +71,8 @@ function createMockQueryResult(nodes: NormalizedNode[]): QueryResult {
   };
 }
 
-// vi.hoisted: las factories de vi.mock se hoistean y no ven el scope del módulo;
-// el holder expone la factory y la instancia actual para factory y tests.
+// vi.mock factories are hoisted and cannot see module scope; the holder exposes
+// the factory and current instance to both the factory and tests.
 const timelineMock = vi.hoisted(() => {
   function createMockTimeline() {
     const onCallbacks: Map<string, (...args: unknown[]) => void> = new Map();
@@ -135,7 +135,7 @@ vi.mock('vis-data', () => ({
   DataSet: vi.fn(function (initial?: unknown[]) {
     const data = initial ? [...initial] : [];
     return {
-      // El DataSet real acepta un item o un array; los grupos se agregan en lote.
+      // Real DataSet accepts an item or array; groups are added in a batch.
       add: vi.fn((item: unknown) => {
         if (Array.isArray(item)) {
           data.push(...item);
@@ -557,9 +557,8 @@ describe('TimelineViewComponent', () => {
     });
 
     /**
-     * El mapa selecciona la entidad con coordenada y la tabla la de la fila:
-     * casi nunca son la que tiene las fechas. Sin resolver por fila, la
-     * timeline se quedaba quieta ante cualquier click de las otras vistas.
+     * Map selects the coordinate entity and table selects the row entity; these
+     * rarely own dates. Row resolution keeps timeline in sync with other views.
      */
     it('should select the dated entity of the same row when the selected one has no dates', () => {
       const result = createMockQueryResult([nodeWithoutDates, nodeWithOneDate]);
@@ -580,9 +579,8 @@ describe('TimelineViewComponent', () => {
     });
 
     /**
-     * Regresión: seleccionar reemite el resultado visible (el lote inyecta el
-     * nodo pineado) y `renderItems` rehace los items desde cero, apagando la
-     * ficha recién marcada — incluida la que el usuario clickeó acá.
+     * Regression: selection re-emits the visible result because pinning injects
+     * a node. Rebuilding items must not clear the newly selected event.
      */
     it('should keep the selected item marked after the items are rebuilt', () => {
       const result = createMockQueryResult([nodeWithDates, nodeWithOneDate]);
@@ -594,7 +592,7 @@ describe('TimelineViewComponent', () => {
       fixture.detectChanges();
       timelineMock.instance.setSelection.mockClear();
 
-      // Re-render: mismo resultado, objeto nuevo (como el que dispara el pin).
+      // Re-render with the same result in a new object, as pinning triggers.
       filteredQueryResultSubject.next({ ...result });
       fixture.detectChanges();
 
@@ -796,8 +794,8 @@ describe('TimelineViewComponent', () => {
       });
     });
 
-    // La rueda hace zoom solo con preferZoom Y sin zoomKey: con zoomKey presente
-    // el handler del Core vuelve a scrollear en vez de dejar zoomear al Range.
+    // The wheel zooms only with preferZoom and no zoomKey; with zoomKey, Core
+    // scrolls instead of allowing Range zoom.
     it('should make the mouse wheel zoom instead of panning horizontally', () => {
       expect(timelineMock.options?.['preferZoom']).toBe(true);
       expect(timelineMock.options).not.toHaveProperty('zoomKey');
@@ -904,8 +902,8 @@ describe('TimelineViewComponent', () => {
   });
 
   describe('initial framing', () => {
-    // La timeline se construye antes de suscribirse justamente por esto: los
-    // BehaviorSubject emiten sincrónicamente y antes se perdía el encuadre.
+    // Timeline is constructed before subscribing because BehaviorSubject emits
+    // synchronously; otherwise initial framing is lost.
     it('should frame the data when a result is already present before ngOnInit', async () => {
       const result = createMockQueryResult([nodeWithDates]);
       queryResultSubject.next(result);
@@ -926,7 +924,7 @@ describe('TimelineViewComponent', () => {
 
       const [start, end] = timelineMock.instance.setWindow.mock.calls.at(-1) as [Date, Date];
       const eventMs = new Date(nodeWithOneDate.temporalEvents![0].isoDate).getTime();
-      // Una sola fecha: el span es 0, así que el piso del padding abre la ventana.
+      // A single date has zero span, so minimum padding opens the window.
       expect(start.getTime()).toBeLessThan(eventMs);
       expect(end.getTime()).toBeGreaterThan(eventMs);
     });

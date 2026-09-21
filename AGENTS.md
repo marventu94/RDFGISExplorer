@@ -1,128 +1,135 @@
 # AGENTS.md — RDF GIS Explorer
 
-## Arquitectura General
+## General architecture
 
-Plataforma de micro-frontends con **Native Federation** (`@angular-architects/native-federation`, sin Webpack).
+Microfrontend platform using **Native Federation** (`@angular-architects/native-federation`, without
+Webpack).
 
 ```
 AppShell (host, :4200)
-├── /               → WelcomePage (dashboards recientes)
+├── /               → WelcomePage (recent dashboards)
 ├── /explorer       → remote: rdf_explorer (:4201) → MainComponent
 ├── /gis            → remote: rdf_gis_explorer (:4202) → App
-├── /dashboards/:id → dashboardRedirectGuard → redirige según kind (gis/explorer)
-└── /**             → redirect a /
+├── /dashboards/:id → dashboardRedirectGuard → redirects by kind (gis/explorer)
+└── /**             → redirect to /
 
-Shell backend (:3000) → `/api/dashboards` (CRUD exclusivo, SQLite)
-RDF backend (:3001)   → query, summary, suggestions, config y health
-GIS backend (:3002)   → query, summary, suggestions, config y health
+Shell backend (:3000) → `/api/dashboards` (exclusive CRUD, SQLite)
+RDF backend (:3001)   → query, summary, suggestions, config, and health
+GIS backend (:3002)   → query, summary, suggestions, config, and health
 ```
 
-Los tipos compartidos entre backend y frontends viven en **`packages/contracts`**
-(`@rdfgis/contracts`, solo tipos): `QueryResult`, `AppConfig`, `Dashboard`.
+Types shared by backends and frontends live in **`packages/contracts`**
+(`@rdfgis/contracts`, types only): `QueryResult`, `AppConfig`, and
+`Dashboard`.
 
-## Estructura del Monorepo
+## Monorepo structure
 
-Workspace **pnpm** (`pnpm-workspace.yaml` en la raíz): un solo `pnpm install` instala todo.
+**pnpm** workspace (`pnpm-workspace.yaml` at the root): one `pnpm install`
+installs everything.
 
-| Proyecto | Path | Framework | Test Runner | Puerto |
-|----------|------|-----------|-------------|--------|
+| Project | Path | Framework | Test runner | Port |
+|---------|------|-----------|-------------|------|
 | Root | `/` | concurrently | — | — |
-| Contracts | `packages/contracts/` | TypeScript (solo tipos) | — | — |
+| Contracts | `packages/contracts/` | TypeScript (types only) | — | — |
 | Shell backend | `products/shell/backend/` | NestJS 11 | Jest 30 | 3000 |
-| Runtime explorers | `packages/explorer-backend/` | NestJS 11 | Jest 30 | 3001/3002 |
-| App Shell | `products/shell/frontend/` | Angular 21 | Vitest 4 (vía `ng test`) | 4200 |
-| RDF Explorer | `products/rdf-explorer/frontend/` | Angular 21 | Vitest 4 (vía `ng test`) | 4201 |
-| RDF GIS Explorer | `products/gis-explorer/frontend/` | Angular 21 | Vitest 4 (vía `ng test`) | 4202 |
+| Explorer runtimes | `packages/explorer-backend/` | NestJS 11 | Jest 30 | 3001/3002 |
+| App Shell | `products/shell/frontend/` | Angular 21 | Vitest 4 (through `ng test`) | 4200 |
+| RDF Explorer | `products/rdf-explorer/frontend/` | Angular 21 | Vitest 4 (through `ng test`) | 4201 |
+| RDF GIS Explorer | `products/gis-explorer/frontend/` | Angular 21 | Vitest 4 (through `ng test`) | 4202 |
 
-## Comandos
+## Commands
 
 ```bash
-./start.sh                     # dev con hot reload; --env .env.custom para otro endpoint
-npm run dev                    # igual, sin el bootstrap de nvm/corepack
+./start.sh                     # dev with hot reload; use --env .env.custom for another endpoint
+npm run dev                    # same, without nvm/corepack bootstrap
 
-cd packages/explorer-backend && pnpm run start:dev   # backend solo
+cd packages/explorer-backend && pnpm run start:dev   # backend only
 cd packages/explorer-backend && pnpm test            # unit tests (Jest)
 cd packages/explorer-backend && pnpm run lint        # ESLint
-pnpm run dev:rdf-standalone       # RDF Explorer + backend propio
-pnpm run dev:gis-standalone       # GIS Explorer + backend propio
+pnpm run dev:rdf-standalone       # RDF Explorer + its own backend
+pnpm run dev:gis-standalone       # GIS Explorer + its own backend
 
-cd products/<producto>/frontend && pnpm test
+cd products/<product>/frontend && pnpm test
 ```
 
-## Convenciones de Código
+## Code conventions
 
 ### Backend (NestJS)
-- **Patrón:** Hexagonal (Ports & Adapters). `SparqlEndpoint` es el puerto; `GenericSparqlAdapter` atiende endpoints SPARQL configurables y `WikidataAdapter` agrega sus integraciones públicas. El factory pasa el valor de `SPARQL_BACKEND` como `backendName`, reportado en `/api/health` y `QueryResult.meta.backend`.
-- **DI tokens:** Symbols (`SPARQL_ENDPOINT`, `DASHBOARDS_DB`), no strings.
-- **DTOs:** `class-validator` + `class-transformer`. Validación global con `ValidationPipe({ transform: true, whitelist: true })`.
-- **Errores:** `HttpExceptionFilter` global mapea `TimeoutError`→408 y `UpstreamError`→502.
-- **DB:** `better-sqlite3` sincrónico, WAL mode. Tabla `dashboards` con JSON opaco en columna `payload`.
-- **Tests:** Jest con `nock` para mock HTTP, `supertest` para endpoints, `@nestjs/testing` para modules.
+
+- **Pattern:** Hexagonal (Ports & Adapters). `SparqlEndpoint` is the port; `GenericSparqlAdapter` serves configurable SPARQL endpoints, and `WikidataAdapter` adds its public integrations. The factory passes `SPARQL_BACKEND` as `backendName`, reported by `/api/health` and `QueryResult.meta.backend`.
+- **DI tokens:** Symbols (`SPARQL_ENDPOINT`, `DASHBOARDS_DB`), not strings.
+- **DTOs:** `class-validator` + `class-transformer`. Global validation through `ValidationPipe({ transform: true, whitelist: true })`.
+- **Errors:** global `HttpExceptionFilter` maps `TimeoutError`→408 and `UpstreamError`→502.
+- **DB:** synchronous `better-sqlite3`, WAL mode. The `dashboards` table stores opaque JSON in `payload`.
+- **Tests:** Jest with `nock` for HTTP mocks, `supertest` for endpoints, and `@nestjs/testing` for modules.
 
 ### Frontend (Angular 21)
-- **Standalone components** en toda la app. Sin NgModules.
-- **Reactividad:** Angular Signals (`signal`, `computed`, `effect`) + RxJS `BehaviorSubject` donde aplica.
-- **Native Federation:** cada remote expone un solo componente vía `federation.config.js` → `exposes: { './Component': '...' }`.
-- **Estilos:** SCSS por componente. Angular Material theme en `styles.scss` del shell.
-- **Tests:** archivos `*.spec.ts` junto al código, corren con Vitest vía `ng test` (ver Notas Importantes).
 
-### Shared deps de federation (¡leer antes de tocar `federation.config.js`!)
-- Base: `shareAll({ singleton: true, strictVersion: true })` en host y remotes.
-- **El host comparte `@angular/material` y `@angular/cdk` explícitamente con `includeSecondaries: { keepAll: true }`** aunque no los importe en su código. Motivo: con `ignoreUnusedDeps`, si el host no los provee, cada remote carga su PROPIA copia del CDK; con dos copias vivas aparecen los warnings NG0912 (Component ID collision) y `MatDialog` crashea (`this._portalOutlet is undefined`: el `viewChild(CdkPortalOutlet)` heredado no matchea la directiva de la otra copia). `keepAll: true` es lo que hace que la entrada sobreviva al filtro de `ignoreUnusedDeps`.
-- **AG Grid es privativo del remote GIS** (está en su `skip`): si se comparte, el host lo omite del import map y el remote no resuelve el specifier.
-- Leaflet, sparqljs, exceljs y otros CJS/UMD tampoco se comparten (skip en el remote GIS); `leaflet-global.ts` setea `window.L` para los plugins.
-- Patch de `@softarc/native-federation` (`products/gis-explorer/frontend/patches/`): resuelve package.json de deps transitivas no-hoisted en el store de pnpm. Referenciado en `pnpm-workspace.yaml`.
+- **Standalone components** throughout. No NgModules.
+- **Reactivity:** Angular Signals (`signal`, `computed`, `effect`) plus RxJS `BehaviorSubject` where appropriate.
+- **Native Federation:** each remote exposes one component through `federation.config.js` → `exposes: { './Component': '...' }`.
+- **Styles:** per-component SCSS. Angular Material theme in the Shell's `styles.scss`.
+- **Tests:** colocated `*.spec.ts` files, run with Vitest through `ng test` (see Important notes).
 
-### Comunicación Shell ↔ Remotes
-- **QueryHandoffService** (duplicado deliberadamente en `rdf_explorer` y `rdf_gis_explorer`; los servicios de app no se pueden compartir por federation): `sessionStorage` + `CustomEvent('query-handoff')` + `storage` event. TTL 5 min. Semántica de un solo uso (`consume()`).
-- **Dashboards:** solo el Shell publica `/api/dashboards` y registra `DashboardHost` en `@rdfgis/platform-bridge`. Los remotes integrados usan esa mediación; standalone oculta persistencia.
-- **APIs de explorers:** standalone usa `/api`; el Shell configura `/rdf-api` y `/gis-api`, siempre como URLs relativas.
+### Federation shared dependencies (read before changing `federation.config.js`)
 
-## Módulos del Backend
+- Baseline: `shareAll({ singleton: true, strictVersion: true })` in the host and remotes.
+- **The host explicitly shares `@angular/material` and `@angular/cdk` with `includeSecondaries: { keepAll: true }`**, even though its code does not import them. With `ignoreUnusedDeps`, if the host does not provide them, each remote loads its OWN CDK copy; two live copies cause NG0912 warnings (Component ID collision) and make `MatDialog` crash (`this._portalOutlet is undefined`: inherited `viewChild(CdkPortalOutlet)` does not match the directive from the other copy). `keepAll: true` keeps the entry from being removed by the `ignoreUnusedDeps` filter.
+- **AG Grid belongs exclusively to the GIS remote** (it is in its `skip`): if shared, the host omits it from the import map and the remote cannot resolve the specifier.
+- Leaflet, sparqljs, exceljs, and other CJS/UMD packages are not shared either (they are in the GIS remote's `skip`); `leaflet-global.ts` assigns `window.L` for plugins.
+- The `@softarc/native-federation` patch (`products/gis-explorer/frontend/patches/`) resolves package.json files for non-hoisted transitive dependencies in the pnpm store. It is referenced in `pnpm-workspace.yaml`.
 
-| Módulo | Path | Responsabilidad |
-|--------|------|-----------------|
-| `SparqlModule` | `modules/sparql/` | `@Global()`. Provee token `SPARQL_ENDPOINT` vía factory según `SPARQL_BACKEND` |
-| `QueryModule` | `modules/query/` | Ejecuta SPARQL. Valida con `sparqljs.Parser`. Aplica límites y timeout. `POST /api/query/summary`: envuelve la query del usuario como subquery y agrega sobre el resultado completo |
-| `DashboardsModule` | `modules/dashboards/` | CRUD dashboards en SQLite. Payload JSON opaco (máx 1MB). `kind` ∈ {gis, explorer} |
-| `SuggestionsModule` | `modules/suggestions/` | Autocompletado de predicados + búsqueda de entidades |
-| `HealthModule` | `modules/health/` | `/api/health` (usado por Docker) + `/api/health/sparql` (chequea el endpoint upstream) |
+### Shell ↔ remote communication
+
+- **QueryHandoffService** is deliberately duplicated in `rdf_explorer` and `rdf_gis_explorer`; application services cannot be shared through federation. It uses `sessionStorage` + `CustomEvent('query-handoff')` + the `storage` event, a 5-minute TTL, and one-time `consume()` semantics.
+- **Dashboards:** only the Shell exposes `/api/dashboards` and registers `DashboardHost` in `@rdfgis/platform-bridge`. Integrated remotes use that mediation; standalone mode hides persistence.
+- **Explorer APIs:** standalone mode uses `/api`; the Shell configures `/rdf-api` and `/gis-api`, always as relative URLs.
+
+## Backend modules
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `SparqlModule` | `modules/sparql/` | `@Global()`. Provides the `SPARQL_ENDPOINT` token through a factory based on `SPARQL_BACKEND` |
+| `QueryModule` | `modules/query/` | Executes SPARQL, validates with `sparqljs.Parser`, and applies limits and timeout. `POST /api/query/summary` wraps the user's query as a subquery and aggregates over the complete result |
+| `DashboardsModule` | `modules/dashboards/` | Dashboard CRUD in SQLite. Opaque JSON payload (max 1 MB). `kind` ∈ {gis, explorer} |
+| `SuggestionsModule` | `modules/suggestions/` | Predicate autocomplete and entity search |
+| `HealthModule` | `modules/health/` | `/api/health` (used by Docker) and `/api/health/sparql` (checks the upstream endpoint) |
 | `AppConfigModule` | `modules/app-config/` | `GET /api/config`: env + `defaultPrefixes` + `describe`/`classColors`/`defaults` |
 
-(No hay módulo de settings: se eliminó junto con su tabla SQLite al quedar sin
-consumidores. Los defaults que necesita el Explorer viajan en `/api/config`.)
+There is no settings module: it and its SQLite table were removed when no
+consumers remained. Explorer defaults are delivered through `/api/config`.
 
-## Adaptadores SPARQL
+## SPARQL adapters
 
-- **`GenericSparqlAdapter`**: cliente SPARQL 1.1 genérico (POST form-urlencoded). URL vía `SPARQL_ENDPOINT_URL`, Basic Auth opcional (`SPARQL_USERNAME`/`SPARQL_PASSWORD`), retry con backoff en 429, normalización de tipos (uri, literal, coordinate WKT, date, bnode), construcción de grafo (nodes+edges) y cache de predicados 1h. Se usa para cualquier `SPARQL_BACKEND` distinto de `wikidata`.
-- **`WikidataAdapter`**: extiende el adaptador genérico con búsqueda pública de entidades y descriptor `wikibase:label`.
-- **Interfaz:** `SparqlEndpoint { execute(), getPredicates(), backendName }` (`backendName: string` = valor de `SPARQL_BACKEND`).
+- **`GenericSparqlAdapter`**: generic SPARQL 1.1 client (form-urlencoded POST). URL from `SPARQL_ENDPOINT_URL`; optional Basic Auth through `SPARQL_USERNAME`/`SPARQL_PASSWORD`; retry with backoff on 429; type normalization (uri, literal, coordinate WKT, date, bnode); graph construction (nodes + edges); and a one-hour predicate cache. Used for every `SPARQL_BACKEND` except `wikidata`.
+- **`WikidataAdapter`**: extends the generic adapter with public entity search and a `wikibase:label` descriptor.
+- **Interface:** `SparqlEndpoint { execute(), getPredicates(), backendName }` (`backendName: string` is the `SPARQL_BACKEND` value).
 
-## Prefixes SPARQL
+## SPARQL prefixes
 
-- Fuente: `packages/explorer-backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). El repo trae `prefixes.wikidata.json`; las configuraciones privadas usan archivos locales ignorados.
-- Se exponen como `defaultPrefixes` en `GET /api/config`.
-- **rdf_explorer** los usa en la generación de queries y para abreviar URIs (describe panel).
-- **rdf_gis_explorer** precarga el bloque `PREFIX ...` en el editor CodeMirror (`SparqlInputComponent.seedDefaultPrefixes()`): al iniciar con editor vacío y al crear tablero nuevo. Nunca pisa un handoff ni un tablero cargado.
-- El backend **no** inyecta prefixes al ejecutar: la query debe ser autocontenida (la validación con `sparqljs` en front y back lo exige).
-- El `Dockerfile` del backend copia `config/` — si se agregan archivos de config nuevos fuera de esa carpeta, actualizar el Dockerfile.
+- Source: `packages/explorer-backend/config/prefixes.${SPARQL_BACKEND}.json` (override: `SPARQL_PREFIXES_PATH`). The repository includes `prefixes.wikidata.json`; private configurations use ignored local files.
+- Exposed as `defaultPrefixes` by `GET /api/config`.
+- **rdf_explorer** uses them for query generation and URI abbreviation in the describe panel.
+- **rdf_gis_explorer** seeds the `PREFIX ...` block in the CodeMirror editor (`SparqlInputComponent.seedDefaultPrefixes()`) when starting with an empty editor and when creating a new dashboard. It never overwrites a handoff or loaded dashboard.
+- The backend **does not** inject prefixes during execution: queries must be self-contained (front- and backend `sparqljs` validation requires this).
+- The backend `Dockerfile` copies `config/`; update it if new configuration files are placed elsewhere.
 
-## Contratos Front↔Back: `@rdfgis/contracts`
+## Front↔back contracts: `@rdfgis/contracts`
 
-La fuente de verdad única es **`packages/contracts/src/`** (`query-result.ts`,
-`query-summary.ts`, `app-config.ts`, `dashboard.ts`). Los archivos históricos
-(`packages/explorer-backend/src/shared/dto/query-result.dto.ts`, `products/gis-explorer/frontend/src/app/shared/models/*`,
-`products/rdf-explorer/frontend/src/app/core/endpoint-adapter.ts`, etc.) son re-exports
-type-only — **los cambios de contrato se hacen SOLO en el paquete** y tsc los
-propaga/valida en las 4 apps. El paquete va en `devDependencies` (`workspace:*`):
-al ser solo tipos no entra en el `shareAll` de federation ni en el runtime.
-Se compila con su script `prepare` en cada `pnpm install`.
+The single source of truth is **`packages/contracts/src/`** (`query-result.ts`,
+`query-summary.ts`, `app-config.ts`, `dashboard.ts`). Historical files
+(`packages/explorer-backend/src/shared/dto/query-result.dto.ts`, `products/gis-explorer/frontend/src/app/shared/models/*`, `products/rdf-explorer/frontend/src/app/core/endpoint-adapter.ts`, etc.) are type-only
+re-exports. **Make contract changes ONLY in the package**; tsc propagates and
+validates them across all four applications. The types-only package is in
+`devDependencies` (`workspace:*`), so it enters neither federation's
+`shareAll` nor runtime bundles. Its `prepare` script builds it
+on every `pnpm install`.
 
 ```typescript
 QueryResult {
   variables: string[]
-  bindings: ResultBinding[]      // filas raw
-  nodes: NormalizedNode[]        // grafo normalizado
+  bindings: ResultBinding[]      // raw rows
+  nodes: NormalizedNode[]        // normalized graph
   edges: NormalizedEdge[]
   meta: { durationMs, truncated, limitApplied, backend }  // backend: string
 }
@@ -133,114 +140,218 @@ NormalizedNode { uri, label, queryVariable?, classes?, classification?, attribut
 NormalizedEdge { id, source, target, predicate, predicateLabel? }
 ```
 
-## RDF Explorer — Dominio del Grafo
+## RDF Explorer — graph domain
 
-El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `graph/domain/`:
+The heart of rdf_explorer is a pure domain model (without Angular) in
+`graph/domain/`:
 
-- **`PropertyGraph`**: contenedor de nodes, edges. Mutaciones, query building (BFS → SPARQL), drop handling.
-- **`RDFResource`** (abstract) → `Node`, `Property`, `Literal`. Cada uno tiene `Variable` (alias, filtros).
-- **`Query`**: genera SPARQL desde el grafo. BFS, triples, OPTIONALs, VALUES, FILTERs, SERVICE wikibase:label. Los filtros de fecha (`datefrom`/`dateto`) serializan `^^xsd:dateTime`; `toSparql()` declara `PREFIX xsd:` automáticamente cuando aparece (sparqljs lo exige al validar). `toSparqlFullProjection()` proyecta TODAS las variables (selectAll + recorte de `?<literal>Label` vacíos, sin mutar el estado): es la que usa el **handoff al GIS** (`main.component.handoffToGis`, `sparql-panel.handoffQuery`) — con la proyección mínima de `toSparql()` el GIS queda sin coordenadas, fechas ni aristas. El seed de dashboards demo usa el mismo método para la query GIS, así que handoff runtime y tablero sembrado producen la misma query.
-- **`Filter`**: 9 tipos (text, lang, regex, leq, geq, isuri, isliteral, datefrom, dateto).
-- **`GraphSerializer`**: serializa/deserializa PropertyGraph ↔ JSON para persistencia.
-- **`PropertyGraphService`**: wrapper Angular con signals. `revision` counter para reactividad.
-- **`CanvasGraphComponent`**: Cytoscape.js con compound nodes, edgehandles, context-menus, drag&drop.
+- **`PropertyGraph`**: node and edge container. Mutations, query building (BFS → SPARQL), and drop handling.
+- **`RDFResource`** (abstract) → `Node`, `Property`, `Literal`. Each has a `Variable` (alias, filters).
+- **`Query`**: generates SPARQL from the graph using BFS, triples, OPTIONALs, VALUES, FILTERs, and SERVICE wikibase:label. Date filters (`datefrom`/`dateto`) serialize as `^^xsd:dateTime`; `toSparql()` automatically declares `PREFIX xsd:` when needed (sparqljs requires it for validation). `toSparqlFullProjection()` projects ALL variables (selectAll plus removal of empty `?<literal>Label` variables, without mutating state). It is used for **handoff to GIS** (`main.component.handoffToGis`, `sparql-panel.handoffQuery`); the minimal `toSparql()` projection would leave GIS without coordinates, dates, or edges. The demo-dashboard seed uses the same method for the GIS query, so runtime handoff and seeded dashboards produce the same query.
+- **`Filter`**: 9 types (text, lang, regex, leq, geq, isuri, isliteral, datefrom, dateto).
+- **`GraphSerializer`**: serializes/deserializes PropertyGraph ↔ JSON for persistence.
+- **`PropertyGraphService`**: Angular wrapper with signals and a `revision` counter for reactivity.
+- **`CanvasGraphComponent`**: Cytoscape.js with compound nodes, edgehandles, context menus, and drag-and-drop.
 
-## RDF GIS Explorer — Vistas Coordinadas
+## RDF GIS Explorer — coordinated views
 
-4 vistas sincronizadas vía `SelectionService` (BehaviorSubject):
+Four views are synchronized through `SelectionService` (BehaviorSubject):
 
-| Vista | Librería | Filtra por | Emite |
-|-------|----------|-----------|-------|
-| Table | AG Grid 35 (`rowSelection` con la API objeto ≥32.2) | Quick filter | select, focus |
+| View | Library | Filters by | Emits |
+|------|---------|------------|-------|
+| Table | AG Grid 35 (`rowSelection` with the object API ≥32.2) | Quick filter | select, focus |
 | Map | Leaflet 1.9 + markercluster + draw | GeoFilter (polygon) | select, focus |
-| Graph | Cytoscape 3.34 (cola+dagre) | Cap de nodos config-driven (`limits.graphMaxNodes`, default 300; el nodo seleccionado entra siempre al presupuesto y un cambio runtime del cap reconstruye la vista una vez). Recorte top-N + coloreo por clase en `graph-view/graph-elements.ts` (puro) | select, focus |
-| Timeline | vis-timeline 8.x | TemporalFilter (rango) | select, focus |
+| Graph | Cytoscape 3.34 (cola+dagre) | Config-driven node cap (`limits.graphMaxNodes`, default 300; the selected node always enters the budget, and a runtime cap change rebuilds the view once). Top-N trimming and class coloring in pure `graph-view/graph-elements.ts` | select, focus |
+| Timeline | vis-timeline 8.x | TemporalFilter (range) | select, focus |
 
-**Coordinated View:** cada vista emite `setFocus(uris)` al hacer pan/zoom. Las demás ajustan su viewport. Toggle global en navbar.
+**Coordinated View:** each view emits `setFocus(uris)` when panning/zooming.
+The others adjust their viewport. A global navbar toggle controls this
+behavior.
 
-**Modo entidad del grafo:** se activa sólo mediante `Ver estructura` sobre una selección explícita; el foco coordinado nunca cambia de modo ni de raíz. Opera exclusivamente sobre el `QueryResult` recuperado, sin SPARQL adicional. La lógica pura vive en `features/graph-view/entity-subgraph.ts` (selección determinista, caminos, hubs y presupuesto) y `entity-exploration.ts` (raíz, activo, ramas, fijados e historial). El estado es transitorio y al salir se restauran cámara/layout/nivel. `entity-summary-text.ts` y `entity-structure.ts` generan las copias de vista/estructura con URIs completas, blank nodes opacos y multiplicidades exactas; `EntitySummaryClipboardService` aplica clipboard + fallback manual.
+**Graph entity mode:** activated only through the `Ver estructura` action on
+an explicit selection; coordinated focus never changes the mode or root. It
+operates exclusively on the retrieved `QueryResult`, without additional
+SPARQL. Pure logic lives in `features/graph-view/entity-subgraph.ts` (deterministic selection, paths,
+hubs, budget) and `entity-exploration.ts` (root, active node, branches, pins,
+history). State is transient; leaving restores camera/layout/level.
+`entity-summary-text.ts` and `entity-structure.ts` generate view/structure copies with
+full URIs, opaque blank nodes, and exact multiplicities; `EntitySummaryClipboardService`
+implements clipboard plus manual fallback.
 
-**SelectionService:** fuente central de verdad. `queryResult$`, `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$` (aplica filtros geo+temporal), `visibleQueryResult$` (lo que consumen las 4 vistas: el resultado filtrado restringido al lote actual + pinning), `lotState$`, `lotSize$`, `currentLot$`. Métodos de lotes: `setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
+**SelectionService:** central source of truth. `queryResult$`,
+`selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$`
+(applies geo + temporal filters), `visibleQueryResult$` (consumed by all four
+views: filtered result restricted to the current batch plus pinning),
+`lotState$`, `lotSize$`, and `currentLot$`. Batch methods:
+`setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
 
-**Lotes globales con pinning:** cuando el resultado filtrado supera `lotSize` **filas** (default 300, config-driven vía `limits.lotDefaultSize`/`lotSizeOptions`), las 4 vistas muestran **el mismo lote**. La lógica pura vive en `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`): el lote pagina `bindings` en el **orden original de la query** (nunca se reordena). Los nodos visibles son los URIs/bnodes de las filas del lote **más sus vecinos a 1 salto** por `edges` (así se recuperan los nodos intermedios que el backend recorta del SELECT con `pickVariables`), y las edges visibles son las que conectan nodos visibles. Los bnodes se normalizan con `bindingGraphId` (las filas traen `b0` crudo, los nodos/edges usan `_:b0`). El nodo seleccionado se **inyecta** en el lote visible aunque no esté referenciado por las filas del lote (con sus edges hacia nodos visibles); al deseleccionar deja de inyectarse. Query nueva → lote 1; al filtrar se conserva el lote si sigue válido y se clampea si `lotCount` se reduce. Con un solo lote `visibleQueryResult$` es idéntico a `filteredQueryResult$` (sin overhead). El navbar tiene el navegador de lotes ("Lote X de N · T filas", anterior/siguiente, selector de tamaño, icono de warning si el backend truncó; tooltip con el aviso de volumen) — solo visible cuando N > 1.
+**Global batches with pinning:** when the filtered result exceeds
+`lotSize` **rows** (default 300, config-driven through
+`limits.lotDefaultSize`/`lotSizeOptions`), all four views show **the same batch**.
+Pure logic lives in `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`).
+The batch paginates `bindings` in **original query order**, never
+sorting them. Visible nodes are the URIs/bnodes from batch rows **plus their
+one-hop neighbors** through `edges`, recovering intermediate nodes
+removed from the SELECT by backend `pickVariables`; visible edges connect
+visible nodes. Bnodes are normalized through `bindingGraphId` (rows contain
+raw `b0`; nodes/edges use `_:b0`). The selected node
+is **injected** into the visible batch even when no batch row references it,
+together with its edges to visible nodes; deselection removes it. New query →
+batch 1; filtering retains a still-valid batch and clamps it when
+`lotCount` shrinks. With one batch, `visibleQueryResult$` is identical to
+`filteredQueryResult$` (no overhead). The navbar batch navigator
+(`"Lote X de N · T filas"`, previous/next, size selector, warning icon when the
+backend truncated, volume-warning tooltip) appears only when N > 1.
 
-**Chips de cobertura:** helper puro `shared/stats/coverage-stats.ts` (`computeCoverageStats`) + componente `shared/components/coverage-chip`. Los conteos de alerta usan solo **entidades principales** (nodos con atributos, coordenada o eventos temporales propios); los nodos estructurales del modelo (features, direcciones, geometrías) no cuentan como "sin coordenada/fecha". Mapa ("Mostrando X de N entidades[ del lote] · Y sin coordenada"), timeline (ídem "sin fecha") y grafo ("Lote X de N · M filas", o "Mostrando 300 de N nodos (top por conexiones)" si el lote visible excede `MAX_NODES`). Computan sobre el lote visible; el chip se oculta cuando no hay alerta.
+**Coverage chips:** pure helper `shared/stats/coverage-stats.ts` (`computeCoverageStats`) plus
+`shared/components/coverage-chip`. Alert counts include only **main entities** (nodes with
+their own attributes, coordinate, or temporal events); structural model nodes
+(features, addresses, geometries) do not count as lacking coordinates/dates.
+Map (`"Mostrando X de N entidades[ del lote] · Y sin coordenada"`), timeline (same with `"sin fecha"`), and graph
+(`"Lote X de N · M filas"`, or `"Mostrando 300 de N nodos (top por conexiones)"` when the visible batch exceeds
+`MAX_NODES`) compute over the visible batch. The chip is hidden when
+there is no alert.
 
-**Panel de resumen:** componente `features/dashboard/summary-panel` (colapsable, bajo el navbar) + helpers puros `shared/stats/result-summary.ts` (`classifyVariables`, `computeLocalSummary`). Muestra agregados (total de filas, avg/min/max por var numérica, rango por temporal, top 12 valores por categórica) computados sobre **el resultado completo de la query** — distinto de los chips de cobertura, que describen el lote visible. Los filtros de las vistas no lo afectan. La clasificación de variables es heurística y domain-agnostic (numérica si ≥90% de los valores no nulos son literales numéricos, temporal si el tipo normalizado es `date`, categórica si ≤20 valores distintos; caps 3/2/3). Si el resultado **no** está truncado se computa localmente; si está truncado se llama a `POST /api/query/summary`, que envuelve la query como subquery (PREFIX al nivel externo, alias `?__agg_*`, degradación por sección vía `failed`). Se recalcula solo con query nueva (`queryResult$`), no al cambiar de lote ni al filtrar. Publica el último `QuerySummary` en `SummaryStateService` (el export usa su COUNT para el progreso real).
+**Summary panel:** collapsible `features/dashboard/summary-panel` below the navbar plus pure
+`shared/stats/result-summary.ts` helpers (`classifyVariables`, `computeLocalSummary`). It shows
+aggregates (total rows, avg/min/max per numeric variable, temporal range, top
+12 values per categorical variable) over **the complete query result**, unlike
+coverage chips describing the visible batch. View filters do not affect it.
+Classification is heuristic and domain-agnostic: numeric if ≥90% of non-null
+values are numeric literals, temporal if normalized type is `date`,
+categorical if ≤20 distinct values; caps 3/2/3. Non-truncated results are
+computed locally; truncated results call `POST /api/query/summary`, which wraps the
+query as a subquery (PREFIX at the outer level, `?__agg_*` aliases,
+per-section degradation through `failed`). It recalculates only for a
+new query (`queryResult$`), not batch or filter changes. It publishes the
+latest `QuerySummary` through `SummaryStateService` (export uses its COUNT for
+real progress).
 
-**Export completo a Excel (XLSX):** botón "Exportar Excel" del navbar (único punto de exportación de la app). Lógica pura en `shared/export/` (`export-query.ts`, `result-exporter.ts`, `xlsx.ts`) + glue Angular en `ResultExportService`. Envuelve la query del usuario como subquery con `ORDER BY` sobre TODAS las variables proyectadas (orden total → paginación OFFSET/LIMIT determinista; si la query ya trae ORDER BY se respeta) y recorre el **resultado completo** página a página (página = `maxLimit` del config) llamando a `/api/query/execute` con `raw: true` (sin grafo ni proyección de intermedios). Timeout de página → reintento con página mitad (2000→1000→500, mínimo 250). Tope 50.000 filas → diálogo (exportar parcial marcado PARCIAL / copiar query / cancelar). Progreso real con el COUNT del summary si está disponible. Si el resultado **no** está truncado exporta directo desde el cliente (sin paginar). Misma semántica que el summary: no exporta el lote visible ni aplica los filtros de las vistas. El workbook (generado con `exceljs`) lleva hoja "Resultado" (encabezado con formato, fila congelada, autofiltro, anchos ajustados al contenido, celdas tipadas: números y fechas como valores, no texto) y hoja "Proveniencia" (backend, query, timestamp ISO, filas, marca PARCIAL); URIs completas y bnodes opacos por fila.
+**Full Excel export (XLSX):** the navbar's `Exportar Excel` button is the
+application's sole export point. Pure logic lives in `shared/export/`
+(`export-query.ts`, `result-exporter.ts`, `xlsx.ts`) with Angular glue in
+`ResultExportService`. It wraps the user's query as a subquery with
+`ORDER BY` over ALL projected variables (total order for deterministic
+OFFSET/LIMIT pagination; an existing ORDER BY is honored) and traverses the
+**complete result** page by page (page size = config `maxLimit`) by
+calling `/api/query/execute` with `raw: true` (no graph or intermediate-node
+projection). Page timeout → retry at half size (2000→1000→500, minimum
+250). At 50,000 rows a dialog offers partial export marked `PARCIAL`,
+query copy, or cancel. Progress uses the summary COUNT when available. A
+non-truncated result exports directly from the client. Like summary, it does
+not export the visible batch or apply view filters. The `exceljs`
+workbook has a `Resultado` sheet (formatted header, frozen row,
+autofilter, content-adjusted widths, typed number/date cells) and a
+`Proveniencia` sheet (backend, query, ISO timestamp, rows,
+`PARCIAL` marker); each row retains full URIs and opaque bnodes.
 
-**Cartel de carga por etapas:** al abrir un tablero (`?dashboardId=…` o el menú "Tableros") el overlay `features/dashboard/load-progress` muestra las etapas necesarias para entrar al tablero con su duración: *Recuperando el tablero* (`GET /api/dashboards/:id` + layout/filtros), *Ejecutando la consulta* (`POST /api/query/execute`; el detalle final trae filas, `meta.durationMs` del endpoint y si truncó), *Procesando resultados* y *Renderizando vistas*. El resumen se calcula aparte y aparece después en su panel, por lo que no forma parte del popup. El estado vive en `DashboardLoadProgressService` (signals) sobre el modelo puro `shared/progress/load-stages.ts` (reducers inmutables + `formatDuration`); lo maneja `DashboardPersistenceService` y las vistas reportan con `reportViewRendered`. El cartel se cierra cuando pintaron **las vistas del layout** (`expectViews(layout.visibleSlots())`), con un margen de 2,5 s por si alguna no reporta. Ojo: el fan-out de `SelectionService` es sincrónico, así que `expectViews` se declara **antes** de `setQueryResult`. `DashboardPersistenceService.isHydrating` sigue siendo el flag de datos, no el del cartel.
+**Staged loading dialog:** when opening a dashboard (`?dashboardId=…` or the
+`Tableros` menu), the `features/dashboard/load-progress` overlay shows the required
+stages and duration: `Recuperando el tablero` (`GET /api/dashboards/:id` plus layout/filters),
+`Ejecutando la consulta` (`POST /api/query/execute`; final detail includes rows, endpoint
+`meta.durationMs`, and truncation), `Procesando resultados`, and `Renderizando vistas`.
+Summary is computed separately and appears later in its panel, so it is not
+part of the dialog. State lives in signal-based `DashboardLoadProgressService` over pure
+`shared/progress/load-stages.ts` (immutable reducers + `formatDuration`);
+`DashboardPersistenceService` manages it, and views call `reportViewRendered`. The dialog
+closes after **the layout's views** render (`expectViews(layout.visibleSlots())`), with a
+2.5-second margin if one does not report. Because `SelectionService` fan-out is
+synchronous, declare `expectViews` **before** `setQueryResult`.
+`DashboardPersistenceService.isHydrating` remains the data flag, not the dialog flag.
 
-## Persistencia
+## Persistence
 
-- **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + selección → `/api/dashboards` (`kind: 'gis'`).
-- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`). Nombres: el tablero y las pestañas tienen nombres independientes, pero se sincronizan para workspaces de **un solo panel** — al guardar, el diálogo renombra el panel activo con el nombre del workspace (`main.component.openSaveDialog`); al cargar (`loadWorkspaceAsTabs`), la pestaña única toma el `name` del dashboard (así los tableros sembrados/legados con panel corto, p.ej. "WWII battles", muestran el nombre del tablero). Workspaces multi-panel conservan los nombres de cada pestaña.
-- **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro.
-- **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) para la preferencia de auto-ejecución.
+- **GIS dashboards:** `DashboardPersistenceService` serializes query + layout + filters + selection to `/api/dashboards` (`kind: 'gis'`).
+- **Explorer workspaces:** `WorkspacePersistenceService` serializes panels (tabs) + graph to `/api/dashboards` (`kind: 'explorer'`). Dashboard and tab names are independent but synchronized for **single-panel** workspaces: on save, the dialog renames the active panel to the workspace name (`main.component.openSaveDialog`); on load (`loadWorkspaceAsTabs`), the single tab takes the dashboard `name`, so seeded/legacy dashboards with short panel names such as `WWII battles` display the dashboard name. Multi-panel workspaces retain each tab name.
+- **GIS layout:** `localStorage` (`rdf-gis-explorer:dashboard-layout`)—pure UI state.
+- **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) stores the auto-run preference.
 
-## Persistencia SQLite de dashboards
+## Dashboard SQLite persistence
 
-El Shell mantiene su SQLite en `products/shell/backend/data/` (override: `DASHBOARDS_SQLITE_PATH`). Los backends de explorers no persisten dashboards.
+The Shell keeps its SQLite files in `products/shell/backend/data/` (override:
+`DASHBOARDS_SQLITE_PATH`). Explorer backends do not persist dashboards.
 
 ```bash
 cd products/shell/backend
-pnpm run clean:unused-data          # reporta archivos SQLite sin uso, exit 1 si hay
-pnpm run clean:unused-data:force    # los borra (incluye -shm/-wal siblings)
+pnpm run clean:unused-data          # reports unused SQLite files, exits 1 if any exist
+pnpm run clean:unused-data:force    # deletes them (including -shm/-wal siblings)
 ```
 
-`SPARQL_PROTECTED_BACKENDS` (default `wikidata`) controla qué archivos en `data/` se preservan aunque no sean el activo.
+`SPARQL_PROTECTED_BACKENDS` (default `wikidata`) controls which files in
+`data/` remain even when not active.
 
-## Configuración runtime — `GET /api/config`
+## Runtime configuration — `GET /api/config`
 
-Derivada de env vars + `config/prefixes.*.json`. Read-only para el cliente:
+Derived from environment variables plus `config/prefixes.*.json`. Read-only for
+clients:
 
 ```ts
 AppConfig {
   backend, endpointUrl, hasBasicAuth, userAgent, timeoutMs, defaultLimit, maxLimit,
   capabilities, supportsWikibaseLabel, defaultPrefixes, search,
-  labelUri,     // rdfs:label por default
+  labelUri,     // defaults to rdfs:label
   describe,     // UI hints: { exclude, objects, datatype, text, image, external }
-  classColors,  // colores por clase (config/class-colors.${SPARQL_BACKEND}.json; {} si no existe)
-  defaults,     // defaults que consume el Explorer (lang, resultLimit, labelUri, searchClass, endpointType)
-  limits,       // límites unificados (env del backend): { graphMaxNodes, lotDefaultSize,
+  classColors,  // colors by class (config/class-colors.${SPARQL_BACKEND}.json; {} if absent)
+  defaults,     // Explorer defaults (lang, resultLimit, labelUri, searchClass, endpointType)
+  limits,       // unified backend-env limits: { graphMaxNodes, lotDefaultSize,
                 //   lotSizeOptions[], tablePageSizeOptions[], exportMaxRows,
                 //   exportMinPageSize, summaryTopCategorical }
 }
 ```
 
-**Canal de límites:** todos los límites de queries y visualización viven en env vars del backend (ver tabla del README) y viajan en `AppConfig.limits`. El GIS los consume con `LimitsService` (signal con defaults equivalentes hasta que la config llega; `App` lo actualiza en `ngOnInit`): grafo (`graphMaxNodes`), lotes (`lotDefaultSize`/`lotSizeOptions`, con clamp del tamaño actual si queda fuera de la nueva oferta), tabla (`tablePageSizeOptions`) y export (`exportMaxRows`/`exportMinPageSize`).
+**Limits channel:** all query and visualization limits live in backend
+environment variables (see the README table) and travel in `AppConfig.limits`.
+GIS consumes them through `LimitsService` (a signal with equivalent defaults
+until configuration arrives; `App` updates it in
+`ngOnInit`): graph (`graphMaxNodes`), batches
+(`lotDefaultSize`/`lotSizeOptions`, clamping the current size when it falls
+outside the new offering), table (`tablePageSizeOptions`), and export
+(`exportMaxRows`/`exportMinPageSize`).
 
-Cada frontend tiene su propio `AppConfigService` (duplicación deliberada por federation) que cachea la respuesta. Los URIs específicos de Wikidata (describe hints, searchClass Q5) viven en el descriptor de su adaptador; para otros endpoints se emiten defaults RDF neutros. Los colores por clase se cargan desde `packages/explorer-backend/config/class-colors.${SPARQL_BACKEND}.json` (override: `CLASS_COLORS_PATH`) y quedan vacíos si el archivo no existe.
+Each frontend has its own `AppConfigService`, deliberately duplicated because of
+federation, and caches the response. Wikidata-specific URIs (describe hints,
+searchClass Q5) live in its adapter descriptor; other endpoints receive neutral
+RDF defaults. Class colors load from `packages/explorer-backend/config/class-colors.${SPARQL_BACKEND}.json` (override:
+`CLASS_COLORS_PATH`) and remain empty if absent.
 
-## Variables de Entorno
+## Environment variables
 
-Ver `.env` (Wikidata, trackeado) y `README.md#configuración-sparql`. No hay `LOG_LEVEL` ni `SQLITE_PATH`.
+See `.env` (tracked Wikidata configuration) and `README.md#sparql-configuration`.
+There is no `LOG_LEVEL` or `SQLITE_PATH`.
 
-## Path Aliases (TypeScript)
+## TypeScript path aliases
 
 ### rdf_gis_explorer
+
 ```
 @shared/*   → src/app/shared/*
 @core/*     → src/app/core/*
 @features/* → src/app/features/*
 ```
 
-## Notas Importantes
+## Important notes
 
-- **No hay NgModules** en el frontend. Todo es standalone components + `provideX()` en `app.config.ts`.
-- **El shell NO expone componentes** como remote; solo consume remotes. Su `app.config.ts` no tiene initializers (el ex-`SettingsService` del shell se eliminó: nadie consumía el resultado).
-- **Tests de frontends**: el target `test` de cada `angular.json` fija `buildTarget: <proyecto>:esbuild:development` + `runner: vitest` (el target `build` de native-federation no sirve para compilar tests). `tsconfig.spec.json` debe incluir `src/polyfills.ts`. En specs, las factories de `vi.mock` se hoistean: helpers compartidos entre factory y tests van dentro de `vi.hoisted()` (ver `graph-view` y `timeline-view` specs).
-- **Interpolación en SPARQL**: nunca interpolar input del usuario en un literal sin escapar `\`, `"`, `'` y saltos de línea (backend: `escapeSparqlLiteral` en `suggestions.service.ts`; explorer: `escapeKeyword`). Con `String.replace`, pasar el reemplazo como función para que `$&`/`$'` no se expandan. URIs externas se validan con `isValidUri` antes de entrar a `VALUES { <...> }`.
-- **Docker**: las imágenes se buildean con contexto en la **raíz del repo** (`docker-compose.yml` usa `context: .` + `dockerfile: <dir>/Dockerfile`) para compartir el lockfile del workspace y los paquetes comunes. El patrón copia manifests y patches, instala el filtro del workspace y compila sus dependencias. El volumen de dashboards monta en `/repo/products/shell/backend/data`.
-- **Cytoscape:** NO pasar `wheelSensitivity` en las opciones (ni siquiera `1.0`): el default ya es 1 y Cytoscape ≥3.31 normaliza el scroll por `deltaMode` (fix Firefox/Linux integrado); definir la opción solo dispara un warning.
-- **Warning benigno conocido:** `wrong event specified: touchleave` viene de Leaflet 1.9 + leaflet-draw (upstream), no es un bug nuestro.
-- **APP_INITIALIZER del remote GIS** (`rdf_gis_explorer/app.config.ts`) solo corre standalone; cargado como remote, la config se carga async (`App.ngOnInit` / `AppConfigService.load()` con `shareReplay`). No asumir config disponible sincrónicamente en componentes del GIS.
-- **El backend NO usa ORM.** Queries SQL directas con `better-sqlite3`.
-- **`sparqljs`** se usa en backend (validación) y en GIS (validación en el frontend).
-- **Límites unificados (resuelto el acoplamiento histórico):** ya no hay `@Max(2000)` hardcodeado en el DTO ni caps fijos en front/back: todos los límites son env del backend y llegan a los frontends vía `AppConfig.limits` (ver "Canal de límites" en la sección de `/api/config`). El GIS **no manda límite propio**: `ApiService.executeQuery` sin `limit` explícito pide el `maxLimit` que publica el backend (el volumen se pagina en cliente con los lotes).
-- **WKT inválido no aborta la query:** si un literal `wktLiteral` no parsea como Point (datos sucios, p.ej. `POINT(None None)`), el adaptador lo degrada a literal plano en vez de lanzar error (`generic-sparql.adapter.ts` `normalizeValue`).
+- There are **no NgModules** in the frontend. Everything uses standalone components + `provideX()` in `app.config.ts`.
+- The Shell **does NOT expose components** as a remote; it only consumes remotes. Its `app.config.ts` has no initializers (the former Shell `SettingsService` was removed because nothing consumed its result).
+- **Frontend tests:** each `angular.json` test target sets `buildTarget: <project>:esbuild:development` + `runner: vitest` (the native-federation `build` target cannot compile tests). `tsconfig.spec.json` must include `src/polyfills.ts`. In specs, `vi.mock` factories are hoisted; helpers shared by the factory and tests belong inside `vi.hoisted()` (see the `graph-view` and `timeline-view` specs).
+- **SPARQL interpolation:** never interpolate user input into a literal without escaping `\`, `"`, `'`, and line breaks (backend: `escapeSparqlLiteral` in `suggestions.service.ts`; explorer: `escapeKeyword`). With `String.replace`, pass replacement as a function so `$&`/`$'` are not expanded. Validate external URIs with `isValidUri` before inserting them into `VALUES { <...> }`.
+- **Docker:** images build with the repository root as context (`docker-compose.yml` uses `context: .` + `dockerfile: <dir>/Dockerfile`) to share the workspace lockfile and common packages. The pattern copies manifests and patches, installs the workspace filter, and builds its dependencies. The dashboard volume mounts at `/repo/products/shell/backend/data`.
+- **Cytoscape:** do NOT pass `wheelSensitivity` in options, even as `1.0`. The default is already 1, and Cytoscape ≥3.31 normalizes scrolling by `deltaMode` (integrated Firefox/Linux fix); specifying it only triggers a warning.
+- **Known benign warning:** `wrong event specified: touchleave` comes from Leaflet 1.9 + leaflet-draw upstream; it is not our bug.
+- The GIS remote's **APP_INITIALIZER** (`rdf_gis_explorer/app.config.ts`) runs only standalone. When loaded as a remote, configuration loads asynchronously (`App.ngOnInit` / `AppConfigService.load()` with `shareReplay`). Do not assume configuration is synchronously available in GIS components.
+- The backend **does NOT use an ORM.** It uses direct SQL queries with `better-sqlite3`.
+- **`sparqljs`** is used in the backend for validation and in GIS for frontend validation.
+- **Unified limits (historical coupling resolved):** there is no hard-coded `@Max(2000)` in the DTO or fixed caps in front/back. All limits are backend environment variables delivered through `AppConfig.limits` (see Limits channel under `/api/config`). GIS **does not send its own limit**: `ApiService.executeQuery` without an explicit `limit` requests the backend's published `maxLimit`; the client paginates volume through batches.
+- **Invalid WKT does not abort a query:** when a `wktLiteral` cannot be parsed as a Point (dirty data such as `POINT(None None)`), the adapter degrades it to a plain literal instead of throwing (`generic-sparql.adapter.ts` `normalizeValue`).
 
-## Regla de git
+## Git rule
 
-**No commitear ni pushear sin OK explícito del usuario.** `git add`, `git status`, `git diff`, `git fetch` y demás lecturas son libres; todo lo que modifique el historial/estado (`commit`, `push`, `merge`, `rebase`, `reset`, `branch -D`, `tag`, `cherry-pick`, `revert`, `--force`, etc.) requiere autorización explícita en el mismo turno ("comiteá" / "hacé commit" / "subí"). Cuando se autoriza, los commits se firman a nombre del usuario (config de git), nunca con Co-Authored-By de Claude.
+**Do not commit or push without explicit user approval.** `git add`,
+`git status`, `git diff`, `git fetch`, and other reads are
+allowed; anything that changes history/state (`commit`,
+`push`, `merge`, `rebase`, `reset`,
+`branch -D`, `tag`, `cherry-pick`, `revert`,
+`--force`, etc.) requires authorization in the same turn
+(`commit it` / `make a commit` / `push it`). When
+authorized, commits are signed under the user's git configuration and never
+include a Claude Co-Authored-By trailer.

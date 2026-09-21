@@ -78,7 +78,7 @@ describe('SummaryPanelComponent', () => {
 
   it('shows that the summary is pending while a dashboard is loading', () => {
     const progress = TestBed.inject(DashboardLoadProgressService);
-    progress.begin('Cargando tablero', ['summary']);
+    progress.begin('Loading dashboard', ['summary']);
     fixture.detectChanges();
 
     const panel = fixture.nativeElement.querySelector('.summary-panel');
@@ -108,7 +108,7 @@ describe('SummaryPanelComponent', () => {
       query: USER_QUERY,
       numericVars: ['price'],
       temporalVars: [],
-      // ?item también clasifica categórica: uri con pocos valores distintos.
+      // ?item is also categorical: a URI with few distinct values.
       categoricalVars: ['item', 'city'],
     });
     const resolved = component['resolved']();
@@ -131,7 +131,7 @@ describe('SummaryPanelComponent', () => {
     expect(fetchSummaryMock).toHaveBeenCalledTimes(1);
     const before = component['resolved']();
 
-    // Cambiar de lote y de tamaño de lote no emite queryResult$: no recalcula.
+    // Changing batch or batch size does not emit queryResult$, so it does not recalculate.
     selectionService.setCurrentLot(2);
     selectionService.setLotSize(100);
     selectionService.nextLot();

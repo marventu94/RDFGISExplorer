@@ -74,8 +74,8 @@ describe('sliceLot', () => {
   });
 
   it('chunks rows in the original query order, without reordering', () => {
-    // n0 tiene grado alto, pero el orden de la query manda: el lote 1 son las
-    // primeras 4 filas tal cual, no el top por conexiones.
+    // n0 has high degree, but query order wins: batch 1 is the first four rows,
+    // not the top nodes by connection count.
     const edges = [makeEdge('n0', 'n5'), makeEdge('n0', 'n6')];
     const result = makeResult(nodes, edges, bindings);
     const slice = sliceLot(result, 4, 1);
@@ -97,8 +97,8 @@ describe('sliceLot', () => {
   });
 
   it('includes bnodes referenced by the lot rows (raw id in rows, _:id in nodes)', () => {
-    // Los bindings traen el bnode crudo ('b0') pero los nodos/edges usan '_:b0':
-    // sin normalizar, el bnode se caía del lote visible.
+    // Bindings carry raw bnode 'b0' while nodes/edges use '_:b0'; normalization
+    // prevents the bnode from falling out of the visible batch.
     const rows: QueryResult['bindings'] = [
       { s: { type: 'bnode', value: 'b0' } },
       ...Array.from({ length: 5 }, (_, i) => makeRow(`n${i}`)),
@@ -110,8 +110,8 @@ describe('sliceLot', () => {
   });
 
   it('a projected bnode belongs to the correct lot, with its edges', () => {
-    // Resultado multi-lote: las filas del lote 2 referencian el bnode crudo 'b0';
-    // el nodo '_:b0' y sus aristas solo deben aparecer en ese lote.
+    // In a multi-batch result, batch 2 rows reference raw 'b0'; node '_:b0' and
+    // its edges must appear only in that batch.
     const rows: QueryResult['bindings'] = [
       makeRow('n0'),
       makeRow('n1'),
@@ -119,8 +119,8 @@ describe('sliceLot', () => {
       makeRow('n3'),
     ];
     const allNodes = [makeNode('_:b0'), ...nodes];
-    // La arista conecta el bnode con n3 (fila del lote 2): ningún extremo toca
-    // las filas del lote 1, así que el bnode no entra por expansión de vecinos.
+    // The edge connects the bnode to n3 in batch 2; neither endpoint touches
+    // batch 1 rows, so neighbor expansion must not include it.
     const edges = [makeEdge('_:b0', 'n3')];
     const result = makeResult(allNodes, edges, rows);
 
@@ -144,15 +144,15 @@ describe('sliceLot', () => {
   });
 
   it('adds 1-hop neighbors of the row URIs (intermediate nodes not in bindings)', () => {
-    // mid es un intermedio que no aparece en los bindings: se recupera por la edge.
+    // mid is absent from bindings and recovered through the edge.
     const allNodes = [...nodes, makeNode('mid')];
     const edges = [makeEdge('n0', 'mid'), makeEdge('mid', 'n9')];
     const result = makeResult(allNodes, edges, bindings);
     const slice = sliceLot(result, 4, 1);
     expect(slice.result.nodes.map((n) => n.uri)).toContain('mid');
     expect(slice.result.edges.map((e) => e.id)).toContain('n0->mid');
-    // mid->n9 no entra: n9 no es visible en el lote 1 (la expansión es de 1 salto
-    // desde las filas, no recursiva).
+    // mid->n9 is excluded because n9 is not visible in batch 1; expansion is
+    // one hop from rows and is not recursive.
     expect(slice.result.edges.map((e) => e.id)).not.toContain('mid->n9');
   });
 
@@ -163,21 +163,21 @@ describe('sliceLot', () => {
   });
 
   it('injects pinned URIs from other lots, with their edges to visible nodes', () => {
-    // n4 y n9 están fuera del lote 1 (filas n0..n3) y no son vecinos de sus filas.
+    // n4 and n9 are outside batch 1 and are not neighbors of its rows.
     const edges = [makeEdge('n4', 'n9')];
     const result = makeResult(nodes, edges, bindings);
     const unpinned = sliceLot(result, 4, 1);
     expect(unpinned.result.nodes.map((n) => n.uri)).toEqual(['n0', 'n1', 'n2', 'n3']);
 
-    // Pinear solo n9 inyecta el nodo, pero no la edge (n4 sigue sin ser visible).
+    // Pinning only n9 injects the node but not the edge because n4 is hidden.
     const pinnedOne = sliceLot(result, 4, 1, ['n9']);
     expect(pinnedOne.result.nodes.map((n) => n.uri)).toContain('n9');
     expect(pinnedOne.result.edges.map((e) => e.id)).not.toContain('n4->n9');
 
-    // Con ambos extremos visibles, la edge aparece.
+    // The edge appears when both endpoints are visible.
     const pinnedBoth = sliceLot(result, 4, 1, ['n4', 'n9']);
     expect(pinnedBoth.result.edges.map((e) => e.id)).toContain('n4->n9');
-    // El pinning no agrega filas: los bindings siguen siendo los del lote.
+    // Pinning adds no rows; bindings remain those of the batch.
     expect(pinnedBoth.result.bindings).toEqual(bindings.slice(0, 4));
   });
 

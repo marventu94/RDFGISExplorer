@@ -10,7 +10,7 @@ PREFIX rdfs:   <http://www.w3.org/2000/01/rdf-schema#>
 `;
 
 describe('extractQueryTopology', () => {
-  it('usa el predicado real y la dirección real, no una estrella', () => {
+  it('uses the real predicate and direction instead of a wildcard', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?realEstate ?listing ?agente WHERE {
         ?listing sioc:about ?realEstate .
@@ -32,7 +32,7 @@ describe('extractQueryTopology', () => {
         }),
       ]),
     );
-    // Lo que hacía la estrella: colgar el agente del inmueble. No debe aparecer.
+    // What the wildcard did: attach the agent to the property. It must not appear.
     expect(t.links).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ subject: 'realEstate', object: 'agente' }),
@@ -40,7 +40,7 @@ describe('extractQueryTopology', () => {
     );
   });
 
-  it('conserva la jerarquía geográfica en lugar de aplanarla', () => {
+  it('preserves the geographic hierarchy instead of flattening it', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?realEstate ?barrio ?distrito WHERE {
         ?realEstate inm:hasFeature/inm:hasValue ?dir .
@@ -74,7 +74,7 @@ describe('extractQueryTopology', () => {
     );
   });
 
-  it('normaliza un path inverso dando vuelta sujeto y objeto', () => {
+  it('normalizes an inverse path by swapping subject and object', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?casa ?listing WHERE { ?casa ^sioc:about ?listing . }`);
 
@@ -86,7 +86,7 @@ describe('extractQueryTopology', () => {
     });
   });
 
-  it('ignora los patrones cuyo objeto es una constante', () => {
+  it('ignores patterns whose object is a constant', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?listing ?realEstate WHERE {
         ?listing a pronto:RealEstateListing ; sioc:about ?realEstate .
@@ -94,7 +94,7 @@ describe('extractQueryTopology', () => {
         ?listing rdfs:label "Casa en venta" .
       }`);
 
-    // Sólo sobrevive sioc:about: una clase o un literal no son nodos del resultado.
+    // Only sioc:about survives: a class or literal is not a result node.
     expect(t.links).toHaveLength(1);
     expect(t.links[0]).toMatchObject({
       subject: 'listing',
@@ -102,7 +102,7 @@ describe('extractQueryTopology', () => {
     });
   });
 
-  it('sí produce arista cuando la clase es una variable', () => {
+  it('does produce an edge when the class is a variable', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?realEstate ?tipo WHERE {
         VALUES ?tipo { inm:House inm:Apartment }
@@ -117,7 +117,7 @@ describe('extractQueryTopology', () => {
     });
   });
 
-  it('marca el predicado como variable cuando la consulta lo deja abierto', () => {
+  it('marks the predicate as variable when the query leaves it open', () => {
     const t = extractQueryTopology('SELECT * WHERE { ?s ?p ?o }');
     expect(t.links).toHaveLength(1);
     expect(t.links[0]).toMatchObject({
@@ -128,7 +128,7 @@ describe('extractQueryTopology', () => {
     expect(t.projected).toBeNull();
   });
 
-  it('detecta los intermedios y los agrega al SELECT', () => {
+  it('detects intermediates and adds them to SELECT', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?realEstate ?barrio WHERE {
         ?realEstate inm:hasFeature ?feature .
@@ -143,9 +143,9 @@ describe('extractQueryTopology', () => {
     expect(t.rewritten).toMatch(/\?dir/);
   });
 
-  it('la reescritura conserva LIMIT, ORDER BY y los FILTER', () => {
-    // Invariante crítico: el backend NO inyecta LIMIT (sólo recorta la respuesta), así
-    // que si la reescritura perdiera el LIMIT la consulta correría sin tope sobre las
+  it('preserves LIMIT, ORDER BY, and FILTER clauses when rewriting', () => {
+    // Critical invariant: the backend does NOT inject LIMIT (it only trims the response),
+    // so if rewriting lost LIMIT, the query would run without a cap over the
     // ~81M de tripletas del OVS.
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?realEstate ?barrio WHERE {
@@ -163,7 +163,7 @@ describe('extractQueryTopology', () => {
     expect(t.rewritten).toMatch(/dock sud/);
   });
 
-  it('no reescribe con DISTINCT, porque cambiaría la cantidad de filas', () => {
+  it('does not rewrite DISTINCT because that would change the row count', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT DISTINCT ?realEstate ?barrio WHERE {
         ?realEstate inm:hasFeature ?feature .
@@ -174,7 +174,7 @@ describe('extractQueryTopology', () => {
     expect(t.rewritten).toBeUndefined();
   });
 
-  it('no reescribe con agregados ni GROUP BY', () => {
+  it('does not rewrite queries with aggregates or GROUP BY', () => {
     const t = extractQueryTopology(`${PREFIXES}
       SELECT ?barrio (COUNT(?realEstate) AS ?n) WHERE {
         ?realEstate inm:hasFeature ?feature .
@@ -185,13 +185,13 @@ describe('extractQueryTopology', () => {
     expect(t.rewritten).toBeUndefined();
   });
 
-  it('devuelve topología vacía si la consulta no parsea', () => {
+  it('returns empty topology when the query cannot be parsed', () => {
     const t = extractQueryTopology('SELECT ?x WHERE { esto no es sparql');
     expect(t.links).toEqual([]);
     expect(t.intermediates).toEqual([]);
   });
 
-  it('devuelve topología vacía para un ASK', () => {
+  it('returns empty topology for ASK', () => {
     const t = extractQueryTopology('ASK WHERE { ?s ?p ?o }');
     expect(t.links).toEqual([]);
   });
@@ -199,7 +199,7 @@ describe('extractQueryTopology', () => {
   describe('classAssertions', () => {
     const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 
-    it('captura una afirmación de clase simple', () => {
+    it('captures a simple class assertion', () => {
       const t = extractQueryTopology(`${PREFIXES}
         SELECT ?listing ?realEstate WHERE {
           ?listing a pronto:RealEstateListing ; sioc:about ?realEstate .
@@ -208,18 +208,18 @@ describe('extractQueryTopology', () => {
       expect(t.classAssertions.get('listing')).toEqual([
         'https://raw.githubusercontent.com/fdioguardi/pronto/main/ontology/pronto.owl#RealEstateListing',
       ]);
-      // El patrón de clase no genera link, sólo la afirmación.
+      // The class pattern produces an assertion, not a link.
       expect(t.links).toHaveLength(1);
     });
 
-    it('también la captura con el predicado rdf:type escrito como IRI', () => {
+    it('also captures it when rdf:type is written as an IRI', () => {
       const t = extractQueryTopology(
         `SELECT ?x WHERE { ?x <${RDF_TYPE}> <http://example.org/House> }`,
       );
       expect(t.classAssertions.get('x')).toEqual(['http://example.org/House']);
     });
 
-    it('agrupa varias clases para la misma variable (multi-tipo), en orden', () => {
+    it('groups multiple classes for the same variable in order', () => {
       const t = extractQueryTopology(`${PREFIXES}
         SELECT ?realEstate WHERE {
           ?realEstate a inm:House .
@@ -232,7 +232,7 @@ describe('extractQueryTopology', () => {
       ]);
     });
 
-    it('deduplica la misma clase afirmada dos veces', () => {
+    it('deduplicates the same class asserted twice', () => {
       const t = extractQueryTopology(`${PREFIXES}
         SELECT ?realEstate WHERE {
           ?realEstate a inm:House .
@@ -242,7 +242,7 @@ describe('extractQueryTopology', () => {
       expect(t.classAssertions.get('realEstate')).toHaveLength(1);
     });
 
-    it('?x a ?tipoVariable NO es afirmación: sigue siendo un link', () => {
+    it('?x a ?typeVariable is NOT an assertion and remains a link', () => {
       const t = extractQueryTopology(`${PREFIXES}
         SELECT ?realEstate ?tipo WHERE {
           VALUES ?tipo { inm:House inm:Apartment }
@@ -258,7 +258,7 @@ describe('extractQueryTopology', () => {
       });
     });
 
-    it('viene vacío en consultas sin clases', () => {
+    it('is empty for queries without classes', () => {
       const t = extractQueryTopology(`${PREFIXES}
         SELECT ?listing ?realEstate WHERE { ?listing sioc:about ?realEstate . }`);
       expect(t.classAssertions.size).toBe(0);

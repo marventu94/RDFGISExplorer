@@ -41,7 +41,7 @@ describe('projectedVariables', () => {
     const vars = projectedVariables(ast);
     expect(vars).toContain('a');
     expect(vars).toContain('b');
-    // ?c y ?inner son internas de la subquery: no son visibles afuera.
+    // ?c and ?inner are internal to the subquery and are not visible outside.
     expect(vars).not.toContain('c');
     expect(vars).not.toContain('inner');
   });
@@ -53,7 +53,7 @@ describe('buildPagedQuery', () => {
     const page = buildPagedQuery(wrapped, 4000, 2000);
 
     expect(page).toMatch(/^PREFIX wd: <http:\/\/www\.wikidata\.org\/entity\/>\nSELECT \* WHERE \{ \{/);
-    // La subquery no contiene PREFIX (inválido en varios endpoints).
+    // The subquery contains no PREFIX, which is invalid on several endpoints.
     const subqueryStart = page.indexOf('WHERE { {');
     expect(page.slice(subqueryStart)).not.toContain('PREFIX');
     expect(page).toContain('ORDER BY ?item ?price');
@@ -66,10 +66,10 @@ describe('buildPagedQuery', () => {
       'SELECT ?x WHERE { ?s ?p ?x } ORDER BY DESC(?x)',
     );
     const page = buildPagedQuery(wrapped, 0, 100);
-    // El ORDER BY del usuario queda dentro de la subquery (el Generator lo
+    // The user's ORDER BY remains inside the subquery (the Generator
     // emite como `ORDER BY DESC (?x)`)...
     expect(page).toContain('ORDER BY DESC');
-    // ...y no se agrega otro afuera.
+    // ...and no additional one is added outside.
     expect(page.indexOf('ORDER BY')).toBe(page.lastIndexOf('ORDER BY'));
   });
 

@@ -23,11 +23,11 @@ describe('bindingToCellValue', () => {
     ).toBe('http://www.wikidata.org/entity/Q1486');
   });
 
-  it('literal numérico va como número', () => {
+  it('writes a numeric literal as a number', () => {
     expect(bindingToCellValue({ type: 'literal', value: '123.4' }, 1)).toBe(123.4);
   });
 
-  it('literal con cero a la izquierda va como texto (es identificador)', () => {
+  it('writes a leading-zero literal as text because it is an identifier', () => {
     expect(bindingToCellValue({ type: 'literal', value: '007' }, 1)).toBe('007');
   });
 
@@ -44,7 +44,7 @@ describe('bindingToCellValue', () => {
     expect((cell as Date).toISOString()).toBe('2024-01-15T00:00:00.000Z');
   });
 
-  it('date inválida degrada a texto', () => {
+  it('degrades an invalid date to text', () => {
     expect(bindingToCellValue({ type: 'date', value: 'no-fecha', raw: 'no-fecha' }, 1)).toBe(
       'no-fecha',
     );
@@ -58,14 +58,14 @@ describe('bindingToCellValue', () => {
     expect(cell).toBe('Point(-57.9 -34.9)');
   });
 
-  it('bnode es opaco por fila', () => {
+  it('keeps bnodes opaque per row', () => {
     expect(bindingToCellValue({ type: 'bnode', value: 'b0' }, 7)).toBe('_:b7');
     expect(bindingToCellValue({ type: 'bnode', value: 'b0' }, 8)).not.toBe(
       bindingToCellValue({ type: 'bnode', value: 'b0' }, 7),
     );
   });
 
-  it('undefined va como celda vacía', () => {
+  it('writes undefined as an empty cell', () => {
     expect(bindingToCellValue(undefined, 1)).toBeNull();
   });
 });
@@ -91,7 +91,7 @@ describe('buildXlsx', () => {
     return workbook;
   }
 
-  it('genera hoja Resultado con encabezado y filas tipadas', async () => {
+  it('generates a Resultado sheet with a header and typed rows', async () => {
     const workbook = await load(false);
     const sheet = workbook.getWorksheet(RESULT_SHEET_NAME);
     expect(sheet).toBeDefined();
@@ -103,12 +103,12 @@ describe('buildXlsx', () => {
     expect(first.getCell(2).value).toBe(250000);
     expect(first.getCell(3).value).toBeInstanceOf(Date);
 
-    // Segunda fila: literal no numérico queda texto y la celda sin valor, vacía.
+    // Second row: the nonnumeric literal remains text and the valueless cell is empty.
     expect(sheet!.getRow(3).getCell(2).value).toBe('texto');
     expect(sheet!.getRow(3).getCell(3).value).toBeNull();
   });
 
-  it('la hoja Proveniencia incluye backend, filas y query', async () => {
+  it('includes backend, rows, and query in the Proveniencia sheet', async () => {
     const workbook = await load(false);
     const sheet = workbook.getWorksheet(PROVENANCE_SHEET_NAME);
     const text = sheet!
@@ -121,7 +121,7 @@ describe('buildXlsx', () => {
     expect(text).toContain('SELECT ?item WHERE { ?item ?p ?o }');
   });
 
-  it('marca PARCIAL cuando se alcanzó el tope', async () => {
+  it('marks the workbook PARCIAL when the cap is reached', async () => {
     const workbook = await load(true);
     const sheet = workbook.getWorksheet(PROVENANCE_SHEET_NAME);
     const text = sheet!

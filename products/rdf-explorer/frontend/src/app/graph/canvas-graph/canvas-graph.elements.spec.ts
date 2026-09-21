@@ -20,19 +20,17 @@ function positionOf(
   id: string,
 ): cytoscape.Position {
   const el = elements.find(e => e.data.id === id);
-  expect(el, `no se encontro el elemento ${id}`).toBeDefined();
+  expect(el, `element ${id} was not found`).toBeDefined();
   const position = (el as cytoscape.NodeDefinition).position;
-  expect(position, `el elemento ${id} no trae posicion`).toBeDefined();
+  expect(position, `element ${id} has no position`).toBeDefined();
   return position!;
 }
 
 describe('buildCanvasElements', () => {
-  it('posiciona a los hijos en coordenadas ABSOLUTAS, no relativas al padre', () => {
-    // Es el caso que rompia al volver al Explorer desde el GIS sin recargar:
-    // el canvas se creaba con `cytoscape({ elements })` y los hijos venian con
-    // x=0 (relativo). Cytoscape los tomaba como absolutos, y como la posicion de
-    // un compound se deriva del bounding box de sus hijos, TODOS los nodos
-    // terminaban apilados en la misma columna.
+  it('positions children at ABSOLUTE coordinates rather than parent-relative coordinates', () => {
+    // This failed when returning from GIS without reloading: children arrived
+    // with relative x=0 but Cytoscape treated it as absolute. Because compound
+    // position derives from child bounds, every node stacked in one column.
     const graph = createGraph();
     const a = graph.addNode().setPosition(100, 50);
     const b = graph.addNode().setPosition(900, 400);
@@ -43,13 +41,13 @@ describe('buildCanvasElements', () => {
 
     expect(positionOf(elements, `p${a.properties[0].id}`).x).toBe(100);
     expect(positionOf(elements, `p${b.properties[0].id}`).x).toBe(900);
-    // Lo esencial: los hijos de nodos distintos NO comparten abscisa.
+    // Crucially, children of different nodes do NOT share an x coordinate.
     expect(positionOf(elements, `p${a.properties[0].id}`).x).not.toBe(
       positionOf(elements, `p${b.properties[0].id}`).x,
     );
   });
 
-  it('centra el bloque de hijos sobre (node.x, node.y)', () => {
+  it('centers the child block on (node.x, node.y)', () => {
     const graph = createGraph();
     const node = graph.addNode().setPosition(0, 0);
     const prop = node.newProp();
@@ -65,7 +63,7 @@ describe('buildCanvasElements', () => {
     );
   });
 
-  it('mantiene el desplazamiento del padre al apilar varios hijos', () => {
+  it('retains the parent offset when stacking multiple children', () => {
     const graph = createGraph();
     const node = graph.addNode().setPosition(500, 250);
     const first = node.newProp();
@@ -79,12 +77,12 @@ describe('buildCanvasElements', () => {
     expect(positionOf(elements, `p${first.id}`).x).toBe(500);
     expect(positionOf(elements, `p${second.id}`).x).toBe(500);
     expect(secondY - firstY).toBe(CHILD_HEIGHT + CHILD_PADDING);
-    // Centrado sobre el padre: el bloque queda repartido alrededor de node.y.
+    // Centered on the parent, the block is distributed around node.y.
     expect(firstY).toBeLessThan(250);
     expect(secondY).toBeGreaterThan(250);
   });
 
-  it('deja al nodo sin hijos en su propia posicion y sin spacer', () => {
+  it('keeps a childless node at its own position without a spacer', () => {
     const graph = createGraph();
     const node = graph.addNode().setPosition(42, 84);
 

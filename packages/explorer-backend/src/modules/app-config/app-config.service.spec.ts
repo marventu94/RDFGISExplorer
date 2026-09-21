@@ -7,9 +7,9 @@ import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
 import { GenericSparqlAdapter } from '../../adapters/generic-sparql.adapter';
 import { WikidataAdapter } from '../../adapters/wikidata.adapter';
 
-// Las capacidades del backend (supportsWikibaseLabel, modo de busqueda, describe,
-// clase por defecto) las aporta el adapter, no el SPARQL_BACKEND de la config.
-// Se arma el mismo adapter que armaria la factory.
+// Backend capabilities (supportsWikibaseLabel, search mode, describe hints,
+// default class) come from the adapter, not the configuration's SPARQL_BACKEND.
+// Build the same adapter the factory would create.
 function endpointFor(backend: string | undefined): SparqlEndpoint {
   return backend === 'wikidata'
     ? new WikidataAdapter()

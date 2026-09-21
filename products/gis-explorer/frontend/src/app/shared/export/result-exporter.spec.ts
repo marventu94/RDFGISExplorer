@@ -19,7 +19,7 @@ function rows(n: number, prefix = 'http://x/i'): ResultBinding[] {
   }));
 }
 
-/** fetchPage que devuelve páginas según el OFFSET de la query envuelta. */
+/** fetchPage returning pages by the wrapped query OFFSET. */
 function fakeEndpoint(total: number) {
   const all = rows(total);
   return vi.fn((sparql: string, limit: number) => {
@@ -48,12 +48,12 @@ describe('exportAllPages', () => {
   });
 
   it('stops on an empty page', async () => {
-    const fetchPage = fakeEndpoint(4000); // exactamente 2 páginas llenas
+    const fetchPage = fakeEndpoint(4000); // Exactly two full pages.
     const result = await exportAllPages({ query: QUERY, pageSize: 2000, fetchPage });
 
     expect(result.status).toBe('complete');
     expect(result.rows).toHaveLength(4000);
-    expect(fetchPage).toHaveBeenCalledTimes(3); // la 3ra vuelve vacía
+    expect(fetchPage).toHaveBeenCalledTimes(3); // The third page is empty.
   });
 
   it('paginates deterministically with ORDER BY and embedded OFFSET/LIMIT', async () => {
@@ -84,7 +84,7 @@ describe('exportAllPages', () => {
     let calls = 0;
     const fetchPage = vi.fn((sparql: string, limit: number) => {
       calls++;
-      if (calls === 1) return Promise.reject({ status: 408 }); // timeout en la 1ra página
+      if (calls === 1) return Promise.reject({ status: 408 }); // Timeout on the first page.
       const offset = Number(/OFFSET (\d+)/.exec(sparql)?.[1] ?? 0);
       return Promise.resolve(page(['item'], all.slice(offset, offset + limit)));
     });
@@ -93,7 +93,7 @@ describe('exportAllPages', () => {
 
     expect(result.status).toBe('complete');
     expect(result.rows).toHaveLength(3000);
-    // 2do intento: mismo OFFSET 0 con LIMIT 1000; y sigue con página reducida.
+    // Second attempt: the same OFFSET 0 with LIMIT 1000, then reduced pages continue.
     expect(fetchPage.mock.calls[1][0]).toContain('OFFSET 0');
     expect(fetchPage.mock.calls[1][0]).toContain('LIMIT 1000');
     expect(fetchPage.mock.calls[2][0]).toContain('OFFSET 1000');
@@ -146,7 +146,7 @@ describe('exportAllPages', () => {
       fetchPage,
       isCancelled: () => cancel,
       onProgress: () => {
-        cancel = true; // se cancela después de la 1ra página
+        cancel = true; // Cancel after the first page.
       },
     });
 

@@ -16,7 +16,7 @@ function edgeIds(result: ReturnType<typeof buildGraphElements>): string[] {
 }
 
 describe('buildGraphElements', () => {
-  it('siembra posiciones distintas para que el layout no parta con aristas de longitud cero', () => {
+  it('seeds distinct positions so layout does not start with zero-length edges', () => {
     const source = makeNode('source');
     const target = makeNode('target');
 
@@ -34,7 +34,7 @@ describe('buildGraphElements', () => {
     expect(positions[0]).not.toEqual(positions[1]);
   });
 
-  it('resume componentes multi-etapa isomorfos sin perder sus relaciones', () => {
+  it('summarizes isomorphic multi-stage components without losing relationships', () => {
     const nodes = Array.from({ length: 2 }, (_, index) => [
       makeNode(`listing-${index}`, { queryVariable: 'listing' }),
       makeNode(`estate-${index}`, { queryVariable: 'realEstate' }),
@@ -98,7 +98,7 @@ describe('buildGraphElements', () => {
     expect(motifEdge?.data['representedTriples']).toBe(4);
   });
 
-  it('resume componentes de dos nodos repetidos como un motivo reversible', () => {
+  it('summarizes repeated two-node components as a reversible motif', () => {
     const nodes = Array.from({ length: 3 }, (_, index) => [
       makeNode(`listing-${index}`, { queryVariable: 'listing' }),
       makeNode(`estate-${index}`, { queryVariable: 'realEstate' }),
@@ -141,7 +141,7 @@ describe('buildGraphElements', () => {
     expect(built.motifCount).toBe(1);
   });
 
-  it('conserva el id del motivo en sus aristas expandidas para poder contraerlo', () => {
+  it('retains the motif id on expanded edges so it can be collapsed', () => {
     const nodes = Array.from({ length: 2 }, (_, index) => [
       makeNode(`listing-${index}`, { queryVariable: 'listing' }),
       makeNode(`estate-${index}`, { queryVariable: 'realEstate' }),
@@ -172,9 +172,9 @@ describe('buildGraphElements', () => {
     expect(expandedEdges.every((element) => element.data['motifId'] === motifId)).toBe(true);
   });
 
-  it('un pinned de grado cero sobrevive al cap aunque compita contra hubs', () => {
-    // Hub con 40 hojas + un nodo aislado: con maxNodes 2, sin pinning entrarían
-    // el hub y una hoja; el aislado (seleccionado) tiene grado cero.
+  it('keeps a pinned zero-degree node despite the cap and competing hubs', () => {
+    // Hub with 40 leaves plus an isolated node: with maxNodes 2 and no pinning,
+    // the hub and one leaf enter; the selected isolated node has zero degree.
     const base = makeHubWithLeaves(40);
     const lonely = makeNode('http://example.org/lonely');
     const result = makeQueryResult([...base.nodes, lonely], base.edges);
@@ -186,9 +186,9 @@ describe('buildGraphElements', () => {
     expect(built.drawnNodes).toBe(2);
   });
 
-  it('no privilegia un hub estructural sobre un pinned', () => {
-    // El hub estructural concentra el grado; el pinned es una hoja cualquiera.
-    // Pinned primero: la hoja seleccionada desplaza a otras hojas de igual grado.
+  it('does not prioritize a structural hub over a pinned node', () => {
+    // The structural hub concentrates degree; the pin is an ordinary leaf.
+    // Pin priority makes the selected leaf displace equal-degree leaves.
     const base = makeHubWithLeaves(10);
     const pinnedLeaf = 'http://example.org/leaf9';
 
@@ -200,13 +200,13 @@ describe('buildGraphElements', () => {
     expect(ids).toHaveLength(3);
   });
 
-  it('es determinista ante empates de grado (conserva el orden de entrada)', () => {
-    const base = makeHubWithLeaves(10); // todas las hojas empatan con grado 1
+  it('is deterministic on degree ties and preserves input order', () => {
+    const base = makeHubWithLeaves(10); // All leaves tie at degree 1.
     const first = buildGraphElements(base, { maxNodes: 4 });
     const second = buildGraphElements(base, { maxNodes: 4 });
 
     expect(nodeIds(first)).toEqual(nodeIds(second));
-    // Hub + las 3 primeras hojas en el orden del resultado.
+    // Hub plus the first three leaves in result order.
     expect(nodeIds(first)).toEqual([
       'http://example.org/hub',
       'http://example.org/leaf0',
@@ -215,44 +215,44 @@ describe('buildGraphElements', () => {
     ]);
   });
 
-  it('dibuja una arista solo si ambos extremos sobrevivieron al corte', () => {
+  it('draws an edge only when both endpoints survive trimming', () => {
     const nodes = ['Q1', 'Q2', 'Q3'].map((id) => makeNode(id));
     const edges = [makeEdge('Q1', 'Q2'), makeEdge('Q1', 'Q3')];
     const built = buildGraphElements(makeQueryResult(nodes, edges), { maxNodes: 2 });
 
-    // Q1 (grado 2) y una de Q2/Q3 sobreviven; la arista al descartado no se dibuja
-    // y cuenta como oculta por truncado.
+    // Q1 (degree 2) and one of Q2/Q3 survive; the dropped endpoint edge is not
+    // drawn and counts as hidden by truncation.
     expect(edgeIds(built)).toHaveLength(1);
     expect(built.edgesHiddenByTruncation).toBe(1);
   });
 
-  it('no muta el QueryResult ni el orden de sus nodos/aristas', () => {
+  it('does not mutate QueryResult or its node and edge order', () => {
     const base = makeHubWithLeaves(10);
     const nodesBefore = [...base.nodes];
     const edgesBefore = [...base.edges];
 
     buildGraphElements(base, { maxNodes: 2, pinnedUris: ['http://example.org/leaf5'] });
 
-    // Mismas referencias y mismo orden: el recorte trabaja sobre copias.
+    // Same references and order: trimming operates on copies.
     expect(base.nodes.map((n) => n.uri)).toEqual(nodesBefore.map((n) => n.uri));
     expect(base.edges).toEqual(edgesBefore);
   });
 
-  it('dibuja self-loops y aristas paralelas (mismo par, predicados distintos)', () => {
+  it('draws self-loops and parallel edges with distinct predicates', () => {
     const built = buildGraphElements(makeParallelRelations(), { maxNodes: 300 });
     const drawn = built.elements.filter((e) => 'source' in e.data);
 
     expect(drawn).toHaveLength(3);
     const byPredicate = drawn.map((e) => String(e.data['predicate']));
     expect(new Set(byPredicate).size).toBe(3);
-    // El self-loop tiene source === target y aun así entra.
+    // The self-loop has source === target and is still included.
     expect(
       drawn.some((e) => e.data['source'] === 'http://example.org/a' && e.data['target'] === 'http://example.org/a'),
     ).toBe(true);
     expect(drawn.find((e) => e.data['source'] === 'http://example.org/a' && e.data['target'] === 'http://example.org/b')?.data['multiplicity']).toBe(2);
   });
 
-  it('expone classUri y queryVariable en el data del nodo', () => {
+  it('exposes classUri and queryVariable in node data', () => {
     const node = makeNode('http://example.org/n1', {
       classes: ['http://example.org/class/Person', 'http://example.org/class/Agent'],
       queryVariable: 'person',
@@ -265,7 +265,7 @@ describe('buildGraphElements', () => {
     expect(data['queryVariable']).toBe('person');
   });
 
-  it('un pinned que no existe en el resultado no rompe nada ni cuenta', () => {
+  it('ignores a pinned node absent from the result without failing', () => {
     const base = makeHubWithLeaves(5);
     const built = buildGraphElements(base, { maxNodes: 3, pinnedUris: ['http://example.org/ghost'] });
 
@@ -273,7 +273,7 @@ describe('buildGraphElements', () => {
     expect(nodeIds(built)).not.toContain('http://example.org/ghost');
   });
 
-  it('sin recorte devuelve todos los nodos y aristas', () => {
+  it('returns every node and edge when no trimming is needed', () => {
     const base = makeParallelRelations();
     const built = buildGraphElements(base, { maxNodes: 300 });
 

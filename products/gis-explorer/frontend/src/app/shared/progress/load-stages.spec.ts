@@ -25,7 +25,7 @@ const STAGES: readonly LoadStageId[] = [
 
 describe('load-stages', () => {
   it('creates every stage pending, in the given order', () => {
-    const run = createRun('Cargando tablero', STAGES, 1000);
+    const run = createRun('Loading dashboard', STAGES, 1000);
 
     expect(run.stages.map((s) => s.id)).toEqual([...STAGES]);
     expect(run.stages.every((s) => s.status === 'pending')).toBe(true);
@@ -39,11 +39,11 @@ describe('load-stages', () => {
     expect(findStage(run, 'execute-query')?.status).toBe('active');
     expect(stageElapsedMs(findStage(run, 'execute-query')!, 1700)).toBe(500);
 
-    run = completeStage(run, 'execute-query', 2200, '10 filas');
+    run = completeStage(run, 'execute-query', 2200, '10 rows');
     const stage = findStage(run, 'execute-query')!;
     expect(stage.status).toBe('done');
-    expect(stage.detail).toBe('10 filas');
-    // Ya cerrada: el reloj no la sigue corriendo.
+    expect(stage.detail).toBe('10 rows');
+    // Already closed: its clock no longer advances.
     expect(stageElapsedMs(stage, 9999)).toBe(1000);
   });
 
@@ -57,18 +57,18 @@ describe('load-stages', () => {
 
   it('keeps the detail of an already closed stage', () => {
     let run = createRun('t', STAGES, 0);
-    run = startStage(run, 'process-results', 10, '5 nodos');
+    run = startStage(run, 'process-results', 10, '5 nodes');
     run = completeStage(run, 'process-results', 20);
     run = completeStage(run, 'process-results', 99, 'otro detalle');
 
     const stage = findStage(run, 'process-results')!;
     expect(stage.endedAt).toBe(20);
-    expect(stage.detail).toBe('5 nodos');
+    expect(stage.detail).toBe('5 nodes');
   });
 
   it('closes a stage that never started with zero duration', () => {
     let run = createRun('t', STAGES, 0);
-    run = completeStage(run, 'summary', 500, 'instantáneo');
+    run = completeStage(run, 'summary', 500, 'instant');
 
     const stage = findStage(run, 'summary')!;
     expect(stage.status).toBe('done');

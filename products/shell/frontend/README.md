@@ -1,8 +1,8 @@
 # Shell Frontend
 
-Host Angular de la plataforma. Publica la portada de tableros, navegación,
-idioma y rutas que cargan los dos remotes mediante Native Federation. Es el
-único frontend que media con el CRUD de tableros.
+Angular host for the platform. It provides the dashboard home page, navigation,
+language selection, and routes that load both remotes through Native
+Federation. It is the only frontend that mediates dashboard CRUD operations.
 
 ```bash
 pnpm --dir products/shell/frontend start
@@ -10,4 +10,5 @@ pnpm --dir products/shell/frontend test
 pnpm --dir products/shell/frontend build
 ```
 
-Escucha en `:4200`; `/explorer` carga RDF Explorer y `/gis` carga GIS Explorer.
+It listens on `:4200`; `/explorer` loads RDF Explorer and
+`/gis` loads GIS Explorer.

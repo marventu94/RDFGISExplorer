@@ -23,7 +23,7 @@ function makeResult(bindings: ResultBinding[]): QueryResult {
 const uri = (value: string) => ({ type: 'uri' as const, value });
 const literal = (value: string) => ({ type: 'literal' as const, value });
 
-/** Fila típica de una consulta espacio-temporal: varias entidades por fila. */
+/** Typical spatiotemporal query row containing several entities. */
 const row1: ResultBinding = {
   listing: uri('urn:listing/1'),
   realEstate: uri('urn:casa/1'),
@@ -88,7 +88,7 @@ describe('row-index', () => {
     it('groups the entities that share a row', () => {
       const index = buildRowIndex(makeResult([row1, row2]));
 
-      // Click en la geometría del mapa: la tabla tiene que poder llegar al aviso.
+      // Clicking map geometry must let the table reach the related notice.
       expect([...relatedUris(index, 'urn:geo/1')].sort()).toEqual([
         'urn:casa/1',
         'urn:geo/1',

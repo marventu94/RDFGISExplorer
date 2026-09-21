@@ -8,10 +8,9 @@ import {
 } from './testing/graph-fixtures';
 
 /**
- * Benchmark estructural de buildGraphElements (M0): mide la mediana de 30
- * corridas por fixture y la imprime con console.table. No hay assertions de
- * tiempo absoluto (flakiness); sí de estructura: pinned preservado,
- * determinismo entre corridas y aristas sin extremos colgados.
+ * Structural buildGraphElements benchmark (M0): measures the median of 30 runs
+ * per fixture. It avoids flaky absolute-time assertions but checks preserved
+ * pins, determinism, and edges without dangling endpoints.
  */
 
 const ITERATIONS = 30;
@@ -25,24 +24,24 @@ interface BenchCase {
 
 const CASES: BenchCase[] = [
   {
-    name: 'wide-sparse (300 nodos, 30 aristas)',
+    name: 'wide-sparse (300 nodes, 30 edges)',
     build: () => makeWideSparse(300, 30),
     maxNodes: 300,
   },
   {
-    name: 'dense-small (100 nodos, 3000 aristas)',
+    name: 'dense-small (100 nodes, 3000 edges)',
     build: () => makeDenseSmall(100, 30),
     maxNodes: 300,
     pinned: 'http://example.org/d99',
   },
   {
-    name: 'hub con 500 hojas (cap 300, hoja pinned)',
+    name: 'hub with 500 leaves (cap 300, pinned leaf)',
     build: () => makeHubWithLeaves(500),
     maxNodes: 300,
     pinned: 'http://example.org/leaf499',
   },
   {
-    name: 'árbol dirigido (364 nodos, cap 300)',
+    name: 'directed tree (364 nodes, cap 300)',
     build: () => makeDirectedTree(6, 3),
     maxNodes: 300,
     pinned: 'http://example.org/t363',
@@ -83,21 +82,21 @@ describe('buildGraphElements benchmark', () => {
 
       table.push({
         fixture: benchCase.name,
-        nodos: result.nodes.length,
-        aristas: result.edges.length,
+        nodes: result.nodes.length,
+        edges: result.edges.length,
         dibujados: last.drawnNodes,
-        'aristas ocultas': last.edgesHiddenByTruncation,
+        'hidden edges': last.edgesHiddenByTruncation,
         'mediana ms': Number(median(times).toFixed(3)),
       });
 
-      // Estructura: el pinned siempre sobrevive al cap.
+      // Structure: the pinned node always survives the cap.
       if (benchCase.pinned) {
         expect(drawnNodeIds(last)).toContain(benchCase.pinned);
       }
-      // Determinismo: dos corridas dibujan exactamente los mismos ids.
+      // Determinism: two runs draw exactly the same ids.
       const again = buildGraphElements(result, options);
       expect(drawnNodeIds(again)).toEqual(drawnNodeIds(last));
-      // Ninguna arista dibujada cuelga de un nodo recortado.
+      // No drawn edge references a trimmed node.
       const drawn = new Set(drawnNodeIds(last));
       for (const el of last.elements) {
         if (!('source' in el.data)) continue;

@@ -35,7 +35,7 @@ describe('PropertyGraphService', () => {
     expect(sel).toBeInstanceOf(Node);
   });
 
-  it('collectConstantUris ignora los valores de literales', () => {
+  it('collectConstantUris ignores literal values', () => {
     const node = service.addNode();
     node.addUri('http://example.org/Thing');
     node.mkConst();
@@ -49,8 +49,8 @@ describe('PropertyGraphService', () => {
     literal!.addUri('BASE');
     literal!.mkConst();
 
-    // El valor del literal no es un IRI: si entra al prefetch de labels sale
-    // como <BASE> y el endpoint rechaza la query entera (400 INVALID_SPARQL).
+    // The literal value is not an IRI. Label prefetch would emit <BASE> and make
+    // the endpoint reject the whole query with 400 INVALID_SPARQL.
     const uris = (service as unknown as { collectConstantUris(): string[] }).collectConstantUris();
     expect(uris).toContain('http://example.org/Thing');
     expect(uris).toContain('http://purl.org/goodrelations/v1#priceType');

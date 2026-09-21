@@ -58,7 +58,7 @@ describe('classifyVariables', () => {
   });
 
   it('does not classify a dirty variable (<90% numeric) as numeric', () => {
-    // 8 de 10 numéricos: por debajo del umbral del 90%.
+    // Eight of ten numeric values are below the 90% threshold.
     const rows: ResultBinding[] = [
       { v: num(1) }, { v: num(2) }, { v: num(3) }, { v: num(4) }, { v: num(5) },
       { v: num(6) }, { v: num(7) }, { v: num(8) }, { v: text('n/a') }, { v: text('?') },
@@ -80,7 +80,7 @@ describe('classifyVariables', () => {
     const rows: ResultBinding[] = [
       { v: num(1) }, { v: num(2) }, { v: num(3) }, { v: num(4) }, { v: num(5) },
       { v: num(6) }, { v: num(7) }, { v: num(8) }, { v: num(9) },
-      {}, // fila sin valor para ?v: no cuenta ni a favor ni en contra
+      {}, // A row without ?v counts neither for nor against classification.
     ];
     const result = makeResult(['v'], rows);
     expect(classifyVariables(result).numeric).toEqual(['v']);
@@ -193,7 +193,7 @@ describe('computeLocalSummary', () => {
 
   it('keeps at most TOP_CATEGORICAL_VALUES values per categorical variable', () => {
     const rows: ResultBinding[] = [];
-    // 15 valores distintos (<= 20, sigue siendo categórica) con conteos decrecientes.
+    // Fifteen distinct values remain categorical and have decreasing counts.
     for (let v = 0; v < 15; v++) {
       for (let i = 0; i < 15 - v; i++) rows.push({ k: text(`valor${v}`) });
     }

@@ -263,13 +263,13 @@ describe('RequestService', () => {
       ).toBe('instance of');
     });
 
-    it('descarta valores que no son IRIs absolutos (valores de literal)', async () => {
+    it('discards values that are not absolute IRIs, such as literal values', async () => {
       const execSpy = vi
         .spyOn(service, 'execQuery')
         .mockResolvedValue({ results: { bindings: [] } } as unknown as SparqlJsonResult);
 
-      // "BASE" es el valor de un literal (gr:priceType "BASE"), no un IRI:
-      // enviarlo como <BASE> hacía fallar el parseo de TODA la query con
+      // "BASE" is a literal value (gr:priceType "BASE"), not an IRI:
+      // Sending it as <BASE> made parsing the ENTIRE query fail with
       // 400 INVALID_SPARQL "Cannot resolve relative IRI BASE".
       await service.prefetchLabels(['http://example.org/Q1', 'BASE', '  '], {
         labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
@@ -283,7 +283,7 @@ describe('RequestService', () => {
       expect(query).not.toContain('<BASE>');
     });
 
-    it('no hace request si ningún valor es un IRI absoluto', async () => {
+    it('does not request when no value is an absolute IRI', async () => {
       const execSpy = vi
         .spyOn(service, 'execQuery')
         .mockResolvedValue({ results: { bindings: [] } } as unknown as SparqlJsonResult);

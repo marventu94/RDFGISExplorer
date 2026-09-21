@@ -11,16 +11,15 @@ import {
 } from './testing/entity-subgraph-fixtures';
 
 /**
- * Etapa 6: cierre de la "estructura disponible" para la raíz. Lo que se prueba
- * acá es que el alcance sea **completo pero acotado**: todo lo alcanzable sin
- * atravesar recursos compartidos, nada más.
+ * Stage 6: closes the root's available structure. The scope must be complete
+ * but bounded: everything reachable without traversing shared resources.
  */
 
 const urisOf = (structure: ReturnType<typeof buildAvailableStructure>): string[] =>
   structure.subgraph.nodes.map((node) => node.uri);
 
 describe('buildAvailableStructure', () => {
-  it('expande las ramas que la vista dejó sin expandir', () => {
+  it('expands branches left unexpanded by the view', () => {
     const structure = buildAvailableStructure({
       visibleResult: sharedTargetFixture(),
       rootUri: `${EX}shared/root`,
@@ -32,7 +31,7 @@ describe('buildAvailableStructure', () => {
     expect(structure.expandedBranchIds.length).toBeGreaterThan(0);
   });
 
-  it('no atraviesa recursos compartidos: la estructura de un aviso no trae los otros', () => {
+  it('does not traverse shared resources into sibling structures', () => {
     const fixture = realEstateFixture();
 
     const structure = buildAvailableStructure({
@@ -56,7 +55,7 @@ describe('buildAvailableStructure', () => {
     expect(uris).toHaveLength(6);
   });
 
-  it('reporta las ramas de los hubs sin expandirlas', () => {
+  it('reports hub branches without expanding them', () => {
     const fixture = realEstateFixture();
 
     const structure = buildAvailableStructure({
@@ -71,11 +70,11 @@ describe('buildAvailableStructure', () => {
     const hubOwners = structure.hubBranchIds.map((id) => parseBranchId(id)?.nodeUri);
     expect(hubOwners).toContain(fixture.partido);
     expect(hubOwners).toContain(fixture.commercialFunction);
-    // Con las ramas del hub sin recorrer, el cierre igual se considera completo.
+    // Closure remains complete without traversing hub branches.
     expect(structure.complete).toBe(true);
   });
 
-  it('deja el hub como frontera aunque sobre presupuesto', () => {
+  it('keeps the hub as a frontier even when budget remains', () => {
     const structure = buildAvailableStructure({
       visibleResult: wideStarFixture(12),
       rootUri: `${EX}star/root`,
@@ -90,11 +89,11 @@ describe('buildAvailableStructure', () => {
     });
   });
 
-  it('marca la estructura como incompleta cuando el presupuesto no alcanza', () => {
+  it('marks structure as incomplete when the budget is insufficient', () => {
     const structure = buildAvailableStructure({
       visibleResult: wideStarFixture(12),
       rootUri: `${EX}star/root`,
-      // Sin umbral de hub, la estrella se recorre y no entra en 5 nodos.
+      // Without a hub threshold, the star is traversed and exceeds five nodes.
       budget: { maxNodes: 5, hubDegreeThreshold: 100 },
     });
 
@@ -104,7 +103,7 @@ describe('buildAvailableStructure', () => {
     expect(structure.subgraph.nodes).toHaveLength(5);
   });
 
-  it('termina en grafos con ciclos e incorpora todo el ciclo', () => {
+  it('terminates on cyclic graphs and includes the entire cycle', () => {
     const structure = buildAvailableStructure({
       visibleResult: cycleFixture(4),
       rootUri: `${EX}cycle/0`,
@@ -119,7 +118,7 @@ describe('buildAvailableStructure', () => {
     expect(structure.complete).toBe(true);
   });
 
-  it('respeta el tope de iteraciones y no marca completo lo que quedó a medias', () => {
+  it('honors the iteration cap and does not mark partial work complete', () => {
     const structure = buildAvailableStructure({
       visibleResult: sharedTargetFixture(),
       rootUri: `${EX}shared/root`,
@@ -146,7 +145,7 @@ describe('buildAvailableStructure', () => {
     );
   });
 
-  it('conserva nodo activo y nodos fijados', () => {
+  it('retains the active node and pinned nodes', () => {
     const fixture = realEstateFixture();
 
     const structure = buildAvailableStructure({
@@ -162,7 +161,7 @@ describe('buildAvailableStructure', () => {
     );
   });
 
-  it('usa un presupuesto propio, más amplio que el de la vista', () => {
+  it('uses its own budget, larger than the view budget', () => {
     expect(DEFAULT_STRUCTURE_BUDGET.maxNodes).toBeGreaterThan(60);
     expect(DEFAULT_STRUCTURE_BUDGET.maxEdges).toBeGreaterThan(120);
 

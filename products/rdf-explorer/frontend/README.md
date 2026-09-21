@@ -1,8 +1,8 @@
 # RDF Explorer Frontend
 
-Aplicación Angular standalone para construir consultas SPARQL mediante un
-grafo visual. Puede ejecutarse sola o como remote del Shell y entregar la
-consulta completa a GIS Explorer.
+Standalone Angular application for building SPARQL queries through a visual
+graph. It can run on its own or as a Shell remote and hand the complete query
+off to GIS Explorer.
 
 ```bash
 pnpm run dev:rdf-standalone
@@ -10,5 +10,6 @@ pnpm --dir products/rdf-explorer/frontend test
 pnpm --dir products/rdf-explorer/frontend build
 ```
 
-En standalone usa `/api` y escucha en `:4201`. Integrada, el Shell configura
-`/rdf-api` y ofrece persistencia mediante el platform bridge.
+In standalone mode it uses `/api` and listens on `:4201`.
+When integrated, the Shell configures `/rdf-api` and provides
+persistence through the platform bridge.

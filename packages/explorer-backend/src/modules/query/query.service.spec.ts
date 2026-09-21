@@ -39,7 +39,7 @@ describe('QueryService', () => {
           provide: SPARQL_ENDPOINT,
           useValue: mockSparqlEndpoint,
         },
-        // Sin valores: el servicio cae en sus defaults. Antes esto se controlaba
+        // Without values, the service falls back to its defaults. Previously this was controlled
         // manipulando process.env del proceso de test.
         { provide: ConfigService, useValue: { get: () => undefined } },
       ],

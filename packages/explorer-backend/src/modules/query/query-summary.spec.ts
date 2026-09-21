@@ -10,7 +10,7 @@ import {
 import { GenericSparqlAdapter } from '../../adapters/generic-sparql.adapter';
 import { QueryResult } from '../../shared/dto/query-result.dto';
 
-/** Config del servicio para cada test: se llena en el test que la necesite. */
+/** Service configuration for each test; populated by the test that needs it. */
 const config: Record<string, string | undefined> = {};
 
 const USER_QUERY =
@@ -36,7 +36,7 @@ function aggRowResult(bindings: QueryResult['bindings']): QueryResult {
   return { ...emptyResult(), bindings };
 }
 
-/** Query SPARQL enviada al endpoint en la llamada `callIndex` (0-based). */
+/** SPARQL query sent to the endpoint in zero-based `callIndex`. */
 function sentQuery(executeMock: jest.Mock, callIndex = 0): string {
   const calls = executeMock.mock.calls as unknown as [string, unknown][];
   return calls[callIndex][0];
@@ -78,15 +78,15 @@ describe('QueryService.summarize', () => {
     await service.summarize({ query: USER_QUERY });
 
     const sent = sentQuery(executeMock);
-    // El PREFIX queda al nivel externo, antes del SELECT agregado...
+    // PREFIX remains at the outer level before the aggregate SELECT...
     expect(sent).toMatch(
       /^PREFIX wd: <http:\/\/www\.wikidata\.org\/entity\/>\nSELECT/,
     );
-    // ...y la subquery envuelta no contiene PREFIX (inválido en varios endpoints).
+    // ...and the wrapped subquery contains no PREFIX (invalid on several endpoints).
     const subqueryStart = sent.indexOf('WHERE { {');
     expect(subqueryStart).toBeGreaterThan(-1);
     expect(sent.slice(subqueryStart)).not.toContain('PREFIX');
-    // El cuerpo conserva los LIMIT internos de la query del usuario.
+    // The body preserves the user's query-internal LIMIT clauses.
     expect(sent.slice(subqueryStart)).toContain('LIMIT 50');
   });
 
@@ -260,7 +260,7 @@ describe('QueryService.summarize', () => {
     expect(summary.failed.total).toBe(true);
     expect(summary.failed.numeric).toEqual(['price']);
     expect(summary.failed.temporal).toEqual(['date']);
-    // La sección categórica se ejecutó igual (nunca 500 por una sección).
+    // The categorical section still ran (a single section never causes a 500).
     expect(summary.categorical).toEqual([
       { variable: 'city', values: [{ value: 'http://x/C', count: 7 }] },
     ]);
@@ -300,13 +300,13 @@ describe('QueryService.summarize', () => {
 
     const summary = await service.summarize({
       query: 'SELECT ?__agg_total WHERE { ?s ?p ?__agg_total }',
-      // El nombre reservado se descarta como variable a agregar.
+      // The reserved name is discarded as an aggregation variable.
       numericVars: ['__agg_total'],
     });
 
     const sent = sentQuery(executeMock);
     expect(sent).toContain('(COUNT(*) AS ?__agg_total)');
-    // No se generaron agregados sobre la variable del usuario (sanitize).
+    // No aggregates were generated over the user variable (sanitization).
     expect(sent).not.toContain('AVG(?__agg_total)');
     expect(summary.totalRows).toBe(5);
     expect(summary.numeric).toEqual([]);

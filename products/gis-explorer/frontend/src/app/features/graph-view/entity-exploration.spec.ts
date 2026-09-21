@@ -51,7 +51,7 @@ function realEstateContext(): {
   return { context, fixture, entered };
 }
 
-describe('estado de exploración local', () => {
+describe('local exploration state', () => {
   describe('entrada y salida del modo entidad', () => {
     it.each<EntityModeTrigger>([
       'table-selection',
@@ -59,7 +59,7 @@ describe('estado de exploración local', () => {
       'timeline-selection',
       'graph-selection',
       'user-action',
-    ])('entra desde una selección explícita (%s)', (trigger) => {
+    ])('enters from an explicit selection (%s)', (trigger) => {
       const state = enterEntityMode(createExplorationState(), {
         rootUri: `${EX}listing/0`,
         trigger,
@@ -72,7 +72,7 @@ describe('estado de exploración local', () => {
       expect(isExplorationActive(state)).toBe(true);
     });
 
-    it('el foco coordinado no inicia la exploración', () => {
+    it('coordinated focus does not start exploration', () => {
       const state = enterEntityMode(createExplorationState(), {
         rootUri: `${EX}listing/0`,
         trigger: 'coordinated-focus',
@@ -83,14 +83,14 @@ describe('estado de exploración local', () => {
       expect(state.lastRejection?.code).toBe('focus-not-explicit');
     });
 
-    it('el foco coordinado tampoco altera una exploración en curso', () => {
+    it('coordinated focus does not alter ongoing exploration either', () => {
       const { entered } = realEstateContext();
       const after = applyCoordinatedFocus(entered, [`${EX}listing/3`, `${EX}listing/4`]);
 
       expect(after).toBe(entered);
     });
 
-    it('volver al resultado limpia raíz, expansiones e historial', () => {
+    it('returning to the result clears root, expansions, and history', () => {
       const { context, fixture, entered } = realEstateContext();
       const withPin = pinNode(context, entered, fixture.estate);
       const back = exitToResult(withPin);
@@ -102,7 +102,7 @@ describe('estado de exploración local', () => {
       expect(explorationSubgraph(context, back)).toBeNull();
     });
 
-    it('las operaciones fuera del modo entidad se rechazan sin cambiar el estado', () => {
+    it('rejects entity operations outside entity mode without changing state', () => {
       const context: ExplorationContext = { visibleResult: realEstateFixture().result };
       const state = createExplorationState();
 
@@ -124,8 +124,8 @@ describe('estado de exploración local', () => {
     });
   });
 
-  describe('expansión de un salto', () => {
-    it('expandir un hub agrega su rama y nada más (no reconstruye el hairball)', () => {
+  describe('one-hop expansion', () => {
+    it('expanding a hub adds its branch only and does not rebuild the hairball', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -139,12 +139,12 @@ describe('estado de exploración local', () => {
       expect(expanded.expandedBranchIds).toEqual([branchId]);
       expect(after.metrics.nodeCount).toBe(15);
       expect(uris(after)).toContain(`${EX}address/7`);
-      // Un salto: las direcciones ajenas no arrastran sus inmuebles.
+      // One hop: unrelated addresses do not pull in their properties.
       expect(uris(after)).not.toContain(fixture.otherEstate);
       expect(uris(after)).not.toContain(fixture.otherListing);
     });
 
-    it('rechaza entera la expansión que no entra en el presupuesto', () => {
+    it('rejects an entire expansion when it exceeds the budget', () => {
       const context: ExplorationContext = { visibleResult: wideStarFixture(12) };
       const state = enterEntityMode(createExplorationState({ maxNodes: 10 }), {
         rootUri: `${EX}star/root`,
@@ -162,7 +162,7 @@ describe('estado de exploración local', () => {
       expect(explorationSubgraph(context, rejected)!.metrics.nodeCount).toBe(2);
     });
 
-    it('acepta la misma expansión con presupuesto suficiente', () => {
+    it('accepts the same expansion with sufficient budget', () => {
       const context: ExplorationContext = { visibleResult: wideStarFixture(12) };
       const state = enterEntityMode(createExplorationState(), {
         rootUri: `${EX}star/root`,
@@ -176,23 +176,23 @@ describe('estado de exploración local', () => {
       expect(explorationSubgraph(context, expanded)!.metrics.nodeCount).toBe(14);
     });
 
-    it('rechaza ramas inexistentes y no repite una ya expandida', () => {
+    it('rejects nonexistent branches and does not repeat an expanded one', () => {
       const { context, fixture, entered } = realEstateContext();
 
       expect(expandBranch(context, entered, 'branch:outgoing:x:y').lastRejection?.code).toBe(
         'unknown-branch',
       );
 
-      // Expandir una rama ya visible registra la intención (no es un no-op)…
+      // Expanding an already visible branch records intent rather than a no-op…
       const alreadyVisible = makeBranchId(fixture.root, 'outgoing', P.about);
       const intent = expandBranch(context, entered, alreadyVisible);
       expect(intent.lastRejection).toBeNull();
       expect(intent.expandedBranchIds).toEqual([alreadyVisible]);
-      // …pero repetirla sí lo es.
+      // …but repeating it is a no-op.
       expect(expandBranch(context, intent, alreadyVisible).lastRejection?.code).toBe('no-op');
     });
 
-    it('ofrece las ramas expandibles ordenadas por cercanía a la raíz', () => {
+    it('offers expandable branches ordered by distance from the root', () => {
       const { context, fixture, entered } = realEstateContext();
       const branches = expandableBranches(explorationSubgraph(context, entered)!);
 
@@ -204,8 +204,8 @@ describe('estado de exploración local', () => {
     });
   });
 
-  describe('contracción', () => {
-    it('no elimina un nodo que otra rama visible necesita', () => {
+  describe('collapse', () => {
+    it('does not remove a node required by another visible branch', () => {
       const context: ExplorationContext = { visibleResult: sharedTargetFixture() };
       const target = `${EX}shared/target`;
       const fromX = makeBranchId(`${EX}shared/x`, 'outgoing', P.tag);
@@ -229,7 +229,7 @@ describe('estado de exploración local', () => {
       expect(uris(explorationSubgraph(context, state))).not.toContain(target);
     });
 
-    it('conserva el nodo activo al contraer su rama (prioridad absoluta de la selección)', () => {
+    it('retains the active node when collapsing its branch because selection has absolute priority', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -242,11 +242,11 @@ describe('estado de exploración local', () => {
       const after = explorationSubgraph(context, state)!;
       expect(uris(after)).toContain(`${EX}address/4`);
       expect(after.nodes.find((n) => n.uri === `${EX}address/4`)?.reason).toBe('active');
-      // El resto de la rama sí se fue.
+      // The rest of the branch was removed.
       expect(uris(after)).not.toContain(`${EX}address/2`);
     });
 
-    it('contraer una rama que no estaba expandida es un no-op explicado', () => {
+    it('explains that collapsing a branch that was not expanded is a no-op', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -257,8 +257,8 @@ describe('estado de exploración local', () => {
     });
   });
 
-  describe('nodo activo, fijados y raíz', () => {
-    it('activa un nodo del subgrafo y rechaza uno ajeno', () => {
+  describe('active node, pins, and root', () => {
+    it('activates a subgraph node and rejects an unrelated node', () => {
       const { context, fixture, entered } = realEstateContext();
 
       const active = setActiveNode(context, entered, fixture.address);
@@ -270,22 +270,22 @@ describe('estado de exploración local', () => {
       expect(rejected.activeUri).toBe(fixture.address);
     });
 
-    it('una selección posterior cambia el nodo activo pero nunca la raíz', () => {
+    it('a later selection changes the active node but never the root', () => {
       const { context, fixture, entered } = realEstateContext();
 
       const after = notifySelection(context, entered, fixture.geometry);
       expect(after.rootUri).toBe(fixture.root);
       expect(after.activeUri).toBe(fixture.geometry);
 
-      // Una entidad ajena a la estructura explorada no cambia nada: la UI
-      // decide si ofrece explorarla como nueva raíz.
+      // An entity outside the explored structure changes nothing; the UI
+      // decides whether to offer it for exploration as a new root.
       const foreign = notifySelection(context, after, fixture.otherListing);
       expect(foreign.rootUri).toBe(fixture.root);
       expect(foreign.activeUri).toBe(fixture.geometry);
       expect(foreign.lastRejection?.code).toBe('unknown-node');
     });
 
-    it('fija y desfija nodos, y el fijado sobrevive a la contracción', () => {
+    it('pins and unpins nodes and keeps pins through collapse', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -300,7 +300,7 @@ describe('estado de exploración local', () => {
       expect(uris(explorationSubgraph(context, state))).not.toContain(`${EX}address/4`);
     });
 
-    it('togglePin alterna y sólo acepta nodos de la estructura', () => {
+    it('togglePin toggles and accepts only structure nodes', () => {
       const { context, fixture, entered } = realEstateContext();
 
       const pinned = togglePin(context, entered, fixture.estate);
@@ -311,7 +311,7 @@ describe('estado de exploración local', () => {
       );
     });
 
-    it('usa el nodo activo como nueva raíz conservando los fijados', () => {
+    it('uses the active node as the new root while retaining pins', () => {
       const { context, fixture, entered } = realEstateContext();
 
       let state = pinNode(context, entered, fixture.geometry);
@@ -324,7 +324,7 @@ describe('estado de exploración local', () => {
       expect(promoteActiveToRoot(state).lastRejection?.code).toBe('no-op');
     });
 
-    it('vuelve a la raíz sin tocar expansiones', () => {
+    it('returns to the root without changing expansions', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -339,7 +339,7 @@ describe('estado de exploración local', () => {
   });
 
   describe('historial', () => {
-    it('deshace paso a paso sin perder la raíz', () => {
+    it('undoes step by step without losing the root', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -363,7 +363,7 @@ describe('estado de exploración local', () => {
       expect(goBack(state).lastRejection?.code).toBe('no-history');
     });
 
-    it('recorta el historial al tope configurado', () => {
+    it('trims history to the configured cap', () => {
       const { context, fixture, entered } = realEstateContext();
       let state = entered;
       for (let i = 0; i < MAX_HISTORY + 10; i++) {
@@ -374,7 +374,7 @@ describe('estado de exploración local', () => {
       expect(state.rootUri).toBe(fixture.root);
     });
 
-    it('el breadcrumb lista las raíces recorridas en orden', () => {
+    it('lists visited roots in breadcrumb order', () => {
       const { context, fixture, entered } = realEstateContext();
 
       let state = setActiveNode(context, entered, fixture.estate);
@@ -389,7 +389,7 @@ describe('estado de exploración local', () => {
       ]);
     });
 
-    it('restablece la exploración de forma reversible', () => {
+    it('resets exploration reversibly', () => {
       const { context, fixture, entered } = realEstateContext();
       const branchId = makeBranchId(fixture.partido, 'incoming', P.locality);
 
@@ -410,7 +410,7 @@ describe('estado de exploración local', () => {
   });
 
   describe('pureza', () => {
-    it('ninguna operación muta el estado recibido ni el resultado', () => {
+    it('no operation mutates the received state or result', () => {
       const { context, fixture, entered } = realEstateContext();
       const stateSnapshot = JSON.stringify(entered);
       const resultSnapshot = JSON.stringify(fixture.result);
@@ -426,7 +426,7 @@ describe('estado de exploración local', () => {
       expect(JSON.stringify(fixture.result)).toBe(resultSnapshot);
     });
 
-    it('la misma secuencia de operaciones produce el mismo estado y subgrafo', () => {
+    it('the same operation sequence produces the same state and subgraph', () => {
       const run = (): { state: ExplorationState; nodes: string[] } => {
         const fixture = realEstateFixture();
         const context: ExplorationContext = { visibleResult: fixture.result };
@@ -447,7 +447,7 @@ describe('estado de exploración local', () => {
       expect(second.nodes).toEqual(first.nodes);
     });
 
-    it('el presupuesto se ajusta sin contar como paso de navegación', () => {
+    it('adjusts the budget without counting it as a navigation step', () => {
       const { context, entered } = realEstateContext();
       const state = setExplorationBudget(entered, { maxNodes: 12 });
 
@@ -457,7 +457,7 @@ describe('estado de exploración local', () => {
       expect(explorationSubgraph(context, state)!.budget.maxNodes).toBe(12);
     });
 
-    it('el estado no conoce filtros, lote ni consulta', () => {
+    it('keeps filters, batch, and query outside exploration state', () => {
       const { entered } = realEstateContext();
 
       expect(Object.keys(entered).sort()).toEqual([

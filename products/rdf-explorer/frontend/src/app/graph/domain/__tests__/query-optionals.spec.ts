@@ -15,7 +15,7 @@ function createGraph(): PropertyGraph {
   });
 }
 
-/** `subject --ex:name--> nuevo nodo variable`, opcional o no. */
+/** `subject --ex:name--> new variable node`, optional or required. */
 function link(
   graph: PropertyGraph,
   subject: Node,
@@ -52,7 +52,7 @@ describe('Query: bloques OPTIONAL', () => {
     graph = createGraph();
   });
 
-  it('encadena en un solo bloque los opcionales que comparten variables propias', () => {
+  it('chains optionals sharing their own variables into one block', () => {
     // Obligatorio: ?a ex:tipo ?t. Opcional (cadena): ?a → ?sitio → ?geom → ?wkt
     const a = graph.addNode();
     link(graph, a, 'tipo');
@@ -66,19 +66,19 @@ describe('Query: bloques OPTIONAL', () => {
 
     expect(query.optionals.length).toBe(1);
     expect(blocks.length).toBe(1);
-    // Cada eslabón después del que liga a su sujeto.
+    // Each link follows the one binding its subject.
     expect(blocks[0].length).toBe(3);
     expect(blocks[0][0]).toContain('ex:includes');
     expect(blocks[0][1]).toContain('ex:hasGeometry');
     expect(blocks[0][2]).toContain('ex:asWKT');
   });
 
-  it('ordena la cadena aunque los triples se hayan creado al revés', () => {
+  it('orders the chain even when triples were created in reverse', () => {
     const a = graph.addNode();
     link(graph, a, 'tipo');
 
-    // Se crea primero el eslabón profundo (?sitio → ?geom) y después el que
-    // liga ?sitio desde el patrón obligatorio.
+    // The deep link (?site → ?geom) is created before the required-pattern link
+    // that binds ?site.
     const sitio = graph.addNode();
     const geomProp = sitio.newProp();
     geomProp.addUri(EX + 'hasGeometry');
@@ -99,9 +99,9 @@ describe('Query: bloques OPTIONAL', () => {
     expect(blocks[0][1]).toContain('ex:hasGeometry');
   });
 
-  it('deja en bloques separados las ramas opcionales independientes', () => {
-    // Dos propiedades opcionales distintas del mismo nodo ya ligado: cada una
-    // matchea o no por su cuenta, así que NO deben unirse.
+  it('keeps independent optional branches in separate blocks', () => {
+    // Two distinct optional properties of an already bound node match
+    // independently, so they must NOT be joined.
     const a = graph.addNode();
     link(graph, a, 'tipo');
     link(graph, a, 'ramaUno', { optional: true });
@@ -115,9 +115,9 @@ describe('Query: bloques OPTIONAL', () => {
     expect(blocks.every(b => b.length === 1)).toBe(true);
   });
 
-  it('no une opcionales que solo comparten variables del patrón obligatorio', () => {
+  it('does not join optionals sharing only required-pattern variables', () => {
     // ?a ex:tipo ?t (obligatorio) y ?t ex:algo ?x (opcional) + ?a ex:otro ?y
-    // (opcional): comparten ?a/?t, que ya vienen ligadas afuera.
+    // They share ?a/?t, which are already bound outside the optional block.
     const a = graph.addNode();
     const t = link(graph, a, 'tipo');
     link(graph, t, 'algo', { optional: true });
