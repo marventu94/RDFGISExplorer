@@ -4,6 +4,7 @@ dist/
 data/
 .env.custom
 .env.local
+.env.*.local
 .angular/cache/
 coverage/
 package-lock.json
