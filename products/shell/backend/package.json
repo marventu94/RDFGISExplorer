@@ -7,6 +7,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "test": "jest",
+    "test:ci": "jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:scripts": "jest --rootDir . --testRegex 'scripts/clean-unused-data\\.spec\\.ts$'",
     "clean:unused-data": "ts-node scripts/clean-unused-data.ts",

@@ -25,11 +25,5 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Primero build: packages/contracts y packages/platform-bridge tienen que
-      # estar compilados antes que las apps que los consumen. `pnpm -r` respeta
-      # el orden topologico del workspace.
+      - run: pnpm test:ci
       - run: pnpm build
-
-      - run: pnpm lint
-
-      - run: pnpm test
