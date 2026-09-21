@@ -44,6 +44,29 @@ fi
 
 export DOTENV_CONFIG_PATH="$(realpath "$ENV_FILE")"
 
+# Export the selected environment for every child process. Do not `source` the
+# file: valid dotenv values may contain spaces or shell metacharacters.
+while IFS= read -r env_line || [[ -n "$env_line" ]]; do
+  env_line="${env_line%$'\r'}"
+  [[ -z "$env_line" || "$env_line" == \#* || "$env_line" != *=* ]] && continue
+  env_key="${env_line%%=*}"
+  env_value="${env_line#*=}"
+  env_key="${env_key#export }"
+  if [[ "$env_value" == \"*\" && "$env_value" == *\" ]]; then
+    env_value="${env_value:1:${#env_value}-2}"
+  elif [[ "$env_value" == \'*\' && "$env_value" == *\' ]]; then
+    env_value="${env_value:1:${#env_value}-2}"
+  fi
+  export "$env_key=$env_value"
+done < "$DOTENV_CONFIG_PATH"
+
+# Relative SQLite paths in env files are repository-relative. Backends are
+# launched with package-specific working directories, so normalize the path
+# before concurrently starts them.
+if [[ -n "${DASHBOARDS_SQLITE_PATH:-}" && "$DASHBOARDS_SQLITE_PATH" != /* ]]; then
+  export DASHBOARDS_SQLITE_PATH="$(realpath -m "$DASHBOARDS_SQLITE_PATH")"
+fi
+
 echo "${CYAN}>> RDF GIS Explorer (dev)${RESET}"
 echo "${DIM}   cwd: $(pwd)${RESET}"
 echo "${YELLOW}   env: $ENV_FILE${RESET}"
