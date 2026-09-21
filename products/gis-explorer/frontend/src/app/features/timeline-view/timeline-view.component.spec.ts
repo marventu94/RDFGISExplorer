@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { BehaviorSubject, of } from 'rxjs';
 import { TimelineViewComponent } from './timeline-view.component';
+import { I18nService } from '@core/services/i18n.service';
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import type {
   QueryResult,
@@ -402,6 +403,21 @@ describe('TimelineViewComponent', () => {
 
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
       expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 3 entidades · 2 sin fechas');
+    });
+
+    it('renders the complete coverage chip in English with batch and plural interpolation', () => {
+      const i18n = TestBed.inject(I18nService);
+      i18n.set('en');
+      const anotherWithoutDates: NormalizedNode = { ...nodeWithoutDates, uri: 'http://x/Q9', label: 'Dato del usuario' };
+      const result = createMockQueryResult([nodeWithDates, nodeWithoutDates, anotherWithoutDates]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      lotStateSubject.next({ lotSize: 300, currentLot: 3, lotCount: 5, totalRows: 1200, visibleNodes: 3 });
+      fixture.detectChanges();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('.coverage-chip')?.textContent?.trim())
+        .toBe('Showing 1 of 3 entities in this batch · 2 without dates');
+      i18n.set('es');
     });
 
     it('should hide the coverage chip when all nodes have dates', () => {

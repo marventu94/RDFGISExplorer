@@ -237,7 +237,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
         id: filterId,
         kind: 'geo',
         polygon: geoJson.geometry as GeoJSON.Polygon,
-        label: `Área dibujada ${this.drawnItems!.getLayers().length}`,
+        label: this.i18n.text('Área dibujada {count}', { count: this.drawnItems!.getLayers().length }),
       };
       (layer as unknown as Record<string, unknown>)['_filterId'] = filterId;
       this.ngZone.run(() => {
@@ -310,10 +310,15 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.currentNodes = visible.nodes;
     const stats = computeCoverageStats(visible);
     if (stats.primaryWithoutCoordinate > 0) {
-      const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
-      this.coverageLabel =
-        `Mostrando ${stats.primaryWithCoordinate} de ${stats.primary} entidades${lotSuffix} · ` +
-        `${stats.primaryWithoutCoordinate} sin coordenada${stats.primaryWithoutCoordinate !== 1 ? 's' : ''}`;
+      const key = stats.primaryWithoutCoordinate === 1
+        ? 'Mostrando {shown} de {total} entidades{batch} · {missing} sin coordenada'
+        : 'Mostrando {shown} de {total} entidades{batch} · {missing} sin coordenadas';
+      this.coverageLabel = this.i18n.text(key, {
+        shown: stats.primaryWithCoordinate,
+        total: stats.primary,
+        batch: lotState.lotCount > 1 ? this.i18n.text(' del lote') : '',
+        missing: stats.primaryWithoutCoordinate,
+      });
     } else {
       this.coverageLabel = '';
     }
@@ -454,7 +459,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
 
     const typeLabel = node.classes?.[0] ?? node.queryVariable;
     if (typeLabel) {
-      html += `<br><span class="tooltip-label">Tipo:</span> ${this.escapeHtml(typeLabel)}`;
+      html += `<br><span class="tooltip-label">${this.i18n.text('Tipo:')}</span> ${this.escapeHtml(typeLabel)}`;
     }
 
     const attrKeys = Object.keys(node.attributes).slice(0, 3);
@@ -466,7 +471,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
     }
 
     if (node.coordinate) {
-      html += `<br><span class="tooltip-label">Coords:</span> ${node.coordinate.lat.toFixed(4)}, ${node.coordinate.lng.toFixed(4)}`;
+      html += `<br><span class="tooltip-label">${this.i18n.text('Coords:')}</span> ${node.coordinate.lat.toFixed(4)}, ${node.coordinate.lng.toFixed(4)}`;
     }
 
     return html;

@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { dashboardHost } from '@rdfgis/platform-bridge';
+import { I18nService } from '@core/services/i18n.service';
 
 export interface SaveDashboardDialogData {
   currentName: string | null;
@@ -38,6 +39,7 @@ export class SaveDashboardDialogComponent implements OnInit {
   private readonly dialogRef = inject(MatDialogRef<SaveDashboardDialogComponent, SaveDashboardDialogResult>);
   protected readonly data = inject<SaveDashboardDialogData>(MAT_DIALOG_DATA);
   private readonly dashboardState = inject(DashboardStateService);
+  private readonly i18n = inject(I18nService);
 
   protected readonly name = signal(this.data.currentName ?? '');
   protected readonly mode = signal<'overwrite' | 'copy'>('overwrite');
@@ -89,9 +91,9 @@ export class SaveDashboardDialogComponent implements OnInit {
   protected get conflictMessage(): string {
     if (!this.hasConflict()) return '';
     if (this.mode() === 'overwrite') {
-      return 'Ya existe un tablero con ese nombre. Se sobreescribirá.';
+      return this.i18n.text('Ya existe un tablero con ese nombre. Se sobreescribirá.');
     }
-    return 'Ya existe un tablero con ese nombre. Cambiá el nombre o elegí "Sobreescribir existente".';
+    return this.i18n.text('Ya existe un tablero con ese nombre. Cambiá el nombre o elegí "Sobreescribir existente".');
   }
 
   protected get showModeOptions(): boolean {

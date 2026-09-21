@@ -13,6 +13,7 @@ import { QueryHandoffService, setAutoRunHandoff } from '@core/services/query-han
 import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
+import { I18nService } from '@core/services/i18n.service';
 
 interface MockTarget {
   setQuery: ReturnType<typeof vi.fn>;
@@ -101,6 +102,22 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).not.toHaveBeenCalled();
   });
 
+  it('builds the missing-handoff popup in English', () => {
+    TestBed.inject(I18nService).set('en');
+    service.consumeInto(asTarget(makeTarget()));
+
+    expect(dialogMock.open).toHaveBeenCalledWith(
+      ErrorDialogComponent,
+      expect.objectContaining({
+        data: {
+          title: 'The query to import was not found',
+          message: expect.stringContaining('The handoff from RDF Explorer expired'),
+        },
+      }),
+    );
+    TestBed.inject(I18nService).set('es');
+  });
+
   it('aplica sin preguntar cuando no hay nada que perder', () => {
     publish();
     const target = makeTarget();
@@ -111,6 +128,19 @@ describe('GisHandoffService', () => {
     expect(target.setBackend).toHaveBeenCalledWith('custom');
     // El handoff se consume: no queda pendiente para el próximo ingreso.
     expect(handoff.peek()).toBeNull();
+  });
+
+  it('uses the localized snackbar action in English', () => {
+    TestBed.inject(I18nService).set('en');
+    publish();
+    service.consumeInto(asTarget(makeTarget()));
+
+    expect(snackMock.open).toHaveBeenCalledWith(
+      'Query imported from RDF Explorer. Press Run to execute it.',
+      'OK',
+      { duration: 6000 },
+    );
+    TestBed.inject(I18nService).set('es');
   });
 
   it('desvincula el tablero abierto al aplicar, para que Guardar no lo sobrescriba', () => {
@@ -194,7 +224,7 @@ describe('GisHandoffService', () => {
     expect(handoff.peek()).toBeNull();
     expect(snackMock.open).toHaveBeenCalledWith(
       expect.stringContaining('descartada'),
-      'OK',
+      'Aceptar',
       expect.any(Object),
     );
   });

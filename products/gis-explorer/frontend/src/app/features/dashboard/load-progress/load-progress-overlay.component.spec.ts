@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { LoadProgressOverlayComponent } from './load-progress-overlay.component';
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import type { LoadStageId } from '@shared/progress/load-stages';
+import { I18nService } from '@core/services/i18n.service';
 
 const STAGES: readonly LoadStageId[] = [
   'fetch-dashboard',
@@ -35,13 +36,13 @@ describe('LoadProgressOverlayComponent', () => {
   });
 
   it('lists every stage with the dashboard name', () => {
-    progress.begin('Cargando tablero', STAGES, 'Batallas WWII');
+    progress.begin('Cargando tablero', STAGES, 'WWII battles');
 
     const el = render();
     const labels = Array.from(el.querySelectorAll('.stage-label')).map((n) => n.textContent?.trim());
 
     expect(el.querySelector('h2')?.textContent).toContain('Cargando tablero');
-    expect(el.querySelector('.subtitle')?.textContent).toContain('Batallas WWII');
+    expect(el.querySelector('.subtitle')?.textContent).toContain('WWII battles');
     expect(labels).toEqual([
       'Recuperando el tablero',
       'Ejecutando la consulta',
@@ -69,6 +70,26 @@ describe('LoadProgressOverlayComponent', () => {
     );
     // La que sigue todavía no arrancó: se muestra apagada y sin tiempo.
     expect(el.querySelector('.stage--pending .stage-time')?.textContent?.trim()).toBe('');
+  });
+
+  it('renders the complete loading flow in English without translating dashboard names', () => {
+    TestBed.inject(I18nService).set('en');
+    progress.begin('Cargando tablero', STAGES, 'Batallas de usuario');
+    progress.complete('fetch-dashboard', 'layout and filters restored · 2 views');
+    progress.start('execute-query', 'waiting for the SPARQL endpoint response');
+
+    const el = render();
+    const text = el.textContent ?? '';
+    expect(text).toContain('Loading dashboard');
+    expect(text).toContain('Retrieving dashboard');
+    expect(text).toContain('Running query');
+    expect(text).toContain('Processing results');
+    expect(text).toContain('Calculating summary');
+    expect(text).toContain('Rendering views');
+    expect(text).toContain('Batallas de usuario');
+    expect(text).not.toContain('Cargando tablero');
+    expect(el.querySelector('.total')?.getAttribute('aria-label')).toMatch(/^Total time /);
+    TestBed.inject(I18nService).set('es');
   });
 
   it('hides itself when the run closes', () => {

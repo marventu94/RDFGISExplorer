@@ -171,17 +171,17 @@ export class NavbarComponent {
 
   /** Aviso de volumen: tooltip del navegador de lotes. */
   protected lotNotice(lot: LotState): string {
-    return (
-      `La query devolvió ${lot.totalRows} filas — mostrando en ${lot.lotCount} ` +
-      `lotes de ${lot.lotSize}. Considerá acotar la query o el LIMIT.`
-    );
+    return this.i18n.text('La query devolvió {rows} filas — mostrando en {lots} lotes de {size}. Considerá acotar la query o el LIMIT.', {
+      rows: lot.totalRows,
+      lots: lot.lotCount,
+      size: lot.lotSize,
+    });
   }
 
   protected truncatedNotice(): string {
-    return (
-      `El backend truncó el resultado al límite de ${this.truncatedLimit()} filas; ` +
-      'los conteos por lote pueden estar incompletos.'
-    );
+    return this.i18n.text('El backend truncó el resultado al límite de {limit} filas; los conteos por lote pueden estar incompletos.', {
+      limit: this.truncatedLimit() ?? 0,
+    });
   }
 
   protected openSaveDialog(): void {
@@ -210,8 +210,8 @@ export class NavbarComponent {
         partial: false,
       });
       this.snackBar.open(
-        `Exportadas ${result.bindings.length} filas (resultado completo)`,
-        'OK',
+        this.i18n.text('Exportadas {rows} filas (resultado completo)', { rows: result.bindings.length }),
+        this.i18n.text('Aceptar'),
         { duration: 4000 },
       );
       return;
@@ -246,8 +246,8 @@ export class NavbarComponent {
           partial: false,
         });
         this.snackBar.open(
-          `Exportadas ${outcome.rows.length} filas (resultado completo)`,
-          'OK',
+          this.i18n.text('Exportadas {rows} filas (resultado completo)', { rows: outcome.rows.length }),
+          this.i18n.text('Aceptar'),
           { duration: 4000 },
         );
         break;
@@ -266,20 +266,20 @@ export class NavbarComponent {
               partial: true,
             });
             this.snackBar.open(
-              `Exportación PARCIAL: ${outcome.rows.length} filas`,
-              'OK',
+              this.i18n.text('Exportación PARCIAL: {rows} filas', { rows: outcome.rows.length }),
+              this.i18n.text('Aceptar'),
               { duration: 5000 },
             );
           } else if (action === 'copy') {
             void navigator.clipboard.writeText(query).then(() =>
-              this.snackBar.open(this.i18n.text('Query copiada al portapapeles'), 'OK', { duration: 3000 }),
+              this.snackBar.open(this.i18n.text('Query copiada al portapapeles'), this.i18n.text('Aceptar'), { duration: 3000 }),
             );
           }
         });
         break;
       }
       case 'cancelled':
-        this.snackBar.open(this.i18n.text('Exportación cancelada'), 'OK', { duration: 3000 });
+        this.snackBar.open(this.i18n.text('Exportación cancelada'), this.i18n.text('Aceptar'), { duration: 3000 });
         break;
       case 'error':
         this.snackBar.open(`${this.i18n.text('No se pudo exportar')}: ${outcome.error}`, this.i18n.text('Cerrar'), {

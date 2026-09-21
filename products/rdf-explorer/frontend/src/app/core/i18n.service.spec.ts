@@ -13,5 +13,7 @@ describe('RDF Explorer internationalization', () => {
     expect(service.language()).toBe('en');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en');
     expect(service.text('Guardar workspace')).toBe('Save workspace');
+    expect(service.text('Cerrar panel')).toBe('Close panel');
+    expect(service.text('Descartar y cerrar')).toBe('Discard and close');
   });
 });

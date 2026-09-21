@@ -6,7 +6,7 @@ import { I18nService } from './i18n.service';
 export class TranslatePipe implements PipeTransform {
   private readonly i18n = inject(I18nService);
 
-  transform(key: UiTextKey): string {
-    return this.i18n.text(key);
+  transform(key: UiTextKey, params?: Readonly<Record<string, string | number>>): string {
+    return this.i18n.text(key, params);
   }
 }

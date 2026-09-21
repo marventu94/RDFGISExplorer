@@ -28,7 +28,7 @@
   @if (queryState === 'filtered-zero') {
     <div class="empty-state">
       <div class="chip">
-        {{ activeFilterCount }} filtro{{ activeFilterCount !== 1 ? 's' : '' }} activo{{ activeFilterCount !== 1 ? 's' : '' }}
+        {{ (activeFilterCount === 1 ? '{count} filtro activo' : '{count} filtros activos') | translate: { count: activeFilterCount } }}
       </div>
       <span class="empty-state__text">{{ emptyRangeMessage() }}</span>
       @if (activeFilterLabel) {

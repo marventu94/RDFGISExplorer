@@ -278,7 +278,7 @@ describe('SparqlInputComponent', () => {
       asAny().execute();
       expect(realSnackBar.open).toHaveBeenCalledWith(
         expect.stringMatching(/1 resultado en 250ms/),
-        'OK',
+        'Aceptar',
         expect.any(Object),
       );
     });

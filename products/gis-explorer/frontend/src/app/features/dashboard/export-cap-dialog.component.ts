@@ -5,6 +5,7 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
+import { TranslatePipe } from '@core/services/translate.pipe';
 
 export interface ExportCapDialogData {
   /** Filas ya descargadas al llegar al tope. */
@@ -22,25 +23,22 @@ export type ExportCapAction = 'partial' | 'copy' | 'cancel';
 @Component({
   selector: 'app-export-cap-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule],
+  imports: [MatDialogModule, MatButtonModule, TranslatePipe],
   template: `
-    <h2 mat-dialog-title>Tope de exportación alcanzado</h2>
+    <h2 mat-dialog-title>{{ 'Tope de exportación alcanzado' | translate }}</h2>
     <mat-dialog-content>
       <p>
-        El resultado supera el tope de {{ data.maxRows }} filas exportables. Se
-        descargaron las primeras {{ data.rows }}.
+        {{ 'El resultado supera el tope de {maxRows} filas exportables. Se descargaron las primeras {rows}.' | translate: { maxRows: data.maxRows, rows: data.rows } }}
       </p>
       <p>
-        Podés exportar el CSV parcial (queda marcado como PARCIAL en el
-        encabezado) o copiar la query para hacer el volcado completo por otro
-        canal.
+        {{ 'Podés exportar el archivo parcial (queda marcado como PARCIAL) o copiar la query para hacer el volcado completo por otro canal.' | translate }}
       </p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button (click)="close('cancel')">Cancelar</button>
-      <button mat-button (click)="close('copy')">Copiar query</button>
+      <button mat-button (click)="close('cancel')">{{ 'Cancelar' | translate }}</button>
+      <button mat-button (click)="close('copy')">{{ 'Copiar query' | translate }}</button>
       <button mat-flat-button color="primary" (click)="close('partial')">
-        Exportar parcial
+        {{ 'Exportar parcial' | translate }}
       </button>
     </mat-dialog-actions>
   `,

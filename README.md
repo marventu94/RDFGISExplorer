@@ -17,6 +17,29 @@ La separación de procesos y responsabilidades está detallada en
 diseño se documentan en [docs/design-decisions.md](docs/design-decisions.md) y
 [docs/graph-rendering-decisions.md](docs/graph-rendering-decisions.md).
 
+## Recorrido visual
+
+### Shell
+
+El punto de entrada reúne los exploradores y permite abrir, administrar y
+retomar tableros guardados.
+
+![Shell con los tableros recientes de Wikidata](docs/assets/01-shell-dashboard.png)
+
+### RDF Explorer
+
+El constructor visual permite modelar una consulta como grafo y generar su
+representación SPARQL sin depender de un dominio específico.
+
+![Construcción visual de una consulta en RDF Explorer](docs/assets/02-rdf-explorer.png)
+
+### GIS Explorer
+
+Los resultados se exploran mediante cuatro vistas coordinadas: mapa, línea de
+tiempo, tabla y grafo.
+
+![Exploración coordinada de resultados en GIS Explorer](docs/assets/03-gis-explorer.png)
+
 ## Stack
 
 - Angular 21 con Native Federation para el Shell y los dos remotes.

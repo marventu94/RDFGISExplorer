@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { MatDialogModule, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { TranslatePipe } from '@core/services/translate.pipe';
 
 export interface ErrorDialogData {
   title: string;
@@ -18,7 +19,7 @@ export interface ErrorDialogData {
 @Component({
   selector: 'app-error-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, TranslatePipe],
   template: `
     <h2 mat-dialog-title>
       <mat-icon color="warn">error_outline</mat-icon>
@@ -31,7 +32,7 @@ export interface ErrorDialogData {
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-flat-button mat-dialog-close>Cerrar</button>
+      <button mat-flat-button mat-dialog-close>{{ 'Cerrar' | translate }}</button>
     </mat-dialog-actions>
   `,
   styles: [`

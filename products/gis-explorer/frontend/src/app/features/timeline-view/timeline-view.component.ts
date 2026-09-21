@@ -191,10 +191,15 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.queryState = 'normal';
     const stats = computeCoverageStats(visible);
     if (stats.primaryWithoutTemporalEvents > 0) {
-      const lotSuffix = lotState.lotCount > 1 ? ' del lote' : '';
-      this.coverageLabel =
-        `Mostrando ${stats.primaryWithTemporalEvents} de ${stats.primary} entidades${lotSuffix} · ` +
-        `${stats.primaryWithoutTemporalEvents} sin fecha${stats.primaryWithoutTemporalEvents !== 1 ? 's' : ''}`;
+      const key = stats.primaryWithoutTemporalEvents === 1
+        ? 'Mostrando {shown} de {total} entidades{batch} · {missing} sin fecha'
+        : 'Mostrando {shown} de {total} entidades{batch} · {missing} sin fechas';
+      this.coverageLabel = this.i18n.text(key, {
+        shown: stats.primaryWithTemporalEvents,
+        total: stats.primary,
+        batch: lotState.lotCount > 1 ? this.i18n.text(' del lote') : '',
+        missing: stats.primaryWithoutTemporalEvents,
+      });
     } else {
       this.coverageLabel = '';
     }
@@ -624,7 +629,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
    * URI completa, según el productor. Devuelve algo legible en ambos casos.
    */
   private humanizeLabel(type: string): string {
-    if (type === 'unknown') return 'Sin tipo';
+    if (type === 'unknown') return this.i18n.text('Sin tipo');
 
     let label = type;
     if (label.includes('://')) {
@@ -656,7 +661,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         year: 'numeric',
       });
       const eventCount = node.temporalEvents?.length ?? 0;
-      const suffix = eventCount > 1 ? ` · ${eventCount} fechas` : '';
+      const suffix = eventCount > 1 ? this.i18n.text(' · {count} fechas', { count: eventCount }) : '';
       lines.push(this.escapeHtml(formatted + suffix));
     }
 

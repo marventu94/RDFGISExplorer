@@ -23,7 +23,7 @@
           [checked]="mode() === 'overwrite'"
           (change)="mode.set('overwrite')"
         >
-          Sobreescribir existente
+          {{ 'Sobreescribir existente' | translate }}
         </mat-radio-button>
         <mat-radio-button
           value="copy"

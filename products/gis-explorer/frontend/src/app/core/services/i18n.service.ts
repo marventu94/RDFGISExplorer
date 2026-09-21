@@ -21,8 +21,11 @@ export class I18nService implements OnDestroy {
     setLanguage(language);
   }
 
-  text(key: UiTextKey): string {
-    return translateUiText(key, this.language());
+  text(key: UiTextKey, params: Readonly<Record<string, string | number>> = {}): string {
+    const translated = translateUiText(key, this.language());
+    return translated.replace(/\{([a-zA-Z][\w]*)\}/g, (placeholder, name: string) =>
+      Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder,
+    );
   }
 
   formatNumber(value: number, options?: Intl.NumberFormatOptions): string {

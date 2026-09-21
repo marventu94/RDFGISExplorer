@@ -1,6 +1,6 @@
 <nav class="navbar">
-  <span class="navbar-brand" [title]="dashboardState.currentDashboardName() ?? (dashboardsAvailable ? 'Tablero sin guardar' : 'GIS Explorer')">
-    {{ dashboardState.currentDashboardName() || (dashboardsAvailable ? 'Tablero sin guardar' : 'GIS Explorer') }}
+  <span class="navbar-brand" [title]="dashboardState.currentDashboardName() ?? (dashboardsAvailable ? ('Tablero sin guardar' | translate) : 'GIS Explorer')">
+    {{ dashboardState.currentDashboardName() || (dashboardsAvailable ? ('Tablero sin guardar' | translate) : 'GIS Explorer') }}
   </span>
   <app-filter-badges />
 
@@ -17,7 +17,7 @@
           <mat-icon>chevron_left</mat-icon>
         </button>
         <span class="lot-label" [title]="lotNotice(lot)">
-          Lote {{ lot.currentLot }} de {{ lot.lotCount }} · {{ lot.totalRows }} filas
+          {{ 'Lote {current} de {total} · {rows} filas' | translate: { current: lot.currentLot, total: lot.lotCount, rows: lot.totalRows } }}
         </span>
         <button
           type="button"

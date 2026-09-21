@@ -21,6 +21,7 @@ import { VariableMappingService } from './variable-mapping.service';
 import type { LoadStageId } from '@shared/progress/load-stages';
 import type { NormalizedNode, QueryResult } from '@shared/models';
 import { registerDashboardStateAdapter } from '@rdfgis/platform-bridge';
+import { I18nService } from './i18n.service';
 
 export interface GisDashboardPayload {
   query: string;
@@ -64,13 +65,13 @@ const HYDRATION_STAGES: readonly LoadStageId[] = [
 ];
 
 /** Lo que el usuario quiere saber de la respuesta: volumen y tiempo del endpoint. */
-function describeResult(result: QueryResult): string {
+function describeResult(result: QueryResult, i18n: I18nService): string {
   const rows = result.bindings.length;
   const parts = [
-    `${rows} fila${rows !== 1 ? 's' : ''}`,
-    `endpoint ${result.meta.durationMs} ms`,
+    i18n.text(rows === 1 ? '{count} fila' : '{count} filas', { count: rows }),
+    i18n.text('endpoint {duration} ms', { duration: result.meta.durationMs }),
   ];
-  if (result.meta.truncated) parts.push(`truncado a ${result.meta.limitApplied}`);
+  if (result.meta.truncated) parts.push(i18n.text('truncado a {limit}', { limit: result.meta.limitApplied }));
   return parts.join(' · ');
 }
 
@@ -84,6 +85,7 @@ export class DashboardStateService {
   private readonly progress = inject(DashboardLoadProgressService);
   private readonly variableMapping = inject(VariableMappingService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly i18n = inject(I18nService);
   private readonly unregisterAdapter = registerDashboardStateAdapter({
     kind: 'gis',
     exportPayload: () => this.serialize(),
@@ -190,7 +192,7 @@ export class DashboardStateService {
     }
 
     this.progress.complete('fetch-dashboard', this.layoutDetail());
-    this.progress.start('execute-query', 'esperando la respuesta del endpoint SPARQL');
+    this.progress.start('execute-query', this.i18n.text('esperando la respuesta del endpoint SPARQL'));
 
     return this.apiService
       .executeQuery({
@@ -198,10 +200,10 @@ export class DashboardStateService {
       })
       .pipe(
         tap((result) => {
-          this.progress.complete('execute-query', describeResult(result));
+          this.progress.complete('execute-query', describeResult(result, this.i18n));
           this.progress.start(
             'process-results',
-            `${result.nodes.length} nodos · ${result.edges.length} aristas`,
+            this.i18n.text('{count} nodos · {edges} aristas', { count: result.nodes.length, edges: result.edges.length }),
           );
           // Las vistas del layout tienen que pintar antes de dar por cargado el
           // tablero; el fan-out de SelectionService es SINCRÓNICO, así que hay
@@ -234,10 +236,10 @@ export class DashboardStateService {
         }),
         catchError((err) => {
           this.isHydrating.set(false);
-          this.progress.failActive('query inválida o backend no disponible');
+          this.progress.failActive(this.i18n.text('query inválida o backend no disponible'));
           this.snackBar.open(
-            'Error al hidratar el dashboard. Query inválida o backend no disponible.',
-            'Cerrar',
+            this.i18n.text('Error al hidratar el dashboard. Query inválida o backend no disponible.'),
+            this.i18n.text('Cerrar'),
             {
               duration: 8000,
               panelClass: 'snackbar-error',
@@ -258,12 +260,12 @@ export class DashboardStateService {
 
   beginLoad(): void {
     this.progress.begin('Cargando tablero', HYDRATION_STAGES);
-    this.progress.start('fetch-dashboard', 'leyendo la definición guardada');
+    this.progress.start('fetch-dashboard', this.i18n.text('leyendo la definición guardada'));
   }
 
   failLoad(): void {
     this.isHydrating.set(false);
-    this.progress.failActive('no se pudo cargar el tablero');
+    this.progress.failActive(this.i18n.text('no se pudo cargar el tablero'));
   }
 
   clearCurrent(): void {
@@ -278,7 +280,10 @@ export class DashboardStateService {
   /** Lo que se restauró antes de salir a buscar los datos. */
   private layoutDetail(): string {
     const count = this.layout.visibleSlots().length;
-    return `layout y filtros restaurados · ${count} vista${count !== 1 ? 's' : ''}`;
+    return this.i18n.text(
+      count === 1 ? 'layout y filtros restaurados · {count} vista' : 'layout y filtros restaurados · {count} vistas',
+      { count },
+    );
   }
 
   private findNodeByUri(uri: string): NormalizedNode | null {

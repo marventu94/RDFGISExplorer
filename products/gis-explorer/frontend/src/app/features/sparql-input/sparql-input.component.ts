@@ -316,7 +316,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
   protected newDashboard(): void {
     const ok = window.confirm(
-      '¿Crear tablero nuevo?\n\nSe perderán todos los cambios que no hayas guardado.',
+      `${this.i18n.text('¿Crear tablero nuevo?')}\n\n${this.i18n.text('Se perderán todos los cambios que no hayas guardado.')}`,
     );
     if (ok) {
       this.clearForNewDashboard();
@@ -374,14 +374,13 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
         const count = result.bindings.length;
         const time = result.meta.durationMs;
-        const msg =
-          count === 0
-            ? `Sin resultados (${time}ms)`
-            : `${count} resultado${count !== 1 ? 's' : ''} en ${time}ms`;
-        this.snackBar.open(msg, 'OK', { duration: 4000 });
+        const msg = count === 0
+          ? this.i18n.text('Sin resultados ({duration}ms)', { duration: time })
+          : this.i18n.text(count === 1 ? '{count} resultado en {duration}ms' : '{count} resultados en {duration}ms', { count, duration: time });
+        this.snackBar.open(msg, this.i18n.text('Aceptar'), { duration: 4000 });
 
         if (result.meta.truncated) {
-          this.snackBar.open(`Resultado truncado a ${result.meta.limitApplied} filas`, 'OK', {
+          this.snackBar.open(this.i18n.text('Resultado truncado a {limit} filas', { limit: result.meta.limitApplied }), this.i18n.text('Aceptar'), {
             duration: 6000,
           });
         }
@@ -426,15 +425,15 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
 
     if (err.status === 408) {
       const secs = body?.timeoutMs ? Math.round(body.timeoutMs / 1000) : 30;
-      return `La query excedió el tiempo límite (${secs} segundos). Intentá reducir el alcance.`;
+      return this.i18n.text('La query excedió el tiempo límite ({seconds} segundos). Intentá reducir el alcance.', { seconds: secs });
     }
 
     if (err.status === 413) {
-      return `Límite excedido. El máximo permitido es ${body?.maxAllowed ?? 2000}.`;
+      return this.i18n.text('Límite excedido. El máximo permitido es {limit}.', { limit: body?.maxAllowed ?? 2000 });
     }
 
     if (err.status === 502) {
-      return 'El endpoint SPARQL no responde. Reintentá más tarde.';
+      return this.i18n.text('El endpoint SPARQL no responde. Reintentá más tarde.');
     }
 
     if (err.status === 0) {
@@ -443,21 +442,21 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       );
     }
 
-    return `Error del servidor (${err.status}). ${body?.message ?? ''}`;
+    return `${this.i18n.text('Error del servidor ({status}).', { status: err.status })} ${body?.message ?? ''}`.trim();
   }
 
   protected onApplyMapping(overrides: Record<string, VariableRole>): void {
     const remapped = this.variableMapping.apply(overrides);
     if (!remapped) return;
     this.selectionService.setQueryResult(remapped);
-    this.snackBar.open(this.i18n.text('Mapeo de variables aplicado'), 'OK', { duration: 3000 });
+    this.snackBar.open(this.i18n.text('Mapeo de variables aplicado'), this.i18n.text('Aceptar'), { duration: 3000 });
   }
 
   protected onRestoreAuto(): void {
     const result = this.variableMapping.restore();
     if (!result) return;
     this.selectionService.setQueryResult(result);
-    this.snackBar.open(this.i18n.text('Mapeo restaurado a detección automática'), 'OK', {
+    this.snackBar.open(this.i18n.text('Mapeo restaurado a detección automática'), this.i18n.text('Aceptar'), {
       duration: 3000,
     });
   }

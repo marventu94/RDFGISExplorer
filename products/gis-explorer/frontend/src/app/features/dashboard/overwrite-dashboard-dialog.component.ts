@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { TranslatePipe } from '@core/services/translate.pipe';
 
 export interface OverwriteDashboardDialogData {
   /** Nombre del tablero abierto, o null si la vista no está guardada. */
@@ -18,37 +19,35 @@ export type OverwriteDashboardAction = 'save-first' | 'replace' | 'cancel';
 @Component({
   selector: 'app-overwrite-dashboard-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, TranslatePipe],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>warning_amber</mat-icon>
       @if (data.dashboardName) {
-        ¿Reemplazar "{{ data.dashboardName }}"?
+        {{ '¿Reemplazar "{name}"?' | translate: { name: data.dashboardName } }}
       } @else {
-        ¿Reemplazar la vista actual?
+        {{ '¿Reemplazar la vista actual?' | translate }}
       }
     </h2>
     <mat-dialog-content>
       @if (data.dashboardName) {
         <p>
-          Tenés abierto el tablero <strong>{{ data.dashboardName }}</strong>. La query
-          importada del RDF Explorer reemplaza la consulta, el layout y los filtros:
-          los cambios que no hayas guardado se pierden.
+          {{ 'Tenés abierto el tablero' | translate }} <strong>{{ data.dashboardName }}</strong>.
+          {{ 'La query importada del RDF Explorer reemplaza la consulta, el layout y los filtros: los cambios que no hayas guardado se pierden.' | translate }}
         </p>
       } @else {
         <p>
-          La vista actual todavía no está guardada como tablero. La query importada
-          del RDF Explorer reemplaza la consulta, el layout y los filtros.
+          {{ 'La vista actual todavía no está guardada como tablero. La query importada del RDF Explorer reemplaza la consulta, el layout y los filtros.' | translate }}
         </p>
       }
       <p class="hint">
-        Guardar primero abre el diálogo de siempre; podés sobrescribir o guardar una copia.
+        {{ 'Guardar primero abre el diálogo de siempre; podés sobrescribir o guardar una copia.' | translate }}
       </p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button (click)="close('cancel')">Cancelar</button>
-      <button mat-button (click)="close('replace')">Reemplazar sin guardar</button>
-      <button mat-flat-button (click)="close('save-first')">Guardar y reemplazar</button>
+      <button mat-button (click)="close('cancel')">{{ 'Cancelar' | translate }}</button>
+      <button mat-button (click)="close('replace')">{{ 'Reemplazar sin guardar' | translate }}</button>
+      <button mat-flat-button (click)="close('save-first')">{{ 'Guardar y reemplazar' | translate }}</button>
     </mat-dialog-actions>
   `,
   styles: [`

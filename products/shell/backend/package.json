@@ -9,7 +9,7 @@
     "test": "jest",
     "test:ci": "jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:scripts": "jest --rootDir . --testRegex 'scripts/clean-unused-data\\.spec\\.ts$'",
+    "test:scripts": "jest --rootDir . --testRegex 'scripts/(clean-unused-data|seed-demo-dashboards)\\.spec\\.ts$'",
     "clean:unused-data": "ts-node scripts/clean-unused-data.ts",
     "clean:unused-data:force": "ts-node scripts/clean-unused-data.ts --force",
     "seed:demo-dashboards": "ts-node --transpile-only scripts/seed-demo-dashboards.ts"

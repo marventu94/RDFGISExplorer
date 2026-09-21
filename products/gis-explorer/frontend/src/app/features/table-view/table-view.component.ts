@@ -125,7 +125,10 @@ export class TableViewComponent implements OnDestroy {
   readonly truncatedMessage = computed(() => {
     const qr = this.rawQueryResult();
     if (!qr?.meta?.truncated) return '';
-    return `Mostrando ${qr.bindings.length} de ${qr.meta.limitApplied} resultados (truncado)`;
+    return this.i18n.text('Mostrando {shown} de {limit} resultados (truncado)', {
+      shown: qr.bindings.length,
+      limit: qr.meta.limitApplied,
+    });
   });
 
   constructor() {

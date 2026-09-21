@@ -8,14 +8,25 @@
         @for (panel of workspace.panels(); track panel.id) {
           <div
             class="panel-tab"
+            role="tab"
+            tabindex="0"
+            [attr.aria-selected]="workspace.activePanelId() === panel.id"
             [class.active]="workspace.activePanelId() === panel.id"
             [class.dirty]="panel.dirty"
             (click)="switchPanel(panel.id)"
+            (keydown.enter)="switchPanel(panel.id)"
+            (keydown.space)="switchPanel(panel.id); $event.preventDefault()"
+            (keydown)="openTabMenuFromKeyboard(panel.id, $event)"
+            (contextmenu)="openTabMenu(panel.id, $event)"
           >
             <span class="tab-name">{{ panel.name }}</span>
-            @if (workspace.panels().length > 1) {
-              <button class="tab-close" (click)="removePanel(panel.id, $event)" type="button">&times;</button>
-            }
+            <button
+              class="tab-close"
+              (click)="removePanel(panel.id, $event)"
+              type="button"
+              [attr.aria-label]="('Cerrar panel' | translate) + ': ' + panel.name"
+              [attr.title]="'Cerrar panel' | translate"
+            >&times;</button>
           </div>
         }
         <button class="tab-add" (click)="addPanel()" type="button" [attr.title]="'Nuevo panel' | translate">+</button>
@@ -43,6 +54,15 @@
     <app-tools-panel />
   </div>
 </div>
+
+@if (tabMenu(); as menu) {
+  <button class="tab-menu-backdrop" type="button" (click)="closeTabMenu()" [attr.aria-label]="'Cancelar' | translate"></button>
+  <div class="tab-context-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
+    <button type="button" role="menuitem" autofocus (click)="closePanelFromMenu($event)">
+      {{ 'Cerrar panel' | translate }}
+    </button>
+  </div>
+}
 
 @if (snackbarMessage(); as msg) {
   <div class="snackbar">{{ msg }}</div>

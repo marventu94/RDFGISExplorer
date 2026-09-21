@@ -1,5 +1,5 @@
 import { TranslatePipe } from '../../core/translate.pipe';
-import { Component, inject, OnInit, DestroyRef, computed, signal } from '@angular/core';
+import { Component, inject, OnInit, DestroyRef, computed, effect, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { lastValueFrom } from 'rxjs';
@@ -18,6 +18,8 @@ import { GisOverwriteGuardService } from '../../core/gis-overwrite-guard.service
 import { ToolService } from '../../tool/tool.service';
 import { AppConfigService } from '../../core/services/app-config.service';
 import { dashboardHost, isDashboardHostAvailable } from '@rdfgis/platform-bridge';
+import { I18nService } from '../../core/i18n.service';
+import { closePanelFlow } from '../../core/panel-close';
 
 @Component({
   selector: 'app-main',
@@ -37,6 +39,8 @@ export class MainComponent implements OnInit {
   readonly toolService = inject(ToolService);
   readonly appConfig = inject(AppConfigService);
   readonly gisGuard = inject(GisOverwriteGuardService);
+  readonly i18n = inject(I18nService);
+  readonly tabMenu = signal<{ panelId: string; x: number; y: number } | null>(null);
 
   readonly generatedSparql = computed(() => {
     void this.graph.revision();
@@ -50,6 +54,14 @@ export class MainComponent implements OnInit {
   // notificación de Angular (app zoneless), así que debe disparar CD él mismo.
   readonly snackbarMessage = signal<string | null>(null);
   private snackbarTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    effect(() => {
+      void this.graph.revision();
+      void this.graph.viewport();
+      this.workspace.snapshotActivePanel(this.graph);
+    });
+  }
 
   ngOnInit(): void {
     this.route.queryParamMap
@@ -75,10 +87,57 @@ export class MainComponent implements OnInit {
     this.workspace.restoreActivePanel(this.graph);
   }
 
-  removePanel(id: string, event: Event): void {
+  async removePanel(id: string, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    if (id === this.workspace.activePanelId()) {
+      this.workspace.snapshotActivePanel(this.graph);
+    }
+    const panel = this.workspace.panels().find(candidate => candidate.id === id);
+    if (!panel) return;
+
+    await closePanelFlow(panel.dirty, async () => {
+      const dialogRef = this.dialog.open<string>(MessageDialogComponent, {
+        width: '440px',
+        hasBackdrop: true,
+        backdropClass: 'cdk-overlay-dark-backdrop',
+        data: {
+          kind: 'info',
+          title: this.i18n.text('¿Cerrar el panel con cambios sin guardar?'),
+          message: this.i18n.text('Los cambios de este panel se perderán. Esta acción no se puede deshacer.'),
+          actions: [
+            { label: this.i18n.text('Cancelar'), value: 'cancel' },
+            { label: this.i18n.text('Descartar y cerrar'), value: 'discard', primary: true },
+          ],
+        } satisfies MessageDialogData,
+      });
+      return await lastValueFrom(dialogRef.closed) === 'discard';
+    }, () => {
+      this.workspace.removePanel(id);
+      this.workspace.restoreActivePanel(this.graph);
+    });
+  }
+
+  openTabMenu(panelId: string, event: MouseEvent): void {
+    event.preventDefault();
     event.stopPropagation();
-    this.workspace.removePanel(id);
-    this.workspace.restoreActivePanel(this.graph);
+    this.tabMenu.set({ panelId, x: event.clientX, y: event.clientY });
+  }
+
+  openTabMenuFromKeyboard(panelId: string, event: KeyboardEvent): void {
+    if (!(event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) return;
+    event.preventDefault();
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.tabMenu.set({ panelId, x: rect.left, y: rect.bottom });
+  }
+
+  closeTabMenu(): void {
+    this.tabMenu.set(null);
+  }
+
+  closePanelFromMenu(event: Event): void {
+    const menu = this.tabMenu();
+    this.closeTabMenu();
+    if (menu) void this.removePanel(menu.panelId, event);
   }
 
   async openSaveDialog(): Promise<void> {
@@ -115,8 +174,8 @@ export class MainComponent implements OnInit {
         mode: typedResult.overwriteId ? 'overwrite' : 'copy',
         currentId: typedResult.overwriteId,
       });
-      this.workspace.markActivePanelClean();
-      this.workspace.setActivePanelSource(dashboard.id);
+      this.workspace.markAllPanelsClean();
+      this.workspace.setAllPanelsSource(dashboard.id);
       this.showSnackbar(`Workspace guardado: ${dashboard.name}`);
       if (!typedResult.overwriteId) {
         await this.router.navigate([], {

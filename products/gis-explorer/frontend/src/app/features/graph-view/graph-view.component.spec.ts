@@ -12,6 +12,8 @@ import { DEFAULT_LIMITS, LimitsService } from '@core/services/limits.service';
 import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } from '@shared/models';
 import { realEstateFixture } from './testing/entity-subgraph-fixtures';
 import { EntitySummaryClipboardService } from './entity-summary-clipboard.service';
+import { I18nService } from '@core/services/i18n.service';
+import type { BuiltGraph } from './graph-elements';
 
 const mockNode: NormalizedNode = {
   uri: 'http://www.wikidata.org/entity/Q7742',
@@ -1168,6 +1170,42 @@ describe('GraphViewComponent', () => {
   });
 
   describe('chip de cobertura', () => {
+    it('compone en inglés todas las ramas y pluraliza batch, rows, nodes, motifs, prioritized y hidden edges', () => {
+      const i18n = TestBed.inject(I18nService);
+      i18n.set('en');
+      const buildLabel = (built: BuiltGraph, rows: number) =>
+        (component as unknown as {
+          buildCoverageLabel: (built: BuiltGraph, visible: QueryResult, lotCount: number, currentLot: number) => string;
+        }).buildCoverageLabel(
+          built,
+          { ...createMockQueryResult([], []), bindings: Array.from({ length: rows }, () => ({})) },
+          3,
+          2,
+        );
+      const base: BuiltGraph = {
+        elements: [], drawnNodes: 2, totalNodes: 3, edgesHiddenByTruncation: 1,
+        inclusionReasons: { selected: 1, 'query-entity': 0, intermediate: 0, context: 1 },
+        abstractedNodes: 0, aggregateNodes: 0, motifCount: 0,
+      };
+
+      expect(buildLabel(base, 1)).toBe(
+        'Batch 2 of 3 · 1 row · 2 of 3 nodes visible · 1 prioritized by the query · 1 hidden edge',
+      );
+      expect(buildLabel({
+        ...base,
+        drawnNodes: 3,
+        totalNodes: 8,
+        edgesHiddenByTruncation: 2,
+        inclusionReasons: { selected: 1, 'query-entity': 1, intermediate: 0, context: 0 },
+        abstractedNodes: 4,
+        aggregateNodes: 1,
+        motifCount: 2,
+      }, 2)).toBe(
+        'Batch 2 of 3 · 2 rows · 4 nodes represented by 2 repeated motifs · 6 of 8 nodes represented · 2 prioritized by the query · 2 hidden edges',
+      );
+      i18n.set('es');
+    });
+
     it('muestra lote y truncado juntos', () => {
       const manyNodes: NormalizedNode[] = Array.from({ length: 301 }, (_, i) => ({
         uri: `Q${i + 1}`,
@@ -1188,7 +1226,7 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
 
       expect(component.coverageLabel).toBe(
-        'Lote 2 de 3 · 1 filas · 300 de 301 nodos visibles · 1 priorizados por la query',
+        'Lote 2 de 3 · 1 fila · 300 de 301 nodos visibles · 1 priorizado por la query',
       );
     });
 
@@ -1406,6 +1444,70 @@ describe('GraphViewComponent', () => {
   // Etapa 5: interfaz del modo entidad
   // ---------------------------------------------------------------------------
   describe('modo entidad', () => {
+    it('traduce al inglés todos los mensajes visibles de modelos puros y preserva errores crudos', () => {
+      const i18n = TestBed.inject(I18nService);
+      i18n.set('en');
+      const translate = (message: string) =>
+        (component as unknown as { translateExplorationMessage: (value: string) => string })
+          .translateExplorationMessage(message);
+
+      expect(translate('No hay una entidad en exploración.')).toBe('No entity is being explored.');
+      expect(translate('El foco coordinado no inicia la exploración: seleccioná una entidad.'))
+        .toBe('Coordinated focus does not start exploration: select an entity.');
+      expect(translate('La entidad seleccionada no existe en el resultado: no hay estructura para mostrar.'))
+        .toBe('The selected entity does not exist in the result: there is no structure to display.');
+      expect(translate('La rama agrega 3 elemento(s) y el presupuesto de 20 nodos no alcanza. Contraé otra rama o quitá un nodo fijado.'))
+        .toBe('The branch adds 3 element(s), exceeding the 20-node budget. Collapse another branch or unpin a node.');
+      expect(translate('El presupuesto de 20 nodos se agotó: 4 elemento(s) quedaron fuera.'))
+        .toBe('The 20-node budget was exhausted: 4 element(s) were omitted.');
+      expect(translate('El presupuesto de 40 relaciones se agotó: hay relaciones sin dibujar.'))
+        .toBe('The 40-edge budget was exhausted: some relationships were not drawn.');
+      expect(translate('No hay pasos previos.')).toBe('There are no previous steps.');
+      const exactMessages: ReadonlyArray<readonly [string, string]> = [
+        ['La entidad ya está en exploración.', 'The entity is already being explored.'],
+        ['Ya estás en el resultado completo.', 'You are already viewing the full result.'],
+        ['El nodo ya está activo.', 'The node is already active.'],
+        ['Sin cambios en la exploración.', 'No changes to the exploration.'],
+        ['La rama no existe en la estructura explorada.', 'The branch does not exist in the explored structure.'],
+        ['La rama ya está expandida.', 'The branch is already expanded.'],
+        ['La rama no estaba expandida.', 'The branch was not expanded.'],
+        ['El nodo ya está fijado.', 'The node is already pinned.'],
+        ['Sólo se pueden fijar nodos de la estructura explorada.', 'Only nodes in the explored structure can be pinned.'],
+        ['El nodo no estaba fijado.', 'The node was not pinned.'],
+        ['El nodo activo ya es la raíz.', 'The active node is already the root.'],
+        ['Ya estás en la raíz.', 'You are already at the root.'],
+        ['La exploración ya está en su estado inicial.', 'The exploration is already in its initial state.'],
+        ['La entidad no está en el lote visible: la estructura se calculó sobre el resultado completo.', 'The entity is not in the visible batch: its structure was calculated from the full result.'],
+        ['El nodo activo ya no está en el resultado: se volvió a la raíz.', 'The active node is no longer in the result: returned to the root.'],
+        ['Hay entidades de las mismas filas sin un camino de relaciones en el resultado: se muestran sueltas.', 'Some entities from the same rows have no relationship path in the result and are shown separately.'],
+        ['Hay recursos compartidos que se muestran como frontera: sus relaciones se incorporan sólo al expandirlos.', 'Some shared resources are shown as boundaries; their relationships are included only when expanded.'],
+        ['Hay ramas expandidas que ya no existen en el resultado actual.', 'Some expanded branches no longer exist in the current result.'],
+        ['No hay una entidad en exploración: seleccioná una y abrí su estructura.', 'No entity is being explored: select one and open its structure.'],
+        ['La entidad no tiene estructura disponible en el resultado: no se copió nada.', 'The entity has no available structure in the result: nothing was copied.'],
+        ['No hay nada que copiar en la vista explorada.', 'There is nothing to copy from the explored view.'],
+        ['No hay nada que copiar en la estructura disponible.', 'There is nothing to copy from the available structure.'],
+        ['Se copió la vista explorada al portapapeles.', 'The explored view was copied to the clipboard.'],
+        ['Se copió la estructura disponible al portapapeles.', 'The available structure was copied to the clipboard.'],
+      ];
+      for (const [source, expected] of exactMessages) expect(translate(source)).toBe(expected);
+      expect(translate('La entidad ya no está en el resultado: se volvió al resultado completo.'))
+        .toBe('The entity is no longer in the result: returned to the full result.');
+      expect(translate('Se copió la vista explorada al portapapeles: 2 nodo(s), 1 arista(s) y 1 tripleta(s).'))
+        .toBe('The explored view was copied to the clipboard: 2 node(s), 1 edge(s), and 1 triple(s).');
+      expect(translate('Se copió la estructura disponible al portapapeles. (copiado con el método alternativo del navegador)'))
+        .toBe('The available structure was copied to the clipboard. (copied using the browser fallback)');
+      expect(translate('El navegador no permite copiar automáticamente: el texto de la vista explorada quedó disponible para copiarlo a mano.'))
+        .toBe('The browser cannot copy automatically; the explored-view text is available for manual copying.');
+      expect(translate('No se pudo copiar la vista explorada: permiso denegado por usuario'))
+        .toBe('Could not copy the explored view: permiso denegado por usuario');
+
+      component.explorationMessage = translate('El nodo no forma parte de la estructura explorada.');
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[role="alert"]')?.textContent)
+        .toContain('The node is not part of the explored structure.');
+      i18n.set('es');
+    });
+
     const estate = realEstateFixture(10);
 
     function nodeOf(uri: string): NormalizedNode {

@@ -13,5 +13,6 @@ describe('GIS Explorer internationalization', () => {
     expect(service.language()).toBe('en');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en');
     expect(service.formatNumber(1234.5)).toContain('1,234.5');
+    expect(service.text('Tablero sin guardar')).toBe('Unsaved dashboard');
   });
 });

@@ -161,10 +161,13 @@ export function runElapsedMs(run: LoadRun, now: number): number {
 }
 
 /** Duración en castellano, con la unidad que corresponde a la magnitud. */
-export function formatDuration(ms: number | null): string {
+export function formatDuration(ms: number | null, language: 'es' | 'en' = 'es'): string {
   if (ms === null || !Number.isFinite(ms) || ms < 0) return '—';
   if (ms < 1000) return `${Math.round(ms)} ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1).replace('.', ',')} s`;
+  if (ms < 60_000) {
+    const seconds = (ms / 1000).toFixed(1);
+    return `${language === 'es' ? seconds.replace('.', ',') : seconds} s`;
+  }
   const totalSec = Math.round(ms / 1000);
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;

@@ -7,6 +7,7 @@ import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
 import { ErrorDialogComponent } from '@features/sparql-input/error-dialog.component';
 import { DashboardSaveFlowService } from './dashboard-save-flow.service';
+import { I18nService } from '@core/services/i18n.service';
 import {
   OverwriteDashboardDialogComponent,
   type OverwriteDashboardAction,
@@ -39,6 +40,7 @@ export class GisHandoffService {
   private readonly saveFlow = inject(DashboardSaveFlowService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly i18n = inject(I18nService);
 
   /**
    * Hay algo que perder: un tablero abierto o una consulta que no es la de la
@@ -55,11 +57,8 @@ export class GisHandoffService {
       this.dialog.open(ErrorDialogComponent, {
         width: '480px',
         data: {
-          title: 'No se encontró la query a importar',
-          message:
-            'El traspaso desde el RDF Explorer venció (dura 5 minutos) o se ' +
-            'abrió esta vista en otra pestaña. Volvé al Explorer y apretá ' +
-            '"Explorar en GIS" de nuevo.',
+          title: this.i18n.text('No se encontró la query a importar'),
+          message: this.i18n.text('El traspaso desde el RDF Explorer venció (dura 5 minutos) o se abrió esta vista en otra pestaña. Volvé al Explorer y apretá "Explorar en GIS" de nuevo.'),
         },
       });
       return;
@@ -89,12 +88,12 @@ export class GisHandoffService {
               this.apply(target);
               return;
             }
-            this.discard('No se guardó nada, así que no se importó nada.');
+            this.discard(this.i18n.text('No se guardó nada, así que no se importó nada.'));
           });
           return;
         }
 
-        this.discard('Importación descartada: el tablero quedó como estaba.');
+        this.discard(this.i18n.text('Importación descartada: el tablero quedó como estaba.'));
       });
   }
 
@@ -114,8 +113,8 @@ export class GisHandoffService {
       setTimeout(() => target.execute({ configureLayout: true }), AUTO_RUN_DELAY_MS);
     } else {
       this.snackBar.open(
-        'Query importada del RDF Explorer. Apretá Ejecutar para correrla.',
-        'OK',
+        this.i18n.text('Query importada del RDF Explorer. Apretá Ejecutar para correrla.'),
+        this.i18n.text('Aceptar'),
         { duration: 6000 },
       );
     }
@@ -123,6 +122,6 @@ export class GisHandoffService {
 
   private discard(message: string): void {
     this.handoff.consume();
-    this.snackBar.open(message, 'OK', { duration: 6000 });
+    this.snackBar.open(message, this.i18n.text('Aceptar'), { duration: 6000 });
   }
 }

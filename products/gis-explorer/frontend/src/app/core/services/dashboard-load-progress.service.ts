@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 
 import {
   type LoadRun,
@@ -14,6 +14,7 @@ import {
   withSubtitle,
 } from '@shared/progress/load-stages';
 import type { ViewType } from './dashboard-layout.service';
+import { I18nService } from './i18n.service';
 
 /** Cada cuánto se refresca el cronómetro del cartel. */
 const TICK_MS = 200;
@@ -25,7 +26,7 @@ const TICK_MS = 200;
  */
 const RENDER_GRACE_MS = 2500;
 
-const VIEW_LABELS: Readonly<Record<ViewType, string>> = Object.freeze({
+const VIEW_LABELS = Object.freeze({
   table: 'tabla',
   graph: 'grafo',
   map: 'mapa',
@@ -43,6 +44,7 @@ const VIEW_LABELS: Readonly<Record<ViewType, string>> = Object.freeze({
  */
 @Injectable({ providedIn: 'root' })
 export class DashboardLoadProgressService {
+  private readonly i18n = inject(I18nService);
   private readonly _run = signal<LoadRun | null>(null);
   /** Reloj propio: las etapas vivas muestran el tiempo transcurrido. */
   private readonly _now = signal(Date.now());
@@ -136,7 +138,7 @@ export class DashboardLoadProgressService {
     if (!this.active()) return;
     this.start(
       'summary',
-      scope === 'local' ? 'agregando en el navegador' : 'agregando en el endpoint',
+      this.i18n.text(scope === 'local' ? 'agregando en el navegador' : 'agregando en el endpoint'),
     );
   }
 
@@ -169,8 +171,8 @@ export class DashboardLoadProgressService {
 
   private renderedLabel(): string {
     const painted = this.expectedViews.filter((v) => this.renderedViews.has(v));
-    if (painted.length === 0) return 'sin vistas para pintar';
-    return painted.map((v) => VIEW_LABELS[v]).join(', ');
+    if (painted.length === 0) return this.i18n.text('sin vistas para pintar');
+    return painted.map((v) => this.i18n.text(VIEW_LABELS[v])).join(', ');
   }
 
   private update(fn: (run: LoadRun) => LoadRun): void {

@@ -15,6 +15,8 @@ export interface PanelState {
   sourceWorkspaceId?: string;
   viewport?: { zoom: number; pan: { x: number; y: number } };
   labels?: Record<string, string>;
+  /** Firma interna del último estado cargado/guardado; nunca se persiste. */
+  cleanSignature: string;
 }
 
 export interface ExplorerPanelSnapshot {
@@ -51,16 +53,7 @@ export class WorkspaceStateService {
     reset: () => this.reset(),
   });
 
-  readonly panels = signal<readonly PanelState[]>([
-    {
-      id: 'panel-0',
-      name: 'Panel 1',
-      graph: { nodes: [], edges: [] },
-      generatedQuery: '',
-      variables: [],
-      dirty: true,
-    },
-  ]);
+  readonly panels = signal<readonly PanelState[]>([this.newPanel('panel-0', 'Panel 1')]);
 
   readonly activePanelId = signal<string>('panel-0');
 
@@ -72,15 +65,32 @@ export class WorkspaceStateService {
   private panelCounter = 0;
   private isRestoring = false;
 
-  reset(): void {
-    this.panels.set([{
-      id: 'panel-0',
-      name: 'Panel 1',
-      graph: { nodes: [], edges: [] },
+  private signature(panel: Pick<PanelState, 'name' | 'graph' | 'generatedQuery' | 'variables'>): string {
+    return JSON.stringify({
+      name: panel.name,
+      graph: panel.graph,
+      generatedQuery: panel.generatedQuery,
+      variables: panel.variables,
+    });
+  }
+
+  private newPanel(id: string, name: string): PanelState {
+    const state = {
+      id,
+      name,
+      graph: { nodes: [], edges: [] } as ExplorerSerializedGraph,
       generatedQuery: '',
-      variables: [],
-      dirty: true,
-    }]);
+      variables: [] as string[],
+    };
+    return { ...state, dirty: false, cleanSignature: this.signature(state) };
+  }
+
+  private withDirtyState(panel: PanelState): PanelState {
+    return { ...panel, dirty: this.signature(panel) !== panel.cleanSignature };
+  }
+
+  reset(): void {
+    this.panels.set([this.newPanel('panel-0', 'Panel 1')]);
     this.activePanelId.set('panel-0');
     this.panelCounter = 0;
   }
@@ -90,7 +100,7 @@ export class WorkspaceStateService {
     const id = `panel-${this.panelCounter}`;
     this.panels.update(list => [
       ...list,
-      { id, name, graph: { nodes: [], edges: [] }, generatedQuery: '', variables: [], dirty: true },
+      this.newPanel(id, name),
     ]);
     this.activePanelId.set(id);
     return id;
@@ -100,14 +110,7 @@ export class WorkspaceStateService {
     this.panels.update(list => {
       const filtered = list.filter(p => p.id !== id);
       if (filtered.length === 0) {
-        const newPanel: PanelState = {
-          id: 'panel-0',
-          name: 'Panel 1',
-          graph: { nodes: [], edges: [] },
-          generatedQuery: '',
-          variables: [],
-          dirty: true,
-        };
+        const newPanel = this.newPanel('panel-0', 'Panel 1');
         this.activePanelId.set(newPanel.id);
         return [newPanel];
       }
@@ -128,29 +131,22 @@ export class WorkspaceStateService {
     const activeId = this.activePanelId();
     this.panels.update(list =>
       list.map(p =>
-        p.id === activeId ? { ...p, name } : p,
+        p.id === activeId ? this.withDirtyState({ ...p, name }) : p,
       ),
     );
   }
 
-  markActivePanelClean(): void {
-    const activeId = this.activePanelId();
-    this.panels.update(list =>
-      list.map(p => p.id === activeId ? { ...p, dirty: false } : p),
-    );
+  markAllPanelsClean(): void {
+    this.panels.update(list => list.map(p => ({
+      ...p,
+      dirty: false,
+      cleanSignature: this.signature(p),
+    })));
   }
 
-  setActivePanelSource(workspaceId: string): void {
-    const activeId = this.activePanelId();
+  setAllPanelsSource(workspaceId: string): void {
     this.panels.update(list =>
-      list.map(p => p.id === activeId ? { ...p, sourceWorkspaceId: workspaceId } : p),
-    );
-  }
-
-  markActivePanelDirty(): void {
-    const activeId = this.activePanelId();
-    this.panels.update(list =>
-      list.map(p => p.id === activeId ? { ...p, dirty: true } : p),
+      list.map(p => ({ ...p, sourceWorkspaceId: workspaceId })),
     );
   }
 
@@ -159,7 +155,7 @@ export class WorkspaceStateService {
     const activeId = this.activePanelId();
     this.panels.update(list =>
       list.map(p =>
-        p.id === activeId ? { ...p, graph, generatedQuery, variables, dirty: true } : p,
+        p.id === activeId ? this.withDirtyState({ ...p, graph, generatedQuery, variables }) : p,
       ),
     );
   }
@@ -217,16 +213,13 @@ export class WorkspaceStateService {
   }
 
   private fromPayload(payload: ExplorerWorkspacePayload): void {
-    const mappedPanels: PanelState[] = payload.panels.map(p => ({
-      id: p.id,
-      name: p.name,
-      graph: p.graph,
-      generatedQuery: p.generatedQuery,
-      variables: p.variables ?? [],
-      dirty: false,
-      viewport: p.viewport,
-      labels: p.labels,
-    }));
+    const mappedPanels: PanelState[] = payload.panels.map(p => {
+      const state = {
+        id: p.id, name: p.name, graph: p.graph, generatedQuery: p.generatedQuery,
+        variables: p.variables ?? [], viewport: p.viewport, labels: p.labels,
+      };
+      return { ...state, dirty: false, cleanSignature: this.signature(state) };
+    });
 
     this.panels.set(mappedPanels);
     this.activePanelId.set(payload.activePanelId);
@@ -251,16 +244,17 @@ export class WorkspaceStateService {
 
     const newPanels: PanelState[] = payload.panels.map((p) => {
       this.panelCounter += 1;
-      return {
+      const state = {
         id: `panel-${this.panelCounter}`,
         name: singlePanel ? name : p.name,
         graph: p.graph,
         generatedQuery: p.generatedQuery,
         variables: p.variables ?? [],
-        dirty: false,
+        viewport: p.viewport,
         sourceWorkspaceId: id,
         labels: p.labels,
       };
+      return { ...state, dirty: false, cleanSignature: this.signature(state) };
     });
 
     this.panels.update(list => [...list, ...newPanels]);
@@ -282,7 +276,7 @@ export class WorkspaceStateService {
     this.panels.update(list =>
       list.map(p =>
         p.id === activeId
-          ? { ...p, graph: snapshot, generatedQuery, variables, viewport: viewport ?? undefined }
+          ? this.withDirtyState({ ...p, graph: snapshot, generatedQuery, variables, viewport: viewport ?? undefined })
           : p,
       ),
     );

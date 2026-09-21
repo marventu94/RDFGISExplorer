@@ -14,9 +14,8 @@
 
   @if (queryState === 'no-edges') {
     <div class="banner banner--info">
-      Esta query no expresó relaciones entre entidades. El grafo muestra nodos aislados.
-      Para ver conexiones, agregá variables URI adicionales al SELECT que vinculen tu entidad
-      principal con otras.
+      {{ 'Esta query no expresó relaciones entre entidades. El grafo muestra nodos aislados.' | translate }}
+      {{ 'Para ver conexiones, agregá variables URI adicionales al SELECT que vinculen tu entidad principal con otras.' | translate }}
     </div>
   }
 
@@ -42,7 +41,7 @@
           class="toolbar-btn toolbar-btn--primary"
           type="button"
           (click)="showStructure()"
-          [title]="'Ver la estructura RDF de ' + selectedEntityLabel"
+          [title]="'Ver la estructura RDF de {name}' | translate: { name: selectedEntityLabel }"
         >{{ 'Ver estructura' | translate }}</button>
       }
       @if (isEntityMode) {

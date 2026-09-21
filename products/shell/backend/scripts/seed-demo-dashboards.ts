@@ -31,6 +31,10 @@ import {
   type ExplorerSerializedGraph,
 } from '../../../rdf-explorer/frontend/src/app/graph/domain/graph-serializer';
 import { WikidataAdapter } from '../../../rdf-explorer/frontend/src/app/graph/domain/endpoint/wikidata-adapter';
+import {
+  DEMO_TOPIC_NAMES,
+  demoDashboardNamesToDelete,
+} from './seed-demo-dashboard-names';
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -186,9 +190,7 @@ interface TopicDef {
 
 const TOPICS: TopicDef[] = [
   {
-    explorerName: 'Batallas de la Segunda Guerra Mundial',
-    gisName: 'Batallas de la Segunda Guerra Mundial (GIS)',
-    panelName: 'Batallas WWII',
+    ...DEMO_TOPIC_NAMES[0],
     minRows: 400,
     minCoordCoverage: 0.95,
     minDateCoverage: 0.9,
@@ -221,9 +223,7 @@ const TOPICS: TopicDef[] = [
     },
   },
   {
-    explorerName: 'Terremotos de magnitud mayor a 6',
-    gisName: 'Terremotos de magnitud mayor a 6 (GIS)',
-    panelName: 'Terremotos M>6',
+    ...DEMO_TOPIC_NAMES[1],
     minRows: 500,
     minCoordCoverage: 0.95,
     minDateCoverage: 0.85,
@@ -250,9 +250,7 @@ const TOPICS: TopicDef[] = [
     },
   },
   {
-    explorerName: 'Premios Nobel',
-    gisName: 'Premios Nobel (GIS)',
-    panelName: 'Laureados Nobel',
+    ...DEMO_TOPIC_NAMES[2],
     minRows: 450,
     minCoordCoverage: 0.9,
     minDateCoverage: 0.95,
@@ -283,9 +281,7 @@ const TOPICS: TopicDef[] = [
     },
   },
   {
-    explorerName: 'Vuelos espaciales tripulados',
-    gisName: 'Vuelos espaciales tripulados (GIS)',
-    panelName: 'Vuelos tripulados',
+    ...DEMO_TOPIC_NAMES[3],
     minRows: 250,
     minCoordCoverage: 0.9,
     minDateCoverage: 0.9,
@@ -312,9 +308,7 @@ const TOPICS: TopicDef[] = [
     },
   },
   {
-    explorerName: 'Museos de Argentina',
-    gisName: 'Museos de Argentina (GIS)',
-    panelName: 'Museos AR',
+    ...DEMO_TOPIC_NAMES[4],
     minRows: 450,
     minCoordCoverage: 0.9,
     minDateCoverage: 0.85,
@@ -709,7 +703,7 @@ function writeRows(rows: SeedRow[]): void {
   db.pragma('journal_mode = WAL');
   db.exec(MIGRATIONS_SQL);
 
-  const names = rows.map((r) => r.name);
+  const names = demoDashboardNamesToDelete(rows.map((r) => r.name));
   const placeholders = names.map(() => '?').join(', ');
   const deleted = db
     .prepare(`DELETE FROM dashboards WHERE name IN (${placeholders})`)

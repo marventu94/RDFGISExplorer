@@ -12,6 +12,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadProgressOverlayComponent } from '@features/dashboard/load-progress/load-progress-overlay.component';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { LanguageSelectorComponent } from '@core/services/language-selector.component';
+import { I18nService } from '@core/services/i18n.service';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -34,6 +35,7 @@ export class App implements OnInit {
   private readonly dashboardLayout = inject(DashboardLayoutService);
   protected readonly dashboardState = inject(DashboardStateService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly i18n = inject(I18nService);
   protected readonly editorCollapsed = this.dashboardLayout.editorCollapsed;
 
   constructor() {
@@ -69,8 +71,8 @@ export class App implements OnInit {
         () => {
           this.dashboardState.failLoad();
           this.snackBar.open(
-            'Error al cargar el dashboard. Se muestra un tablero vacío.',
-            'Cerrar',
+            this.i18n.text('Error al cargar el dashboard. Se muestra un tablero vacío.'),
+            this.i18n.text('Cerrar'),
             {
               duration: 6000,
               panelClass: 'snackbar-error',

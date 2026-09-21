@@ -1,24 +1,29 @@
 # Decisiones de diseño
 
-> Este documento registra y fundamenta las decisiones de diseño de
-> RDFGISExplorer. Cada decisión se deriva del estado del arte relevado en el
-> paper DECISIONING 2026 [Venturino et al. 2026] —una *rapid review* de 30
-> trabajos sobre visualización de grafos de conocimiento (KG) con dimensiones
-> geo-espacial (S) y temporal (T)— y, cuando corresponde, se complementa con
-> criterios propios de ingeniería, explicitados como tales. El objetivo es
-> que cada elección resulte defendible: qué evidencia de la literatura la
-> motiva y qué parte constituye un aporte propio.
->
-> Las decisiones técnicas de la vista de grafo (selección, agregación,
-> layout, codificación visual) se registran por separado en
-> `graph-rendering-decisions.md`.
+Este documento explica las principales decisiones que dieron forma a
+RDFGISExplorer: qué problema resuelve cada una, qué evidencia la respalda y
+qué compromisos de producto o de ingeniería implica. No pretende describir
+la implementación archivo por archivo, sino dejar trazable el razonamiento
+detrás de la experiencia de exploración, sus límites y su arquitectura.
 
-**El problema que enmarca el diseño:** el paper evidencia que solo 7 de 30
-trabajos integran grafo + espacio + tiempo (G+S+T), que cada uno lo hizo para
-un dominio específico sin generalizar, y que el ecosistema de herramientas es
-frágil (§3.2, §4.3, §5). De este diagnóstico se derivan los dos ejes del
-diseño: **integrar las tres dimensiones en una única interfaz** y **no
-atarse a un dominio ni a componentes irreemplazables**.
+El punto de partida es *Integrating Spatial and Temporal Dimensions in
+Knowledge Graphs through Visualization: Challenges and Research
+Opportunities* [Venturino et al. 2026], una *rapid review* de 30 trabajos
+sobre visualización de grafos de conocimiento con dimensiones espaciales y
+temporales. El estudio identifica una brecha concreta: solo 7 de los 30
+trabajos integran grafo, espacio y tiempo (G+S+T); las propuestas encontradas
+están ligadas a dominios particulares y el ecosistema de herramientas resulta
+frágil (§3.2, §4.3 y §5).
+
+Ese diagnóstico orienta dos principios del producto: **reunir las tres
+dimensiones en una experiencia integrada** y **mantener la exploración
+independiente del dominio y del endpoint SPARQL**. Las secciones siguientes
+relacionan cada decisión con la literatura cuando existe respaldo directo y
+distinguen explícitamente las decisiones propias de producto o ingeniería.
+
+Las decisiones específicas de la vista de grafo —selección, agregación,
+layout y codificación visual— se desarrollan por separado en
+[`graph-rendering-decisions.md`](./graph-rendering-decisions.md).
 
 ---
 

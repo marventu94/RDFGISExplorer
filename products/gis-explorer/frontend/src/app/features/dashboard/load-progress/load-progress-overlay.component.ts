@@ -1,6 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { TranslatePipe } from '@core/services/translate.pipe';
+import { I18nService } from '@core/services/i18n.service';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import {
@@ -25,19 +28,19 @@ const SLOW_HINT_MS = 8000;
   selector: 'app-load-progress-overlay',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, MatProgressSpinnerModule],
+  imports: [MatIconModule, MatProgressSpinnerModule, TranslatePipe],
   template: `
     @if (visibleRun(); as run) {
       <div class="loader" role="status" aria-live="polite">
         <div class="card">
           <header class="card-header">
             <div class="titles">
-              <h2>{{ run.title }}</h2>
+              <h2>{{ translate(run.title) }}</h2>
               @if (run.subtitle) {
                 <p class="subtitle">{{ run.subtitle }}</p>
               }
             </div>
-            <span class="total" [attr.aria-label]="'Tiempo total ' + totalElapsed()">
+            <span class="total" [attr.aria-label]="'Tiempo total {duration}' | translate: { duration: totalElapsed() }">
               {{ totalElapsed() }}
             </span>
           </header>
@@ -65,12 +68,12 @@ const SLOW_HINT_MS = 8000;
                   }
                 </span>
                 <span class="stage-body">
-                  <span class="stage-label">{{ stage.label }}</span>
+                  <span class="stage-label">{{ translate(stage.label) }}</span>
                   @if (stage.detail) {
                     <span class="stage-detail">{{ stage.detail }}</span>
                   }
                   @if (stage.status === 'background') {
-                    <span class="stage-detail">sigue en segundo plano</span>
+                    <span class="stage-detail">{{ 'sigue en segundo plano' | translate }}</span>
                   }
                 </span>
                 <span class="stage-time">{{ elapsed(stage) }}</span>
@@ -80,8 +83,7 @@ const SLOW_HINT_MS = 8000;
 
           @if (showSlowHint()) {
             <p class="hint">
-              Las consultas sobre grafos grandes pueden tardar varios minutos: el tablero
-              se arma recién cuando el endpoint contesta.
+              {{ 'Las consultas sobre grafos grandes pueden tardar varios minutos: el tablero se arma recién cuando el endpoint contesta.' | translate }}
             </p>
           }
         </div>
@@ -231,6 +233,7 @@ const SLOW_HINT_MS = 8000;
 })
 export class LoadProgressOverlayComponent {
   protected readonly progress = inject(DashboardLoadProgressService);
+  private readonly i18n = inject(I18nService);
 
   /** La corrida solo se muestra mientras esté abierta; al cerrarse el cartel se va. */
   protected readonly visibleRun = computed(() =>
@@ -239,7 +242,7 @@ export class LoadProgressOverlayComponent {
 
   protected readonly totalElapsed = computed(() => {
     const run = this.progress.run();
-    return run ? formatDuration(runElapsedMs(run, this.progress.now())) : '';
+    return run ? formatDuration(runElapsedMs(run, this.progress.now()), this.i18n.language()) : '';
   });
 
   protected readonly showSlowHint = computed(() => {
@@ -249,6 +252,10 @@ export class LoadProgressOverlayComponent {
 
   protected elapsed(stage: LoadStage): string {
     const ms = stageElapsedMs(stage, this.progress.now());
-    return ms === null ? '' : formatDuration(ms);
+    return ms === null ? '' : formatDuration(ms, this.i18n.language());
+  }
+
+  protected translate(value: string): string {
+    return this.i18n.text(value as UiTextKey);
   }
 }

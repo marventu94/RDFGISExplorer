@@ -169,6 +169,42 @@
   }
 }
 
+.tab-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.tab-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--explorer-toolbar-border);
+  border-radius: 5px;
+  background: var(--explorer-toolbar-bg);
+  box-shadow: var(--shadow-lg);
+
+  button {
+    width: 100%;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--explorer-text);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-bg-active);
+    }
+  }
+}
+
 
 .handoff-btn {
   padding: 4px 10px;

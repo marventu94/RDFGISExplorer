@@ -38,10 +38,10 @@ describe('DashboardLoadProgressService', () => {
   });
 
   it('opens a run with every stage pending', () => {
-    service.begin('Cargando tablero', STAGES, 'Batallas WWII');
+    service.begin('Cargando tablero', STAGES, 'WWII battles');
 
     expect(service.active()).toBe(true);
-    expect(service.run()?.subtitle).toBe('Batallas WWII');
+    expect(service.run()?.subtitle).toBe('WWII battles');
     expect(service.stageStatus('execute-query')).toBe('pending');
   });
 

@@ -59,6 +59,41 @@ import {
   type ExplorationState,
 } from './entity-exploration';
 import { DEFAULT_SUBGRAPH_BUDGET, type EntitySubgraph } from './entity-subgraph';
+
+const EXPLORATION_UI_MESSAGES = new Set<UiTextKey>([
+  'No hay una entidad en exploración.',
+  'El foco coordinado no inicia la exploración: seleccioná una entidad.',
+  'La entidad ya está en exploración.',
+  'Ya estás en el resultado completo.',
+  'El nodo ya está activo.',
+  'El nodo no forma parte de la estructura explorada.',
+  'Sin cambios en la exploración.',
+  'La rama no existe en la estructura explorada.',
+  'La rama ya está expandida.',
+  'La rama no estaba expandida.',
+  'El nodo ya está fijado.',
+  'Sólo se pueden fijar nodos de la estructura explorada.',
+  'El nodo no estaba fijado.',
+  'El nodo activo ya es la raíz.',
+  'Ya estás en la raíz.',
+  'No hay pasos previos.',
+  'La exploración ya está en su estado inicial.',
+  'La entidad no está en el lote visible: la estructura se calculó sobre el resultado completo.',
+  'La entidad seleccionada no existe en el resultado: no hay estructura para mostrar.',
+  'El nodo activo ya no está en el resultado: se volvió a la raíz.',
+  'Hay entidades de las mismas filas sin un camino de relaciones en el resultado: se muestran sueltas.',
+  'Hay recursos compartidos que se muestran como frontera: sus relaciones se incorporan sólo al expandirlos.',
+  'Hay ramas expandidas que ya no existen en el resultado actual.',
+  'La entidad ya no está en el resultado: se volvió al resultado completo.',
+  'No hay una entidad en exploración: seleccioná una y abrí su estructura.',
+  'La entidad no tiene estructura disponible en el resultado: no se copió nada.',
+  'No hay nada que copiar en la vista explorada.',
+  'No hay nada que copiar en la estructura disponible.',
+  'Se copió la vista explorada al portapapeles.',
+  'Se copió la estructura disponible al portapapeles.',
+  'El navegador no permite copiar automáticamente: el texto de la vista explorada quedó disponible para copiarlo a mano.',
+  'El navegador no permite copiar automáticamente: el texto de la estructura disponible quedó disponible para copiarlo a mano.',
+]);
 import {
   activeBranchItems,
   buildEntityModeElements,
@@ -910,14 +945,24 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const parts: string[] = [];
 
     if (lotCount > 1) {
-      parts.push(`Lote ${currentLot} de ${lotCount} · ${visible.bindings.length} filas`);
+      const rows = visible.bindings.length;
+      parts.push(this.i18n.text(
+        rows === 1 ? 'Lote {current} de {total} · {count} fila' : 'Lote {current} de {total} · {rows} filas',
+        rows === 1
+          ? { current: currentLot, total: lotCount, count: rows }
+          : { current: currentLot, total: lotCount, rows },
+      ));
     }
 
     if (built.motifCount > 0) {
-      const motifWord = built.motifCount === 1 ? 'motivo repetido' : 'motivos repetidos';
-      parts.push(
-        `${built.abstractedNodes} nodos representados en ${built.motifCount} ${motifWord}`,
-      );
+      const key = built.abstractedNodes === 1
+        ? (built.motifCount === 1
+            ? '{nodes} nodo representado en {motifs} motivo repetido'
+            : '{nodes} nodo representado en {motifs} motivos repetidos')
+        : (built.motifCount === 1
+            ? '{nodes} nodos representados en {motifs} motivo repetido'
+            : '{nodes} nodos representados en {motifs} motivos repetidos');
+      parts.push(this.i18n.text(key, { nodes: built.abstractedNodes, motifs: built.motifCount }));
     }
 
     const explicitDrawnNodes = built.drawnNodes - built.aggregateNodes;
@@ -925,14 +970,18 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (built.totalNodes > representedOriginalNodes) {
       const prioritized =
         built.inclusionReasons.selected + built.inclusionReasons['query-entity'];
-      const coverageNoun = built.motifCount > 0 ? 'representados' : 'visibles';
-      parts.push(
-        `${representedOriginalNodes} de ${built.totalNodes} nodos ${coverageNoun}` +
-          (prioritized ? ` · ${prioritized} priorizados por la query` : ''),
-      );
+      const singularNode = built.totalNodes === 1;
+      const coverageKey = built.motifCount > 0
+        ? (singularNode ? '{shown} de {total} nodo representado' : '{shown} de {total} nodos representados')
+        : (singularNode ? '{shown} de {total} nodo visible' : '{shown} de {total} nodos visibles');
+      let coverage = this.i18n.text(coverageKey, { shown: representedOriginalNodes, total: built.totalNodes });
+      if (prioritized) {
+        coverage += ` · ${this.i18n.text(prioritized === 1 ? '{count} priorizado por la query' : '{count} priorizados por la query', { count: prioritized })}`;
+      }
+      parts.push(coverage);
       if (built.edgesHiddenByTruncation > 0) {
         const n = built.edgesHiddenByTruncation;
-        parts.push(`${n} arista${n === 1 ? '' : 's'} oculta${n === 1 ? '' : 's'}`);
+        parts.push(this.i18n.text(n === 1 ? '{count} arista oculta' : '{count} aristas ocultas', { count: n }));
       }
     }
 
@@ -1544,7 +1593,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   async copyCurrentEntityView(): Promise<void> {
     if (!this.entitySubgraph) return;
     const result = await this.summaryClipboard.copyBasicView(this.entitySubgraph);
-    this.explorationMessage = result.message;
+    this.explorationMessage = this.translateExplorationMessage(result.message);
     this.copyFallbackText = result.status === 'unsupported' ? result.text : '';
     this.cdr.markForCheck();
   }
@@ -1665,7 +1714,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       scope === 'view'
         ? await this.summaryClipboard.copyCurrentView(request)
         : await this.summaryClipboard.copyFullStructure(request);
-    this.explorationMessage = result.message;
+    this.explorationMessage = this.translateExplorationMessage(result.message);
     this.copyFallbackText = result.status === 'unsupported' ? result.text : '';
     this.cdr.markForCheck();
   }
@@ -1678,7 +1727,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private applyExploration(next: ExplorationState): void {
     const rejection = next.lastRejection;
     this.explorationState = next;
-    this.explorationMessage = rejection && rejection.code !== 'no-op' ? rejection.message : '';
+    this.explorationMessage = rejection && rejection.code !== 'no-op'
+      ? this.translateExplorationMessage(rejection.message)
+      : '';
     if (!rejection) this.syncEntityMode();
     this.cdr.markForCheck();
   }
@@ -1693,8 +1744,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const next = enterEntityMode(this.explorationState, { rootUri, trigger });
     if (next.lastRejection) {
       this.explorationState = next;
-      this.explorationMessage =
-        next.lastRejection.code === 'no-op' ? '' : next.lastRejection.message;
+      this.explorationMessage = next.lastRejection.code === 'no-op'
+        ? ''
+        : this.translateExplorationMessage(next.lastRejection.message);
       this.cdr.markForCheck();
       return;
     }
@@ -1832,7 +1884,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   /** Vuelve al resultado completo y lo redibuja con su estado previo. */
   private leaveEntityMode(message: string): void {
     this.discardEntityMode();
-    this.explorationMessage = message;
+    this.explorationMessage = this.translateExplorationMessage(message);
     this.destroyGraph();
 
     const visible = this.lastVisibleResult;
@@ -1847,6 +1899,53 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.syncGraph(built.elements);
     }
     this.cdr.markForCheck();
+  }
+
+  /** Traduce únicamente mensajes UI conocidos; cualquier detalle externo queda literal. */
+  private translateExplorationMessage(message: string): string {
+    if (!message) return '';
+    if (EXPLORATION_UI_MESSAGES.has(message as UiTextKey)) {
+      return this.i18n.text(message as UiTextKey);
+    }
+
+    let match = message.match(/^La rama agrega (\d+) elemento\(s\) y el presupuesto de (\d+) nodos no alcanza\. Contraé otra rama o quitá un nodo fijado\.$/);
+    if (match) {
+      return this.i18n.text('La rama agrega {count} elemento(s) y el presupuesto de {limit} nodos no alcanza. Contraé otra rama o quitá un nodo fijado.', {
+        count: match[1], limit: match[2],
+      });
+    }
+    match = message.match(/^El presupuesto de (\d+) nodos se agotó: (\d+) elemento\(s\) quedaron fuera\.$/);
+    if (match) {
+      return this.i18n.text('El presupuesto de {limit} nodos se agotó: {count} elemento(s) quedaron fuera.', {
+        limit: match[1], count: match[2],
+      });
+    }
+    match = message.match(/^El presupuesto de (\d+) relaciones se agotó: hay relaciones sin dibujar\.$/);
+    if (match) {
+      return this.i18n.text('El presupuesto de {limit} relaciones se agotó: hay relaciones sin dibujar.', { limit: match[1] });
+    }
+
+    const fallbackSuffix = ' (copiado con el método alternativo del navegador)';
+    if (message.endsWith(fallbackSuffix)) {
+      return this.translateExplorationMessage(message.slice(0, -fallbackSuffix.length)) +
+        this.i18n.text(' (copiado con el método alternativo del navegador)');
+    }
+    match = message.match(/^Se copió la (vista explorada|estructura disponible) al portapapeles: (\d+) nodo\(s\), (\d+) arista\(s\) y (\d+) tripleta\(s\)\.$/);
+    if (match) {
+      const key = match[1] === 'vista explorada'
+        ? 'Se copió la vista explorada al portapapeles: {nodes} nodo(s), {edges} arista(s) y {triples} tripleta(s).'
+        : 'Se copió la estructura disponible al portapapeles: {nodes} nodo(s), {edges} arista(s) y {triples} tripleta(s).';
+      return this.i18n.text(key, { nodes: match[2], edges: match[3], triples: match[4] });
+    }
+    match = message.match(/^No se pudo copiar la (vista explorada|estructura disponible): (.*)$/s);
+    if (match) {
+      const key = match[1] === 'vista explorada'
+        ? 'No se pudo copiar la vista explorada:'
+        : 'No se pudo copiar la estructura disponible:';
+      return `${this.i18n.text(key)} ${match[2]}`;
+    }
+
+    return message;
   }
 
   private getLayoutOptions(layout: GraphLayout): cytoscape.LayoutOptions {

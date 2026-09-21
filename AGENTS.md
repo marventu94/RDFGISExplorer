@@ -175,7 +175,7 @@ El corazón de rdf_explorer es un **modelo de dominio puro** (sin Angular) en `g
 ## Persistencia
 
 - **Dashboards GIS:** `DashboardPersistenceService` serializa query + layout + filtros + selección → `/api/dashboards` (`kind: 'gis'`).
-- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`). Nombres: el tablero y las pestañas tienen nombres independientes, pero se sincronizan para workspaces de **un solo panel** — al guardar, el diálogo renombra el panel activo con el nombre del workspace (`main.component.openSaveDialog`); al cargar (`loadWorkspaceAsTabs`), la pestaña única toma el `name` del dashboard (así los tableros sembrados/legados con panel corto, p.ej. "Batallas WWII", muestran el nombre del tablero). Workspaces multi-panel conservan los nombres de cada pestaña.
+- **Workspaces Explorer:** `WorkspacePersistenceService` serializa paneles (tabs) + grafo → `/api/dashboards` (`kind: 'explorer'`). Nombres: el tablero y las pestañas tienen nombres independientes, pero se sincronizan para workspaces de **un solo panel** — al guardar, el diálogo renombra el panel activo con el nombre del workspace (`main.component.openSaveDialog`); al cargar (`loadWorkspaceAsTabs`), la pestaña única toma el `name` del dashboard (así los tableros sembrados/legados con panel corto, p.ej. "WWII battles", muestran el nombre del tablero). Workspaces multi-panel conservan los nombres de cada pestaña.
 - **Layout GIS:** `localStorage` (`rdf-gis-explorer:dashboard-layout`) — UI state puro.
 - **Handoff:** `sessionStorage` (`platform.handoff.pending`) + `CustomEvent`; `localStorage` (`platform.handoff.autoRun`) para la preferencia de auto-ejecución.
 

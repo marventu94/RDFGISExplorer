@@ -5,6 +5,7 @@ import { BehaviorSubject, of } from 'rxjs';
 import { MapViewComponent } from './map-view.component';
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import type { QueryResult, NormalizedNode, Selection, Filter, Coordinate } from '@shared/models';
+import { I18nService } from '@core/services/i18n.service';
 
 const mockCoord: Coordinate = { lat: -34.6, lng: -58.4 };
 const mockCoord2: Coordinate = { lat: -31.4, lng: -64.2 };
@@ -344,6 +345,21 @@ describe('MapViewComponent', () => {
 
         const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
         expect(chip?.textContent?.trim()).toBe('Mostrando 1 de 3 entidades · 2 sin coordenadas');
+      });
+
+      it('renders the complete coverage chip in English with batch and plural interpolation', () => {
+        const i18n = TestBed.inject(I18nService);
+        i18n.set('en');
+        const anotherNoCoord: NormalizedNode = { ...mockNodeNoCoord, uri: 'http://x/Q2', label: 'Dato visible' };
+        const mixedResult = createMockQueryResult([mockNode, mockNodeNoCoord, anotherNoCoord]);
+        queryResultSubject.next(mixedResult);
+        filteredSubject.next(mixedResult);
+        lotStateSubject.next({ lotSize: 300, currentLot: 2, lotCount: 7, totalRows: 900, visibleNodes: 3 });
+        fixture.detectChanges();
+
+        expect((fixture.nativeElement as HTMLElement).querySelector('.coverage-chip')?.textContent?.trim())
+          .toBe('Showing 1 of 3 entities in this batch · 2 without coordinates');
+        i18n.set('es');
       });
 
       it('should hide the coverage chip when all nodes have a coordinate', () => {
