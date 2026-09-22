@@ -109,6 +109,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
 
     this.tileLayer = L.tileLayer(TILE_LAYERS['osm'].url, {
       attribution: TILE_LAYERS['osm'].attribution,
+      className: 'tile-layer-base',
     }).addTo(this.map);
 
     // markerClusterGroup falla en native federation cuando L global no coincide

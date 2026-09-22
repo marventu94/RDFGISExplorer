@@ -182,3 +182,20 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetCSS[] = [
     } as cytoscape.Css.Node,
   },
 ];
+
+/** Cytoscape resolves colors onto canvas, so CSS variables cannot be used directly. */
+export function canvasStyles(dark: boolean): cytoscape.StylesheetCSS[] {
+  if (!dark) return CYTOSCAPE_STYLES;
+  const replacements: Readonly<Record<string, string>> = {
+    '#f8f8f8': '#35322e',
+    '#f3f3f3': '#292724',
+    '#f0f0f0': '#242321',
+    '#333': '#e8e2dc',
+  };
+  return CYTOSCAPE_STYLES.map((rule) => ({
+    ...rule,
+    css: Object.fromEntries(
+      Object.entries(rule.css).map(([key, value]) => [key, replacements[String(value)] ?? value]),
+    ),
+  })) as cytoscape.StylesheetCSS[];
+}

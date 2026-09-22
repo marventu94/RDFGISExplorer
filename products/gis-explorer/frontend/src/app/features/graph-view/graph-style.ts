@@ -26,7 +26,7 @@ export function createGraphStyle(
           const deg = (ele.data('degree') as number) ?? 0;
           return Math.max(20, Math.min(80, 20 + deg * 3));
         },
-        color: () => (isDark() ? '#f1f5f9' : '#212529'),
+        color: () => (isDark() ? '#e8e2dc' : '#212529'),
         label: (ele: cytoscape.NodeSingular) => {
           const isMotif = ele.data('aggregateKind') === 'repeated-component';
           return detailLevel() === 'summary' && !isMotif ? '' : (ele.data('label') as string);
@@ -39,7 +39,7 @@ export function createGraphStyle(
           detailLevel() === 'detail' || detailLevel() === 'literals-detail'
             ? '160px'
             : '140px',
-        'text-outline-color': () => (isDark() ? '#0f172a' : '#ffffff'),
+        'text-outline-color': () => (isDark() ? '#201f1d' : '#ffffff'),
         'text-outline-width': 2,
       } as cytoscape.Css.Node,
     },
@@ -60,13 +60,13 @@ export function createGraphStyle(
           detailLevel() === 'summary'
             ? 1
             : Math.min(5, 1.5 + (((ele.data('multiplicity') as number) ?? 1) - 1) * 0.75),
-        'line-color': () => (isDark() ? '#475569' : '#B0BEC5'),
-        'target-arrow-color': () => (isDark() ? '#475569' : '#B0BEC5'),
+        'line-color': () => (isDark() ? '#68615b' : '#B0BEC5'),
+        'target-arrow-color': () => (isDark() ? '#68615b' : '#B0BEC5'),
         'target-arrow-shape': 'triangle',
         'font-size': '9px',
         'text-wrap': 'wrap',
         'text-max-width': '140px',
-        'text-background-color': () => (isDark() ? '#0f172a' : '#ffffff'),
+        'text-background-color': () => (isDark() ? '#242321' : '#ffffff'),
         'text-background-opacity': 0.9,
         'text-background-padding': '2px',
         // El backend emite una arista por predicado (el edgeId incluye el
@@ -94,7 +94,7 @@ export function createGraphStyle(
         label: (ele: cytoscape.EdgeSingular) => ele.data('predicateLabel') as string,
         'font-size': '11px',
         'font-weight': 'bold',
-        'text-background-color': () => (isDark() ? '#0f172a' : '#ffffff'),
+        'text-background-color': () => (isDark() ? '#242321' : '#ffffff'),
         'text-background-opacity': 0.9,
         'text-background-padding': '3px',
         'text-rotation': 'autorotate',
@@ -127,7 +127,7 @@ export function createGraphStyle(
       selector: 'node.is-selected',
       style: {
         'border-width': 4,
-        'border-color': '#1565C0',
+        'border-color': () => (isDark() ? '#79a7e3' : '#1565C0'),
         'text-outline-width': 3,
         'font-weight': 'bold',
         'font-size': '11px',
@@ -159,8 +159,8 @@ export function createGraphStyle(
       selector: 'edge.is-focus-edge',
       style: {
         width: 2.5,
-        'line-color': '#1565C0',
-        'target-arrow-color': '#1565C0',
+        'line-color': () => (isDark() ? '#79a7e3' : '#1565C0'),
+        'target-arrow-color': () => (isDark() ? '#79a7e3' : '#1565C0'),
         opacity: 1,
       },
     },

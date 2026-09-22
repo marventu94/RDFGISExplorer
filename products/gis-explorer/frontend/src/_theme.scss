@@ -55,54 +55,86 @@
   // Leaflet
   --leaflet-popup-bg: #ffffff;
   --leaflet-popup-text: #212529;
+
+  // Semantic surfaces
+  --gis-info-bg: #e3f2fd;
+  --gis-info-border: #90caf9;
+  --gis-info-text: #0d47a1;
+  --gis-warning-bg: #fff3e0;
+  --gis-warning-border: #ffb74d;
+  --gis-warning-text: #8d4b00;
+  --gis-overlay-bg: rgba(255, 255, 255, 0.94);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --gis-bg: #0f172a;
-  --gis-panel-bg: #1e293b;
-  --gis-panel-border: #334155;
-  --gis-dashboard-bg: #0f172a;
-  --gis-toolbar-bg: #1e293b;
-  --gis-toolbar-border: #334155;
-  --gis-input-bg: #0f172a;
-  --gis-input-border: #475569;
-  --gis-input-text: #f1f5f9;
-  --gis-tab-bg: #1e293b;
-  --gis-tab-active-bg: #0f172a;
-  --gis-tab-border: #334155;
+  // Warm charcoal: softer than GitHub's near-black canvas and without a blue cast.
+  --gis-bg: #201f1d;
+  --gis-panel-bg: #292724;
+  --gis-panel-border: #48433e;
+  --gis-dashboard-bg: #242321;
+  --gis-toolbar-bg: #292724;
+  --gis-toolbar-border: #48433e;
+  --gis-input-bg: #242321;
+  --gis-input-border: #5b554f;
+  --gis-input-text: #e8e2dc;
+  --gis-tab-bg: #292724;
+  --gis-tab-active-bg: #35322e;
+  --gis-tab-border: #48433e;
 
-  --gis-text: #f1f5f9;
-  --gis-text-muted: #94a3b8;
-  --gis-text-subtle: #64748b;
-  --gis-link: #60a5fa;
+  --gis-text: #e8e2dc;
+  --gis-text-muted: #aaa19a;
+  --gis-text-subtle: #827a73;
+  --gis-link: #79a7e3;
 
-  --gis-accent: #60a5fa;
-  --gis-accent-soft: #1e3a5f;
-  --gis-accent-border: #60a5fa;
+  --gis-accent: #79a7e3;
+  --gis-accent-soft: #343d49;
+  --gis-accent-border: #79a7e3;
 
-  --cy-node-bg: #475569;
-  --cy-node-border: #94a3b8;
-  --cy-node-label: #f1f5f9;
-  --cy-edge: #475569;
+  --cy-node-bg: #625c56;
+  --cy-node-border: #aaa19a;
+  --cy-node-label: #e8e2dc;
+  --cy-edge: #68615b;
 
-  --cm-bg: #0b1220;
-  --cm-gutter-bg: #0f172a;
-  --cm-gutter-fg: #64748b;
-  --cm-text: #e2e8f0;
-  --cm-cursor: #f1f5f9;
-  --cm-selection: #1e3a5f;
-  --cm-active-line-bg: #1e293b;
+  --cm-bg: #1f1e1c;
+  --cm-gutter-bg: #292724;
+  --cm-gutter-fg: #8d857e;
+  --cm-text: #ddd7d1;
+  --cm-cursor: #f0ebe6;
+  --cm-selection: #3b4b60;
+  --cm-active-line-bg: #35322e;
 
-  --ag-header-bg: #1e293b;
-  --ag-header-fg: #f1f5f9;
-  --ag-row-bg: #0f172a;
-  --ag-row-alt-bg: #1e293b;
-  --ag-row-hover-bg: #334155;
-  --ag-border: #334155;
-  --ag-text: #f1f5f9;
+  --ag-header-bg: #302e2b;
+  --ag-header-fg: #e8e2dc;
+  --ag-row-bg: #242321;
+  --ag-row-alt-bg: #292724;
+  --ag-row-hover-bg: #393632;
+  --ag-border: #48433e;
+  --ag-text: #e8e2dc;
 
-  --leaflet-popup-bg: #1e293b;
-  --leaflet-popup-text: #f1f5f9;
+  --leaflet-popup-bg: #292724;
+  --leaflet-popup-text: #e8e2dc;
+
+  --gis-info-bg: #132f4c;
+  --gis-info-border: #1f6feb;
+  --gis-info-text: #cae8ff;
+  --gis-warning-bg: #3b2e0b;
+  --gis-warning-border: #9e6a03;
+  --gis-warning-text: #e3b341;
+  --gis-overlay-bg: rgba(41, 39, 36, 0.96);
+
+  // Angular Material system surfaces used by the dashboard, navbar and dialogs.
+  --mat-sys-surface: #242321;
+  --mat-sys-surface-dim: #201f1d;
+  --mat-sys-surface-bright: #3d3935;
+  --mat-sys-surface-container-lowest: #1f1e1c;
+  --mat-sys-surface-container-low: #242321;
+  --mat-sys-surface-container: #292724;
+  --mat-sys-surface-container-high: #302e2b;
+  --mat-sys-surface-container-highest: #393632;
+  --mat-sys-on-surface: #e8e2dc;
+  --mat-sys-on-surface-variant: #c7beb6;
+  --mat-sys-outline: #8d857e;
+  --mat-sys-outline-variant: #48433e;
 }

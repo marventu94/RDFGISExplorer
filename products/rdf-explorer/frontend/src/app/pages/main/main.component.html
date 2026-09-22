@@ -32,6 +32,7 @@
         <button class="tab-add" (click)="addPanel()" type="button" [attr.title]="'Nuevo panel' | translate">+</button>
       </div>
       <div class="tabs-actions">
+        <div class="preferences"><app-language-selector /><app-theme-toggle /></div>
         <button
           class="handoff-btn"
           [disabled]="!canHandoff()"

@@ -15,7 +15,7 @@ import {
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { I18nService } from '@core/services/i18n.service';
-import type { UiTextKey } from '@rdfgis/platform-bridge';
+import { onThemeChange, type UiTextKey } from '@rdfgis/platform-bridge';
 import { combineLatest, Subject, takeUntil } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
 import cytoscape from 'cytoscape';
@@ -278,6 +278,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private readonly aggregateByMember = new Map<string, string>();
   /** Nodo dibujado que representa la selección vigente (puede ser un resumen). */
   private selectedDrawnUri: string | null = null;
+  private readonly stopThemeListener = onThemeChange(() => this.refreshGraphTheme());
 
   constructor(
     private selectionService: SelectionService,
@@ -414,6 +415,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stopThemeListener();
     this.destroy$.next();
     this.destroy$.complete();
     this.resizeObserver?.disconnect();
@@ -428,6 +430,21 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.markActiveListener = undefined;
     }
     this.cy?.destroy();
+  }
+
+  private refreshGraphTheme(): void {
+    if (!this.cy) return;
+    this.cy.style([
+      ...createGraphStyle(
+        this.colorService,
+        () => document.documentElement.dataset['theme'] === 'dark',
+        () => this.detailLevel,
+      ),
+      ...entityModeStyleRules(
+        () => document.documentElement.dataset['theme'] === 'dark',
+        () => this.detailLevel,
+      ),
+    ]).update();
   }
 
   @HostListener('window:resize')

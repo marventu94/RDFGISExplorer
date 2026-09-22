@@ -3,6 +3,71 @@
   flex-direction: column;
   height: 100%;
   min-width: 1280px;
+
+  // Native Federation does not attach a remote's global stylesheet to the
+  // host document. Keep the GIS design tokens on the remote boundary so all
+  // four views inherit them in both standalone and integrated modes.
+  --gis-bg: #ffffff;
+  --gis-panel-bg: #f8f9fa;
+  --gis-panel-border: #dee2e6;
+  --gis-dashboard-bg: #f1f3f5;
+  --gis-text: #212529;
+  --gis-text-muted: #6c757d;
+  --gis-text-subtle: #adb5bd;
+  --gis-link: #0d6efd;
+  --gis-accent: #0d6efd;
+  --gis-accent-soft: #e7f1ff;
+  --gis-accent-border: #86b7fe;
+  --gis-info-bg: #e3f2fd;
+  --gis-info-border: #90caf9;
+  --gis-info-text: #0d47a1;
+  --gis-warning-bg: #fff3e0;
+  --gis-warning-border: #ffb74d;
+  --gis-warning-text: #8d4b00;
+  --gis-overlay-bg: rgba(255, 255, 255, 0.94);
+  --gis-view-canvas: #ffffff;
+  --gis-view-grid: #dee2e6;
+  --ag-header-bg: #f8f9fa;
+  --ag-header-fg: #212529;
+  --ag-row-bg: #ffffff;
+  --ag-row-alt-bg: #f8f9fa;
+  --ag-row-hover-bg: #e9ecef;
+  --ag-border: #dee2e6;
+  --ag-text: #212529;
+  --leaflet-popup-bg: #ffffff;
+  --leaflet-popup-text: #212529;
+}
+
+:host-context(html[data-theme='dark']) {
+  --gis-bg: #201f1d;
+  --gis-panel-bg: #302e2b;
+  --gis-panel-border: #48433e;
+  --gis-dashboard-bg: #292724;
+  --gis-text: #e8e2dc;
+  --gis-text-muted: #b7aea6;
+  --gis-text-subtle: #8d857e;
+  --gis-link: #8bb4e8;
+  --gis-accent: #79a7e3;
+  --gis-accent-soft: #343d49;
+  --gis-accent-border: #607c9f;
+  --gis-info-bg: #293847;
+  --gis-info-border: #607c9f;
+  --gis-info-text: #d4e2f2;
+  --gis-warning-bg: #342f24;
+  --gis-warning-border: #9e7b32;
+  --gis-warning-text: #e5c56f;
+  --gis-overlay-bg: rgba(48, 46, 43, 0.95);
+  --gis-view-canvas: #292724;
+  --gis-view-grid: #48433e;
+  --ag-header-bg: #35322e;
+  --ag-header-fg: #e8e2dc;
+  --ag-row-bg: #292724;
+  --ag-row-alt-bg: #2d2b28;
+  --ag-row-hover-bg: #3b3834;
+  --ag-border: #48433e;
+  --ag-text: #e8e2dc;
+  --leaflet-popup-bg: #302e2b;
+  --leaflet-popup-text: #e8e2dc;
 }
 
 .app-shell {

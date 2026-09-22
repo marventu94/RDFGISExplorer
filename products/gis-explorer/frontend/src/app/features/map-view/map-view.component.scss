@@ -33,6 +33,35 @@
   z-index: 1;
 }
 
+// Leaflet creates these nodes dynamically, so they need to be reached from
+// the component boundary rather than from the remote's standalone stylesheet.
+:host ::ng-deep {
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip,
+  .leaflet-control,
+  .leaflet-control a,
+  .leaflet-control-geocoder-form input,
+  .leaflet-control-attribution {
+    background-color: var(--leaflet-popup-bg);
+    color: var(--leaflet-popup-text);
+    border-color: var(--gis-panel-border);
+  }
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep {
+  .leaflet-layer.tile-layer-base {
+    filter: invert(0.82) hue-rotate(175deg) brightness(0.72) contrast(0.88) saturate(0.5) sepia(0.12);
+  }
+
+  .leaflet-container {
+    background: var(--gis-view-canvas);
+  }
+
+  .leaflet-control-attribution a {
+    color: var(--gis-link);
+  }
+}
+
 app-coverage-chip {
   position: absolute;
   top: 10px;
@@ -52,7 +81,8 @@ app-coverage-chip {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--gis-overlay-bg);
+  color: var(--gis-text);
   border-radius: 8px;
   padding: 16px 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -60,13 +90,13 @@ app-coverage-chip {
   max-width: 90%;
 
   &--info {
-    background: rgba(227, 242, 253, 0.95);
-    border: 1px solid #90caf9;
+    background: var(--gis-info-bg);
+    border: 1px solid var(--gis-info-border);
   }
 
   &--warning {
-    background: rgba(255, 243, 224, 0.95);
-    border: 1px solid #ffb74d;
+    background: var(--gis-warning-bg);
+    border: 1px solid var(--gis-warning-border);
   }
 }
 
@@ -76,26 +106,26 @@ app-coverage-chip {
 
 .overlay-text {
   font-size: 13px;
-  color: #333;
+  color: var(--gis-text-muted);
   line-height: 1.5;
 }
 
 .overlay-link {
   background: none;
   border: none;
-  color: #1565c0;
+  color: var(--gis-link);
   text-decoration: underline;
   cursor: pointer;
   font-size: inherit;
   padding: 0;
 
   &:hover {
-    color: #0d47a1;
+    color: var(--gis-accent);
   }
 }
 
 code {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--gis-dashboard-bg);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 11px;
@@ -103,7 +133,7 @@ code {
 }
 
 .tooltip-label {
-  color: #888;
+  color: var(--gis-text-muted);
 }
 
 .pulse-ring {

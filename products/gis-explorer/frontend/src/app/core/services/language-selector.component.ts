@@ -22,24 +22,21 @@ import { I18nService } from './i18n.service';
   `,
   styles: `
     .language {
-      position: fixed;
-      right: 0.7rem;
-      top: 0.65rem;
-      z-index: 10000;
       display: flex;
       align-items: center;
       gap: 0.35rem;
       padding: 0.3rem 0.45rem;
-      border: 1px solid #bbb;
+      border: 1px solid var(--mat-sys-outline-variant);
       border-radius: 5px;
-      background: #fff;
-      color: #333;
+      background: transparent;
+      color: var(--mat-sys-on-surface);
       font-size: 0.8rem;
     }
 
     .language select {
       border: 0;
       background: transparent;
+      color: inherit;
     }
   `,
 })

@@ -99,7 +99,7 @@ const SLOW_HINT_MS = 8000;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.9);
+        background: color-mix(in srgb, var(--gis-panel-bg) 90%, transparent);
         backdrop-filter: blur(4px);
       }
 

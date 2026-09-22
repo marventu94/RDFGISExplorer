@@ -17,7 +17,7 @@ import contextMenus from 'cytoscape-context-menus';
 import { PropertyGraphService } from '../property-graph.service';
 import { GraphInteractionService } from './interaction.service';
 import {
-  CYTOSCAPE_STYLES,
+  canvasStyles,
   CHILD_HEIGHT,
   CHILD_PADDING,
   NODE_TITLE_HEIGHT,
@@ -27,6 +27,7 @@ import { buildCanvasElements } from './canvas-graph.elements';
 import { buildContextMenuConfig } from './canvas-graph.context-menus';
 import { Node, Property, type Edge, type RDFResource } from '../domain';
 import { TranslatePipe } from '../../core/translate.pipe';
+import { getTheme, onThemeChange } from '@rdfgis/platform-bridge';
 
 cytoscape.use(edgehandles);
 cytoscape.use(contextMenus);
@@ -74,7 +75,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     this.cy = cytoscape({
       container,
       elements: this.computeElements(),
-      style: CYTOSCAPE_STYLES,
+      style: canvasStyles(getTheme() === 'dark'),
       layout: { name: 'preset' },
       // No pasar wheelSensitivity: el default ya es 1 y Cytoscape >= 3.31
       // normaliza el scroll por deltaMode (fix para Firefox/Linux integrado).
@@ -93,6 +94,8 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     this.installPlugins();
     this.installInteractions();
     this.subscribeToGraphChanges();
+    const stopTheme = onThemeChange((theme) => this.cy.style(canvasStyles(theme === 'dark')).update());
+    this.destroyRef.onDestroy(stopTheme);
   }
 
   ngOnDestroy(): void {

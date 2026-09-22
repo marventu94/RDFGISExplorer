@@ -90,7 +90,8 @@ interface ViewOption {
       }
       .slot-picker {
         --mdc-icon-button-state-layer-size: 28px;
-        background: rgba(255, 255, 255, 0.85);
+        background: color-mix(in srgb, var(--gis-panel-bg) 85%, transparent);
+        color: var(--gis-text);
         backdrop-filter: blur(4px);
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         padding: 0;

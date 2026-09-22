@@ -2,11 +2,12 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LanguageSelectorComponent } from '../core/language-selector.component';
 import { TranslatePipe } from '../core/translate.pipe';
+import { ThemeToggleComponent } from '../core/theme-toggle.component';
 
 @Component({
   selector: 'app-top-bar',
   standalone: true,
-  imports: [RouterLink, LanguageSelectorComponent, TranslatePipe],
+  imports: [RouterLink, LanguageSelectorComponent, ThemeToggleComponent, TranslatePipe],
   template: `
     <header class="top-bar">
       <div class="top-bar__left">
@@ -25,7 +26,10 @@ import { TranslatePipe } from '../core/translate.pipe';
           <span class="top-bar__crumb top-bar__crumb--active">{{ currentLabel }}</span>
         }
       </nav>
-      <app-language-selector />
+      <div class="top-bar__preferences">
+        <app-language-selector />
+        <app-theme-toggle />
+      </div>
     </header>
   `,
   styles: `
@@ -86,6 +90,8 @@ import { TranslatePipe } from '../core/translate.pipe';
       color: var(--color-text-subtle);
       font-size: 1.1rem;
     }
+
+    .top-bar__preferences { display: flex; align-items: center; gap: .45rem; }
   `,
 })
 export class TopBarComponent {

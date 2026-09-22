@@ -20,10 +20,12 @@ import { AppConfigService } from '../../core/services/app-config.service';
 import { dashboardHost, isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { I18nService } from '../../core/i18n.service';
 import { closePanelFlow } from '../../core/panel-close';
+import { LanguageSelectorComponent } from '../../core/language-selector.component';
+import { ThemeToggleComponent } from '../../core/theme-toggle.component';
 
 @Component({
   selector: 'app-main',
-  imports: [TranslatePipe, SearchPanelComponent, CanvasPanelComponent, ToolsPanelComponent],
+  imports: [TranslatePipe, SearchPanelComponent, CanvasPanelComponent, ToolsPanelComponent, LanguageSelectorComponent, ThemeToggleComponent],
   templateUrl: './main.component.html',
   styleUrl: './main.component.scss',
 })

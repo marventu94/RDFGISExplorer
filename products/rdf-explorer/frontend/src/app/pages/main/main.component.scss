@@ -98,6 +98,8 @@
   padding-left: 8px;
 }
 
+.preferences { display: flex; align-items: center; gap: .4rem; }
+
 .panel-tab {
   flex: 1;
   min-width: 0;

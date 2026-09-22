@@ -20,11 +20,11 @@ import { Component, Input } from '@angular/core';
       .coverage-chip {
         display: inline-block;
          padding: 5px 11px;
-        background: rgba(236, 239, 241, 0.95);
-        border: 1px solid #b0bec5;
+        background: color-mix(in srgb, var(--gis-panel-bg) 95%, transparent);
+        border: 1px solid var(--gis-panel-border);
         border-radius: 16px;
          font-size: 12px;
-        color: #546e7a;
+        color: var(--gis-text-muted);
         white-space: nowrap;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
       }

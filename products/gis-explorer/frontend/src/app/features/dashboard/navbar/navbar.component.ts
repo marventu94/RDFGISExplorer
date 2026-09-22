@@ -34,6 +34,8 @@ import {
 import { DashboardSaveFlowService } from '../dashboard-save-flow.service';
 import { isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { I18nService } from '@core/services/i18n.service';
+import { LanguageSelectorComponent } from '@core/services/language-selector.component';
+import { ThemeToggleComponent } from '@core/services/theme-toggle.component';
 
 /**
  * Íconos propios para los presets de 3 y 4 vistas, dibujados en estilo
@@ -70,6 +72,8 @@ const LAYOUT_SVG_ICONS: Record<string, string> = {
     MatMenuModule,
     MatDialogModule,
     MatSnackBarModule,
+    LanguageSelectorComponent,
+    ThemeToggleComponent,
   ],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',

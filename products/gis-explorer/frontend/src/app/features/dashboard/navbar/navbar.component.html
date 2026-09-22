@@ -47,6 +47,7 @@
   }
 
   <div class="navbar-actions">
+    <div class="navbar-preferences"><app-language-selector /><app-theme-toggle /></div>
     <button type="button" class="navbar-btn" (click)="toggleEditor()">
       <mat-icon>{{ layout.editorCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
       <span>{{ 'Editor' | translate }}</span>
