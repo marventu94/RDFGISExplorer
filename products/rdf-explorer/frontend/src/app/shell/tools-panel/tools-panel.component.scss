@@ -15,8 +15,8 @@
 
 .tool-btn {
   pointer-events: auto;
-  background: #fff;
-  border: 1px solid #ccc;
+  background: var(--explorer-input-bg);
+  border: 1px solid var(--explorer-panel-border);
   border-radius: 4px;
   width: 36px;
   padding: 4px 0;
@@ -25,35 +25,36 @@
   justify-content: center;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--explorer-text-muted);
   transition: background-color 0.15s, color 0.15s;
 }
 
 .tool-btn:hover {
-  background-color: #e9ecef;
+  background-color: var(--explorer-panel-bg);
 }
 
 .tool-btn.active {
-  background-color: #007bff;
+  background-color: var(--color-accent);
   color: #fff;
-  border-color: #007bff;
+  border-color: var(--color-accent);
 }
 
 .right-panel {
   width: 390px;
   flex: 1;
   min-height: 0;
-  border: 1px solid #ccc;
+  border: 1px solid var(--explorer-panel-border);
   border-radius: 4px;
   padding: 6px 12px;
   overflow-y: auto;
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: var(--explorer-panel-bg);
+  color: var(--explorer-text);
   pointer-events: auto;
 }
 
 .tool-placeholder {
   padding: 12px;
-  color: #666;
+  color: var(--explorer-text-muted);
   font-size: 0.9rem;
   text-align: center;
 }

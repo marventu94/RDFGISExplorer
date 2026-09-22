@@ -55,9 +55,9 @@ describe('createGraphStyle', () => {
     const node = styles.find((style) => style.selector === 'node')!.style as Record<string, unknown>;
     const edge = styles.find((style) => style.selector === 'edge')!.style as Record<string, unknown>;
 
-    expect((node['color'] as () => string)()).toBe('#f1f5f9');
-    expect((node['text-outline-color'] as () => string)()).toBe('#0f172a');
-    expect((edge['text-background-color'] as () => string)()).toBe('#0f172a');
+    expect((node['color'] as () => string)()).toBe('#e8e2dc');
+    expect((node['text-outline-color'] as () => string)()).toBe('#201f1d');
+    expect((edge['text-background-color'] as () => string)()).toBe('#242321');
   });
 
   it('keeps unselected nodes visible', () => {

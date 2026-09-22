@@ -55,7 +55,8 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
   styles: [`
     .dialog-container {
       padding: 1.5rem;
-      background: #fff;
+      background: var(--explorer-panel-bg);
+      color: var(--explorer-text);
       border-radius: 6px;
       min-width: 320px;
       max-width: 480px;
@@ -72,12 +73,12 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
       margin: 0 0 1rem;
       font-size: 0.9375rem;
       line-height: 1.45;
-      color: #333;
+      color: var(--explorer-text);
     }
     .detail {
       margin: 0 0 1rem;
       padding: 0.5rem 0.75rem;
-      background: #f5f5f5;
+      background: var(--explorer-bg);
       border-radius: 4px;
       font-size: 0.8125rem;
       max-height: 180px;
@@ -103,9 +104,9 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
       color: #fff;
     }
     .btn-secondary {
-      border: 1px solid #ccc;
-      background: #f5f5f5;
-      color: #333;
+      border: 1px solid var(--explorer-panel-border);
+      background: var(--explorer-bg);
+      color: var(--explorer-text);
     }
   `],
 })

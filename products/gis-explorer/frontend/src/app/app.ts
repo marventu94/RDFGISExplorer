@@ -11,7 +11,6 @@ import { GisSessionStateService } from '@core/services/gis-session-state.service
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadProgressOverlayComponent } from '@features/dashboard/load-progress/load-progress-overlay.component';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import { LanguageSelectorComponent } from '@core/services/language-selector.component';
 import { I18nService } from '@core/services/i18n.service';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -23,7 +22,6 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LoadProgressOverlayComponent,
     DashboardComponent,
     NavbarComponent,
-    LanguageSelectorComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',

@@ -11,6 +11,8 @@ export const UI_TRANSLATIONS = [
   ['Inicio', 'Home'], ['Explorador RDF', 'RDF Explorer'], ['Explorador GIS', 'GIS Explorer'],
   ['Explorer', 'Explorer'], ['GIS', 'GIS'],
   ['Idioma', 'Language'], ['Español', 'Spanish'], ['Inglés', 'English'],
+  ['Tema claro', 'Light theme'], ['Tema oscuro', 'Dark theme'],
+  ['Activar tema claro', 'Switch to light theme'], ['Activar tema oscuro', 'Switch to dark theme'],
   ['Tableros recientes', 'Recent dashboards'], ['No hay tableros todavía', 'No dashboards yet'],
   ['Creá tu primera visualización con uno de los exploradores.', 'Create your first visualization with one of the explorers.'],
   ['Abrir', 'Open'], ['Renombrar', 'Rename'], ['Duplicar', 'Duplicate'], ['Eliminar', 'Delete'],

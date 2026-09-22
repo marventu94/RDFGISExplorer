@@ -20,38 +20,40 @@
 .search-input {
   width: 100%;
   padding: 8px 12px 8px 35px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--explorer-panel-border);
   border-radius: 4px;
   font-size: 0.875rem;
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: var(--explorer-input-bg);
+  color: var(--explorer-text);
 }
 
 .search-input.active {
-  border-color: #007bff;
+  border-color: var(--explorer-input-focus-border);
 }
 
 .search-input.loading {
-  background-color: #fff3cd;
+  background-color: var(--status-warning-bg);
 }
 
 .search-input.error {
-  border-color: #dc3545;
+  border-color: var(--color-danger);
 }
 
 .search-results-panel {
   max-height: calc(100vh - 80px);
-  border: 1px solid #ccc;
+  border: 1px solid var(--explorer-panel-border);
   border-radius: 4px;
   margin-top: 6px;
   padding: 6px 12px;
   overflow-y: auto;
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: var(--explorer-panel-bg);
+  color: var(--explorer-text);
   font-size: 0.85rem;
   pointer-events: auto;
 }
 
 .search-wait {
-  color: #888;
+  color: var(--explorer-text-muted);
   padding: 8px 0;
 }
 
@@ -59,18 +61,18 @@
   padding: 6px 8px;
   border-left: 4px solid;
   margin-bottom: 6px;
-  background: #fff;
+  background: var(--explorer-input-bg);
   border-radius: 3px;
   cursor: grab;
   user-select: none;
 }
 
 .fake-rect:hover {
-  background: #f0f8ff;
+  background: var(--highlight-soft);
 }
 
 .fake-rect .classes {
   font-size: 0.75rem;
-  color: #888;
+  color: var(--explorer-text-muted);
   margin-top: 2px;
 }

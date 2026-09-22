@@ -25,6 +25,25 @@ a {
   color: var(--explorer-link);
 }
 
+input, select, textarea, button { font: inherit; }
+input, select, textarea {
+  background: var(--explorer-input-bg);
+  color: var(--explorer-text);
+  border-color: var(--explorer-input-border);
+}
+
+/* CDK dialogs and menus live outside the component tree. */
+.cdk-overlay-pane { color: var(--explorer-text); }
+.cdk-dialog-container { color: var(--explorer-text); }
+
+/* Both SPARQL viewers are CodeMirror instances and update via CSS in-place. */
+.cm-editor { background: var(--explorer-input-bg); color: var(--explorer-text); }
+.cm-editor .cm-scroller { color: var(--explorer-text); }
+.cm-editor .cm-gutters { background: var(--explorer-panel-bg); color: var(--explorer-text-muted); border-color: var(--explorer-panel-border); }
+.cm-editor .cm-cursor { border-left-color: var(--explorer-text); }
+.cm-editor .cm-activeLine, .cm-editor .cm-activeLineGutter { background: var(--explorer-toolbar-btn-hover-bg); }
+.cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--highlight-soft) !important; }
+
 .no-select {
   user-select: none;
 }

@@ -1,6 +1,14 @@
 @use '@angular/material' as mat;
 @use './theme' as theme;
 
+/* Vendor CSS must precede our theme overrides below. */
+@import 'leaflet/dist/leaflet.css';
+@import 'material-icons/iconfont/material-icons.css';
+@import 'leaflet.markercluster/dist/MarkerCluster.css';
+@import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+@import 'leaflet-draw/dist/leaflet.draw.css';
+@import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
+
 html {
   height: 100%;
   @include mat.theme(
@@ -8,11 +16,16 @@ html {
       color: (
         primary: mat.$azure-palette,
         tertiary: mat.$blue-palette,
+        theme-type: light,
       ),
       typography: Roboto,
       density: 0,
     )
   );
+}
+
+html[data-theme='dark'] {
+  @include mat.theme((color: (primary: mat.$azure-palette, tertiary: mat.$blue-palette, theme-type: dark)));
 }
 
 :root[data-theme='light'] {
@@ -33,9 +46,45 @@ body {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-@import 'leaflet/dist/leaflet.css';
-@import 'material-icons/iconfont/material-icons.css';
-@import 'leaflet.markercluster/dist/MarkerCluster.css';
-@import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-@import 'leaflet-draw/dist/leaflet.draw.css';
-@import 'leaflet-control-geocoder/dist/Control.Geocoder.css';
+/* CDK overlays are attached to body, outside component encapsulation. */
+.cdk-overlay-container {
+  color: var(--mat-sys-on-surface);
+}
+
+:root[data-theme='dark'] .mat-mdc-menu-panel,
+:root[data-theme='dark'] .mat-mdc-dialog-surface,
+:root[data-theme='dark'] .mat-mdc-select-panel,
+:root[data-theme='dark'] .mat-mdc-tooltip-surface,
+:root[data-theme='dark'] .mat-mdc-snackbar-surface {
+  color-scheme: dark;
+}
+
+/* CodeMirror follows the document theme without recreating editor state. */
+.cm-editor { background: var(--cm-bg); color: var(--cm-text); }
+.cm-editor .cm-scroller { color: var(--cm-text); }
+.cm-editor .cm-gutters { background: var(--cm-gutter-bg); color: var(--cm-gutter-fg); border-color: var(--gis-panel-border); }
+.cm-editor .cm-cursor { border-left-color: var(--cm-cursor); }
+.cm-editor .cm-activeLine, .cm-editor .cm-activeLineGutter { background: var(--cm-active-line-bg); }
+.cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--cm-selection) !important; }
+
+/* Leaflet creates controls and popups outside Angular component styling. */
+.leaflet-popup-content-wrapper, .leaflet-popup-tip,
+.leaflet-control, .leaflet-control a, .leaflet-control-geocoder-form input {
+  background-color: var(--leaflet-popup-bg);
+  color: var(--leaflet-popup-text);
+  border-color: var(--gis-panel-border);
+}
+:root[data-theme='dark'] .leaflet-layer.tile-layer-base {
+  filter: brightness(.58) contrast(1.08) saturate(.58) sepia(.12);
+}
+
+:root[data-theme='dark'] .leaflet-container {
+  background: var(--gis-dashboard-bg);
+}
+
+/* vis-timeline owns its DOM, so expose its chrome through theme tokens. */
+.vis-timeline { border-color: var(--gis-panel-border); color: var(--gis-text); }
+.vis-panel, .vis-labelset .vis-label, .vis-time-axis .vis-text { color: var(--gis-text); border-color: var(--gis-panel-border); }
+.vis-time-axis .vis-grid.vis-minor, .vis-panel.vis-center, .vis-panel.vis-left { border-color: var(--gis-panel-border); }
+.vis-labelset .vis-label, .vis-foreground .vis-group { border-color: var(--gis-panel-border); }
+:root[data-theme='dark'] .vis-current-time { background-color: #f85149; }

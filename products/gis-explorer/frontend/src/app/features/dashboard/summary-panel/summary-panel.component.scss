@@ -3,8 +3,8 @@
 }
 
 .summary-panel {
-  border-bottom: 1px solid #cfd8dc;
-  background: #fafafa;
+  border-bottom: 1px solid var(--gis-panel-border);
+  background: var(--gis-dashboard-bg);
 }
 
 .summary-header {
@@ -17,10 +17,10 @@
   background: transparent;
   cursor: pointer;
   font-size: 13px;
-  color: #455a64;
+  color: var(--gis-text-muted);
 
   &:hover {
-    background: #eceff1;
+    background: var(--gis-dashboard-bg);
   }
 
   mat-icon {
@@ -35,7 +35,7 @@
 }
 
 .summary-total {
-  color: #607d8b;
+  color: var(--gis-text-muted);
 }
 
 .summary-toggle {
@@ -49,7 +49,7 @@
 .summary-scope {
   margin: 4px 0 8px;
   font-size: 12px;
-  color: #607d8b;
+  color: var(--gis-text-muted);
 }
 
 .summary-failed {
@@ -71,19 +71,19 @@
   min-width: 180px;
   max-width: 320px;
   padding: 8px 12px;
-  border: 1px solid #b0bec5;
+  border: 1px solid var(--gis-panel-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--gis-panel-bg);
   font-size: 12px;
 }
 
 .summary-var {
   font-weight: 600;
-  color: #37474f;
+  color: var(--gis-text-muted);
 }
 
 .summary-values {
-  color: #455a64;
+  color: var(--gis-text-muted);
 }
 
 .summary-hint {
@@ -106,10 +106,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #455a64;
+  color: var(--gis-text-muted);
 }
 
 .summary-top-count {
-  color: #607d8b;
+  color: var(--gis-text-muted);
   font-variant-numeric: tabular-nums;
 }

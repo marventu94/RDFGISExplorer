@@ -55,35 +55,36 @@
   --top-bar-icon: var(--color-text-muted);
   --top-bar-icon-hover-bg: var(--color-bg-hover);
   --top-bar-icon-hover-fg: var(--color-text);
+
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  // Surfaces — slate scale
-  --color-bg: #0f172a;
-  --color-bg-surface: #1e293b;
-  --color-bg-elevated: #1e293b;
-  --color-bg-hover: #334155;
-  --color-bg-active: #475569;
+  // Surfaces — shared warm charcoal scale
+  --color-bg: #201f1d;
+  --color-bg-surface: #292724;
+  --color-bg-elevated: #302e2b;
+  --color-bg-hover: #35322e;
+  --color-bg-active: #3d3935;
   --color-bg-inverse: #f1f5f9;
 
   // Borders
-  --color-border: #334155;
-  --color-border-strong: #475569;
-  --color-border-subtle: #1e293b;
+  --color-border: #48433e;
+  --color-border-strong: #5b554f;
+  --color-border-subtle: #35322e;
 
   // Text
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
-  --color-text-subtle: #64748b;
-  --color-text-inverse: #0f172a;
-  --color-text-on-accent: #0f172a;
+  --color-text: #e8e2dc;
+  --color-text-muted: #aaa19a;
+  --color-text-subtle: #827a73;
+  --color-text-inverse: #201f1d;
+  --color-text-on-accent: #201f1d;
 
   // Accent — softer blue
-  --color-accent: #60a5fa;
-  --color-accent-hover: #93c5fd;
-  --color-accent-soft: #1e3a5f;
+  --color-accent: #79a7e3;
+  --color-accent-hover: #9bbce7;
+  --color-accent-soft: #343d49;
 
   // Semantic
   --color-success: #34d399;
@@ -91,7 +92,7 @@
   --color-danger: #f87171;
 
   // Code
-  --color-code-bg: #0b1220;
+  --color-code-bg: #1f1e1c;
 
   // Shadow — stronger alpha for dark backgrounds
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -107,4 +108,18 @@
   --top-bar-icon: var(--color-text-muted);
   --top-bar-icon-hover-bg: var(--color-bg-hover);
   --top-bar-icon-hover-fg: var(--color-text);
+
+  // Angular Material surfaces keep the same warm scale in overlays and dialogs.
+  --mat-sys-surface: #242321;
+  --mat-sys-surface-dim: #201f1d;
+  --mat-sys-surface-bright: #3d3935;
+  --mat-sys-surface-container-lowest: #1f1e1c;
+  --mat-sys-surface-container-low: #242321;
+  --mat-sys-surface-container: #292724;
+  --mat-sys-surface-container-high: #302e2b;
+  --mat-sys-surface-container-highest: #393632;
+  --mat-sys-on-surface: #e8e2dc;
+  --mat-sys-on-surface-variant: #c7beb6;
+  --mat-sys-outline: #8d857e;
+  --mat-sys-outline-variant: #48433e;
 }
