@@ -1,12 +1,8 @@
 import { TranslatePipe } from '../../core/services/translate.pipe';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatRadioModule } from '@angular/material/radio';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { dashboardHost } from '@rdfgis/platform-bridge';
 import { I18nService } from '@core/services/i18n.service';
@@ -24,12 +20,9 @@ export interface SaveDashboardDialogResult {
 @Component({
   selector: 'app-save-dashboard-dialog',
   standalone: true,
-  imports: [TranslatePipe,    MatDialogModule,
-    MatButtonModule,
+  imports: [
+    TranslatePipe,
     MatIconModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatRadioModule,
     FormsModule,
   ],
   templateUrl: './save-dashboard-dialog.component.html',
@@ -108,5 +101,9 @@ export class SaveDashboardDialogComponent implements OnInit {
       mode: this.data.hasCurrentDashboard ? this.mode() : 'copy',
     };
     this.dialogRef.close(result);
+  }
+
+  protected onCancel(): void {
+    this.dialogRef.close();
   }
 }

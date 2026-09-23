@@ -1,12 +1,21 @@
-<h2 mat-dialog-title>{{ 'Guardar tablero' | translate }}</h2>
-<mat-dialog-content>
-  <mat-form-field appearance="outline" class="full-width">
-    <mat-label>{{ 'Nombre del tablero' | translate }}</mat-label>
-    <input matInput [ngModel]="name()" (ngModelChange)="onNameChange($event)" [attr.placeholder]="'Ej: Mis ciudades argentinas' | translate" />
-    @if (checking()) {
-      <mat-icon matSuffix>hourglass_empty</mat-icon>
-    }
-  </mat-form-field>
+<div class="dialog-container">
+  <h3>{{ 'Guardar tablero' | translate }}</h3>
+
+  <label class="field">
+    <span>{{ 'Nombre del tablero' | translate }}</span>
+    <span class="input-wrapper">
+      <input
+        type="text"
+        [ngModel]="name()"
+        (ngModelChange)="onNameChange($event)"
+        [attr.placeholder]="'Ej: Mis ciudades argentinas' | translate"
+        [class.input-error]="hasConflict() && mode() === 'copy'"
+      />
+      @if (checking()) {
+        <mat-icon class="checking-icon">hourglass_empty</mat-icon>
+      }
+    </span>
+  </label>
 
   @if (hasConflict()) {
     <div class="conflict-message" [class.conflict-warning]="mode() === 'overwrite'" [class.conflict-error]="mode() === 'copy'">
@@ -16,29 +25,34 @@
   }
 
   @if (showModeOptions) {
-    <div class="mode-options">
-      <mat-radio-group name="saveMode">
-        <mat-radio-button
+    <div class="mode-selector">
+      <label>
+        <input
+          type="radio"
+          name="saveMode"
           value="overwrite"
           [checked]="mode() === 'overwrite'"
           (change)="mode.set('overwrite')"
-        >
+        />
           {{ 'Sobreescribir existente' | translate }}
-        </mat-radio-button>
-        <mat-radio-button
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="saveMode"
           value="copy"
           [checked]="mode() === 'copy'"
           (change)="mode.set('copy')"
-        >
+        />
           {{ 'Guardar como copia' | translate }}
-        </mat-radio-button>
-      </mat-radio-group>
+      </label>
     </div>
   }
-</mat-dialog-content>
-<mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close>{{ 'Cancelar' | translate }}</button>
-  <button mat-flat-button [disabled]="!canSave" (click)="onSave()">
-    {{ 'Guardar' | translate }}
-  </button>
-</mat-dialog-actions>
+
+  <div class="actions">
+    <button class="btn-secondary" type="button" (click)="onCancel()">{{ 'Cancelar' | translate }}</button>
+    <button class="btn-primary" type="button" [disabled]="!canSave" (click)="onSave()">
+      {{ 'Guardar' | translate }}
+    </button>
+  </div>
+</div>

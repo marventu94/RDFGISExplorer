@@ -15,9 +15,10 @@
 
 .tool-btn {
   pointer-events: auto;
-  background: var(--explorer-input-bg);
-  border: 1px solid var(--explorer-panel-border);
-  border-radius: 4px;
+  background: var(--explorer-input-bg, var(--color-bg-elevated, #fff));
+  border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 8%));
   width: 36px;
   padding: 4px 0;
   display: flex;
@@ -25,36 +26,37 @@
   justify-content: center;
   cursor: pointer;
   font-size: 0.9rem;
-  color: var(--explorer-text-muted);
+  color: var(--explorer-text-muted, var(--color-text-muted, #6c757d));
   transition: background-color 0.15s, color 0.15s;
 }
 
 .tool-btn:hover {
-  background-color: var(--explorer-panel-bg);
+  background-color: var(--explorer-toolbar-btn-hover-bg, var(--color-bg-hover, #f1f3f5));
 }
 
 .tool-btn.active {
-  background-color: var(--color-accent);
-  color: #fff;
-  border-color: var(--color-accent);
+  background-color: var(--color-accent, var(--explorer-link, #0d6efd));
+  color: var(--color-text-on-accent, #fff);
+  border-color: var(--color-accent, var(--explorer-link, #0d6efd));
 }
 
 .right-panel {
   width: 390px;
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--explorer-panel-border);
-  border-radius: 4px;
-  padding: 6px 12px;
+  border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+  border-radius: 8px;
+  padding: 12px;
   overflow-y: auto;
-  background-color: var(--explorer-panel-bg);
-  color: var(--explorer-text);
+  background-color: var(--explorer-panel-bg, var(--color-bg-elevated, #fff));
+  color: var(--explorer-text, var(--color-text, #212529));
+  box-shadow: var(--shadow-md, 0 2px 6px rgb(0 0 0 / 12%));
   pointer-events: auto;
 }
 
 .tool-placeholder {
   padding: 12px;
-  color: var(--explorer-text-muted);
+  color: var(--explorer-text-muted, var(--color-text-muted, #6c757d));
   font-size: 0.9rem;
   text-align: center;
 }

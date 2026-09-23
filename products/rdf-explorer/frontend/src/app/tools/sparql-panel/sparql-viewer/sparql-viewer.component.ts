@@ -19,6 +19,15 @@ import { sparql } from 'codemirror-lang-sparql';
   styles: [`
     :host { display: block; overflow: hidden; }
     .cm-host { font-size: 0.8rem; }
+    :host-context(html[data-theme='dark']) ::ng-deep .cm-gutters {
+      background: #302e2b;
+      color: #948b83;
+      border-right-color: #48433e;
+    }
+    :host-context(html[data-theme='dark']) ::ng-deep .cm-activeLineGutter {
+      background: #35322e;
+      color: #c1b8b0;
+    }
   `],
 })
 export class SparqlViewerComponent implements AfterViewInit, OnChanges, OnDestroy {
