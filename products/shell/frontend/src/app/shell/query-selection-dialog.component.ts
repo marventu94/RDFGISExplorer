@@ -26,7 +26,7 @@ export interface QuerySelectionDialogData {
             (click)="selectedId.set(candidate.id)"
           >
             <span class="radio" aria-hidden="true"></span>
-            <span>{{ candidate.label }}</span>
+            <span class="option-label" [attr.title]="candidate.label">{{ candidate.label }}</span>
           </button>
         }
       </div>
@@ -64,6 +64,7 @@ export interface QuerySelectionDialogData {
       cursor: pointer;
     }
     .option--selected { border-color: var(--color-accent, #1f77b4); background: var(--color-bg-active, #eef6ff); }
+    .option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .radio { width: 16px; height: 16px; border: 2px solid var(--color-border, #aaa); border-radius: 50%; flex: 0 0 auto; }
     .option--selected .radio { border: 5px solid var(--color-accent, #1f77b4); }
     .actions { display: flex; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; }

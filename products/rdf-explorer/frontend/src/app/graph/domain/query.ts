@@ -24,6 +24,7 @@ export interface QueryRetriever {
 }
 
 export class Query {
+  readonly root: RDFResource;
   select: RDFResource[] = [];
   triples: RDFResource[][] = [];
   optionals: RDFResource[][][] = [];
@@ -36,6 +37,7 @@ export class Query {
     private readonly ctx: GraphContext,
     resource: RDFResource,
   ) {
+    this.root = resource;
     this.select = [resource];
     this.update(resource);
   }

@@ -54,16 +54,15 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
   `,
   styles: [`
     .dialog-container {
+      box-sizing: border-box;
       padding: 1.5rem;
-      background: var(--explorer-panel-bg);
-      color: var(--explorer-text);
-      border-radius: 6px;
+      background: var(--explorer-panel-bg, var(--color-bg-elevated, #fff));
+      color: var(--explorer-text, var(--color-text, #212529));
+      border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg, 0 4px 12px rgb(0 0 0 / 18%));
       min-width: 320px;
       max-width: 480px;
-      border-top: 4px solid #1f77b4;
-    }
-    .dialog-container.is-error {
-      border-top-color: #c0392b;
     }
     h3 {
       margin: 0 0 0.75rem;
@@ -73,12 +72,14 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
       margin: 0 0 1rem;
       font-size: 0.9375rem;
       line-height: 1.45;
-      color: var(--explorer-text);
+      color: var(--explorer-text, var(--color-text, #212529));
     }
     .detail {
       margin: 0 0 1rem;
       padding: 0.5rem 0.75rem;
-      background: var(--explorer-bg);
+      border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+      background: var(--explorer-input-bg, var(--color-bg, #fff));
+      color: var(--explorer-text, var(--color-text, #212529));
       border-radius: 4px;
       font-size: 0.8125rem;
       max-height: 180px;
@@ -90,23 +91,33 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
       display: flex;
       justify-content: flex-end;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
     .actions button {
       padding: 0.5rem 1rem;
       border-radius: 4px;
+      border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+      background: var(--explorer-input-bg, var(--color-bg, #fff));
+      color: var(--explorer-text, var(--color-text, #212529));
       cursor: pointer;
       font-size: 0.875rem;
+      font: inherit;
+    }
+    .actions button:hover {
+      background: var(--explorer-toolbar-btn-hover-bg, var(--color-bg-hover, #f1f3f5));
+    }
+    .actions button:focus-visible {
+      outline: 2px solid var(--color-accent, var(--explorer-link, #0d6efd));
+      outline-offset: 2px;
     }
     .btn-primary {
-      border: 1px solid #1f77b4;
-      background: #1f77b4;
-      color: #fff;
+      border-color: var(--color-accent, var(--explorer-link, #0d6efd));
+      background: var(--color-accent, var(--explorer-link, #0d6efd));
+      color: var(--color-text-on-accent, #fff);
     }
-    .btn-secondary {
-      border: 1px solid var(--explorer-panel-border);
-      background: var(--explorer-bg);
-      color: var(--explorer-text);
+    .btn-primary:hover {
+      border-color: var(--color-accent-hover, #0b5ed7);
+      background: var(--color-accent-hover, #0b5ed7);
     }
   `],
 })

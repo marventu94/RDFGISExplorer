@@ -2,8 +2,10 @@ import cytoscape from 'cytoscape';
 
 export const CHILD_HEIGHT = 28;
 export const CHILD_PADDING = 8;
+export const FILTER_HEIGHT = 22;
 export const NODE_WIDTH = 220;
 export const PROP_WIDTH = 200;
+export const FILTER_WIDTH = 184;
 
 // Height of a node that has no properties — just enough room for the title.
 export const NODE_EMPTY_HEIGHT = 44;
@@ -158,6 +160,39 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetCSS[] = [
     } as cytoscape.Css.Node,
   },
   {
+    selector: 'node[kind = "filter"]',
+    css: {
+      'shape': 'round-rectangle',
+      'background-color': '#fff4dc',
+      'background-opacity': 1,
+      'border-width': 1,
+      'border-color': '#c28a32',
+      'label': 'data(label)',
+      'text-valign': 'center',
+      // In Cytoscape, `left` places the whole label to the left of the node;
+      // it is not CSS-like text alignment inside the node. Keep the label and
+      // capsule on the same centre and let text-max-width ellipsize long rows.
+      'text-halign': 'center',
+      'text-margin-x': 0,
+      'text-margin-y': 0,
+      'font-size': '10px',
+      'font-weight': 'normal',
+      'color': '#684712',
+      'width': FILTER_WIDTH,
+      'height': FILTER_HEIGHT,
+      'padding': '2px 6px',
+      'text-wrap': 'ellipsis',
+      'text-max-width': `${FILTER_WIDTH - 18}px`,
+    } as cytoscape.Css.Node,
+  },
+  {
+    selector: 'node[kind = "filter"]:selected',
+    css: {
+      'overlay-color': '#c28a32',
+      'overlay-opacity': 0.22,
+    } as cytoscape.Css.Node,
+  },
+  {
     selector: 'edge',
     css: {
       'width': 3,
@@ -191,6 +226,9 @@ export function canvasStyles(dark: boolean): cytoscape.StylesheetCSS[] {
     '#f3f3f3': '#292724',
     '#f0f0f0': '#242321',
     '#333': '#e8e2dc',
+    '#fff4dc': '#463a28',
+    '#c28a32': '#d5a24f',
+    '#684712': '#f1d49b',
   };
   return CYTOSCAPE_STYLES.map((rule) => ({
     ...rule,

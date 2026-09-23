@@ -11,6 +11,7 @@ export interface QueryExportProvider {
 }
 
 const QUERY_EXPORT_PROVIDER_KEY = '__rdfgisQueryExportProvider_v1';
+const QUERY_EXPORT_REQUEST_EVENT = 'rdfgis:query-export-request';
 
 type BridgeWindow = Window & {
   [QUERY_EXPORT_PROVIDER_KEY]?: QueryExportProvider;
@@ -33,4 +34,19 @@ export function registerQueryExportProvider(provider: QueryExportProvider): () =
 
 export function queryExportProvider(): QueryExportProvider | null {
   return browserWindow()?.[QUERY_EXPORT_PROVIDER_KEY] ?? null;
+}
+
+/** Requests the host to run its centralized Explorer -> GIS handoff flow. */
+export function requestQueryExport(): boolean {
+  const target = browserWindow();
+  if (!target) return false;
+  return target.dispatchEvent(new CustomEvent(QUERY_EXPORT_REQUEST_EVENT));
+}
+
+/** Registers the Shell-side orchestration without coupling a remote to Angular services. */
+export function onQueryExportRequest(listener: () => void): () => void {
+  const target = browserWindow();
+  if (!target) return () => undefined;
+  target.addEventListener(QUERY_EXPORT_REQUEST_EVENT, listener);
+  return () => target.removeEventListener(QUERY_EXPORT_REQUEST_EVENT, listener);
 }

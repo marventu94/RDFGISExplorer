@@ -1,7 +1,45 @@
 import type cytoscape from 'cytoscape';
 
-import { CHILD_HEIGHT, CHILD_PADDING, NODE_TITLE_HEIGHT } from './canvas-graph.styles';
+import {
+  CHILD_HEIGHT,
+  CHILD_PADDING,
+  FILTER_HEIGHT,
+  NODE_TITLE_HEIGHT,
+} from './canvas-graph.styles';
 import type { Node, Edge, RDFResource } from '../domain';
+import type { Filter } from '../domain/filter';
+
+const FILTER_VALUE_MAX_LENGTH = 34;
+
+function compactFilterValue(value: unknown): string {
+  const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (normalized.length <= FILTER_VALUE_MAX_LENGTH) return normalized;
+  return `${normalized.slice(0, FILTER_VALUE_MAX_LENGTH - 1)}…`;
+}
+
+/** Human-readable, compact representation of the actual SPARQL constraint. */
+export function filterLabel(filter: Filter): string {
+  switch (filter.type) {
+    case 'text':
+      return `⌕ text · “${compactFilterValue(filter.data.keyword)}”`;
+    case 'lang':
+      return `⌕ lang · ${compactFilterValue(filter.data.language)}`;
+    case 'regex':
+      return `⌕ regex · /${compactFilterValue(filter.data.regex)}/i`;
+    case 'leq':
+      return `⌕ < ${compactFilterValue(filter.data.number)}`;
+    case 'geq':
+      return `⌕ > ${compactFilterValue(filter.data.number)}`;
+    case 'isuri':
+      return '⌕ isIRI';
+    case 'isliteral':
+      return '⌕ isLiteral';
+    case 'datefrom':
+      return `⌕ ≥ ${compactFilterValue(filter.data.date)}`;
+    case 'dateto':
+      return `⌕ ≤ ${compactFilterValue(filter.data.date)}`;
+  }
+}
 
 /**
  * Traduccion dominio -> elementos de cytoscape.
@@ -24,20 +62,46 @@ export function buildCanvasElements(
   const elements: cytoscape.ElementDefinition[] = [];
 
   for (const node of nodes) {
-    const block = CHILD_HEIGHT + CHILD_PADDING;
-    const totalChildren = node.properties.reduce(
-      (n, p) => n + 1 + (p.literal ? 1 : 0),
-      0,
-    );
+    const rowHeights: number[] = [
+      ...node.variable.filters.map(() => FILTER_HEIGHT),
+      ...node.properties.flatMap((prop) => [
+        CHILD_HEIGHT,
+        ...prop.variable.filters.map(() => FILTER_HEIGHT),
+        ...(prop.literal
+          ? [CHILD_HEIGHT, ...prop.literal.variable.filters.map(() => FILTER_HEIGHT)]
+          : []),
+      ]),
+    ];
+    const totalChildren = rowHeights.length;
     // El bloque de hijos se acomoda para que el compound (titulo + hijos +
-    // padding) quede centrado en (node.x, node.y). Sin hijos, childY no se usa:
+    // padding) quede centrado en (node.x, node.y). Sin hijos, rowTop no se usa:
     // de ese caso se encarga el estilo :childless.
     const childrenBlockHeight =
       totalChildren > 0
-        ? totalChildren * CHILD_HEIGHT + (totalChildren - 1) * CHILD_PADDING
+        ? rowHeights.reduce((sum, height) => sum + height, 0) +
+          (totalChildren - 1) * CHILD_PADDING
         : 0;
     const compoundHeight = NODE_TITLE_HEIGHT + childrenBlockHeight + CHILD_PADDING;
-    let childY = node.y - compoundHeight / 2 + NODE_TITLE_HEIGHT + CHILD_HEIGHT / 2;
+    let rowTop = node.y - compoundHeight / 2 + NODE_TITLE_HEIGHT;
+
+    const addFilterRows = (resource: RDFResource, ownerId: string): void => {
+      resource.variable.filters.forEach((filter, index) => {
+        elements.push({
+          group: 'nodes',
+          data: {
+            id: `f-${resource.variable.id}-${index}`,
+            parent: `n${node.id}`,
+            kind: 'filter',
+            label: filterLabel(filter),
+            domain: resource,
+            ownerId,
+          },
+          position: { x: node.x, y: rowTop + FILTER_HEIGHT / 2 },
+          classes: 'cy-filter',
+        });
+        rowTop += FILTER_HEIGHT + CHILD_PADDING;
+      });
+    };
 
     elements.push({
       group: 'nodes',
@@ -64,6 +128,8 @@ export function buildCanvasElements(
       });
     }
 
+    addFilterRows(node, `n${node.id}`);
+
     for (const prop of node.properties) {
       const propColor = prop.isLiteral()
         ? '#9467bd'
@@ -81,10 +147,11 @@ export function buildCanvasElements(
           label: resourceLabel(prop),
           domain: prop,
         },
-        position: { x: node.x, y: childY },
+        position: { x: node.x, y: rowTop + CHILD_HEIGHT / 2 },
         classes: 'cy-prop',
       });
-      childY += block;
+      rowTop += CHILD_HEIGHT + CHILD_PADDING;
+      addFilterRows(prop, `p${prop.id}`);
 
       if (prop.literal) {
         elements.push({
@@ -97,10 +164,11 @@ export function buildCanvasElements(
             label: resourceLabel(prop.literal),
             domain: prop.literal,
           },
-          position: { x: node.x, y: childY },
+          position: { x: node.x, y: rowTop + CHILD_HEIGHT / 2 },
           classes: 'cy-lit',
         });
-        childY += block;
+        rowTop += CHILD_HEIGHT + CHILD_PADDING;
+        addFilterRows(prop.literal, `l${prop.id}`);
       }
     }
   }

@@ -1,9 +1,10 @@
-import { Injectable, inject } from '@angular/core';
+import { DestroyRef, Injectable, inject } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import {
   queryExportProvider,
+  onQueryExportRequest,
   writePendingHandoff,
   type QueryExportCandidate,
 } from '@rdfgis/platform-bridge';
@@ -19,6 +20,11 @@ export class ExploreInGisService {
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
   private readonly gisGuard = inject(GisOpenGuardService);
+
+  constructor() {
+    const unregister = onQueryExportRequest(() => void this.explore());
+    inject(DestroyRef).onDestroy(unregister);
+  }
 
   async explore(): Promise<void> {
     const candidates = queryExportProvider()?.listCandidates() ?? [];
