@@ -32,6 +32,43 @@
   overflow: auto;
 }
 
+// En modo oscuro se usa una paleta cálida y sobria, alineada con el visor de
+// RDF Explorer. Los valores son locales para que el editor integrado en el
+// Shell no dependa de que los tokens globales del remote estén disponibles.
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-editor {
+  background: #242321;
+  color: #d8d1ca;
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-content,
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-content span {
+  color: #d8d1ca !important;
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-gutters {
+  background: #302e2b;
+  color: #948b83;
+  border-right-color: #48433e;
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-activeLine,
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-activeLineGutter {
+  background: #35322e;
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-activeLineGutter {
+  color: #c1b8b0;
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-cursor {
+  border-left-color: #f0ebe6;
+}
+
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-selectionBackground,
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-editor.cm-focused .cm-selectionBackground {
+  background: #4a443e !important;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
