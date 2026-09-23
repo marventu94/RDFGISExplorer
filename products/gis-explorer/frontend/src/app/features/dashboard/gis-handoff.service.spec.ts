@@ -15,6 +15,7 @@ import { SparqlQueryStateService } from '@core/services/sparql-query-state.servi
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
+import { SelectionService } from '@core/services/selection.service';
 import { I18nService } from '@core/services/i18n.service';
 
 interface MockTarget {
@@ -44,6 +45,7 @@ describe('GisHandoffService', () => {
   let saveFlowMock: { saveInteractive: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
   let snackMock: { open: ReturnType<typeof vi.fn> };
+  let selectionMock: { setQueryResult: ReturnType<typeof vi.fn> };
   let dialogResult: unknown;
 
   beforeEach(() => {
@@ -64,6 +66,7 @@ describe('GisHandoffService', () => {
       open: vi.fn(() => ({ afterClosed: () => of(dialogResult) })),
     };
     snackMock = { open: vi.fn() };
+    selectionMock = { setQueryResult: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
@@ -75,6 +78,7 @@ describe('GisHandoffService', () => {
         { provide: DashboardSaveFlowService, useValue: saveFlowMock },
         { provide: MatDialog, useValue: dialogMock },
         { provide: MatSnackBar, useValue: snackMock },
+        { provide: SelectionService, useValue: selectionMock },
       ],
     });
 
@@ -137,6 +141,8 @@ describe('GisHandoffService', () => {
       'timeline',
     ]);
     expect(TestBed.inject(DashboardViewStateService).graphState()).toEqual({ layout: 'dagre' });
+    expect(selectionMock.setQueryResult).toHaveBeenCalledWith(null);
+    expect(TestBed.inject(DashboardViewStateService).mapViewportFit()).toBe(1);
     // The handoff is consumed and is not pending on the next entry.
     expect(handoff.peek()).toBeNull();
   });

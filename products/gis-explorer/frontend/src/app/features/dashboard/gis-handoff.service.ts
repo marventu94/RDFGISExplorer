@@ -7,6 +7,7 @@ import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
+import { SelectionService } from '@core/services/selection.service';
 import { ErrorDialogComponent } from '@features/sparql-input/error-dialog.component';
 import { DashboardSaveFlowService } from './dashboard-save-flow.service';
 import { I18nService } from '@core/services/i18n.service';
@@ -41,6 +42,7 @@ export class GisHandoffService {
   private readonly dashboardLayout = inject(DashboardLayoutService);
   private readonly viewState = inject(DashboardViewStateService);
   private readonly sessionState = inject(GisSessionStateService);
+  private readonly selection = inject(SelectionService);
   private readonly saveFlow = inject(DashboardSaveFlowService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -110,6 +112,10 @@ export class GisHandoffService {
     // use the dedicated graph-right / map-and-timeline-left arrangement.
     this.dashboardLayout.applyRdfHandoffLayout();
     this.viewState.resetGraphLayout('dagre');
+    // Clear the previous result before requesting the fit. Otherwise an open
+    // map can consume the new fit revision while re-rendering the old result,
+    // leaving the imported result at the previous dashboard's zoom.
+    this.selection.setQueryResult(null);
     this.viewState.requestMapViewportFit();
 
     target.setQuery(payload.query);
