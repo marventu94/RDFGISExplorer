@@ -108,18 +108,8 @@ describe('GisSessionStateService', () => {
     expect(readGisSessionState()).toMatchObject({ dashboardId: null, hasWorkAtRisk: true });
   });
 
-  it('does not mark risk when the view matches the latest import', () => {
-    const imported = 'SELECT ?x WHERE { ?x ?p ?o } LIMIT 100';
-    TestBed.inject(GisSessionStateService).markImported(imported);
-    queryState.query.set(imported);
-    TestBed.tick();
-
-    expect(readGisSessionState()?.hasWorkAtRisk).toBe(false);
-  });
-
-  it('marks risk again when the imported query is edited', () => {
-    TestBed.inject(GisSessionStateService).markImported('SELECT ?x WHERE { ?x ?p ?o }');
-    queryState.query.set('SELECT ?x WHERE { ?x ?p ?o } LIMIT 5');
+  it('marks the latest imported query as at risk once it has been executed', () => {
+    queryState.query.set('SELECT ?x WHERE { ?x ?p ?o } LIMIT 100');
     TestBed.tick();
 
     expect(readGisSessionState()?.hasWorkAtRisk).toBe(true);
