@@ -4,6 +4,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { QueryHandoffService, getAutoRunHandoff } from '@core/services/query-handoff.service';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
+import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
 import { ErrorDialogComponent } from '@features/sparql-input/error-dialog.component';
 import { DashboardSaveFlowService } from './dashboard-save-flow.service';
@@ -36,6 +38,8 @@ const AUTO_RUN_DELAY_MS = 300;
 export class GisHandoffService {
   private readonly handoff = inject(QueryHandoffService);
   private readonly dashboardState = inject(DashboardStateService);
+  private readonly dashboardLayout = inject(DashboardLayoutService);
+  private readonly viewState = inject(DashboardViewStateService);
   private readonly sessionState = inject(GisSessionStateService);
   private readonly saveFlow = inject(DashboardSaveFlowService);
   private readonly dialog = inject(MatDialog);
@@ -106,12 +110,18 @@ export class GisHandoffService {
     this.dashboardState.clearCurrent();
     this.sessionState.markImported(payload.query);
 
+    // A handoff starts a new GIS view: discard the previous graph camera and
+    // use the dedicated graph-right / map-and-timeline-left arrangement.
+    this.dashboardLayout.applyRdfHandoffLayout();
+    this.viewState.resetGraphLayout('dagre');
+    this.viewState.requestMapViewportFit();
+
     target.setQuery(payload.query);
     target.setBackend(payload.backend);
 
     if (getAutoRunHandoff()) {
       this.dashboardState.beginQueryLoad();
-      setTimeout(() => target.execute({ configureLayout: true, showLoadProgress: true }), AUTO_RUN_DELAY_MS);
+      setTimeout(() => target.execute({ showLoadProgress: true }), AUTO_RUN_DELAY_MS);
     } else {
       this.snackBar.open(
         this.i18n.text('Query importada del RDF Explorer. Apretá Ejecutar para correrla.'),

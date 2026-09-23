@@ -285,6 +285,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private cdr: ChangeDetectorRef,
   ) {
+    effect(() => {
+      const request = this.viewState.graphLayoutReset();
+      if (request.revision === 0 || !this.cy || !(request.layout in LAYOUT_CONFIGS)) return;
+      this.setLayout(request.layout as GraphLayout);
+    });
+
     // Cuando llega la config se aplica el cap configurado (en tests el
     // LimitsService queda con defaults y el spec pisa MAX_NODES después).
     effect(() => {

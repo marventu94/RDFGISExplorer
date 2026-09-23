@@ -12,6 +12,8 @@ import { ErrorDialogComponent } from '@features/sparql-input/error-dialog.compon
 import { QueryHandoffService, setAutoRunHandoff } from '@core/services/query-handoff.service';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
+import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import { GisSessionStateService } from '@core/services/gis-session-state.service';
 import { I18nService } from '@core/services/i18n.service';
 
@@ -128,6 +130,13 @@ describe('GisHandoffService', () => {
     expect(dialogMock.open).not.toHaveBeenCalled();
     expect(target.setQuery).toHaveBeenCalledWith('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
     expect(target.setBackend).toHaveBeenCalledWith('custom');
+    expect(TestBed.inject(DashboardLayoutService).preset()).toBe('triple-v-inv');
+    expect(TestBed.inject(DashboardLayoutService).visibleSlots()).toEqual([
+      'graph',
+      'map',
+      'timeline',
+    ]);
+    expect(TestBed.inject(DashboardViewStateService).graphState()).toEqual({ layout: 'dagre' });
     // The handoff is consumed and is not pending on the next entry.
     expect(handoff.peek()).toBeNull();
   });
@@ -157,7 +166,6 @@ describe('GisHandoffService', () => {
     expect(target.execute).not.toHaveBeenCalled();
     vi.advanceTimersByTime(300);
     expect(target.execute).toHaveBeenCalledWith({
-      configureLayout: true,
       showLoadProgress: true,
     });
     vi.useRealTimers();
