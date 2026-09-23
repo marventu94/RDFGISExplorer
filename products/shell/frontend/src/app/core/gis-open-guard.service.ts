@@ -67,4 +67,27 @@ export class GisOpenGuardService {
     if (choice === 'go-save') return 'go-save';
     return 'cancel';
   }
+
+  async askBeforeHandoff(): Promise<OpenDecision> {
+    const gis = readGisSessionState();
+    if (!gis?.hasWorkAtRisk) return 'proceed';
+
+    const data: MessageDialogData = {
+      title: gis.dashboardName
+        ? `Vas a reemplazar "${gis.dashboardName}" en GIS`
+        : 'Vas a reemplazar la vista de GIS',
+      message: gis.dashboardName
+        ? `En GIS tenés abierto el tablero "${gis.dashboardName}". Al explorar esta consulta se reemplazan su consulta, layout y filtros: lo que no hayas guardado se pierde.`
+        : 'En GIS hay una vista sin guardar. Al explorar esta consulta se reemplazan su consulta, layout y filtros.',
+      actions: [
+        { label: 'Cancelar', value: 'cancel' },
+        { label: 'Ir a GIS a guardar', value: 'go-save' },
+        { label: 'Explorar igual', value: 'open', primary: true },
+      ],
+    };
+    const choice = await firstValueFrom(this.dialog.open<string>(MessageDialogComponent, { data }).closed);
+    if (choice === 'open') return 'proceed-confirmed';
+    if (choice === 'go-save') return 'go-save';
+    return 'cancel';
+  }
 }

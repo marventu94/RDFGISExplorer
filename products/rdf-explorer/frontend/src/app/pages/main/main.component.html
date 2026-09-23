@@ -33,13 +33,6 @@
       </div>
       <div class="tabs-actions">
         <div class="preferences"><app-language-selector /><app-theme-toggle /></div>
-        <button
-          class="handoff-btn"
-          [disabled]="!canHandoff()"
-          (click)="handoffToGis()"
-          type="button"
-          [attr.title]="'Explorar en GIS' | translate"
-        >{{ 'Explorar en GIS' | translate }}</button>
         @if (dashboardsAvailable) {
           <button class="save-btn" (click)="openSaveDialog()" type="button" [attr.title]="'Guardar workspace' | translate">
             &#128190; {{ 'Guardar' | translate }}
