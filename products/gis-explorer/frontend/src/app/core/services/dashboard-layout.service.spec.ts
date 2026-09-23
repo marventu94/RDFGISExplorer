@@ -75,6 +75,13 @@ describe('DashboardLayoutService', () => {
     expect(service.visibleSlots()).toEqual(['graph', 'map', 'timeline', 'table']);
   });
 
+  it('places the graph on the large right side for an RDF Explorer handoff', () => {
+    service.applyRdfHandoffLayout();
+
+    expect(service.preset()).toBe('triple-v-inv');
+    expect(service.visibleSlots()).toEqual(['graph', 'map', 'timeline']);
+  });
+
   describe('applyLayoutForResult', () => {
     it('should use quad layout when result has both geo and temporal data', () => {
       service.applyLayoutForResult(

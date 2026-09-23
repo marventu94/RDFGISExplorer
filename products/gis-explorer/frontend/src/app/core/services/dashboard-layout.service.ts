@@ -83,6 +83,12 @@ export class DashboardLayoutService {
     this.slots.set(next);
   }
 
+  /** Applies the purpose-built arrangement used when a query arrives from RDF Explorer. */
+  applyRdfHandoffLayout(): void {
+    this.preset.set('triple-v-inv');
+    this.slots.set(['graph', 'map', 'timeline', 'table']);
+  }
+
   /**
    * Ajusta el layout a partir de un resultado SPARQL, mostrando solo las
    * vistas que tienen datos relevantes. Usado al importar una query desde

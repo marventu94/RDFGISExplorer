@@ -78,6 +78,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
   }
 
   private currentNodes: NormalizedNode[] = [];
+  private appliedViewportFitRevision = 0;
   /** URI del nodo seleccionado, para poder repintar el resalte tras un re-render. */
   private selectedUri: string | null = null;
   private suppressViewportEmit = false;
@@ -324,6 +325,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
       this.coverageLabel = '';
     }
     this.renderMarkers(visible);
+    this.applyRequestedViewportFit(visible.nodes);
     this.syncDrawnItems(activeFilters);
     this.cdr.markForCheck();
   }
@@ -453,6 +455,36 @@ export class MapViewComponent implements OnInit, OnDestroy {
     if (this.selectedUri) {
       this.applySelectionStyle(this.selectedUri);
     }
+  }
+
+  /** Fits a newly imported RDF result once, leaving later manual navigation untouched. */
+  private applyRequestedViewportFit(nodes: NormalizedNode[]): void {
+    if (!this.map) return;
+    const revision = this.viewState.mapViewportFit();
+    if (revision === 0 || revision === this.appliedViewportFitRevision) return;
+
+    const points = nodes.flatMap((node): L.LatLngTuple[] =>
+      node.coordinate ? [[node.coordinate.lat, node.coordinate.lng]] : [],
+    );
+    if (points.length === 0) return;
+
+    this.appliedViewportFitRevision = revision;
+    this.suppressViewportEmit = true;
+    if (points.length === 1) {
+      this.map.setView(points[0], 14, { animate: false });
+    } else {
+      this.map.fitBounds(L.latLngBounds(points), {
+        padding: [40, 40],
+        maxZoom: 14,
+        animate: false,
+      });
+    }
+    const center = this.map.getCenter();
+    this.viewState.mapState.set({
+      center: [center.lat, center.lng],
+      zoom: this.map.getZoom(),
+    });
+    this.suppressViewportEmit = false;
   }
 
   private popupHtml(node: NormalizedNode): string {

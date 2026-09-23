@@ -6,6 +6,7 @@ import { MapViewComponent } from './map-view.component';
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import type { QueryResult, NormalizedNode, Selection, Filter, Coordinate } from '@shared/models';
 import { I18nService } from '@core/services/i18n.service';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 
 const mockCoord: Coordinate = { lat: -34.6, lng: -58.4 };
 const mockCoord2: Coordinate = { lat: -31.4, lng: -64.2 };
@@ -71,6 +72,7 @@ vi.mock('leaflet', () => {
     addControl: vi.fn(),
     flyTo: vi.fn(),
     flyToBounds: vi.fn(),
+    fitBounds: vi.fn(),
     invalidateSize: vi.fn(),
     remove: vi.fn(),
     whenReady: vi.fn((cb: () => void) => cb()),
@@ -269,6 +271,24 @@ describe('MapViewComponent', () => {
         fixture.detectChanges();
 
         expect(component.queryState).toBe('normal');
+      });
+
+      it('fits all visible coordinates once when an RDF handoff requests it', () => {
+        TestBed.inject(DashboardViewStateService).requestMapViewportFit();
+        const result = createMockQueryResult([mockNode, mockNode2]);
+
+        queryResultSubject.next(result);
+        filteredSubject.next(result);
+
+        const map = component['map'] as unknown as { fitBounds: ReturnType<typeof vi.fn> };
+        expect(map.fitBounds).toHaveBeenCalledOnce();
+        expect(map.fitBounds).toHaveBeenCalledWith(
+          expect.anything(),
+          { padding: [40, 40], maxZoom: 14, animate: false },
+        );
+
+        filteredSubject.next(result);
+        expect(map.fitBounds).toHaveBeenCalledOnce();
       });
 
       it('should show filtered-zero state when filters leave no visible nodes', () => {

@@ -34,7 +34,25 @@ export interface TableViewState {
 @Injectable({ providedIn: 'root' })
 export class DashboardViewStateService {
   readonly mapState = signal<MapViewState | null>(null);
+  readonly mapViewportFit = signal(0);
   readonly timelineState = signal<TimelineViewState | null>(null);
   readonly graphState = signal<GraphViewState | null>(null);
+  readonly graphLayoutReset = signal<{ revision: number; layout: string }>({
+    revision: 0,
+    layout: 'dagre',
+  });
   readonly tableState = signal<TableViewState | null>(null);
+
+  resetGraphLayout(layout: string): void {
+    this.graphState.set({ layout });
+    this.graphLayoutReset.update((request) => ({
+      revision: request.revision + 1,
+      layout,
+    }));
+  }
+
+  requestMapViewportFit(): void {
+    this.mapState.set(null);
+    this.mapViewportFit.update((revision) => revision + 1);
+  }
 }
