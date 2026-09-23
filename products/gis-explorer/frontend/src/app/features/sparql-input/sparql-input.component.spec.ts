@@ -50,6 +50,9 @@ describe('SparqlInputComponent', () => {
   let persistenceMock: {
     beginLoad: ReturnType<typeof vi.fn>;
     failLoad: ReturnType<typeof vi.fn>;
+    prepareQueryResult: ReturnType<typeof vi.fn>;
+    completeQueryProcessing: ReturnType<typeof vi.fn>;
+    failQueryLoad: ReturnType<typeof vi.fn>;
     currentDashboardId: ReturnType<typeof vi.fn>;
     clearCurrent: ReturnType<typeof vi.fn>;
   };
@@ -79,6 +82,9 @@ describe('SparqlInputComponent', () => {
     persistenceMock = {
       beginLoad: vi.fn(),
       failLoad: vi.fn(),
+      prepareQueryResult: vi.fn(),
+      completeQueryProcessing: vi.fn(),
+      failQueryLoad: vi.fn(),
       currentDashboardId: vi.fn().mockReturnValue(null),
       clearCurrent: vi.fn(),
     };
@@ -270,6 +276,23 @@ describe('SparqlInputComponent', () => {
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
       asAny().execute();
       expect(selectionServiceMock.setQueryResult).toHaveBeenCalledWith(result);
+    });
+
+    it('reports imported-query stages around the synchronous result fan-out', () => {
+      const result = makeQueryResult();
+      apiServiceMock.executeQuery.mockReturnValue(of(result));
+      asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
+
+      asAny().execute({ showLoadProgress: true });
+
+      expect(persistenceMock.prepareQueryResult).toHaveBeenCalledWith(result);
+      expect(persistenceMock.completeQueryProcessing).toHaveBeenCalledOnce();
+      expect(persistenceMock.prepareQueryResult.mock.invocationCallOrder[0]).toBeLessThan(
+        selectionServiceMock.setQueryResult.mock.invocationCallOrder[0],
+      );
+      expect(selectionServiceMock.setQueryResult.mock.invocationCallOrder[0]).toBeLessThan(
+        persistenceMock.completeQueryProcessing.mock.invocationCallOrder[0],
+      );
     });
 
     it('should show snackbar with result count on success', () => {

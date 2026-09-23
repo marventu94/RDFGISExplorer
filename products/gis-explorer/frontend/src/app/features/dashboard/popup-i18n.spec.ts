@@ -43,6 +43,9 @@ describe('GIS popup internationalization', () => {
     expect(text).toContain('Replace without saving');
     expect(text).toContain('Save and replace');
     expect(text).not.toContain('Reemplazar');
+    expect(el.querySelector('.dialog-container')).toBeTruthy();
+    expect(el.querySelectorAll('.actions button')).toHaveLength(3);
+    expect(el.querySelector('.actions .btn-primary')?.textContent).toContain('Save and replace');
   });
 
   it('renders query replacement and error actions in English while preserving raw errors', async () => {

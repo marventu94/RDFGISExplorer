@@ -37,6 +37,7 @@ describe('GisHandoffService', () => {
     currentDashboardId: ReturnType<typeof signal<string | null>>;
     currentDashboardName: ReturnType<typeof signal<string | null>>;
     clearCurrent: ReturnType<typeof vi.fn>;
+    beginQueryLoad: ReturnType<typeof vi.fn>;
   };
   let saveFlowMock: { saveInteractive: ReturnType<typeof vi.fn> };
   let dialogMock: { open: ReturnType<typeof vi.fn> };
@@ -53,6 +54,7 @@ describe('GisHandoffService', () => {
       currentDashboardId: signal<string | null>(null),
       currentDashboardName: signal<string | null>(null),
       clearCurrent: vi.fn(),
+      beginQueryLoad: vi.fn(),
     };
     saveFlowMock = { saveInteractive: vi.fn().mockReturnValue(of(null)) };
     dialogResult = undefined;
@@ -141,6 +143,24 @@ describe('GisHandoffService', () => {
       { duration: 6000 },
     );
     TestBed.inject(I18nService).set('es');
+  });
+
+  it('reuses the staged dashboard loader before auto-running the imported query', () => {
+    vi.useFakeTimers();
+    setAutoRunHandoff(true);
+    publish();
+    const target = makeTarget();
+
+    service.consumeInto(asTarget(target));
+
+    expect(persistenceMock.beginQueryLoad).toHaveBeenCalledOnce();
+    expect(target.execute).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(300);
+    expect(target.execute).toHaveBeenCalledWith({
+      configureLayout: true,
+      showLoadProgress: true,
+    });
+    vi.useRealTimers();
   });
 
   it('detaches the open dashboard so Save does not overwrite it', () => {

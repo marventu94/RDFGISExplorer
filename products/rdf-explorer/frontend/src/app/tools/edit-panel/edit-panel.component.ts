@@ -295,6 +295,7 @@ export class EditPanelComponent implements OnDestroy {
 
   updateExistingFilterField(filter: Filter, field: string, value: string | number): void {
     (filter.data as Record<string, string | number>)[field] = value;
+    this.graph.refresh();
   }
 
   ngOnDestroy(): void {

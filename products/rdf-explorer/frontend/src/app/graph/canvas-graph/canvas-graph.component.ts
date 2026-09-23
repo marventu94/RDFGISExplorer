@@ -178,7 +178,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.cy.nodes('[kind = "property"], [kind = "literal"], [kind = "title-spacer"]').ungrabify();
+    this.cy.nodes('[kind = "property"], [kind = "literal"], [kind = "filter"], [kind = "title-spacer"]').ungrabify();
     if (this.drawMode) {
       this.cy.nodes('[kind = "property"]').grabify();
     }

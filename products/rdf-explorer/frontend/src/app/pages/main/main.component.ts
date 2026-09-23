@@ -1,5 +1,5 @@
 import { TranslatePipe } from '../../core/translate.pipe';
-import { Component, inject, OnInit, DestroyRef, effect, signal } from '@angular/core';
+import { Component, inject, OnInit, DestroyRef, computed, effect, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { lastValueFrom } from 'rxjs';
@@ -14,11 +14,12 @@ import type { SaveWorkspaceDialogResult } from '../../shell/save-workspace-dialo
 import { MessageDialogComponent } from '../../shell/message-dialog/message-dialog.component';
 import type { MessageDialogData } from '../../shell/message-dialog/message-dialog.component';
 import { AppConfigService } from '../../core/services/app-config.service';
-import { dashboardHost, isDashboardHostAvailable, registerQueryExportProvider } from '@rdfgis/platform-bridge';
+import { dashboardHost, isDashboardHostAvailable, registerQueryExportProvider, requestQueryExport } from '@rdfgis/platform-bridge';
 import { I18nService } from '../../core/i18n.service';
 import { closePanelFlow } from '../../core/panel-close';
 import { LanguageSelectorComponent } from '../../core/language-selector.component';
 import { ThemeToggleComponent } from '../../core/theme-toggle.component';
+import { queryExportLabel } from '../../core/query-export-label';
 
 @Component({
   selector: 'app-main',
@@ -38,6 +39,13 @@ export class MainComponent implements OnInit {
   readonly i18n = inject(I18nService);
   readonly tabMenu = signal<{ panelId: string; x: number; y: number } | null>(null);
 
+  readonly canHandoff = computed(() => {
+    void this.graph.revision();
+    return this.graph.getQueriesForGraph().queries.some(query =>
+      Boolean(query.toSparqlFullProjection({ limit: this.appConfig.resultLimit() })?.trim()),
+    );
+  });
+
   // Signal: el timeout que oculta el snackbar corre fuera de cualquier
   // notificación de Angular (app zoneless), así que debe disparar CD él mismo.
   readonly snackbarMessage = signal<string | null>(null);
@@ -55,7 +63,7 @@ export class MainComponent implements OnInit {
           if (!sparql?.trim()) return [];
           return [{
             id: `${panel?.id ?? 'panel'}:${index}`,
-            label: `${panel?.name ?? 'Panel'} · Query ${index + 1}`,
+            label: queryExportLabel(panel?.name ?? 'Panel', index, query),
             query: sparql,
             backend,
             source: { workspaceId, panelId: panel?.id },
@@ -94,6 +102,10 @@ export class MainComponent implements OnInit {
     this.workspace.snapshotActivePanel(this.graph);
     this.workspace.switchPanel(id);
     this.workspace.restoreActivePanel(this.graph);
+  }
+
+  handoffToGis(): void {
+    requestQueryExport();
   }
 
   async removePanel(id: string, event?: Event): Promise<void> {

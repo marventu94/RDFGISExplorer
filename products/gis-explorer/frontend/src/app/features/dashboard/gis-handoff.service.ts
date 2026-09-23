@@ -18,7 +18,7 @@ import {
 export interface HandoffTarget {
   setQuery(query: string): void;
   setBackend(backend: string): void;
-  execute(options?: { configureLayout?: boolean }): void;
+  execute(options?: { configureLayout?: boolean; showLoadProgress?: boolean }): void;
 }
 
 /** Espera a que el editor esté montado antes de ejecutar la query importada. */
@@ -110,7 +110,8 @@ export class GisHandoffService {
     target.setBackend(payload.backend);
 
     if (getAutoRunHandoff()) {
-      setTimeout(() => target.execute({ configureLayout: true }), AUTO_RUN_DELAY_MS);
+      this.dashboardState.beginQueryLoad();
+      setTimeout(() => target.execute({ configureLayout: true, showLoadProgress: true }), AUTO_RUN_DELAY_MS);
     } else {
       this.snackBar.open(
         this.i18n.text('Query importada del RDF Explorer. Apretá Ejecutar para correrla.'),

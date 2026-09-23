@@ -64,6 +64,12 @@ const HYDRATION_STAGES: readonly LoadStageId[] = [
   'render-views',
 ];
 
+const QUERY_LOAD_STAGES: readonly LoadStageId[] = [
+  'execute-query',
+  'process-results',
+  'render-views',
+];
+
 /** Lo que el usuario quiere saber de la respuesta: volumen y tiempo del endpoint. */
 function describeResult(result: QueryResult, i18n: I18nService): string {
   const rows = result.bindings.length;
@@ -261,6 +267,33 @@ export class DashboardStateService {
   beginLoad(): void {
     this.progress.begin('Cargando tablero', HYDRATION_STAGES);
     this.progress.start('fetch-dashboard', this.i18n.text('leyendo la definición guardada'));
+  }
+
+  /** Starts the existing staged overlay for an imported query (there is no dashboard fetch). */
+  beginQueryLoad(): void {
+    this.progress.begin('Cargando tablero', QUERY_LOAD_STAGES);
+    this.progress.start('execute-query', this.i18n.text('esperando la respuesta del endpoint SPARQL'));
+  }
+
+  /** Must run after the optional auto-layout and before SelectionService's synchronous fan-out. */
+  prepareQueryResult(result: QueryResult): void {
+    this.progress.complete('execute-query', describeResult(result, this.i18n));
+    this.progress.start(
+      'process-results',
+      this.i18n.text('{count} nodos · {edges} aristas', {
+        count: result.nodes.length,
+        edges: result.edges.length,
+      }),
+    );
+    this.progress.expectViews(this.layout.visibleSlots());
+  }
+
+  completeQueryProcessing(): void {
+    this.progress.complete('process-results');
+  }
+
+  failQueryLoad(): void {
+    this.progress.failActive(this.i18n.text('query inválida o backend no disponible'));
   }
 
   failLoad(): void {

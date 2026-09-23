@@ -2,6 +2,13 @@
   width: 250px;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+  border-radius: 8px;
+  background-color: var(--explorer-panel-bg, var(--color-bg-elevated, #fff));
+  color: var(--explorer-text, var(--color-text, #212529));
+  box-shadow: var(--shadow-md, 0 2px 6px rgb(0 0 0 / 12%));
   pointer-events: none;
 }
 
@@ -18,13 +25,14 @@
 }
 
 .search-input {
+  box-sizing: border-box;
   width: 100%;
   padding: 8px 12px 8px 35px;
-  border: 1px solid var(--explorer-panel-border);
+  border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
   border-radius: 4px;
   font-size: 0.875rem;
-  background-color: var(--explorer-input-bg);
-  color: var(--explorer-text);
+  background-color: var(--explorer-input-bg, var(--color-bg, #fff));
+  color: var(--explorer-text, var(--color-text, #212529));
 }
 
 .search-input.active {
@@ -41,19 +49,19 @@
 
 .search-results-panel {
   max-height: calc(100vh - 80px);
-  border: 1px solid var(--explorer-panel-border);
+  border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
   border-radius: 4px;
   margin-top: 6px;
   padding: 6px 12px;
   overflow-y: auto;
-  background-color: var(--explorer-panel-bg);
-  color: var(--explorer-text);
+  background-color: var(--explorer-input-bg, var(--color-bg, #fff));
+  color: var(--explorer-text, var(--color-text, #212529));
   font-size: 0.85rem;
   pointer-events: auto;
 }
 
 .search-wait {
-  color: var(--explorer-text-muted);
+  color: var(--explorer-text-muted, var(--color-text-muted, #6c757d));
   padding: 8px 0;
 }
 
@@ -61,7 +69,7 @@
   padding: 6px 8px;
   border-left: 4px solid;
   margin-bottom: 6px;
-  background: var(--explorer-input-bg);
+  background: var(--explorer-panel-bg, var(--color-bg-elevated, #f8f9fa));
   border-radius: 3px;
   cursor: grab;
   user-select: none;
@@ -73,6 +81,6 @@
 
 .fake-rect .classes {
   font-size: 0.75rem;
-  color: var(--explorer-text-muted);
+  color: var(--explorer-text-muted, var(--color-text-muted, #6c757d));
   margin-top: 2px;
 }

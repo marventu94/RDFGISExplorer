@@ -330,9 +330,10 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     this.dashboardState.clearCurrent();
   }
 
-  public execute(options?: { configureLayout?: boolean }): void {
+  public execute(options?: { configureLayout?: boolean; showLoadProgress?: boolean }): void {
     const sparql = this.sparqlText;
     if (!sparql) {
+      if (options?.showLoadProgress) this.dashboardState.failQueryLoad();
       this.showError({
         title: this.i18n.text('No hay query para ejecutar'),
         message: this.i18n.text('El editor está vacío. Escribí una query o cargá un tablero.'),
@@ -344,6 +345,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       const parser = new Parser();
       parser.parse(sparql);
     } catch (e) {
+      if (options?.showLoadProgress) this.dashboardState.failQueryLoad();
       this.showError({
         title: this.i18n.text('SPARQL inválido'),
         message: this.i18n.text('La query no se pudo parsear, así que no se envió al backend.'),
@@ -364,12 +366,17 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         this.executing.set(false);
         this.snackBar.dismiss();
         this.dashboardLayout.collapseEditor();
-        this.variableMapping.setSourceResult(result);
-
-        this.selectionService.setQueryResult(result);
-
         if (options?.configureLayout) {
           this.dashboardLayout.applyLayoutForResult(result);
+        }
+
+        if (options?.showLoadProgress) {
+          this.dashboardState.prepareQueryResult(result);
+        }
+        this.variableMapping.setSourceResult(result);
+        this.selectionService.setQueryResult(result);
+        if (options?.showLoadProgress) {
+          this.dashboardState.completeQueryProcessing();
         }
 
         const count = result.bindings.length;
@@ -388,6 +395,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
       error: (err: HttpErrorResponse) => {
         this.executing.set(false);
         this.snackBar.dismiss();
+        if (options?.showLoadProgress) {
+          this.dashboardState.failQueryLoad();
+        }
         this.handleHttpError(err);
       },
     });

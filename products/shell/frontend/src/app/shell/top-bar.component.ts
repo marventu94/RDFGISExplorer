@@ -1,9 +1,8 @@
-import { Component, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LanguageSelectorComponent } from '../core/language-selector.component';
 import { TranslatePipe } from '../core/translate.pipe';
 import { ThemeToggleComponent } from '../core/theme-toggle.component';
-import { ExploreInGisService } from '../core/explore-in-gis.service';
 
 @Component({
   selector: 'app-top-bar',
@@ -28,11 +27,6 @@ import { ExploreInGisService } from '../core/explore-in-gis.service';
         }
       </nav>
       <div class="top-bar__preferences">
-        @if (isExplorer) {
-          <button class="top-bar__gis-action" type="button" (click)="exploreInGis()">
-            {{ 'Explorar en GIS' | translate }}
-          </button>
-        }
         <app-language-selector />
         <app-theme-toggle />
       </div>
@@ -99,24 +93,9 @@ import { ExploreInGisService } from '../core/explore-in-gis.service';
 
     .top-bar__preferences { display: flex; align-items: center; gap: .45rem; }
 
-    .top-bar__gis-action {
-      padding: 0.45rem 0.8rem;
-      border: 1px solid var(--color-accent);
-      border-radius: 6px;
-      background: var(--color-accent);
-      color: var(--color-text-on-accent);
-      font: inherit;
-      font-weight: 500;
-      cursor: pointer;
-    }
-
-    .top-bar__gis-action:hover { filter: brightness(0.95); }
   `,
 })
 export class TopBarComponent {
-  private readonly router = inject(Router);
-  private readonly exploreService = inject(ExploreInGisService);
-
   get currentPath(): string {
     return window.location.pathname;
   }
@@ -128,11 +107,4 @@ export class TopBarComponent {
     return path.split('/').pop() ?? '';
   }
 
-  get isExplorer(): boolean {
-    return this.router.url.split('?')[0] === '/explorer';
-  }
-
-  exploreInGis(): void {
-    void this.exploreService.explore();
-  }
 }
