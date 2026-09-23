@@ -1,7 +1,10 @@
 .dialog-container {
   padding: 1.5rem;
-  background: var(--explorer-input-bg);
-  border-radius: 6px;
+  background: var(--explorer-panel-bg, var(--color-bg-elevated, #fff));
+  color: var(--explorer-text, var(--color-text, #212529));
+  border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg, 0 4px 12px rgb(0 0 0 / 18%));
   min-width: 320px;
   max-width: 420px;
 }
@@ -19,23 +22,31 @@ h3 {
 
   span {
     font-size: 0.875rem;
-    color: var(--explorer-text-muted);
+    color: var(--explorer-text-muted, var(--color-text-muted, #6c757d));
   }
 
   input {
     padding: 0.5rem 0.75rem;
-    border: 1px solid var(--explorer-panel-border);
+    border: 1px solid var(--explorer-input-border, var(--color-border-strong, #ced4da));
     border-radius: 4px;
+    background: var(--explorer-input-bg, var(--color-bg, #fff));
+    color: var(--explorer-text, var(--color-text, #212529));
     font-size: 0.9375rem;
 
+    &:focus-visible {
+      border-color: var(--explorer-input-focus-border, var(--color-accent, #0d6efd));
+      outline: 2px solid var(--explorer-input-focus-border, var(--color-accent, #0d6efd));
+      outline-offset: 1px;
+    }
+
     &.input-error {
-      border-color: #c0392b;
+      border-color: var(--color-danger, #c0392b);
     }
   }
 
   .field-error {
     font-size: 0.8125rem;
-    color: #c0392b;
+    color: var(--color-danger, #c0392b);
   }
 }
 
@@ -52,6 +63,10 @@ h3 {
     font-size: 0.875rem;
     cursor: pointer;
   }
+
+  input[type='radio'] {
+    accent-color: var(--color-accent, var(--explorer-link, #0d6efd));
+  }
 }
 
 .actions {
@@ -62,10 +77,20 @@ h3 {
   button {
     padding: 0.5rem 1rem;
     border-radius: 4px;
-    border: 1px solid var(--explorer-panel-border);
-    background: var(--explorer-panel-bg);
+    border: 1px solid var(--explorer-panel-border, var(--color-border, #dee2e6));
+    background: var(--explorer-input-bg, var(--color-bg, #fff));
+    color: var(--explorer-text, var(--color-text, #212529));
     cursor: pointer;
     font-size: 0.875rem;
+
+    &:hover:not(:disabled) {
+      background: var(--explorer-toolbar-btn-hover-bg, var(--color-bg-hover, #f1f3f5));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent, var(--explorer-link, #0d6efd));
+      outline-offset: 2px;
+    }
 
     &:disabled {
       opacity: 0.5;
@@ -74,8 +99,13 @@ h3 {
   }
 
   .btn-primary {
-    background: #1f77b4;
-    color: #fff;
-    border-color: #1f77b4;
+    background: var(--color-accent, var(--explorer-link, #0d6efd));
+    color: var(--color-text-on-accent, #fff);
+    border-color: var(--color-accent, var(--explorer-link, #0d6efd));
+
+    &:hover:not(:disabled) {
+      background: var(--color-accent-hover, #0b5ed7);
+      border-color: var(--color-accent-hover, #0b5ed7);
+    }
   }
 }
