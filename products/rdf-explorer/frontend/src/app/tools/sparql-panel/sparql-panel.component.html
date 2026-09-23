@@ -19,9 +19,6 @@
         }
         <span> )</span>
       </div>
-      <button class="gis-btn" (click)="handoffQuery(query)" type="button" [attr.title]="'Explorar en GIS' | translate">
-        &#9654; GIS
-      </button>
     </div>
     @if (isQueryShown(i)) {
       <sparql-viewer [content]="getSparql(query)" />

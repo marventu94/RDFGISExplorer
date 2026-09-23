@@ -1,5 +1,5 @@
 import { TranslatePipe } from '../../core/translate.pipe';
-import { Component, inject, OnInit, DestroyRef, computed, effect, signal } from '@angular/core';
+import { Component, inject, OnInit, DestroyRef, effect, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { lastValueFrom } from 'rxjs';
@@ -13,11 +13,8 @@ import { SaveWorkspaceDialogComponent } from '../../shell/save-workspace-dialog/
 import type { SaveWorkspaceDialogResult } from '../../shell/save-workspace-dialog/save-workspace-dialog.model';
 import { MessageDialogComponent } from '../../shell/message-dialog/message-dialog.component';
 import type { MessageDialogData } from '../../shell/message-dialog/message-dialog.component';
-import { QueryHandoffService } from '../../core/query-handoff.service';
-import { GisOverwriteGuardService } from '../../core/gis-overwrite-guard.service';
-import { ToolService } from '../../tool/tool.service';
 import { AppConfigService } from '../../core/services/app-config.service';
-import { dashboardHost, isDashboardHostAvailable } from '@rdfgis/platform-bridge';
+import { dashboardHost, isDashboardHostAvailable, registerQueryExportProvider } from '@rdfgis/platform-bridge';
 import { I18nService } from '../../core/i18n.service';
 import { closePanelFlow } from '../../core/panel-close';
 import { LanguageSelectorComponent } from '../../core/language-selector.component';
@@ -37,20 +34,9 @@ export class MainComponent implements OnInit {
   readonly router = inject(Router);
   readonly dialog = inject(Dialog);
   readonly destroyRef = inject(DestroyRef);
-  readonly queryHandoff = inject(QueryHandoffService);
-  readonly toolService = inject(ToolService);
   readonly appConfig = inject(AppConfigService);
-  readonly gisGuard = inject(GisOverwriteGuardService);
   readonly i18n = inject(I18nService);
   readonly tabMenu = signal<{ panelId: string; x: number; y: number } | null>(null);
-
-  readonly generatedSparql = computed(() => {
-    void this.graph.revision();
-    const { queries } = this.graph.getQueriesForGraph();
-    return queries.map(q => q.toSparql()).filter(Boolean).join('\n');
-  });
-
-  readonly canHandoff = computed(() => this.generatedSparql().trim().length > 0);
 
   // Signal: el timeout que oculta el snackbar corre fuera de cualquier
   // notificación de Angular (app zoneless), así que debe disparar CD él mismo.
@@ -58,6 +44,27 @@ export class MainComponent implements OnInit {
   private snackbarTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    const unregisterQueryExport = registerQueryExportProvider({
+      listCandidates: () => {
+        void this.graph.revision();
+        const panel = this.workspace.activePanel();
+        const workspaceId = this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined;
+        const backend = this.appConfig.config()?.backend || 'generic';
+        return this.graph.getQueriesForGraph().queries.flatMap((query, index) => {
+          const sparql = query.toSparqlFullProjection({ limit: this.appConfig.resultLimit() });
+          if (!sparql?.trim()) return [];
+          return [{
+            id: `${panel?.id ?? 'panel'}:${index}`,
+            label: `${panel?.name ?? 'Panel'} · Query ${index + 1}`,
+            query: sparql,
+            backend,
+            source: { workspaceId, panelId: panel?.id },
+          }];
+        });
+      },
+    });
+    this.destroyRef.onDestroy(unregisterQueryExport);
+
     effect(() => {
       void this.graph.revision();
       void this.graph.viewport();
@@ -212,93 +219,4 @@ export class MainComponent implements OnInit {
     }, 3000);
   }
 
-  /** Popup que hay que cerrar a mano: el botón nunca queda "sin hacer nada". */
-  private showDialog(data: MessageDialogData): void {
-    this.dialog.open(MessageDialogComponent, { data });
-  }
-
-  async handoffToGis(): Promise<void> {
-    void this.graph.revision();
-    const { queries } = this.graph.getQueriesForGraph();
-    const validQueries = queries.filter(q => q.toSparql()?.trim());
-
-    if (validQueries.length === 0) {
-      this.showDialog({
-        title: 'No hay consulta para exportar',
-        message:
-          'El canvas no tiene ningún patrón completo todavía. Agregá al menos ' +
-          'un nodo con una propiedad y su valor antes de explorar en GIS.',
-      });
-      return;
-    }
-
-    if (validQueries.length > 1) {
-      this.toolService.active.set('sparql');
-      this.showDialog({
-        title: `El grafo tiene ${validQueries.length} consultas separadas`,
-        message:
-          'El GIS ejecuta una sola consulta por vez. Abrí el panel SPARQL (ya ' +
-          'quedó seleccionado) y exportá desde ahí la consulta que te interesa, ' +
-          'o conectá los nodos sueltos para que quede un solo grafo.',
-      });
-      return;
-    }
-
-    // Proyección completa: el GIS necesita coords/fechas/intermedios
-    // proyectados para alimentar mapa, timeline y grafo.
-    const sparql = validQueries[0].toSparqlFullProjection({
-      limit: this.appConfig.resultLimit(),
-    });
-    if (!sparql?.trim()) {
-      this.showDialog({
-        title: 'No se pudo generar la consulta',
-        message:
-          'La proyección completa de este grafo salió vacía. Revisá el panel ' +
-          'SPARQL para ver qué está generando el canvas.',
-      });
-      return;
-    }
-
-    // Una query exportada reemplaza el tablero abierto en el GIS: preguntar
-    // antes, con la opción de ir a guardarlo.
-    const decision = await this.gisGuard.askBeforeHandoff();
-    if (decision === 'cancel') return;
-    if (decision === 'go-save') {
-      void this.router.navigate(['/gis']);
-      return;
-    }
-
-    const backend = this.appConfig.config()?.backend || 'generic';
-
-    this.queryHandoff.publish({
-      query: sparql,
-      backend,
-      overwriteConfirmed: decision === 'proceed-confirmed',
-      source: {
-        workspaceId: this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined,
-        panelId: this.workspace.activePanel()?.id,
-      },
-    });
-
-    void this.router
-      .navigate(['/gis'], { queryParams: { handoff: '1' } })
-      .then(ok => {
-        if (!ok) {
-          this.showDialog({
-            title: 'No se pudo abrir el GIS',
-            message:
-              'La consulta quedó publicada pero la navegación a la vista GIS ' +
-              'fue cancelada. Entrá al GIS desde la barra superior: la consulta ' +
-              'sigue disponible por 5 minutos.',
-          });
-        }
-      })
-      .catch((err: unknown) => {
-        this.showDialog({
-          title: 'No se pudo abrir el GIS',
-          message: 'Falló la navegación a la vista GIS.',
-          detail: err instanceof Error ? err.message : String(err),
-        });
-      });
-  }
 }
