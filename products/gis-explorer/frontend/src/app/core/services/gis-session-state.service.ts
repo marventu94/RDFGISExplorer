@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject } from '@angular/core';
 
 import { DashboardStateService } from './dashboard-state.service';
 import { SparqlQueryStateService } from './sparql-query-state.service';
@@ -14,21 +14,14 @@ export class GisSessionStateService {
   private readonly dashboardState = inject(DashboardStateService);
   private readonly queryState = inject(SparqlQueryStateService);
 
-  /** Query que dejó la última importación del Explorer (si sigue tal cual). */
-  private readonly importedQuery = signal<string | null>(null);
-
   /**
    * Hay algo que perder si entra una importación:
    *  - un tablero guardado abierto (sus cambios sin guardar se van), o
-   *  - una consulta en pantalla que NO es la de la última importación.
-   * Una vista que es exactamente el último handoff no cuenta: se regenera
-   * exportando otra vez, y avisar en cada re-export vacía el aviso de sentido.
+   *  - cualquier consulta ejecutada, aunque el tablero todavía no esté guardado.
    */
   readonly hasWorkAtRisk = computed(() => {
     if (this.dashboardState.currentDashboardId() !== null) return true;
-    const query = this.queryState.query().trim();
-    if (query.length === 0) return false;
-    return query !== (this.importedQuery() ?? '');
+    return this.queryState.query().trim().length > 0;
   });
 
   constructor() {
@@ -42,8 +35,4 @@ export class GisSessionStateService {
     });
   }
 
-  /** La vista actual es una importación del Explorer todavía sin tocar. */
-  markImported(query: string): void {
-    this.importedQuery.set(query.trim());
-  }
 }

@@ -46,10 +46,7 @@ export class GisHandoffService {
   private readonly snackBar = inject(MatSnackBar);
   private readonly i18n = inject(I18nService);
 
-  /**
-   * Hay algo que perder: un tablero abierto o una consulta que no es la de la
-   * última importación (misma regla que publica el canal para el Explorer).
-   */
+  /** Hay algo que perder: un tablero abierto o cualquier consulta ejecutada. */
   hasWorkToLose(): boolean {
     return this.sessionState.hasWorkAtRisk();
   }
@@ -108,7 +105,6 @@ export class GisHandoffService {
     // La vista importada es una vista NUEVA: si siguiera apuntando al tablero
     // que estaba abierto, "Guardar" lo sobrescribiría con la query importada.
     this.dashboardState.clearCurrent();
-    this.sessionState.markImported(payload.query);
 
     // A handoff starts a new GIS view: discard the previous graph camera and
     // use the dedicated graph-right / map-and-timeline-left arrangement.

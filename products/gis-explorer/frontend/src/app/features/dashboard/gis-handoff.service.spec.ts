@@ -211,16 +211,18 @@ describe('GisHandoffService', () => {
     expect(target.setQuery).toHaveBeenCalled();
   });
 
-  it('does not ask when GIS still matches the previous export', () => {
-    const imported = 'SELECT ?x WHERE { ?x ?p ?o } LIMIT 10';
-    TestBed.inject(GisSessionStateService).markImported(imported);
-    queryState.query.set(imported);
+  it('asks before replacing a previously imported query once it was executed', () => {
+    queryState.query.set('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
     publish();
+    dialogResult = 'replace';
 
     const target = makeTarget();
     service.consumeInto(asTarget(target));
 
-    expect(dialogMock.open).not.toHaveBeenCalled();
+    expect(dialogMock.open).toHaveBeenCalledWith(
+      OverwriteDashboardDialogComponent,
+      expect.any(Object),
+    );
     expect(target.setQuery).toHaveBeenCalled();
   });
 
