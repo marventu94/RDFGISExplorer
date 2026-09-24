@@ -204,6 +204,18 @@ compartidas (documentada en `AGENTS.md`). Se prefirió sobre un monolito (que
 acoplaría los ciclos de vida de ambas herramientas) y sobre aplicaciones
 separadas sin shell (que perdería la integración del flujo).
 
+## 12. Guardar y compartir tableros
+
+**Fundamento.** La revisión de Venturino et al. [2026] (§3.3, «Sharing
+Results») identifica la reutilización de estados de visualización y la
+posibilidad de compartir recorridos de exploración como formas de comunicar
+hallazgos más allá de una exportación estática.
+
+**Decisión y estado.** El Shell guarda los tableros y permite volver a abrirlos
+mediante `/dashboards/:id`. Ese enlace puede compartirse con quien tenga
+acceso a la misma instalación. Actualmente no existe una acción específica
+para copiar o publicar el enlace.
+
 ---
 
 ## Referencias

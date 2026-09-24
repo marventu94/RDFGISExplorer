@@ -412,6 +412,13 @@ locales: reorganizan elementos presentes en el `QueryResult` y no piden datos.
 
 ### 3.11. Exploración local de una entidad y copia inequívoca
 
+**Fundamento.** Ante un grafo extenso, inspeccionar por separado la estructura
+de una entidad ayuda a seguir sus relaciones y nodos intermedios. CEPV muestra
+el valor de seleccionar estructuras relevantes dentro de un grafo de
+conocimiento grande (Sheng et al., 2019); Yacoubi Ayadi et al. (2022) combinan
+vistas generales con detalles bajo demanda. En RDF GIS Explorer, esta
+inspección se limita a los datos ya recuperados por la consulta.
+
 **Decisión.** Una selección explícita puede abrir el modo **Entidad
 seleccionada**. La entrada nunca se dispara por foco coordinado. El contenido se
 obtiene mediante un modelo puro y determinista que prioriza raíz, entidades de
