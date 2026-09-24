@@ -9,10 +9,11 @@ construcción visual y handoff. El seed escribe nueve dashboards en total.
 
 1. Copiar `.env.evaluation.example` a un archivo local ignorado por Git y
    completar URL y credenciales de GraphDB.
-2. Ajustar, si el repositorio usa otros vocabularios, los ejemplos
-   `packages/explorer-backend/config/prefixes.graphdb.example.json` y
-   `class-colors.graphdb.example.json`, o apuntar las variables de entorno a
-   copias locales.
+2. La evaluación del OVS usa
+   `packages/explorer-backend/config/class-colors.ovs.json`. Si el repositorio
+   usa otros vocabularios, ajustar los ejemplos
+   `prefixes.graphdb.example.json` y `class-colors.graphdb.example.json`, o
+   apuntar las variables de entorno a copias locales.
 3. Crear la base aislada indicando siempre su ruta de forma explícita:
 
    ```bash
