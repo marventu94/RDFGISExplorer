@@ -348,6 +348,13 @@ branches—are strictly local: they reorganize elements already present in
 
 ### 3.11. Local entity exploration and unambiguous copying
 
+**Rationale.** In a large graph, inspecting an entity's structure separately
+helps users follow its relationships and intermediate nodes. CEPV shows the
+value of selecting relevant structures from a large knowledge graph (Sheng et
+al., 2019); Yacoubi Ayadi et al. (2022) combine overview views with details on
+demand. In RDF GIS Explorer, this inspection is limited to data already
+retrieved by the query.
+
 **Decision.** An explicit selection can open **Selected entity** mode.
 Coordinated focus never triggers entry. A pure, deterministic model selects
 root, same-row entities, paths, and intermediates; hubs remain at the frontier

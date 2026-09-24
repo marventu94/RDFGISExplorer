@@ -196,6 +196,17 @@ loads only its own heavy dependencies (Leaflet/AG Grid in GIS).
 would couple both tools' life cycles, and over separate applications without a
 shell, which would lose flow integration.
 
+## 12. Saving and sharing dashboards
+
+**Rationale.** The review by Venturino et al. [2026] (§3.3, “Sharing Results”)
+identifies reusable visualization states and shared exploration paths as ways
+to communicate findings beyond a static export.
+
+**Decision and status.** The Shell saves dashboards and lets users reopen them
+through `/dashboards/:id`. That link can be shared with someone who has access
+to the same deployment. There is currently no dedicated action to copy or
+publish the link.
+
 ---
 
 ## References
