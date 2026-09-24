@@ -9,6 +9,7 @@ import {
   DestroyRef,
   effect,
   runInInjectionContext,
+  untracked,
 } from '@angular/core';
 import cytoscape from 'cytoscape';
 import edgehandles from 'cytoscape-edgehandles';
@@ -23,7 +24,10 @@ import {
   NODE_TITLE_HEIGHT,
 } from './canvas-graph.styles';
 import { parseDropPayload } from './canvas-graph.drop';
-import { buildCanvasElements } from './canvas-graph.elements';
+import {
+  buildCanvasElements,
+  canvasGraphInstanceChanged,
+} from './canvas-graph.elements';
 import { buildContextMenuConfig } from './canvas-graph.context-menus';
 import { Node, Property, type Edge, type RDFResource } from '../domain';
 import { TranslatePipe } from '../../core/translate.pipe';
@@ -68,6 +72,9 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
   private cyFocused = false;
   private lastKeyDown = -1;
   private lastContextMenuPosition: cytoscape.Position = { x: 0, y: 0 };
+  private applyingGraphState = false;
+  private autoFit = true;
+  private viewportFrame: number | null = null;
   drawMode = false;
 
   ngOnInit(): void {
@@ -84,7 +91,10 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       autounselectify: false,
     });
 
-    this.cy.on('viewport', () => {
+    this.cy.on('viewport', (event) => {
+      if (this.applyingGraphState) return;
+      if (this.autoFit && !event.originalEvent) return;
+      this.autoFit = false;
       this.graph.viewport.set({
         zoom: this.cy.zoom(),
         pan: { ...this.cy.pan() },
@@ -99,6 +109,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.viewportFrame !== null) cancelAnimationFrame(this.viewportFrame);
     this.ehApi?.destroy?.();
     this.cmApi?.destroy?.();
     this.cy?.destroy();
@@ -127,10 +138,29 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
   }
 
   private syncCytoscape(): void {
+    // Capture the requested viewport before mutating Cytoscape. Adding compound
+    // nodes can emit viewport events and must not replace the persisted value
+    // that this synchronization is about to restore.
+    const requestedViewport = untracked(() => this.graph.viewport());
+    this.autoFit = requestedViewport === null;
     const desired = this.computeElements();
     const desiredIds = new Set<string>(desired.map((e) => e.data.id as string));
+    const existingDomains = new Map<string, unknown>();
+    this.cy.elements().forEach((element) => {
+      const domain = element.data('domain');
+      if (domain !== undefined) existingDomains.set(element.id(), domain);
+    });
+    const rebuildGraph = canvasGraphInstanceChanged(existingDomains, desired);
 
+    this.applyingGraphState = true;
     this.cy.batch(() => {
+      if (rebuildGraph) {
+        // Los paneles deserializados reutilizan IDs internos. Esos IDs no son
+        // identidad global: si cambió el objeto de dominio hay que reconstruir
+        // compounds y parentescos para no mezclar la geometría de dos tabs.
+        this.cy.elements().remove();
+      }
+
       const existing = this.cy.elements();
       const toRemove = existing.filter((el) => !desiredIds.has(el.id()));
 
@@ -176,27 +206,66 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
           }
         }
       }
+
     });
+
+    // Cytoscape only settles compound bounds when the batch closes. Applying
+    // child positions inside the batch leaves the first render with different
+    // geometry from a later tab switch.
+    for (const elDef of desired) {
+      const nodeData = elDef.data as cytoscape.NodeDataDefinition;
+      if (!nodeData.id || !nodeData.parent) continue;
+      const position = (elDef as cytoscape.NodeDefinition).position;
+      if (position) this.cy.getElementById(nodeData.id).position({ ...position });
+    }
 
     this.cy.nodes('[kind = "property"], [kind = "literal"], [kind = "filter"], [kind = "title-spacer"]').ungrabify();
     if (this.drawMode) {
       this.cy.nodes('[kind = "property"]').grabify();
     }
-    this.applySavedViewport();
+    this.scheduleSavedViewport(requestedViewport);
     this.syncSelectionHighlight();
   }
 
-  private applySavedViewport(): void {
-    const vp = this.graph.viewport();
-    if (!vp) return;
+  private scheduleSavedViewport(
+    viewport: { zoom: number; pan: { x: number; y: number } } | null,
+  ): void {
+    if (this.viewportFrame !== null) cancelAnimationFrame(this.viewportFrame);
+    this.viewportFrame = requestAnimationFrame(() => {
+      this.viewportFrame = null;
+      this.cy.resize();
+      this.applySavedViewport(viewport);
+      // `null` means auto-fit, not "viewport missing for one render". Keep it
+      // null while labels hydrate and change compound bounds, so each graph
+      // refresh fits the complete graph again. A real user pan/zoom will be
+      // captured by the viewport listener once restoration finishes.
+      if (viewport) {
+        this.graph.viewport.set({
+          zoom: this.cy.zoom(),
+          pan: { ...this.cy.pan() },
+        });
+      }
+      this.applyingGraphState = false;
+    });
+  }
+
+  private applySavedViewport(
+    viewport: { zoom: number; pan: { x: number; y: number } } | null,
+  ): void {
+    if (!viewport) {
+      if (this.cy.nodes('[kind = "node"]').nonempty()) {
+        this.cy.fit(this.cy.elements(), 40);
+      }
+      return;
+    }
     const cyZoom = this.cy.zoom();
     const cyPan = this.cy.pan();
     if (
-      Math.abs(cyZoom - vp.zoom) > 0.01 ||
-      Math.abs(cyPan.x - vp.pan.x) > 1 ||
-      Math.abs(cyPan.y - vp.pan.y) > 1
+      Math.abs(cyZoom - viewport.zoom) > 0.01 ||
+      Math.abs(cyPan.x - viewport.pan.x) > 1 ||
+      Math.abs(cyPan.y - viewport.pan.y) > 1
     ) {
-      this.cy.viewport({ zoom: vp.zoom, pan: vp.pan });
+      this.cy.viewport({ zoom: viewport.zoom, pan: viewport.pan });
     }
   }
 

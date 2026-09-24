@@ -212,7 +212,10 @@ export class MainComponent implements OnInit {
 
   private async loadWorkspace(id: string): Promise<void> {
     try {
-      if (this.workspace.hasWorkspaceOpen(id)) return;
+      if (this.workspace.hasWorkspaceOpen(id)) {
+        this.workspace.restoreActivePanel(this.graph);
+        return;
+      }
       await dashboardHost().load(id, 'tabs');
       this.workspace.restoreActivePanel(this.graph);
       this.showSnackbar('Workspace cargado');
