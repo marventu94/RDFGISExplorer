@@ -190,6 +190,29 @@ export function buildCanvasElements(
   return elements;
 }
 
+/**
+ * Detecta cuando IDs visuales iguales pertenecen a otra instancia del grafo.
+ *
+ * Los IDs del dominio se vuelven a numerar al deserializar cada panel, por lo
+ * que C1 y C2 pueden contener ambos `n0`, `p1`, etc. En ese caso Cytoscape no
+ * debe reutilizar los compounds existentes: actualizar `data.parent` no mueve
+ * de forma fiable un hijo a su nuevo padre y deja mezclada la geometría de los
+ * dos paneles.
+ */
+export function canvasGraphInstanceChanged(
+  existingDomains: ReadonlyMap<string, unknown>,
+  desired: readonly cytoscape.ElementDefinition[],
+): boolean {
+  return desired.some((definition) => {
+    const id = definition.data.id as string | undefined;
+    const domain = (definition.data as { domain?: unknown }).domain;
+    return id !== undefined
+      && domain !== undefined
+      && existingDomains.has(id)
+      && existingDomains.get(id) !== domain;
+  });
+}
+
 export function nodeLabel(node: Node): string {
   return node.getRepr() ?? 'No values set!';
 }

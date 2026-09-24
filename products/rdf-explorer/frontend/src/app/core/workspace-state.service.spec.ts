@@ -79,4 +79,144 @@ describe('WorkspaceStateService dirty state', () => {
       'workspace-123',
     ]);
   });
+
+  it('replaces only the untouched initial panel when opening the first workspace', () => {
+    const payload: ExplorerWorkspacePayload = {
+      panels: [{
+        id: 'saved',
+        name: 'Legacy short name',
+        graph: { nodes: [], edges: [] },
+        generatedQuery: '',
+      }],
+      activePanelId: 'saved',
+      settings: { endpointType: 'generic', limit: 500 },
+    };
+
+    (service as unknown as {
+      appendPayloadAsTabs(value: ExplorerWorkspacePayload, id: string, name: string): void;
+    }).appendPayloadAsTabs(payload, 'workspace-1', 'Dashboard name');
+
+    expect(service.panels()).toHaveLength(1);
+    expect(service.activePanel()?.name).toBe('Dashboard name');
+    expect(service.activePanel()?.sourceWorkspaceId).toBe('workspace-1');
+  });
+
+  it('keeps an explicitly created empty panel when a workspace is opened', () => {
+    service.addPanel();
+    service.removePanel('panel-0');
+    const payload: ExplorerWorkspacePayload = {
+      panels: [{
+        id: 'saved',
+        name: 'Saved panel',
+        graph: { nodes: [], edges: [] },
+        generatedQuery: '',
+      }],
+      activePanelId: 'saved',
+      settings: { endpointType: 'generic', limit: 500 },
+    };
+
+    (service as unknown as {
+      appendPayloadAsTabs(value: ExplorerWorkspacePayload, id: string, name: string): void;
+    }).appendPayloadAsTabs(payload, 'workspace-1', 'Workspace');
+
+    expect(service.panels().map(panel => panel.name)).toEqual(['Panel 2', 'Workspace']);
+  });
+
+  it('does not append a workspace twice and focuses its existing panel', () => {
+    const payload: ExplorerWorkspacePayload = {
+      panels: [{
+        id: 'saved',
+        name: 'Saved panel',
+        graph: { nodes: [], edges: [] },
+        generatedQuery: '',
+      }],
+      activePanelId: 'saved',
+      settings: { endpointType: 'generic', limit: 500 },
+    };
+    const append = (service as unknown as {
+      appendPayloadAsTabs(value: ExplorerWorkspacePayload, id: string, name: string): void;
+    }).appendPayloadAsTabs.bind(service);
+
+    append(payload, 'workspace-1', 'Workspace');
+    service.addPanel('Another panel');
+    append(payload, 'workspace-1', 'Workspace');
+
+    expect(service.panels()).toHaveLength(2);
+    expect(service.activePanel()?.sourceWorkspaceId).toBe('workspace-1');
+  });
+
+  it('keeps one panel open and does not reuse automatic names after closing tabs', () => {
+    const secondId = service.addPanel();
+    expect(service.activePanel()?.name).toBe('Panel 2');
+
+    service.removePanel(secondId);
+    expect(service.activePanel()?.name).toBe('Panel 1');
+
+    service.addPanel();
+    expect(service.activePanel()?.name).toBe('Panel 3');
+    service.removePanel('panel-0');
+    service.removePanel(service.activePanelId());
+
+    expect(service.panels()).toHaveLength(1);
+    expect(service.activePanel()?.name).toBe('Panel 4');
+  });
+
+  it('publishes a missing viewport before restoring a legacy dashboard graph', () => {
+    const payload: ExplorerWorkspacePayload = {
+      panels: [{
+        id: 'legacy',
+        name: 'Legacy panel',
+        graph: { nodes: [{ id: 'node-0', type: 'node', data: {} }], edges: [] },
+        generatedQuery: '',
+      }],
+      activePanelId: 'legacy',
+      settings: { endpointType: 'generic', limit: 500 },
+    };
+    (service as unknown as { fromPayload(value: ExplorerWorkspacePayload): void }).fromPayload(payload);
+
+    const calls: string[] = [];
+    const viewport = signal<{ zoom: number; pan: { x: number; y: number } } | null>({
+      zoom: 3,
+      pan: { x: 10, y: 20 },
+    });
+    const originalSet = viewport.set.bind(viewport);
+    viewport.set = (value) => {
+      calls.push(`viewport:${value === null ? 'fit' : value.zoom}`);
+      originalSet(value);
+    };
+    const graph = {
+      viewport,
+      restoreGraph: () => calls.push('graph'),
+      serializeGraph: () => payload.panels[0].graph,
+    } as unknown as PropertyGraphService;
+
+    service.restoreActivePanel(graph);
+
+    expect(calls).toEqual(['viewport:fit', 'graph']);
+    expect(viewport()).toBeNull();
+  });
+
+  it('rebases restored runtime IDs without marking a loaded panel dirty', () => {
+    const payload: ExplorerWorkspacePayload = {
+      panels: [{
+        id: 'saved',
+        name: 'Saved panel',
+        graph: { nodes: [{ id: 'node-8', type: 'node', data: {} }], edges: [] },
+        generatedQuery: '',
+      }],
+      activePanelId: 'saved',
+      settings: { endpointType: 'generic', limit: 500 },
+    };
+    (service as unknown as { fromPayload(value: ExplorerWorkspacePayload): void }).fromPayload(payload);
+
+    service.restoreActivePanel({
+      viewport: signal(null),
+      restoreGraph: () => undefined,
+      serializeGraph: () => ({ nodes: [{ id: 'node-0', type: 'node', data: {} }], edges: [] }),
+    } as unknown as PropertyGraphService);
+
+    expect(service.activePanel()?.graph.nodes[0].id).toBe('node-0');
+    expect(service.activePanel()?.dirty).toBe(false);
+    expect(JSON.parse(service.activePanel()!.cleanSignature).graph.nodes[0].id).toBe('node-0');
+  });
 });

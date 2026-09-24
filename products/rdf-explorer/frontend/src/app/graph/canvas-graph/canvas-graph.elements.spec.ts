@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type cytoscape from 'cytoscape';
 
-import { buildCanvasElements, filterLabel } from './canvas-graph.elements';
+import {
+  buildCanvasElements,
+  canvasGraphInstanceChanged,
+  filterLabel,
+} from './canvas-graph.elements';
 import { CHILD_HEIGHT, CHILD_PADDING, FILTER_HEIGHT, NODE_TITLE_HEIGHT } from './canvas-graph.styles';
 import { PropertyGraph } from '../domain/graph';
 import { GenericAdapter } from '../domain/endpoint/generic-adapter';
@@ -27,6 +31,33 @@ function positionOf(
 }
 
 describe('buildCanvasElements', () => {
+  it('detects reused Cytoscape IDs that belong to another restored panel', () => {
+    const firstGraph = createGraph();
+    const secondGraph = createGraph();
+    const firstElements = buildCanvasElements(firstGraph.nodes, firstGraph.edges);
+    const firstDomains = new Map<string, unknown>();
+
+    for (const element of firstElements) {
+      const domain = (element.data as { domain?: unknown }).domain;
+      if (domain !== undefined) firstDomains.set(element.data.id as string, domain);
+    }
+
+    expect(canvasGraphInstanceChanged(firstDomains, firstElements)).toBe(false);
+
+    firstGraph.addNode();
+    secondGraph.addNode();
+    const restoredFirst = buildCanvasElements(firstGraph.nodes, firstGraph.edges);
+    const restoredSecond = buildCanvasElements(secondGraph.nodes, secondGraph.edges);
+    const restoredDomains = new Map<string, unknown>();
+    for (const element of restoredFirst) {
+      const domain = (element.data as { domain?: unknown }).domain;
+      if (domain !== undefined) restoredDomains.set(element.data.id as string, domain);
+    }
+
+    expect(canvasGraphInstanceChanged(restoredDomains, restoredFirst)).toBe(false);
+    expect(canvasGraphInstanceChanged(restoredDomains, restoredSecond)).toBe(true);
+  });
+
   it('positions children at ABSOLUTE coordinates rather than parent-relative coordinates', () => {
     // This failed when returning from GIS without reloading: children arrived
     // with relative x=0 but Cytoscape treated it as absolute. Because compound

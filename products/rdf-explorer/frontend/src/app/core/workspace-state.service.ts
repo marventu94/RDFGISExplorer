@@ -15,6 +15,8 @@ export interface PanelState {
   sourceWorkspaceId?: string;
   viewport?: { zoom: number; pan: { x: number; y: number } };
   labels?: Record<string, string>;
+  /** Panel vacío automático; se reemplaza al abrir el primer workspace. */
+  placeholder?: boolean;
   /** Firma interna del último estado cargado/guardado; nunca se persiste. */
   cleanSignature: string;
 }
@@ -53,7 +55,7 @@ export class WorkspaceStateService {
     reset: () => this.reset(),
   });
 
-  readonly panels = signal<readonly PanelState[]>([this.newPanel('panel-0', 'Panel 1')]);
+  readonly panels = signal<readonly PanelState[]>([this.newPanel('panel-0', 'Panel 1', true)]);
 
   readonly activePanelId = signal<string>('panel-0');
 
@@ -63,6 +65,7 @@ export class WorkspaceStateService {
   });
 
   private panelCounter = 0;
+  private panelNameCounter = 1;
   private isRestoring = false;
 
   private signature(panel: Pick<PanelState, 'name' | 'graph' | 'generatedQuery' | 'variables'>): string {
@@ -74,7 +77,7 @@ export class WorkspaceStateService {
     });
   }
 
-  private newPanel(id: string, name: string): PanelState {
+  private newPanel(id: string, name: string, placeholder = false): PanelState {
     const state = {
       id,
       name,
@@ -82,25 +85,45 @@ export class WorkspaceStateService {
       generatedQuery: '',
       variables: [] as string[],
     };
-    return { ...state, dirty: false, cleanSignature: this.signature(state) };
+    return { ...state, placeholder, dirty: false, cleanSignature: this.signature(state) };
   }
 
   private withDirtyState(panel: PanelState): PanelState {
     return { ...panel, dirty: this.signature(panel) !== panel.cleanSignature };
   }
 
-  reset(): void {
-    this.panels.set([this.newPanel('panel-0', 'Panel 1')]);
-    this.activePanelId.set('panel-0');
-    this.panelCounter = 0;
+  private nextPanelId(): string {
+    const ids = new Set(this.panels().map(panel => panel.id));
+    let id: string;
+    do {
+      this.panelCounter += 1;
+      id = `panel-${this.panelCounter}`;
+    } while (ids.has(id));
+    return id;
   }
 
-  addPanel(name = `Panel ${this.panels().length + 1}`): string {
-    this.panelCounter += 1;
-    const id = `panel-${this.panelCounter}`;
+  private nextPanelName(): string {
+    const names = new Set(this.panels().map(panel => panel.name));
+    let name: string;
+    do {
+      this.panelNameCounter += 1;
+      name = `Panel ${this.panelNameCounter}`;
+    } while (names.has(name));
+    return name;
+  }
+
+  reset(): void {
+    this.panels.set([this.newPanel('panel-0', 'Panel 1', true)]);
+    this.activePanelId.set('panel-0');
+    this.panelCounter = 0;
+    this.panelNameCounter = 1;
+  }
+
+  addPanel(name?: string): string {
+    const id = this.nextPanelId();
     this.panels.update(list => [
       ...list,
-      this.newPanel(id, name),
+      this.newPanel(id, name ?? this.nextPanelName()),
     ]);
     this.activePanelId.set(id);
     return id;
@@ -108,14 +131,17 @@ export class WorkspaceStateService {
 
   removePanel(id: string): void {
     this.panels.update(list => {
+      const removedIndex = list.findIndex(p => p.id === id);
+      if (removedIndex < 0) return list;
       const filtered = list.filter(p => p.id !== id);
       if (filtered.length === 0) {
-        const newPanel = this.newPanel('panel-0', 'Panel 1');
+        const newPanel = this.newPanel(this.nextPanelId(), this.nextPanelName(), true);
         this.activePanelId.set(newPanel.id);
         return [newPanel];
       }
       if (this.activePanelId() === id) {
-        this.activePanelId.set(filtered[0].id);
+        const nextActiveIndex = Math.min(removedIndex, filtered.length - 1);
+        this.activePanelId.set(filtered[nextActiveIndex].id);
       }
       return filtered;
     });
@@ -131,7 +157,7 @@ export class WorkspaceStateService {
     const activeId = this.activePanelId();
     this.panels.update(list =>
       list.map(p =>
-        p.id === activeId ? this.withDirtyState({ ...p, name }) : p,
+        p.id === activeId ? this.withDirtyState({ ...p, name, placeholder: false }) : p,
       ),
     );
   }
@@ -155,7 +181,15 @@ export class WorkspaceStateService {
     const activeId = this.activePanelId();
     this.panels.update(list =>
       list.map(p =>
-        p.id === activeId ? this.withDirtyState({ ...p, graph, generatedQuery, variables }) : p,
+        p.id === activeId
+          ? this.withDirtyState({
+              ...p,
+              graph,
+              generatedQuery,
+              variables,
+              placeholder: p.placeholder && graph.nodes.length === 0 && graph.edges.length === 0,
+            })
+          : p,
       ),
     );
   }
@@ -235,6 +269,11 @@ export class WorkspaceStateService {
   }
 
   private appendPayloadAsTabs(payload: ExplorerWorkspacePayload, id: string, name: string): void {
+    // La misma navegación puede resolverse más de una vez mientras el remote
+    // se monta. La deduplicación debe vivir también en la importación, después
+    // del fetch, para que dos cargas concurrentes no creen pestañas repetidas.
+    if (this.hasWorkspaceOpen(id)) return;
+
     const activePanelIndex = payload.panels.findIndex(p => p.id === payload.activePanelId);
 
     // Workspace de un solo panel: la pestaña muestra el nombre del tablero
@@ -257,13 +296,17 @@ export class WorkspaceStateService {
       return { ...state, dirty: false, cleanSignature: this.signature(state) };
     });
 
-    this.panels.update(list => [...list, ...newPanels]);
+    this.panels.update(list => this.isDisposableInitialPanel(list) ? newPanels : [...list, ...newPanels]);
 
     const newActivePanel = newPanels[activePanelIndex >= 0 ? activePanelIndex : 0];
     if (newActivePanel) {
       this.activePanelId.set(newActivePanel.id);
     }
 
+  }
+
+  private isDisposableInitialPanel(panels: readonly PanelState[]): boolean {
+    return panels.length === 1 && panels[0].placeholder === true;
   }
 
   snapshotActivePanel(graph: PropertyGraphService): void {
@@ -276,7 +319,14 @@ export class WorkspaceStateService {
     this.panels.update(list =>
       list.map(p =>
         p.id === activeId
-          ? this.withDirtyState({ ...p, graph: snapshot, generatedQuery, variables, viewport: viewport ?? undefined })
+          ? this.withDirtyState({
+              ...p,
+              graph: snapshot,
+              generatedQuery,
+              variables,
+              viewport: viewport ?? undefined,
+              placeholder: p.placeholder && snapshot.nodes.length === 0 && snapshot.edges.length === 0,
+            })
           : p,
       ),
     );
@@ -285,6 +335,7 @@ export class WorkspaceStateService {
   restoreActivePanel(graph: PropertyGraphService): void {
     const panel = this.activePanel();
     if (!panel) return;
+    const wasClean = !panel.dirty;
     this.isRestoring = true;
 
     if (panel.labels) {
@@ -293,9 +344,26 @@ export class WorkspaceStateService {
       }
     }
 
+    // Publish the viewport first so the graph renderer can restore it after
+    // adding compound nodes. Legacy dashboards without one are fitted once.
+    graph.viewport.set(panel.viewport ?? null);
     graph.restoreGraph(panel.graph);
-    if (panel.viewport) {
-      graph.viewport.set(panel.viewport);
+
+    // Runtime resource IDs are allocated again during deserialization, so a
+    // serialize-after-restore can be structurally equivalent but differ from
+    // the persisted JSON IDs. Rebase only panels that were clean before the
+    // restore; a genuinely edited panel must keep its original baseline.
+    if (wasClean) {
+      const canonicalGraph = graph.serializeGraph();
+      this.panels.update(list => list.map(candidate => {
+        if (candidate.id !== panel.id) return candidate;
+        const canonical = { ...candidate, graph: canonicalGraph };
+        return {
+          ...canonical,
+          dirty: false,
+          cleanSignature: this.signature(canonical),
+        };
+      }));
     }
     this.isRestoring = false;
   }
