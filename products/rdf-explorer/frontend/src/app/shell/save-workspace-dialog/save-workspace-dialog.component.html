@@ -12,11 +12,11 @@
   @if (canOverwrite) {
     <div class="mode-selector">
       <label>
-        <input type="radio" name="saveMode" value="overwrite" [(ngModel)]="mode" />
+        <input type="radio" name="saveMode" value="overwrite" [ngModel]="mode" (ngModelChange)="setMode($event)" />
         Sobrescribir "{{ data.currentName }}"
       </label>
       <label>
-        <input type="radio" name="saveMode" value="copy" [(ngModel)]="mode" />
+        <input type="radio" name="saveMode" value="copy" [ngModel]="mode" (ngModelChange)="setMode($event)" />
         {{ 'Guardar como copia' | translate }}
       </label>
     </div>

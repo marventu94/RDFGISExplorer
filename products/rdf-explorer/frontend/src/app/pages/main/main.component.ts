@@ -56,7 +56,7 @@ export class MainComponent implements OnInit {
       listCandidates: () => {
         void this.graph.revision();
         const panel = this.workspace.activePanel();
-        const workspaceId = this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined;
+        const workspaceId = panel?.sourceWorkspaceId;
         const backend = this.appConfig.config()?.backend || 'generic';
         return this.graph.getQueriesForGraph().queries.flatMap((query, index) => {
           const sparql = query.toSparqlFullProjection({ limit: this.appConfig.resultLimit() });
@@ -165,12 +165,10 @@ export class MainComponent implements OnInit {
     this.workspace.snapshotActivePanel(this.graph);
 
     const currentPanel = this.workspace.activePanel();
-    const currentId = this.route.snapshot.queryParamMap.get('workspaceId') ?? undefined;
+    const currentId = currentPanel?.sourceWorkspaceId;
 
     const allWorkspaces = await dashboardHost().list('explorer');
-    const existingNames = allWorkspaces
-      .filter(w => w.id !== currentId)
-      .map(w => w.name);
+    const existingNames = allWorkspaces.map(w => w.name);
 
     const dialogRef = this.dialog.open<SaveWorkspaceDialogResult>(SaveWorkspaceDialogComponent, {
       width: '420px',

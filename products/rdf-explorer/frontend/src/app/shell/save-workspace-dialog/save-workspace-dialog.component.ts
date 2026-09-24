@@ -25,11 +25,29 @@ export class SaveWorkspaceDialogComponent {
   get hasNameConflict(): boolean {
     const trimmed = this.name.trim().toLowerCase();
     if (!trimmed) return false;
-    return (this.data.existingNames ?? []).some(n => n.toLowerCase() === trimmed);
+    if (
+      this.mode === 'overwrite'
+      && trimmed === this.data.currentName?.trim().toLowerCase()
+    ) {
+      return false;
+    }
+    return (this.data.existingNames ?? []).some(n => n.trim().toLowerCase() === trimmed);
   }
 
   get canSave(): boolean {
     return !!this.name.trim() && !this.hasNameConflict;
+  }
+
+  setMode(mode: 'overwrite' | 'copy'): void {
+    this.mode = mode;
+    if (mode === 'overwrite') {
+      this.name = this.data.currentName?.trim() ?? this.name.trim();
+      return;
+    }
+
+    if (this.canOverwrite) {
+      this.name = this.nextCopyName();
+    }
   }
 
   save(): void {
@@ -43,5 +61,19 @@ export class SaveWorkspaceDialogComponent {
 
   cancel(): void {
     this.dialogRef.close(undefined);
+  }
+
+  private nextCopyName(): string {
+    const baseName = this.data.currentName?.trim() || this.name.trim() || 'Workspace';
+    const existing = new Set(
+      (this.data.existingNames ?? []).map(name => name.trim().toLowerCase()),
+    );
+    let candidate = `${baseName} copy`;
+    let copyNumber = 2;
+    while (existing.has(candidate.toLowerCase())) {
+      candidate = `${baseName} ${copyNumber} copy`;
+      copyNumber += 1;
+    }
+    return candidate;
   }
 }
