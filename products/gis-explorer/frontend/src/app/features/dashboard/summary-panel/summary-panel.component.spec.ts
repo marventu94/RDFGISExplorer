@@ -125,6 +125,20 @@ describe('SummaryPanelComponent', () => {
     expect(scope.textContent).toContain('las 5000 filas del resultado completo');
   });
 
+  it('marks the header as covering the full query while batches are active', () => {
+    selectionService.setLotSize(2);
+    selectionService.setQueryResult(makeResult(false));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.summary-batch-scope')?.textContent)
+      .toContain('Total de la consulta · no del lote');
+
+    selectionService.setLotSize(10);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.summary-batch-scope')).toBeNull();
+    expect(component['resolved']()?.summary.totalRows).toBe(3);
+  });
+
   it('does not recompute when the lot changes', () => {
     selectionService.setQueryResult(makeResult(true));
     fixture.detectChanges();
