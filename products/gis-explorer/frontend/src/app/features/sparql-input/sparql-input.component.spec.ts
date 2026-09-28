@@ -129,45 +129,6 @@ describe('SparqlInputComponent', () => {
     return component as any;
   }
 
-  describe('query-owned LIMIT notice', () => {
-    function noticeEl(): HTMLElement | null {
-      return (fixture.nativeElement as HTMLElement).querySelector('.limit-notice');
-    }
-
-    it('shows nothing for a query without LIMIT', () => {
-      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o }');
-      fixture.detectChanges();
-      expect(noticeEl()).toBeNull();
-    });
-
-    it('warns when the query LIMIT is below the backend cap', () => {
-      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 500');
-      fixture.detectChanges();
-
-      const el = noticeEl();
-      expect(el).not.toBeNull();
-      expect(el!.textContent).toContain('LIMIT 500');
-      expect(el!.getAttribute('title')).toContain('no se marca');
-    });
-
-    it('warns that the backend still truncates when LIMIT exceeds the cap', () => {
-      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 9000');
-      fixture.detectChanges();
-
-      expect(noticeEl()!.textContent).toContain('recorta a 1000 filas');
-    });
-
-    it('removes the notice when query LIMIT is deleted', () => {
-      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o } LIMIT 500');
-      fixture.detectChanges();
-      expect(noticeEl()).not.toBeNull();
-
-      asAny().setEditorContent('SELECT * WHERE { ?s ?p ?o }');
-      fixture.detectChanges();
-      expect(noticeEl()).toBeNull();
-    });
-  });
-
   it('should create the component', () => {
     expect(component).toBeTruthy();
   });

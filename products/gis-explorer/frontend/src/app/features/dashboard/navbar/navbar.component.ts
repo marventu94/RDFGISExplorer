@@ -1,6 +1,6 @@
 import { TranslatePipe } from '../../../core/services/translate.pipe';
 import type { UiTextKey } from '@rdfgis/platform-bridge';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -34,6 +34,8 @@ import {
 import { DashboardSaveFlowService } from '../dashboard-save-flow.service';
 import { isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { I18nService } from '@core/services/i18n.service';
+import { AppConfigService } from '@core/services/app-config.service';
+import { buildQueryLimitNotice, type QueryLimitNotice } from '@shared/sparql/query-limit';
 import { LanguageSelectorComponent } from '@core/services/language-selector.component';
 import { ThemeToggleComponent } from '@core/services/theme-toggle.component';
 
@@ -87,6 +89,7 @@ export class NavbarComponent {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly queryState = inject(SparqlQueryStateService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly summaryState = inject(SummaryStateService);
   private readonly exportService = inject(ResultExportService);
   private readonly i18n = inject(I18nService);
@@ -103,6 +106,10 @@ export class NavbarComponent {
   /** Hay un resultado ejecutado (habilita el export completo). */
   private readonly _hasResult = signal(false);
   protected readonly hasResult = this._hasResult.asReadonly();
+  private readonly resultQuery = signal('');
+  protected readonly queryLimitNotice = computed(() => this.hasResult()
+    ? buildQueryLimitNotice(this.resultQuery(), this.appConfig.config()?.maxLimit ?? null)
+    : null);
 
   constructor() {
     const destroyRef = inject(DestroyRef);
@@ -125,6 +132,7 @@ export class NavbarComponent {
       .subscribe((r) => {
         this._truncatedLimit.set(r?.meta?.truncated ? r.meta.limitApplied : null);
         this._hasResult.set(!!r);
+        this.resultQuery.set(r ? this.queryState.query() : '');
       });
   }
 
@@ -186,6 +194,25 @@ export class NavbarComponent {
     return this.i18n.text('El backend truncó el resultado al límite de {limit} filas; los conteos por lote pueden estar incompletos.', {
       limit: this.truncatedLimit() ?? 0,
     });
+  }
+
+  protected queryLimitLabel(notice: QueryLimitNotice, lot: LotState | null): string {
+    const params = { limit: notice.limit, maxLimit: notice.maxLimit };
+    return notice.capped
+      ? this.i18n.text('LIMIT {limit} · tope del backend {maxLimit}', params)
+      : lot && lot.lotCount <= 1
+        ? this.i18n.text('LIMIT {limit} · sin más lotes', params)
+        : this.i18n.text('LIMIT {limit} · resultado acotado', params);
+  }
+
+  protected queryLimitDetail(notice: QueryLimitNotice, lot: LotState | null): string {
+    const params = { limit: notice.limit, maxLimit: notice.maxLimit };
+    if (notice.capped) {
+      return this.i18n.text('La consulta pide LIMIT {limit}, pero el backend entrega como máximo {maxLimit} filas. Los lotes solo paginan las filas recibidas.', params);
+    }
+    return lot && lot.lotCount <= 1
+      ? this.i18n.text('La consulta aplica LIMIT {limit} antes de llegar al tablero. Con las filas recibidas no hay más lotes; el resumen y la exportación las consideran el resultado completo.', params)
+      : this.i18n.text('La consulta aplica LIMIT {limit} antes de llegar al tablero. Los lotes solo paginan esas filas; el resumen y la exportación las consideran el resultado completo.', params);
   }
 
   protected openSaveDialog(): void {
