@@ -41,14 +41,13 @@ describe('buildQueryLimitNotice', () => {
     expect(notice).not.toBeNull();
     expect(notice!.capped).toBe(false);
     expect(notice!.limit).toBe(500);
-    expect(notice!.summary).toContain('resultado completo');
-    expect(notice!.detail).toContain('no se marca');
+    expect(notice!.maxLimit).toBe(1000);
   });
 
   it('reports that the backend still truncates when LIMIT exceeds the cap', () => {
     const notice = buildQueryLimitNotice(`${BASE} LIMIT 5000`, 1000);
     expect(notice!.capped).toBe(true);
-    expect(notice!.summary).toContain('recorta a 1000 filas');
+    expect(notice!.maxLimit).toBe(1000);
   });
 
   it('treats LIMIT equal to the cap as backend truncation', () => {

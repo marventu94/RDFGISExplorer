@@ -4,6 +4,17 @@
   </span>
   <app-filter-badges />
 
+  @if (queryLimitNotice(); as notice) {
+    <span
+      class="query-limit-indicator"
+      [title]="queryLimitDetail(notice, lotState())"
+      [attr.aria-label]="queryLimitDetail(notice, lotState())"
+    >
+      <mat-icon>warning</mat-icon>
+      {{ queryLimitLabel(notice, lotState()) }}
+    </span>
+  }
+
   @if (lotState(); as lot) {
     @if (lot.lotCount > 1) {
       <div class="lot-navigator">

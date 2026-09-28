@@ -118,6 +118,24 @@ app-filter-badges {
   flex-shrink: 0;
 }
 
+.query-limit-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: help;
+
+  mat-icon {
+    color: #f9a825;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
 .lot-nav-btn {
   padding: 0 4px;
 }

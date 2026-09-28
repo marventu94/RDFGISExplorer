@@ -1,7 +1,8 @@
 import { Parser } from 'sparqljs';
 
 /**
- * Aviso por `LIMIT` escrito a mano en el editor.
+ * Data for the LIMIT notice on the executed query, including queries handed
+ * off from RDF Explorer.
  *
  * El backend no inyecta su propio LIMIT: manda la query tal cual y recorta la
  * respuesta a `maxLimit` (`generic-sparql.adapter.ts`). Un LIMIT propio, entonces,
@@ -26,10 +27,6 @@ export interface QueryLimitNotice {
   maxLimit: number;
   /** El LIMIT llega al tope del backend: el recorte efectivo lo hace el backend. */
   capped: boolean;
-  /** Texto corto para la barra del editor. */
-  summary: string;
-  /** Explicación completa, para el tooltip. */
-  detail: string;
 }
 
 /**
@@ -60,30 +57,5 @@ export function buildQueryLimitNotice(
 ): QueryLimitNotice | null {
   const limit = detectTopLevelLimit(sparql);
   if (limit === null || maxLimit === null || maxLimit <= 0) return null;
-
-  const capped = limit >= maxLimit;
-  const cola =
-    'No hace falta acotar a mano: las vistas ya paginan el volumen en lotes.';
-
-  return capped
-    ? {
-        limit,
-        maxLimit,
-        capped,
-        summary: `LIMIT ${limit}: el backend recorta a ${maxLimit} filas`,
-        detail:
-          `El backend recorta todo resultado a ${maxLimit} filas, así que el LIMIT ${limit} ` +
-          `de la consulta no se aplica entero. ${cola}`,
-      }
-    : {
-        limit,
-        maxLimit,
-        capped,
-        summary: `LIMIT ${limit}: el tablero lo toma como resultado completo`,
-        detail:
-          `El LIMIT ${limit} recorta el resultado en el endpoint, antes del tope del backend ` +
-          `(${maxLimit} filas). Como llegan menos filas que ese tope, el resultado no se marca ` +
-          `como truncado: el panel de resumen se calcula sobre esas ${limit} filas y el export ` +
-          `las baja como si fueran el total, sin ir a buscar el resto. ${cola}`,
-      };
+  return { limit, maxLimit, capped: limit >= maxLimit };
 }
