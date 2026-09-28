@@ -287,12 +287,12 @@ clients:
 
 ```ts
 AppConfig {
-  backend, endpointUrl, hasBasicAuth, userAgent, timeoutMs, defaultLimit, maxLimit,
+  backend, endpointUrl, hasBasicAuth, userAgent, timeoutMs, maxLimit,
   capabilities, supportsWikibaseLabel, defaultPrefixes, search,
   labelUri,     // defaults to rdfs:label
   describe,     // UI hints: { exclude, objects, datatype, text, image, external }
   classColors,  // colors by class (config/class-colors.${SPARQL_BACKEND}.json; {} if absent)
-  defaults,     // Explorer defaults (lang, resultLimit, labelUri, searchClass, endpointType)
+  defaults,     // Explorer defaults (lang, labelUri, searchClass, endpointType)
   limits,       // unified backend-env limits: { graphMaxNodes, lotDefaultSize,
                 //   lotSizeOptions[], tablePageSizeOptions[], exportMaxRows,
                 //   exportMinPageSize, summaryTopCategorical }

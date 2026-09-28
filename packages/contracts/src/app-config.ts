@@ -24,7 +24,6 @@ export interface DescribeConfig {
 
 export interface SettingsDefaults {
   lang: string;
-  resultLimit: number;
   labelUri: string;
   searchClass: SearchClass;
   endpointType: EndpointType;
@@ -59,7 +58,6 @@ export interface AppConfig {
   hasBasicAuth: boolean;
   userAgent: string;
   timeoutMs: number;
-  defaultLimit: number;
   maxLimit: number;
   capabilities: string[];
   supportsWikibaseLabel: boolean;

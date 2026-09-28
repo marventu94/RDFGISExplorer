@@ -1,6 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import type { ExplorerSerializedGraph } from '../graph/domain/graph-serializer';
-import { AppConfigService } from './services/app-config.service';
 import { PropertyGraphService } from '../graph/property-graph.service';
 import { RequestService } from './request.service';
 import { registerDashboardStateAdapter } from '@rdfgis/platform-bridge';
@@ -34,15 +33,10 @@ export interface ExplorerPanelSnapshot {
 export interface ExplorerWorkspacePayload {
   panels: Readonly<ExplorerPanelSnapshot[]>;
   activePanelId: string;
-  settings: {
-    endpointType: 'virtuoso' | 'fuseki' | 'generic';
-    limit: number;
-  };
 }
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceStateService {
-  private readonly appConfig = inject(AppConfigService);
   private readonly request = inject(RequestService);
   private readonly unregisterAdapter = registerDashboardStateAdapter({
     kind: 'explorer',
@@ -194,10 +188,6 @@ export class WorkspaceStateService {
     );
   }
 
-  private mapEndpointType(type: 'virtuoso' | 'fuseki' | 'other'): 'virtuoso' | 'fuseki' | 'generic' {
-    return type === 'virtuoso' || type === 'fuseki' ? type : 'generic';
-  }
-
   private collectUrisFromSnapshot(graph: ExplorerSerializedGraph): Set<string> {
     const uris = new Set<string>();
     for (const node of graph.nodes) {
@@ -224,8 +214,6 @@ export class WorkspaceStateService {
   }
 
   exportPayload(): ExplorerWorkspacePayload {
-    const endpointType = this.appConfig.endpointType();
-    const limit = this.appConfig.resultLimit();
     const payloadPanels: ExplorerPanelSnapshot[] = this.panels().map(p => ({
       id: p.id,
       name: p.name,
@@ -239,10 +227,6 @@ export class WorkspaceStateService {
     return {
       panels: payloadPanels,
       activePanelId: this.activePanelId(),
-      settings: {
-        endpointType: this.mapEndpointType(endpointType),
-        limit,
-      },
     };
   }
 

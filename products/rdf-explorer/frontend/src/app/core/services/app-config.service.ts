@@ -50,10 +50,6 @@ export class AppConfigService {
     this.config()?.defaults?.endpointType ?? 'other',
   );
 
-  readonly resultLimit = computed<number>(() =>
-    this.config()?.defaults?.resultLimit ?? 500,
-  );
-
   readonly searchClass = computed<SearchClass>(() =>
     this.config()?.defaults?.searchClass ?? {
       uri: { type: 'uri', value: 'http://www.w3.org/2002/07/owl#Thing' },

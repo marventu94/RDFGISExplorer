@@ -15,7 +15,6 @@ const fakeConfig = {
   hasBasicAuth: false,
   userAgent: 'test',
   timeoutMs: 30000,
-  defaultLimit: 20,
   maxLimit: 1000,
   capabilities: [],
   supportsWikibaseLabel: false,
@@ -26,7 +25,6 @@ const fakeConfig = {
   classColors: {},
   defaults: {
     lang: 'en',
-    resultLimit: 20,
     labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
     searchClass: {
       uri: { type: 'uri' as const, value: 'http://www.w3.org/2002/07/owl#Thing' },
@@ -92,7 +90,6 @@ describe('RequestService', () => {
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({
         sparql: 'SELECT * WHERE { ?s ?p ?o }',
-        limit: 500,
       });
       req.flush({
         variables: [],

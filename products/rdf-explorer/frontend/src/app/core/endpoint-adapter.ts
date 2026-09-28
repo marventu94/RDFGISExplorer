@@ -65,7 +65,7 @@ export class GisBackendAdapter implements RdfBackendAdapter {
   }
 
   async executeQuery(query: string, opts: ExecuteOpts = {}): Promise<QueryResult> {
-    const body = { sparql: query, limit: opts.limit ?? 500 };
+    const body = { sparql: query, ...(opts.limit !== undefined ? { limit: opts.limit } : {}) };
     try {
       const result = await firstValueFrom(
         this.http.post<QueryResult>(`${this.apiBase()}/query/execute`, body),

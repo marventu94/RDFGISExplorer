@@ -65,11 +65,11 @@ describe('QueryService', () => {
     );
   });
 
-  it('should apply default limit of 500 when not provided', async () => {
+  it('uses the backend maximum when no response limit is provided', async () => {
     await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10');
     expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      expect.objectContaining({ limit: 500 }),
+      expect.objectContaining({ limit: 2000 }),
     );
   });
 

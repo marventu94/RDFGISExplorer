@@ -66,7 +66,7 @@ export class QueryService {
     }
 
     const maxLimit = this.intConfig('SPARQL_MAX_LIMIT', 2000);
-    const resolvedLimit = limit ?? this.intConfig('SPARQL_DEFAULT_LIMIT', 500);
+    const resolvedLimit = limit ?? maxLimit;
 
     if (resolvedLimit > maxLimit) {
       throw new HttpException(

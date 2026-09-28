@@ -278,17 +278,13 @@ export class Query {
   }
 
   /**
-   * SPARQL con proyección completa (todas las variables del componente),
-   * pensado para el handoff al GIS: si solo se proyecta la semilla, el
-   * backend no puede adjuntar coordenadas, eventos temporales ni aristas
-   * al grafo normalizado (mapa/timeline vacíos, grafo sin edges).
-   * No muta el estado: restaura `select` e invalida el cache al salir.
-   * Las columnas `?<literal>Label` (siempre vacías, son literales) se
-   * eliminan del SELECT, igual que hace el seed de dashboards demo.
-   * `opts.limit` agrega un LIMIT explícito si la query no tiene uno: el
-   * backend recorta las filas DESPUÉS de recibirlas, así que sin LIMIT el
-   * endpoint materializa el resultado completo y la ejecución en el GIS
-   * puede quedar colgada varios minutos.
+   * SPARQL with every variable in the connected component projected for GIS
+   * handoff. Projecting only the seed prevents the backend from attaching
+   * coordinates, temporal events, and edges to the normalized graph.
+   * Restores `select` and clears the cache before returning.
+   * Removes empty `?<literal>Label` columns, as the demo dashboard seed does.
+   * `opts.limit` is for cases that explicitly need a cap. Normal handoff adds
+   * no LIMIT, allowing GIS batches to paginate up to the backend response cap.
    */
   toSparqlFullProjection(opts?: { limit?: number }): string | null {
     const prevSelect = this.select;

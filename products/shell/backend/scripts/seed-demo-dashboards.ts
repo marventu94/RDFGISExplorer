@@ -48,8 +48,6 @@ const ENDPOINT =
 const USER_AGENT =
   'RDFGISExplorer-DemoSeed/1.0 (demo dashboard seed; local dev)';
 
-/** defaultLimit que publica el backend → settings.limit del workspace Explorer. */
-const EXPLORER_RESULT_LIMIT = 500;
 /** maxLimit del backend: los demos deben quedar por debajo para no truncarse. */
 const MAX_ROWS = 1900;
 
@@ -648,10 +646,6 @@ function explorerPayload(
       },
     ],
     activePanelId: 'panel-0',
-    settings: {
-      endpointType: 'generic',
-      limit: EXPLORER_RESULT_LIMIT,
-    },
   };
 }
 
