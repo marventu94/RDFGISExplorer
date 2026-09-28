@@ -50,6 +50,7 @@ export class SummaryPanelComponent {
   protected readonly collapsed = signal(true);
   protected readonly loading = signal(false);
   protected readonly resolved = signal<ResolvedSummary | null>(null);
+  protected readonly batchesActive = signal(false);
   private loadRunStartedAt: number | null = null;
 
   constructor() {
@@ -74,6 +75,9 @@ export class SummaryPanelComponent {
         // El export completo usa el COUNT para el progreso real ("X de ~N").
         this.summaryState.set(resolved?.summary ?? null);
       });
+    this.selectionService.lotState$
+      .pipe(takeUntilDestroyed(destroyRef))
+      .subscribe((lot) => this.batchesActive.set(lot.lotCount > 1));
   }
 
   private resolveSummary(result: QueryResult | null): Observable<ResolvedSummary | null> {

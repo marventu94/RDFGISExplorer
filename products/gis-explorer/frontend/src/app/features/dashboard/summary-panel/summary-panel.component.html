@@ -3,6 +3,9 @@
     <button type="button" class="summary-header" (click)="toggleCollapsed()">
       <mat-icon>query_stats</mat-icon>
       <span class="summary-title">{{ 'Resumen del resultado' | translate }}</span>
+      @if (!loading() && resolved() && batchesActive()) {
+        <span class="summary-batch-scope">{{ 'Total de la consulta · no del lote' | translate }}</span>
+      }
       @if (loading()) {
         <mat-spinner diameter="16" />
         <span class="summary-total">{{ 'Calculando…' | translate }}</span>

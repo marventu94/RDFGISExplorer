@@ -66,6 +66,7 @@ export const UI_TRANSLATIONS = [
   ['Exportar TODAS las filas del resultado completo a Excel (no solo el lote visible)', 'Export ALL rows from the full result to Excel (not only the visible batch)'],
   ['Guardar tablero', 'Save dashboard'], ['Nombre del tablero', 'Dashboard name'], ['Ej: Mis ciudades argentinas', 'E.g. My Argentine cities'],
   ['Resumen del resultado', 'Result summary'], ['Calculando…', 'Calculating…'], ['Promedio', 'Average'],
+  ['Total de la consulta · no del lote', 'Full query result · not this batch'],
   ['Mínimo', 'Minimum'], ['Máximo', 'Maximum'], ['Valores más frecuentes', 'Most frequent values'],
   ['Mapa', 'Map'], ['Grafo', 'Graph'], ['Tabla', 'Table'], ['Línea de tiempo', 'Timeline'],
   ['Cargando tablero', 'Loading dashboard'], ['Recuperando el tablero', 'Retrieving dashboard'],
