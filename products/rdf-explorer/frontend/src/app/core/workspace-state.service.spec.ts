@@ -1,7 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AppConfigService } from './services/app-config.service';
 import { RequestService } from './request.service';
 import { WorkspaceStateService, type ExplorerWorkspacePayload } from './workspace-state.service';
 import type { PropertyGraphService } from '../graph/property-graph.service';
@@ -13,7 +12,6 @@ describe('WorkspaceStateService dirty state', () => {
     TestBed.configureTestingModule({
       providers: [
         WorkspaceStateService,
-        { provide: AppConfigService, useValue: { endpointType: () => 'other', resultLimit: () => 500 } },
         { provide: RequestService, useValue: { labelCache: signal(new Map()), setLabel: () => undefined } },
       ],
     });
@@ -46,7 +44,6 @@ describe('WorkspaceStateService dirty state', () => {
         viewport: { zoom: 2, pan: { x: 10, y: 20 } },
       }],
       activePanelId: 'saved',
-      settings: { endpointType: 'generic', limit: 500 },
     };
     (service as unknown as { fromPayload(value: ExplorerWorkspacePayload): void }).fromPayload(payload);
     expect(service.activePanel()?.dirty).toBe(false);
@@ -89,7 +86,6 @@ describe('WorkspaceStateService dirty state', () => {
         generatedQuery: '',
       }],
       activePanelId: 'saved',
-      settings: { endpointType: 'generic', limit: 500 },
     };
 
     (service as unknown as {
@@ -112,7 +108,6 @@ describe('WorkspaceStateService dirty state', () => {
         generatedQuery: '',
       }],
       activePanelId: 'saved',
-      settings: { endpointType: 'generic', limit: 500 },
     };
 
     (service as unknown as {
@@ -131,7 +126,6 @@ describe('WorkspaceStateService dirty state', () => {
         generatedQuery: '',
       }],
       activePanelId: 'saved',
-      settings: { endpointType: 'generic', limit: 500 },
     };
     const append = (service as unknown as {
       appendPayloadAsTabs(value: ExplorerWorkspacePayload, id: string, name: string): void;
@@ -170,7 +164,6 @@ describe('WorkspaceStateService dirty state', () => {
         generatedQuery: '',
       }],
       activePanelId: 'legacy',
-      settings: { endpointType: 'generic', limit: 500 },
     };
     (service as unknown as { fromPayload(value: ExplorerWorkspacePayload): void }).fromPayload(payload);
 
@@ -205,7 +198,6 @@ describe('WorkspaceStateService dirty state', () => {
         generatedQuery: '',
       }],
       activePanelId: 'saved',
-      settings: { endpointType: 'generic', limit: 500 },
     };
     (service as unknown as { fromPayload(value: ExplorerWorkspacePayload): void }).fromPayload(payload);
 

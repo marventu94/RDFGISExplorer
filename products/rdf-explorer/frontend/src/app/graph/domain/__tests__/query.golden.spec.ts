@@ -171,6 +171,15 @@ describe('Query.toSparqlFullProjection()', () => {
     expect(q.select.length).toBe(1);
   });
 
+  it('leaves the GIS handoff query unrestricted unless a limit is explicitly requested', () => {
+    const graph = createWikidataGraph();
+    const seed = createMosquitoExample(graph, 0, 0);
+    const q = seed.createQuery()!;
+
+    expect(q.toSparqlFullProjection()).not.toMatch(/\bLIMIT\s+\d+/i);
+    expect(q.toSparqlFullProjection({ limit: 100 })).toMatch(/\bLIMIT\s+100\b/i);
+  });
+
   it('honors hidden variables', () => {
     const graph = createWikidataGraph();
     const seed = createCancerExample(graph, 0, 0);

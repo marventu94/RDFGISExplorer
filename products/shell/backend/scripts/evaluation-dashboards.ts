@@ -547,10 +547,6 @@ function explorerPayload(artifacts: CaseArtifacts): Record<string, unknown> {
       },
     ],
     activePanelId: 'panel-0',
-    // `limit` acá es decorativo: al cargar un workspace el Explorer no lo lee
-    // (`workspace-persistence.service.fromPayload`), toma su límite de
-    // `/api/config` → `defaults.resultLimit` (env `SPARQL_DEFAULT_LIMIT`).
-    settings: { endpointType: 'generic', limit: RESULT_LIMIT },
   };
 }
 

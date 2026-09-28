@@ -10,6 +10,9 @@ interface EntitySearchResponse {
   entities: WikidataSearchResult[];
 }
 
+/** Search suggestion cap, independent of GIS query result volume. */
+const ENTITY_SEARCH_LIMIT = 100;
+
 @Injectable({ providedIn: 'root' })
 export class EntitySearchService {
   private readonly http = inject(HttpClient);
@@ -21,7 +24,7 @@ export class EntitySearchService {
 
     const params = new URLSearchParams({
       q: input,
-      limit: String(this.appConfig.resultLimit()),
+      limit: String(ENTITY_SEARCH_LIMIT),
     });
     if (classUri) {
       params.set('classUri', classUri);

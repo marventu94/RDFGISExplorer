@@ -130,7 +130,7 @@ inyecta al ejecutar: cada consulta debe ser autocontenida.
 | `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Basic Auth opcional |
 | `SPARQL_ENTITY_SEARCH_QUERY` | búsqueda por `rdfs:label` | Búsqueda personalizable |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
-| `SPARQL_DEFAULT_LIMIT` / `SPARQL_MAX_LIMIT` | `500` / `2000` | Límites de consulta |
+| `SPARQL_MAX_LIMIT` | `2000` | Máximo de filas devueltas por una consulta; también se usa si la petición omite un límite de respuesta |
 | `SPARQL_PREFIXES_PATH` | `config/prefixes.${SPARQL_BACKEND}.json` | Prefixes |
 | `CLASS_COLORS_PATH` | `config/class-colors.${SPARQL_BACKEND}.json` | Colores RDF |
 | `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | SQLite del Shell |

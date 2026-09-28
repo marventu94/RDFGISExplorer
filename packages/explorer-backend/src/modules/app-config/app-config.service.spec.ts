@@ -38,7 +38,6 @@ describe('AppConfigService', () => {
               SPARQL_ENDPOINT_URL: 'https://query.wikidata.org/sparql',
               SPARQL_USER: 'test-agent/1.0',
               SPARQL_TIMEOUT_MS: '10000',
-              SPARQL_DEFAULT_LIMIT: '500',
               SPARQL_MAX_LIMIT: '2000',
               SPARQL_USERNAME: '',
               SPARQL_PASSWORD: '',
@@ -75,7 +74,12 @@ describe('AppConfigService', () => {
       const config = service.getConfig();
       const defaults = service.getSettingsDefaults();
       expect(defaults.lang).toBe('en');
-      expect(defaults.resultLimit).toBe(config.defaultLimit);
+      expect(Object.keys(defaults).sort()).toEqual([
+        'endpointType',
+        'labelUri',
+        'lang',
+        'searchClass',
+      ]);
       expect(defaults.labelUri).toBe(config.labelUri);
       expect(defaults.endpointType).toBe('other');
       expect(defaults.searchClass.uri.value).toBe(
@@ -109,7 +113,6 @@ describe('AppConfigService', () => {
               SPARQL_ENDPOINT_URL: 'http://localhost:7200/repositories/test',
               SPARQL_USER: 'test-agent/1.0',
               SPARQL_TIMEOUT_MS: '30000',
-              SPARQL_DEFAULT_LIMIT: '500',
               SPARQL_MAX_LIMIT: '2000',
             }),
           },

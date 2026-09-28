@@ -42,7 +42,7 @@ export class MainComponent implements OnInit {
   readonly canHandoff = computed(() => {
     void this.graph.revision();
     return this.graph.getQueriesForGraph().queries.some(query =>
-      Boolean(query.toSparqlFullProjection({ limit: this.appConfig.resultLimit() })?.trim()),
+      Boolean(query.toSparqlFullProjection()?.trim()),
     );
   });
 
@@ -59,7 +59,7 @@ export class MainComponent implements OnInit {
         const workspaceId = panel?.sourceWorkspaceId;
         const backend = this.appConfig.config()?.backend || 'generic';
         return this.graph.getQueriesForGraph().queries.flatMap((query, index) => {
-          const sparql = query.toSparqlFullProjection({ limit: this.appConfig.resultLimit() });
+          const sparql = query.toSparqlFullProjection();
           if (!sparql?.trim()) return [];
           return [{
             id: `${panel?.id ?? 'panel'}:${index}`,

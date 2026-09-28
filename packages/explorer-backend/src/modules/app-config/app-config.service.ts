@@ -27,7 +27,6 @@ export class AppConfigService {
     const cfg = this.buildRuntimeConfig();
     return {
       lang: 'en',
-      resultLimit: cfg.defaultLimit,
       labelUri: cfg.labelUri,
       searchClass: this.endpoint.describeEndpoint().defaultSearchClass,
       endpointType: 'other',
@@ -89,10 +88,6 @@ export class AppConfigService {
     const username = this.config.get<string>('SPARQL_USERNAME');
     const password = this.config.get<string>('SPARQL_PASSWORD');
 
-    const defaultLimit = parseInt(
-      this.config.get<string>('SPARQL_DEFAULT_LIMIT') ?? '500',
-      10,
-    );
     const maxLimit = parseInt(
       this.config.get<string>('SPARQL_MAX_LIMIT') ?? '2000',
       10,
@@ -108,7 +103,6 @@ export class AppConfigService {
         this.config.get<string>('SPARQL_TIMEOUT_MS') ?? '30000',
         10,
       ),
-      defaultLimit,
       maxLimit,
       capabilities: [
         'sparql11',

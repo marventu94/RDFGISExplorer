@@ -14,7 +14,6 @@ describe('AppConfigController', () => {
         hasBasicAuth: false,
         userAgent: 'test-agent/1.0',
         timeoutMs: 10000,
-        defaultLimit: 500,
         maxLimit: 2000,
         capabilities: ['sparql11'],
         supportsWikibaseLabel: true,
@@ -31,7 +30,6 @@ describe('AppConfigController', () => {
         },
         defaults: {
           lang: 'en',
-          resultLimit: 500,
           labelUri: 'rdfs:label',
           searchClass: {
             uri: { type: 'uri', value: 'x' },

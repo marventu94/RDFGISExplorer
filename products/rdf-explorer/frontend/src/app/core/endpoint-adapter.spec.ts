@@ -78,12 +78,12 @@ describe('GisBackendAdapter', () => {
     expect(result).toEqual(expected);
   });
 
-  it('executeQuery uses default limit 500 when not provided', async () => {
+  it('executeQuery lets the backend apply its maximum when no limit is provided', async () => {
     const adapter = new GisBackendAdapter(httpClient, BASE_URL);
     const promise = adapter.executeQuery(FIXTURE_QUERY_1);
 
     const req = httpTestingController.expectOne('/api/query/execute');
-    expect(req.request.body).toEqual({ sparql: FIXTURE_QUERY_1, limit: 500 });
+    expect(req.request.body).toEqual({ sparql: FIXTURE_QUERY_1 });
 
     req.flush(makeQueryResult());
     await promise;
