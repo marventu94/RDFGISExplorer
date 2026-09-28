@@ -32,17 +32,18 @@
   overflow: auto;
 }
 
-// En modo oscuro se usa una paleta cálida y sobria, alineada con el visor de
-// RDF Explorer. Los valores son locales para que el editor integrado en el
-// Shell no dependa de que los tokens globales del remote estén disponibles.
 :host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-editor {
   background: #242321;
   color: #d8d1ca;
 }
 
-:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-content,
-:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-content span {
-  color: #d8d1ca !important;
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-content {
+  color: #ddd7d1;
+}
+
+// Reuse CodeMirror's syntax colors and brighten them for the dark background.
+:host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-line span {
+  filter: invert(1) hue-rotate(120deg) saturate(1.4);
 }
 
 :host-context(html[data-theme='dark']) ::ng-deep .editor-area .cm-gutters {
