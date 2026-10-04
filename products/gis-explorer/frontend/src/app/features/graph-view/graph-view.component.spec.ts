@@ -896,6 +896,47 @@ describe('GraphViewComponent', () => {
   });
 
   describe('external clear and empty focus', () => {
+    it('frames a selected node admitted by the cap after the animated layout finishes', () => {
+      component.MAX_NODES = 1;
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      expect(cy._ids()).not.toContain(mockNode2.uri);
+      cy.zoom(0.1);
+      cy.animate.mockClear();
+      cy._emit('layoutstart', null, {});
+
+      selectedNodeSubject.next({ node: mockNode2, source: 'map' });
+      expect(cy._ids()).toContain(mockNode2.uri);
+      expect(cy.animate).not.toHaveBeenCalled();
+
+      const selected = cy.getElementById(mockNode2.uri) as {
+        position: (value: { x: number; y: number }) => void;
+      };
+      selected.position({ x: 8500, y: 200 });
+      cy._emit('layoutstop', null, {});
+
+      expect(cy.animate).toHaveBeenCalledOnce();
+      const animation = cy.animate.mock.calls[0][0];
+      expect(animation.center.eles.id()).toBe(mockNode2.uri);
+      expect(animation.center.eles.position()).toEqual({ x: 8500, y: 200 });
+      expect(animation.duration).toBe(600);
+      expect(cy._classesOf(mockNode2.uri)).toContain('is-selected');
+    });
+
+    it('cancels pending camera focus when the selection clears before layout completion', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      cy.zoom(0.1);
+      cy.animate.mockClear();
+      cy._emit('layoutstart', null, {});
+      selectedNodeSubject.next({ node: mockNode2, source: 'map' });
+      selectedNodeSubject.next({ node: null, source: 'external' });
+      cy._emit('layoutstop', null, {});
+
+      expect(cy.animate).not.toHaveBeenCalled();
+      expect(cy._classesOf(mockNode2.uri)).not.toContain('is-selected');
+    });
+
     it('clears is-selected and is-dimmed on external clearSelection', () => {
       const lonely: NormalizedNode = {
         uri: 'http://www.wikidata.org/entity/Q888',
