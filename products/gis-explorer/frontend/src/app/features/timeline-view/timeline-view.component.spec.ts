@@ -948,6 +948,34 @@ describe('TimelineViewComponent', () => {
     ]);
   });
 
+  it.each(['pointerdown', 'wheel'])('clears coordinated dimming on timeline %s while keeping explicit selection', (event) => {
+    const result = createMockQueryResult([nodeWithDates]);
+    queryResultSubject.next(result);
+    filteredQueryResultSubject.next(result);
+    fixture.detectChanges();
+    selectedNodeSubject.next({ node: nodeWithDates, source: 'map' });
+    const view = component as unknown as {
+      applyExternalFocus: (uris: Set<string>) => void;
+      selectedItemIds: string[];
+      tlContainer: { nativeElement: HTMLElement };
+    };
+    view.applyExternalFocus(new Set(['urn:outside-timeline']));
+    const selected = [...view.selectedItemIds];
+    const items = timelineMock.items as { update: ReturnType<typeof vi.fn> };
+    items.update.mockClear();
+    timelineMock.instance.setSelection.mockClear();
+
+    view.tlContainer.nativeElement.dispatchEvent(new Event(event));
+
+    expect(items.update).toHaveBeenLastCalledWith(expect.arrayContaining([
+      expect.objectContaining({ className: '' }),
+    ]));
+    expect(view.selectedItemIds).toEqual(selected);
+    expect(timelineMock.instance.setSelection).not.toHaveBeenCalled();
+    expect(TestBed.inject(SelectionService).markActiveView).toHaveBeenCalledWith('timeline');
+    expect(TestBed.inject(SelectionService).clearSelection).not.toHaveBeenCalled();
+  });
+
   it('does not reset the timeline for unmatched or incompatible viewport focus', () => {
     const result = createMockQueryResult([nodeWithDates]);
     queryResultSubject.next(result);

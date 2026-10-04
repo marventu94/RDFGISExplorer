@@ -308,6 +308,9 @@ export class SelectionService {
   }
 
   clearFocus(): void {
+    if (this.activeViewTimer) clearTimeout(this.activeViewTimer);
+    this.activeViewTimer = undefined;
+    this._activeView$.next(null);
     this._focus$.next({ uris: new Set<string>(), source: null });
   }
 

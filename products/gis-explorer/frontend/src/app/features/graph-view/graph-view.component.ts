@@ -126,6 +126,8 @@ const SUPPRESS_VIEWPORT_MS = 800;
 
 /** Margen del encuadre de la vista coordinada, en la línea del que usa el mapa. */
 const FOCUS_PADDING = 40;
+const FOCUS_ZOOM_MARGIN = 0.8;
+const FOCUS_MAX_ZOOM = 2;
 /**
  * Piso de zoom del encuadre coordinado. Un nodo chico mide 20px, así que por
  * debajo de esto los nodos son puntos y las etiquetas (11px) no se leen:
@@ -214,6 +216,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private markActiveListener?: () => void;
   /** Firma del conjunto de elementos dibujado; si no cambia, no se re-corre layout. */
   private lastTopologyKey: string | null = null;
+  private lastAppliedFiltersKey = '[]';
   private shouldFitAfterLayout = false;
   private pendingCamera?: { pan: { x: number; y: number }; zoom: number };
   /** Simulación de cola encendida mientras dura un arrastre. */
@@ -429,7 +432,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
             this.focusPins.clear();
             this.syncGraph(this.buildElements(this.lastVisibleResult).elements);
           }
-          this.applyFocusContext(this.selectedDrawnUri);
+          this.clearFocusClasses();
+          if (this.selectedDrawnUri) {
+            this.cy?.getElementById(this.selectedDrawnUri).addClass('is-selected');
+          }
           return;
         }
         this.applyExternalFocus(f.uris, f.entityUris);
@@ -507,13 +513,20 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * el layout completo — de ahí que los nodos se reacomodaran y se perdiera la
    * cámara en cada click.
    */
-  private syncGraph(elements: cytoscape.ElementDefinition[]): void {
+  private syncGraph(elements: cytoscape.ElementDefinition[], resetLayout = false): void {
     this.indexAggregates(elements);
     const key = this.topologyKey(elements);
 
     if (!this.cy) {
-      this.createGraph(elements);
+      this.createGraph(elements, resetLayout);
       this.lastTopologyKey = key;
+      return;
+    }
+
+    if (resetLayout) {
+      this.patchGraph(elements, false);
+      this.lastTopologyKey = key;
+      this.resetFilteredLayout();
       return;
     }
 
@@ -528,7 +541,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.lastTopologyKey = key;
   }
 
-  private createGraph(elements: cytoscape.ElementDefinition[]): void {
+  private createGraph(elements: cytoscape.ElementDefinition[], resetLayout = false): void {
     // El modo entidad es transitorio: ni lee el estado guardado del tablero ni
     // deja que su layout/nivel lo pisen. Siempre arranca en Jerárquico (§9).
     const entityMode = this.isEntityMode;
@@ -578,12 +591,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     });
 
     this.manualPositions.clear();
-    const restoredPositions = this.restoreManualPositions;
+    const restoredPositions = resetLayout ? undefined : this.restoreManualPositions;
     this.restoreManualPositions = undefined;
     if (restoredPositions) {
       restoredPositions.forEach((pos, uri) => this.manualPositions.set(uri, pos));
     } else {
-      for (const [uri, pos] of Object.entries(stored?.manualPositions ?? {})) {
+      for (const [uri, pos] of Object.entries(resetLayout ? {} : stored?.manualPositions ?? {})) {
         this.manualPositions.set(uri, pos);
       }
     }
@@ -591,7 +604,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     // Si hay cámara guardada se restaura en vez de encuadrar, así volver al slot
     // no pierde el zoom. La cámara de `restoreCamera` (volver del modo entidad)
     // gana: es la que el usuario tenía hace un instante.
-    const camera =
+    const camera = resetLayout ? undefined :
       this.restoreCamera ??
       (stored?.pan && typeof stored.zoom === 'number'
         ? { pan: stored.pan, zoom: stored.zoom }
@@ -669,7 +682,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   /** Agrega/quita/actualiza elementos y coloca solo los nuevos, sin mover el resto. */
-  private patchGraph(elements: cytoscape.ElementDefinition[]): void {
+  private patchGraph(elements: cytoscape.ElementDefinition[], layoutAddedNodes = true): void {
     const cy = this.cy;
     if (!cy) return;
 
@@ -701,7 +714,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       if (toAdd.length > 0) cy.add(toAdd);
     });
 
-    if (addedIds.size === 0) return;
+    if (addedIds.size === 0 || !layoutAddedNodes) return;
 
     // Un nodo que vuelve y ya tenía acomodo manual va directo a su lugar; solo
     // los realmente nuevos pasan por el layout.
@@ -787,7 +800,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       if (this.suppressTimer) clearTimeout(this.suppressTimer);
       this.suppressViewportEmit = false;
       this.cy?.stop();
+      this.pendingSelectionFocusUri = null;
+      this.clearFocusClasses();
+      if (this.selectedDrawnUri) {
+        this.cy?.getElementById(this.selectedDrawnUri).addClass('is-selected');
+      }
       this.selectionService.markActiveView('graph');
+      this.viewportChange$.next();
     };
     this.markActiveListener = markActive;
     container.addEventListener('pointerdown', markActive);
@@ -860,6 +879,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     filters: Filter[],
     lotState: LotState,
   ): void {
+    const filtersKey = JSON.stringify(filters);
+    const filtersChanged = filtersKey !== this.lastAppliedFiltersKey;
+    this.lastAppliedFiltersKey = filtersKey;
+    if (filtersChanged) this.focusPins.clear();
     this.activeFilterCount = filters.length;
     this.coverageLabel = '';
     this.indexNodes(original, visible);
@@ -893,6 +916,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       // Filtros y lotes siguen mandando sobre los datos; la exploración se
       // recalcula sobre el nuevo resultado visible sin perder raíz ni ramas.
       this.syncEntityMode();
+      if (filtersChanged) this.resetFilteredLayout();
       this.cdr.markForCheck();
       return;
     }
@@ -904,8 +928,30 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       lotState.lotCount,
       lotState.currentLot,
     );
-    this.syncGraph(built.elements);
+    this.syncGraph(built.elements, filtersChanged);
     this.cdr.markForCheck();
+  }
+
+  /** A new filter defines a new exploration subset, so place and frame it afresh. */
+  private resetFilteredLayout(): void {
+    const cy = this.cy;
+    if (!cy) return;
+    this.liveLayout?.stop();
+    this.liveLayout = undefined;
+    this.lockedForDrag?.unlock();
+    this.lockedForDrag = undefined;
+    cy.stop();
+    cy.nodes().unlock();
+    this.manualPositions.clear();
+    this.pendingCamera = undefined;
+    this.pendingSelectionFocusUri = null;
+    this.clearFocusClasses();
+    this.shouldFitAfterLayout = true;
+    this.suppressViewport();
+    cy.layout(this.getInitialLayoutOptions(this.currentLayout)).run();
+    const selection = this.selectionService.getSelectedNodeSnapshot();
+    this.selectedDrawnUri = this.resolveDrawnUri(selection);
+    if (this.selectedDrawnUri) cy.getElementById(this.selectedDrawnUri).addClass('is-selected');
   }
 
   private indexNodes(original: QueryResult | null, visible: QueryResult | null): void {
@@ -1365,13 +1411,15 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     const frame = this.cy.nodes().filter((node) => entityUris.has(node.id()) ||
       ((node.data('memberNodeIds') as string[] | undefined)?.some((id) => entityUris.has(id)) ?? false));
-    if (frame.nonempty()) this.frameFocus(frame);
+    // Prefer the visible structure over framing only its root. If its members
+    // are too dispersed, keep the root frame with the same wider zoom margin.
+    if (!this.frameFocus(matched) && frame.nonempty()) this.frameFocus(frame);
   }
 
   /** Frame only when all targets fit at a readable scale. */
-  private frameFocus(nodes: cytoscape.NodeCollection): void {
+  private frameFocus(nodes: cytoscape.NodeCollection): boolean {
     const cy = this.cy;
-    if (!cy) return;
+    if (!cy || nodes.empty()) return false;
 
     const bb = nodes.boundingBox();
     const width = cy.width();
@@ -1383,15 +1431,16 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const fitZoom = Math.min(usableWidth / Math.max(bb.w, 1), usableHeight / Math.max(bb.h, 1));
     // An incompatible focus keeps the camera where the user left it. Do not
     // center between distant objects while leaving both outside the viewport.
-    if (fitZoom < FOCUS_MIN_ZOOM) return;
-    const zoom = Math.min(fitZoom, cy.maxZoom());
+    if (fitZoom < FOCUS_MIN_ZOOM) return false;
+    const zoom = Math.min(cy.maxZoom(), FOCUS_MAX_ZOOM,
+      Math.max(FOCUS_MIN_ZOOM, fitZoom * FOCUS_ZOOM_MARGIN));
 
     const centerX = (bb.x1 + bb.x2) / 2;
     const centerY = (bb.y1 + bb.y2) / 2;
 
     const pan = { x: width / 2 - centerX * zoom, y: height / 2 - centerY * zoom };
     const currentPan = cy.pan();
-    if (Math.abs(cy.zoom() - zoom) < 0.05 && Math.hypot(currentPan.x - pan.x, currentPan.y - pan.y) < 8) return;
+    if (Math.abs(cy.zoom() - zoom) < 0.05 && Math.hypot(currentPan.x - pan.x, currentPan.y - pan.y) < 8) return true;
     this.suppressViewport();
     cy.stop();
     cy.animate({
@@ -1400,6 +1449,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       pan: { x: width / 2 - centerX * zoom, y: height / 2 - centerY * zoom },
       duration: 600,
     });
+    return true;
   }
 
   private emitFocusFromViewport(): void {
