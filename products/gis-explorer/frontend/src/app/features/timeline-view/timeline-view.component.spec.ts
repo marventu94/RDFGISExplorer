@@ -504,6 +504,8 @@ describe('TimelineViewComponent', () => {
       expect(selectionService.select).toHaveBeenCalledWith(
         nodeWithDates,
         'timeline',
+        undefined,
+        { field: 'inception', isoDate: '1952-06-04T00:00:00Z' },
       );
     });
 
@@ -929,4 +931,34 @@ describe('TimelineViewComponent', () => {
       expect(end.getTime()).toBeGreaterThan(eventMs);
     });
   });
+  it('renders every date and preserves the exact row date on external selection', () => {
+    const result = createMockQueryResult([nodeWithDates]);
+    queryResultSubject.next(result);
+    filteredQueryResultSubject.next(result);
+    fixture.detectChanges();
+    const items = (timelineMock.items as { get: () => { id: string; start: Date }[] }).get();
+    expect(items.map((item) => item.start.toISOString()).sort()).toEqual([
+      '1946-06-04T00:00:00.000Z', '1952-06-04T00:00:00.000Z',
+    ]);
+    selectedNodeSubject.next({ node: nodeWithDates, source: 'table', row: {
+      inception: { type: 'date', value: '1946-06-04T00:00:00Z', raw: '1946-06-04T00:00:00Z' },
+    } });
+    expect(timelineMock.instance.setSelection).toHaveBeenLastCalledWith([
+      items.find((item) => item.start.getUTCFullYear() === 1946)!.id,
+    ]);
+  });
+
+  it('does not reset the timeline for unmatched or incompatible viewport focus', () => {
+    const result = createMockQueryResult([nodeWithDates]);
+    queryResultSubject.next(result);
+    filteredQueryResultSubject.next(result);
+    fixture.detectChanges();
+    timelineMock.instance.getWindow.mockReturnValue({ start: new Date('2024-01-01'), end: new Date('2024-01-02') });
+    timelineMock.instance.setWindow.mockClear();
+    const view = component as unknown as { applyExternalFocus: (uris: Set<string>) => void };
+    view.applyExternalFocus(new Set(['unknown']));
+    view.applyExternalFocus(new Set([nodeWithDates.uri]));
+    expect(timelineMock.instance.setWindow).not.toHaveBeenCalled();
+  });
+
 });

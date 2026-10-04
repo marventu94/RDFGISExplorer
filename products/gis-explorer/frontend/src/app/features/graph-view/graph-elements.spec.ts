@@ -186,6 +186,26 @@ describe('buildGraphElements', () => {
     expect(built.drawnNodes).toBe(2);
   });
 
+  it('reserves space for a selected node before allocating motif summaries', () => {
+    const nodes = Array.from({ length: 3 }, (_, index) => [
+      makeNode(`listing-${index}`, { queryVariable: 'listing' }),
+      makeNode(`estate-${index}`, { queryVariable: 'estate' }),
+    ]).flat();
+    const edges = Array.from({ length: 3 }, (_, index) =>
+      makeEdge(`listing-${index}`, `estate-${index}`),
+    );
+    const result = makeQueryResult(nodes, edges);
+
+    const built = buildGraphElements(result, {
+      maxNodes: 2,
+      detailLevel: 'summary',
+      pinnedUris: ['listing-0'],
+    });
+
+    expect(nodeIds(built)).toContain('listing-0');
+    expect(built.drawnNodes).toBeLessThanOrEqual(2);
+  });
+
   it('does not prioritize a structural hub over a pinned node', () => {
     // The structural hub concentrates degree; the pin is an ordinary leaf.
     // Pin priority makes the selected leaf displace equal-degree leaves.

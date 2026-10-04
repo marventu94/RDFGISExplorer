@@ -233,3 +233,7 @@ code {
   padding: 1px 5px;
   border-radius: 3px;
 }
+
+:host ::ng-deep .vis-item.coordinated-muted:not(.vis-selected) {
+  opacity: 0.3;
+}

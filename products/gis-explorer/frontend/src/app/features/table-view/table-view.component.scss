@@ -147,3 +147,11 @@ ag-grid-angular,
   --ag-icon-color: var(--gis-text-muted);
   --ag-secondary-foreground-color: var(--gis-text-muted);
 }
+
+:host { position: relative; }
+:host.is-active-view { outline: 3px solid rgba(120, 200, 140, 0.9); outline-offset: -3px; }
+:host ::ng-deep .ag-row.coordinated-focus:not(.ag-row-selected) {
+  background: color-mix(in srgb, var(--gis-accent) 12%, var(--ag-row-bg));
+  box-shadow: inset 3px 0 var(--gis-accent);
+}
+.table-toolbar { flex-wrap: wrap; }

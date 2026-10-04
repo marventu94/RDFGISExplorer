@@ -289,13 +289,14 @@ export function buildGraphElements(
 ): BuiltGraph {
   const { maxNodes } = options;
   const pinned = new Set(options.pinnedUris ?? []);
+  const pinnedNodeCount = result.nodes.filter((node) => pinned.has(node.uri)).length;
   const motifSummary =
     options.detailLevel === 'summary'
       ? summarizeRepeatedComponents(
           result,
           pinned,
           new Set(options.expandedMotifIds ?? []),
-          maxNodes,
+          Math.max(0, maxNodes - Math.min(maxNodes, pinnedNodeCount)),
         )
       : {
           elements: [],

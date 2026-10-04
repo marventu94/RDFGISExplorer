@@ -244,6 +244,7 @@ const { createMockCy, cyRegistry } = vi.hoisted(() => {
       fit: vi.fn(),
       center: vi.fn(),
       animate: vi.fn(),
+      stop: vi.fn(),
       style: vi.fn(),
       batch: (fn: () => void) => fn(),
       add: (defs: unknown) => addDefs(defs),
@@ -374,6 +375,7 @@ describe('GraphViewComponent', () => {
       activeView$: activeViewSubject.asObservable(),
       coordinatedViewEnabled$: of(true),
       select: vi.fn(),
+      setFocus: vi.fn(),
       clearSelection: vi.fn(),
       markActiveView: vi.fn(),
       getActiveView: vi.fn(() => null),
@@ -573,38 +575,31 @@ describe('GraphViewComponent', () => {
     });
   });
 
-  /**
-   * An entity collapsed into a motif does not exist as its own canvas node;
-   * lienzo: antes, seleccionarla desde otra vista no resaltaba nada. Ahora se
-   * the summary node containing it is highlighted instead.
-   */
-  it('highlights the summary node containing an entity selected in another view', () => {
-    const result = createRepeatedPairResult();
-    queryResultSubject.next(result);
-    visibleQueryResultSubject.next(result);
-    fixture.detectChanges();
+  it.each(['table', 'map', 'timeline'])(
+    'draws and highlights the exact entity selected from %s instead of its motif',
+    (source) => {
+      const result = createRepeatedPairResult();
+      queryResultSubject.next(result);
+      visibleQueryResultSubject.next(result);
+      fixture.detectChanges();
 
-    const cy = lastCy();
-    expect(cy._ids()).not.toContain('listing-0'); // It remains collapsed into the motif.
+      const cy = lastCy();
+      expect(cy._ids()).not.toContain('listing-0');
 
-    selectedNodeSubject.next({
-      node: { uri: 'listing-0', label: 'listing-0', attributes: {} },
-      source: 'timeline',
-      relatedUris: new Set(['listing-0', 'estate-0']),
-    });
-    fixture.detectChanges();
+      selectedNodeSubject.next({
+        node: { uri: 'listing-0', label: 'listing-0', attributes: {} },
+        source: source as Selection['source'],
+        relatedUris: new Set(['listing-0', 'estate-0']),
+      });
+      fixture.detectChanges();
 
-    const seleccionados = cy
-      ._ids()
-      .filter((id: string) => cy._classesOf(id).includes('is-selected'));
-    expect(seleccionados).toHaveLength(1);
-    expect(seleccionados[0]).toContain('component-motif');
-    // The highlighted summary is the one grouping listing-0.
-    const miembros = (cy._els as Array<{ id: string; data: Record<string, unknown> }>).find(
-      (el) => el.id === seleccionados[0],
-    )?.data['memberNodeIds'] as string[] | undefined;
-    expect(miembros).toContain('listing-0');
-  });
+      const selected = cy
+        ._ids()
+        .filter((id: string) => cy._classesOf(id).includes('is-selected'));
+      expect(selected).toEqual(['listing-0']);
+      expect(cy._ids()).toContain('listing-0');
+    },
+  );
 
   it('highlights nothing when neither the entity nor its row is on the canvas', () => {
     const result = createRepeatedPairResult();
@@ -935,7 +930,7 @@ describe('GraphViewComponent', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
 
-      focusSubject.next({ uris: new Set([mockNode.uri]), source: 'map' });
+      focusSubject.next({ uris: new Set([mockNode.uri, mockNode2.uri]), source: 'map' });
       fixture.detectChanges();
       expect(cy._classesOf(mockEdge.id)).toContain('is-focus-edge');
 
@@ -969,6 +964,24 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(mockNode2.uri)).not.toContain('is-dimmed');
     });
 
+    it.each(['map', 'timeline'])('keeps the selection when %s focus misses the drawn graph', (source) => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+
+      selectedNodeSubject.next({ node: mockNode, source: 'table' });
+      focusSubject.next({ uris: new Set(['urn:outside-graph']), source });
+      fixture.detectChanges();
+
+      expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
+      expect(cy._classesOf(mockNode2.uri)).not.toContain('is-selected');
+
+      focusSubject.next({ uris: new Set(), source });
+      fixture.detectChanges();
+
+      expect(cy._classesOf(mockNode.uri)).toContain('is-selected');
+      expect(cy._classesOf(mockNode2.uri)).not.toContain('is-selected');
+    });
+
     it('does not dim focus when nothing is selected', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
@@ -984,7 +997,7 @@ describe('GraphViewComponent', () => {
      * Map and timeline focus covers their entire viewport. Using `fit` made graph
      * nodes tiny, so framing never goes below `FOCUS_MIN_ZOOM`.
      */
-    it('does not zoom below the floor when framing a broad focus', () => {
+    it('keeps the camera when distant targets cannot fit legibly', () => {
       const nodes: NormalizedNode[] = Array.from({ length: 6 }, (_, i) => ({
         uri: `Q${i}`,
         label: `N${i}`,
@@ -999,10 +1012,7 @@ describe('GraphViewComponent', () => {
       focusSubject.next({ uris: new Set(nodes.map((n) => n.uri)), source: 'map' });
       fixture.detectChanges();
 
-      expect(cy.animate).toHaveBeenCalledTimes(1);
-      const opts = cy.animate.mock.calls[0][0] as { zoom: number; pan: { x: number; y: number } };
-      expect(opts.zoom).toBeCloseTo(0.8, 5);
-      expect(Number.isFinite(opts.pan.x)).toBe(true);
+      expect(cy.animate).not.toHaveBeenCalled();
     });
 
     it('honors a tight frame when focus fits without zooming out', () => {
@@ -1671,7 +1681,7 @@ describe('GraphViewComponent', () => {
       expect(component.isEntityMode).toBe(false);
     });
 
-    it('does not reframe or alter the explored subgraph from coordinated focus', () => {
+    it('frames compatible focus without altering the explored subgraph', () => {
       enter();
       const cy = lastCy();
       const before = drawnIds();
@@ -1685,7 +1695,7 @@ describe('GraphViewComponent', () => {
 
       expect(component.isEntityMode).toBe(true);
       expect(drawnIds()).toEqual(before);
-      expect(cy.animate).not.toHaveBeenCalled();
+      expect(cy.animate).toHaveBeenCalled();
     });
 
     it('adds only shared-resource neighbors without recreating the canvas', () => {
@@ -2006,6 +2016,32 @@ describe('GraphViewComponent', () => {
       expect(component.queryState).toBe('no-query');
     });
   });
+  it('translates a summarized graph viewport into member resources', () => {
+    const result = createRepeatedPairResult();
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+    const service = TestBed.inject(SelectionService);
+    vi.mocked(service.getActiveView).mockReturnValue('graph');
+    (component as unknown as { suppressViewportEmit: boolean }).suppressViewportEmit = false;
+    (component as unknown as { emitFocusFromViewport: () => void }).emitFocusFromViewport();
+    const [ids, source] = vi.mocked(service.setFocus).mock.calls.at(-1)!;
+    expect(source).toBe('graph');
+    expect([...ids]).toContain('listing-0');
+    expect([...ids].some((id) => id.startsWith('component-motif:'))).toBe(false);
+  });
+
+  it('highlights the aggregate representing an external focus', () => {
+    const result = createRepeatedPairResult();
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+    focusSubject.next({ uris: new Set(['listing-0']), source: 'map' });
+    const cy = lastCy();
+    const aggregates = cy._ids().filter((id: string) => id.includes('component-motif:') && id.includes(':node:'));
+    expect(aggregates.some((id: string) => !cy._classesOf(id).includes('is-dimmed'))).toBe(true);
+  });
+
 });
 
 describe('EntityColorService', () => {
@@ -2045,4 +2081,5 @@ describe('EntityColorService', () => {
     );
     expect(service.colorForClass('http://www.wikidata.org/entity/Q5')).toBe('#000000');
   });
+
 });
