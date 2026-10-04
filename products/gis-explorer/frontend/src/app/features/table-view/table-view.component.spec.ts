@@ -1,10 +1,11 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { TableViewComponent } from './table-view.component';
-import { SelectionService } from '@core/services/selection.service';
+import { SelectionService, type FocusState, type FocusSource } from '@core/services/selection.service';
 import { DEFAULT_LIMITS, LimitsService } from '@core/services/limits.service';
 import type {
   QueryResult,
@@ -71,6 +72,14 @@ describe('TableViewComponent', () => {
     clearSelection: ReturnType<typeof vi.fn>;
     addFilter: ReturnType<typeof vi.fn>;
     removeFilter: ReturnType<typeof vi.fn>;
+    focus$: BehaviorSubject<FocusState>;
+    activeView$: BehaviorSubject<FocusSource>;
+    primaryVariable: ReturnType<typeof signal<string | null>>;
+    entityForRow: ReturnType<typeof vi.fn>;
+    markActiveView: ReturnType<typeof vi.fn>;
+    getActiveView: ReturnType<typeof vi.fn>;
+    setFocus: ReturnType<typeof vi.fn>;
+    setPrimaryVariable: ReturnType<typeof vi.fn>;
   };
   beforeEach(async () => {
     selectionServiceMock = {
@@ -86,6 +95,14 @@ describe('TableViewComponent', () => {
       clearSelection: vi.fn(),
       addFilter: vi.fn(),
       removeFilter: vi.fn(),
+      focus$: new BehaviorSubject<FocusState>({ uris: new Set(), source: null }),
+      activeView$: new BehaviorSubject<FocusSource>(null),
+      primaryVariable: signal<string | null>(null),
+      entityForRow: vi.fn(() => null),
+      markActiveView: vi.fn(),
+      getActiveView: vi.fn(() => null),
+      setFocus: vi.fn(),
+      setPrimaryVariable: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
@@ -237,6 +254,9 @@ describe('TableViewComponent', () => {
       rows = makeRows();
       const api = {
         sizeColumnsToFit: vi.fn(),
+        redrawRows: vi.fn(),
+        forEachNodeAfterFilterAndSort: (cb: (row: unknown) => void) => rows.forEach(cb),
+        ensureIndexVisible: vi.fn(),
         forEachNode: (cb: (row: unknown) => void) => rows.forEach(cb),
         paginationGetPageSize: () => 50,
         paginationGetCurrentPage: () => 0,
@@ -354,7 +374,46 @@ describe('TableViewComponent', () => {
       } as never);
 
       // Use the entity selected by other views, not the row's first URI.
-      expect(selectionServiceMock.select).toHaveBeenCalledWith(casaNode, 'table');
+      expect(selectionServiceMock.select).toHaveBeenCalledWith(casaNode, 'table', result.bindings[0]);
     });
   });
+  it('highlights and scrolls coordinated rows without changing the explicit selection', () => {
+    const row = mockQueryResult.bindings[0];
+    selectionServiceMock.entityForRow.mockReturnValue(mockQueryResult.nodes[0]);
+    const api = {
+      sizeColumnsToFit: vi.fn(), redrawRows: vi.fn(),
+      forEachNodeAfterFilterAndSort: (visit: (row: unknown) => void) => visit({ data: row, rowIndex: 8 }),
+      paginationGetPageSize: () => 50, paginationGoToPage: vi.fn(), ensureIndexVisible: vi.fn(),
+      getFirstDisplayedRowIndex: () => 0, getLastDisplayedRowIndex: () => 4,
+    };
+    component.onGridReady({ api } as never);
+    selectionServiceMock.focus$.next({ uris: new Set([mockQueryResult.nodes[0].uri]), source: 'map' });
+    expect(component.rowClassRules['coordinated-focus']({ data: row } as never)).toBe(true);
+    expect(api.ensureIndexVisible).toHaveBeenCalledWith(8, 'top');
+    expect(selectionServiceMock.select).not.toHaveBeenCalled();
+    selectionServiceMock.focus$.next({ uris: new Set(), source: null });
+    expect(component.rowClassRules['coordinated-focus']({ data: row } as never)).toBe(false);
+  });
+
+  it('emits viewport entities only for user navigation of the table', () => {
+    vi.useFakeTimers();
+    try {
+      selectionServiceMock.entityForRow.mockReturnValue(mockQueryResult.nodes[0]);
+      const api = {
+        sizeColumnsToFit: vi.fn(), getFirstDisplayedRowIndex: () => 0,
+        getLastDisplayedRowIndex: () => 0,
+        getDisplayedRowAtIndex: () => ({ data: mockQueryResult.bindings[0] }),
+      };
+      component.onGridReady({ api } as never);
+      component.onViewportChanged();
+      vi.advanceTimersByTime(500);
+      expect(selectionServiceMock.setFocus).not.toHaveBeenCalled();
+      selectionServiceMock.getActiveView.mockReturnValue('table');
+      component.onUserNavigation();
+      component.onViewportChanged();
+      vi.advanceTimersByTime(500);
+      expect(selectionServiceMock.setFocus).toHaveBeenCalledWith([mockQueryResult.nodes[0].uri], 'table');
+    } finally { vi.useRealTimers(); }
+  });
+
 });

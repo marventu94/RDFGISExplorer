@@ -37,7 +37,6 @@ import {
 } from './graph-layouts';
 import { buildGraphElements, type BuiltGraph } from './graph-elements';
 import {
-  applyCoordinatedFocus,
   collapseBranch,
   createExplorationState,
   enterEntityMode,
@@ -130,7 +129,7 @@ const FOCUS_PADDING = 40;
 /**
  * Piso de zoom del encuadre coordinado. Un nodo chico mide 20px, así que por
  * debajo de esto los nodos son puntos y las etiquetas (11px) no se leen:
- * preferimos mostrar menos nodos pero legibles. Subilo para acercar más.
+ * si no entran todos a esta escala, se conserva la cámara.
  */
 const FOCUS_MIN_ZOOM = 0.8;
 
@@ -150,6 +149,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   detailLevel: GraphDetailLevel = 'summary';
   private expandedSuperEdgeIds = new Set<string>();
   private expandedMotifIds = new Set<string>();
+  private focusPins = new Set<string>();
   private readonly resultDetailLevels: ReadonlyArray<{
     value: GraphDetailLevel;
     label: UiTextKey;
@@ -368,6 +368,25 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           this.clearFocusClasses();
           return;
         }
+        const selectedUri = sel.node.uri;
+        const visible = this.lastVisibleResult;
+        if (
+          !this.isEntityMode &&
+          visible &&
+          this.cy.getElementById(selectedUri).empty() &&
+          visible.nodes.some((node) => node.uri === selectedUri)
+        ) {
+          // A collapsed motif or node cap can hide the exact entity. Pinning it
+          // makes selections from the table, map, and timeline unambiguous.
+          const built = this.buildElements(visible);
+          this.coverageLabel = this.buildCoverageLabel(
+            built,
+            visible,
+            this.lastLotState.lotCount,
+            this.lastLotState.currentLot,
+          );
+          this.syncGraph(built.elements);
+        }
         const uri = this.resolveDrawnUri(sel);
         // Se recuerda para poder re-marcarlo cuando llegue un foco coordinado.
         this.selectedDrawnUri = uri;
@@ -396,27 +415,21 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$),
         filter(
           (f) =>
-            f.source !== null &&
-            f.source !== 'graph' &&
-            this.selectionService.getActiveView() !== 'graph',
+            f.source === null || (f.source !== 'graph' &&
+            this.selectionService.getActiveView() !== 'graph'),
         ),
       )
       .subscribe((f) => {
-        if (this.isEntityMode) {
-          // §8 del plan: el foco masivo del viewport de otra vista es inerte
-          // para la exploración (no entra al modo, no cambia la raíz, no
-          // expande) y tampoco reencuadra el subgrafo que el usuario está
-          // leyendo. La función pura deja la decisión documentada.
-          this.explorationState = applyCoordinatedFocus(this.explorationState, [...f.uris]);
-          return;
-        }
-        // Foco externo vacío (otra vista dejó de tener nada en viewport):
-        // se limpia el dimming en vez de dejarlo congelado.
+        // An empty viewport focus must not clear an explicit selection.
         if (f.uris.size === 0) {
-          this.clearFocusClasses();
+          if (this.focusPins.size && !this.isEntityMode && this.lastVisibleResult) {
+            this.focusPins.clear();
+            this.syncGraph(this.buildElements(this.lastVisibleResult).elements);
+          }
+          this.applyFocusContext(this.selectedDrawnUri);
           return;
         }
-        this.applyExternalFocus(f.uris);
+        this.applyExternalFocus(f.uris, f.entityUris);
       });
   }
 
@@ -760,7 +773,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private bindContainerListeners(): void {
     const container = this.container?.nativeElement;
     if (!container) return;
-    const markActive = () => this.selectionService.markActiveView('graph');
+    const markActive = () => {
+      if (this.suppressTimer) clearTimeout(this.suppressTimer);
+      this.suppressViewportEmit = false;
+      this.cy?.stop();
+      this.selectionService.markActiveView('graph');
+    };
     this.markActiveListener = markActive;
     container.addEventListener('pointerdown', markActive);
     container.addEventListener('wheel', markActive, { passive: true });
@@ -853,6 +871,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (original !== this.lastOriginalResult) this.focusPins.clear();
     this.filteredNodeCount = visible.nodes.length;
     this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
     this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
@@ -895,10 +914,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * seleccionado nunca quede fuera del dibujo aunque tenga grado bajo.
    */
   private buildElements(result: QueryResult): BuiltGraph {
-    const selected = this.selectionService.getSelectedNodeSnapshot().node;
+    const selection = this.selectionService.getSelectedNodeSnapshot();
+    const selected = selection.node;
     return buildGraphElements(result, {
       maxNodes: this.MAX_NODES,
-      pinnedUris: selected ? [selected.uri] : [],
+      pinnedUris: [...new Set([...(selected ? [selected.uri, selection.primaryUri ?? selected.uri] : []), ...this.focusPins])],
       expandedSuperEdgeIds: [...this.expandedSuperEdgeIds],
       detailLevel:
         this.detailLevel === 'literals' || this.detailLevel === 'literals-detail'
@@ -1042,6 +1062,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
             this.applyExploration(setActiveNode(context, next, nodeUri));
           });
         }
+      } else if (!nodeData && evt.target.data('memberNodeIds')) {
+        const motifId = evt.target.data('motifId') as string | undefined;
+        if (motifId && this.lastVisibleResult) {
+          this.expandedMotifIds.add(motifId);
+          this.syncGraph(this.buildElements(this.lastVisibleResult).elements);
+        }
+        return;
       } else if (nodeData) {
         this.ngZone.run(() => {
           this.selectionService.select(nodeData, 'graph');
@@ -1274,8 +1301,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const focus = this.cy.getElementById(focusUri);
     if (focus.empty()) return;
 
+    const related = this.selectionService.getSelectedNodeSnapshot().relatedUris;
     const neighbors = focus.closedNeighborhood();
     this.cy.elements().difference(neighbors).addClass('is-dimmed');
+    if (related) {
+      this.cy.nodes().filter((node) => related.has(node.id())).removeClass('is-dimmed');
+      this.cy.edges().filter((edge) => related.has(edge.data('source')) && related.has(edge.data('target'))).removeClass('is-dimmed');
+    }
     focus.addClass('is-selected');
   }
 
@@ -1283,17 +1315,34 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy?.elements().removeClass('is-dimmed is-muted is-selected is-focus-edge');
   }
 
-  private applyExternalFocus(uris: ReadonlySet<string>): void {
+  private applyExternalFocus(uris: ReadonlySet<string>, entityUris = uris): void {
     if (!this.cy) return;
-    const matched = this.cy.nodes().filter((n) => uris.has(n.id()));
+    const visible = this.lastVisibleResult;
+    // Reveal only targets with no drawn representation, within the node budget.
+    // Aggregates already represent their members and need no bulk expansion.
+    if (!this.isEntityMode && visible) {
+      const targets = visible.nodes.filter((node) => entityUris.has(node.uri));
+      const nextPins = new Set(targets.filter((node) => !this.aggregateByMember.has(node.uri) &&
+        (this.focusPins.has(node.uri) || this.cy!.getElementById(node.uri).empty())).map((node) => node.uri));
+      if (nextPins.size > this.MAX_NODES) nextPins.clear();
+      if (nextPins.size !== this.focusPins.size || [...nextPins].some((id) => !this.focusPins.has(id))) {
+        this.focusPins = nextPins;
+        const built = this.buildElements(visible);
+        this.coverageLabel = this.buildCoverageLabel(built, visible, this.lastLotState.lotCount, this.lastLotState.currentLot);
+        this.syncGraph(built.elements);
+      }
+    }
+    const matched = this.cy.nodes().filter((n) => uris.has(n.id()) ||
+      ((n.data('memberNodeIds') as string[] | undefined)?.some((id) => uris.has(id)) ?? false));
     if (matched.empty()) {
-      this.clearFocusClasses();
+      // A viewport can contain only nodes outside the graph's drawing budget.
+      this.applyFocusContext(this.selectedDrawnUri);
       return;
     }
 
     this.clearFocusClasses();
     this.cy.elements().difference(matched).addClass('is-dimmed');
-    matched.connectedEdges().removeClass('is-dimmed').addClass('is-focus-edge');
+    matched.connectedEdges().filter((edge) => uris.has(edge.data('source')) && uris.has(edge.data('target')) || !!edge.data('motifId')).removeClass('is-dimmed').addClass('is-focus-edge');
 
     // El foco coordinado no puede borrar la selección: se vuelve a marcar y el
     // resto del foco baja de opacidad. Antes `clearFocusClasses` se la llevaba
@@ -1304,23 +1353,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       selected.removeClass('is-muted is-dimmed').addClass('is-selected');
     }
 
-    if (this.allInsideViewport(matched)) return;
-
-    this.suppressViewport();
-    this.frameFocus(matched);
+    const frame = this.cy.nodes().filter((node) => entityUris.has(node.id()) ||
+      ((node.data('memberNodeIds') as string[] | undefined)?.some((id) => entityUris.has(id)) ?? false));
+    if (frame.nonempty()) this.frameFocus(frame);
   }
 
-  /**
-   * Encuadra los nodos enfocados por la vista coordinada, pero sin alejarse
-   * tanto que dejen de leerse.
-   *
-   * Con `fit` a secas el grafo quedaba inservible: el foco que mandan el mapa y
-   * la timeline es todo lo que entra en SU viewport (decenas de entidades más
-   * sus vecinos), y encuadrarlas a todas dejaba los nodos como puntos sin
-   * etiqueta. Ahora el encuadre tiene un piso de zoom: si entrar todos exige
-   * alejarse por debajo de ese piso, se prioriza que se lea y quedan nodos
-   * fuera de pantalla.
-   */
+  /** Frame only when all targets fit at a readable scale. */
   private frameFocus(nodes: cytoscape.NodeCollection): void {
     const cy = this.cy;
     if (!cy) return;
@@ -1333,11 +1371,19 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
     // Mismo cálculo que hace `fit`, para no cambiar el encuadre cuando ya alcanza.
     const fitZoom = Math.min(usableWidth / Math.max(bb.w, 1), usableHeight / Math.max(bb.h, 1));
-    const zoom = Math.min(Math.max(fitZoom, FOCUS_MIN_ZOOM), cy.maxZoom());
+    // An incompatible focus keeps the camera where the user left it. Do not
+    // center between distant objects while leaving both outside the viewport.
+    if (fitZoom < FOCUS_MIN_ZOOM) return;
+    const zoom = Math.min(fitZoom, cy.maxZoom());
 
     const centerX = (bb.x1 + bb.x2) / 2;
     const centerY = (bb.y1 + bb.y2) / 2;
 
+    const pan = { x: width / 2 - centerX * zoom, y: height / 2 - centerY * zoom };
+    const currentPan = cy.pan();
+    if (Math.abs(cy.zoom() - zoom) < 0.05 && Math.hypot(currentPan.x - pan.x, currentPan.y - pan.y) < 8) return;
+    this.suppressViewport();
+    cy.stop();
     cy.animate({
       zoom,
       // rendered = modelo * zoom + pan: así el centro del foco queda centrado.
@@ -1350,10 +1396,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (!this.cy) return;
     const uris: string[] = [];
     this.cy.nodes().forEach((n) => {
-      if (this.intersectsViewport(n)) uris.push(n.id());
+      if (!this.intersectsViewport(n)) return;
+      const members = n.data('memberNodeIds') as string[] | undefined;
+      uris.push(...(members ?? [n.id()]));
     });
-    if (uris.length === 0) return;
-    this.selectionService.markActiveView('graph');
+    if (this.suppressViewportEmit || this.selectionService.getActiveView() !== 'graph') return;
     this.selectionService.setFocus(uris, 'graph');
   }
 
@@ -1361,10 +1408,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (!this.cy) return;
     const node = this.cy.getElementById(uri);
     if (node.empty()) return;
-    if (this.allInsideViewport(node)) return;
+    if (this.allInsideViewport(node) && this.cy.zoom() >= FOCUS_MIN_ZOOM) return;
 
     this.suppressViewport();
+    this.cy.stop();
     this.cy.animate({
+      zoom: Math.min(this.cy.maxZoom(), Math.max(this.cy.zoom(), FOCUS_MIN_ZOOM)),
       center: { eles: node },
       duration: 600,
     });

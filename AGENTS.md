@@ -167,6 +167,19 @@ Four views are synchronized through `SelectionService` (BehaviorSubject):
 **Coordinated View:** each view emits `setFocus(uris)` when panning/zooming.
 The others adjust their viewport. A global navbar toggle controls this
 behavior.
+The table participates through visible rows, scrolling and pagination. Click
+selection works independently of this toggle. `shared/selection/entity-context.ts`
+resolves a directed row root (C1: listing) and its representations, including
+unprojected structural nodes. Shared cities/origins never pick an arbitrary owner.
+The table's primary-entity selector overrides ambiguous queries and is persisted
+as `primaryVariable` in the GIS dashboard payload. Selection preserves the exact
+resource, optional row/date event, and primary entity. Focus carries entity IDs
+and representation IDs; graph aggregates emit their members, never synthetic IDs.
+Each destination frames only compatible targets (graph readability floor, bounded
+map/time zoom-out, table rows fitting together); otherwise it keeps the camera
+and highlights matches. Empty focus and disabling coordination clear focus styling.
+Timeline renders each distinct field/date event, with clicks retaining that event.
+
 
 **Graph entity mode:** activated only through the `Ver estructura` action on
 an explicit selection; coordinated focus never changes the mode or root. It
@@ -196,7 +209,9 @@ removed from the SELECT by backend `pickVariables`; visible edges connect
 visible nodes. Bnodes are normalized through `bindingGraphId` (rows contain
 raw `b0`; nodes/edges use `_:b0`). The selected node
 is **injected** into the visible batch even when no batch row references it,
-together with its edges to visible nodes; deselection removes it. New query →
+together with its object's representations and matching table rows; deselection
+removes these additions. Pinned rows are appended without changing batch counts
+or the original ordering of the base batch. New query →
 batch 1; filtering retains a still-valid batch and clamps it when
 `lotCount` shrinks. With one batch, `visibleQueryResult$` is identical to
 `filteredQueryResult$` (no overhead). The navbar batch navigator

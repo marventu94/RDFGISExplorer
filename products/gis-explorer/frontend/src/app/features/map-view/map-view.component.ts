@@ -61,6 +61,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private tileLayer?: L.TileLayer;
   private destroy$ = new Subject<void>();
   private resizeObserver?: ResizeObserver;
+  private markActiveListener?: () => void;
 
   queryState: QueryState = 'no-query';
   originalNodeCount = 0;
@@ -81,7 +82,10 @@ export class MapViewComponent implements OnInit, OnDestroy {
   private appliedViewportFitRevision = 0;
   /** URI del nodo seleccionado, para poder repintar el resalte tras un re-render. */
   private selectedUri: string | null = null;
+  private selectedUris: ReadonlySet<string> = new Set();
   private suppressViewportEmit = false;
+  private suppressTimer?: ReturnType<typeof setTimeout>;
+  private focusedUris: ReadonlySet<string> = new Set();
   private readonly viewportChange$ = new Subject<void>();
 
   private readonly selectionService = inject(SelectionService);
@@ -141,9 +145,17 @@ export class MapViewComponent implements OnInit, OnDestroy {
       this.ngZone.run(() => this.viewportChange$.next());
     });
 
-    this.map.on('mousedown wheel touchstart movestart zoomstart drag move zoom', () => {
-      if (this.suppressViewportEmit) return;
+    const markActive = () => {
+      if (this.suppressTimer) clearTimeout(this.suppressTimer);
+      this.suppressViewportEmit = false;
+      this.map?.stop();
       this.selectionService.markActiveView('map');
+    };
+    this.markActiveListener = markActive;
+    this.container.nativeElement.addEventListener('pointerdown', markActive, { capture: true });
+    this.container.nativeElement.addEventListener('wheel', markActive, { passive: true, capture: true });
+    this.map.on('drag', () => {
+      if (!this.suppressViewportEmit) this.selectionService.markActiveView('map');
     });
 
     try { this.setupDrawControl(); } catch { /* leaflet-draw no disponible en este contexto */ }
@@ -179,6 +191,11 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
     this.resizeObserver?.disconnect();
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
+    if (this.markActiveListener) {
+      this.container.nativeElement.removeEventListener('pointerdown', this.markActiveListener, { capture: true });
+      this.container.nativeElement.removeEventListener('wheel', this.markActiveListener, { capture: true });
+    }
     this.map?.remove();
   }
 
@@ -342,10 +359,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$),
         filter(
           (f) =>
-            f.source !== null &&
-            f.source !== 'map' &&
-            f.uris.size > 0 &&
-            this.selectionService.getActiveView() !== 'map',
+            f.source === null || (f.source !== 'map' &&
+            this.selectionService.getActiveView() !== 'map'),
         ),
       )
       .subscribe((f) => this.applyExternalFocus(f.uris));
@@ -359,7 +374,9 @@ export class MapViewComponent implements OnInit, OnDestroy {
         // El resalte se aplica siempre, incluso si no hay nada que resaltar o si
         // la selección se limpió (node === null): así se apaga el marcador anterior.
         const target = this.resolveMappableNode(sel);
-        this.applySelectionStyle(target?.uri ?? null);
+        const targets = this.currentNodes.filter((node) => node.coordinate &&
+          (node.uri === sel.node?.uri || sel.relatedUris?.has(node.uri)));
+        this.applySelectionStyle(target?.uri ?? null, new Set(targets.map((node) => node.uri)));
 
         if (target) {
           this.flyToNode(target);
@@ -381,7 +398,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
 
     const related = sel.relatedUris;
     if (!related || related.size === 0) return null;
-    return this.currentNodes.find((n) => n.coordinate && related.has(n.uri)) ?? null;
+    return this.currentNodes.find((n) => n.coordinate && n.uri === sel.primaryUri) ??
+      this.currentNodes.find((n) => n.coordinate && related.has(n.uri)) ?? null;
   }
 
   /**
@@ -390,7 +408,9 @@ export class MapViewComponent implements OnInit, OnDestroy {
    * disparaba un anillo de pulso de 2,4 s: pasado ese tiempo nada indicaba qué nodo
    * estaba seleccionado.
    */
-  private applySelectionStyle(uri: string | null): void {
+  private applySelectionStyle(uri: string | null, uris?: ReadonlySet<string>): void {
+    if (uris) this.selectedUris = uris;
+    else if (uri !== this.selectedUri || !uri) this.selectedUris = new Set(uri ? [uri] : []);
     this.selectedUri = uri;
     if (!this.clusterGroup) return;
 
@@ -398,11 +418,12 @@ export class MapViewComponent implements OnInit, OnDestroy {
       const marker = layer as L.CircleMarker & { _node?: NormalizedNode };
       if (!marker._node || typeof marker.setStyle !== 'function') return;
 
-      if (uri && marker._node.uri === uri) {
+      if (this.selectedUris.has(marker._node.uri)) {
         marker.setStyle({
           color: SELECTED_STROKE,
           weight: SELECTED_WEIGHT,
           fillColor: SELECTED_FILL,
+          opacity: 1,
           fillOpacity: 1,
         });
         marker.setRadius(SELECTED_RADIUS);
@@ -414,7 +435,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
           color: baseColor,
           weight: MARKER_WEIGHT,
           fillColor: baseColor,
-          fillOpacity: MARKER_FILL_OPACITY,
+          opacity: this.focusedUris.size && !this.focusedUris.has(marker._node.uri) ? 0.25 : 1,
+          fillOpacity: this.focusedUris.size && !this.focusedUris.has(marker._node.uri) ? 0.2 : MARKER_FILL_OPACITY,
         });
         marker.setRadius(MARKER_RADIUS);
       }
@@ -444,7 +466,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
         });
         // La suscripción a selectedNode$ descarta las selecciones propias
         // (source === 'map'), así que el resalte de un click en el mapa se aplica acá.
-        this.applySelectionStyle(node.uri);
+        this.applySelectionStyle(node.uri, new Set([node.uri]));
       });
 
       this.clusterGroup?.addLayer(marker);
@@ -547,13 +569,14 @@ export class MapViewComponent implements OnInit, OnDestroy {
         uris.push(node.uri);
       }
     }
-    if (uris.length === 0) return;
-    this.selectionService.markActiveView('map');
+    if (this.suppressViewportEmit || this.selectionService.getActiveView() !== 'map') return;
     this.selectionService.setFocus(uris, 'map');
   }
 
   private applyExternalFocus(uris: ReadonlySet<string>): void {
     if (!this.map) return;
+    this.focusedUris = uris;
+    this.applySelectionStyle(this.selectedUri);
     const points: L.LatLngTuple[] = [];
     for (const node of this.currentNodes) {
       if (!node.coordinate) continue;
@@ -566,15 +589,23 @@ export class MapViewComponent implements OnInit, OnDestroy {
     const bounds = L.latLngBounds(points);
     const currentBounds = this.map.getBounds();
     
-    if (currentBounds.contains(bounds)) {
-      return;
-    }
-    
-    this.suppressViewportEmit = true;
+    const targetZoom = Math.min(14, this.map.getBoundsZoom(bounds, false, L.point(80, 80)));
+    // Do not take a local inspection to a continent-wide frame. Reevaluated on
+    // the next user focus, independently of the graph and timeline decisions.
+    if (targetZoom < this.map.getZoom() - 2) return;
+    if (currentBounds.contains(bounds) && Math.abs(this.map.getZoom() - targetZoom) < 0.5) return;
+    this.suppressViewport();
+    this.map.stop();
     this.map.flyToBounds(bounds, { padding: [40, 40], duration: 0.8, maxZoom: 14 });
-    setTimeout(() => {
+  }
+
+  private suppressViewport(ms = 1000): void {
+    this.suppressViewportEmit = true;
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
+    this.suppressTimer = setTimeout(() => {
       this.suppressViewportEmit = false;
-    }, 1000);
+      this.suppressTimer = undefined;
+    }, ms);
   }
 
   private flyToNode(node: NormalizedNode): void {
@@ -584,13 +615,12 @@ export class MapViewComponent implements OnInit, OnDestroy {
     const isVisible = this.map.getBounds().contains(latlng);
 
     if (!isVisible) {
-      this.suppressViewportEmit = true;
+      this.suppressViewport(1200);
+      this.map.stop();
       this.map.flyTo(latlng, 14, {
         duration: 1.0,
       });
-      setTimeout(() => {
-        this.suppressViewportEmit = false;
-      }, 1200);
+
     }
 
     this.clusterGroup?.eachLayer((layer: L.Layer) => {
@@ -600,7 +630,8 @@ export class MapViewComponent implements OnInit, OnDestroy {
         const cluster = this.clusterGroup as L.MarkerClusterGroup & {
           zoomToShowLayer?: (layer: L.Layer, onDone: () => void) => void;
         };
-        if (!isVisible && typeof cluster?.zoomToShowLayer === 'function') {
+        if (typeof cluster?.zoomToShowLayer === 'function') {
+          this.suppressViewport(1200);
           cluster.zoomToShowLayer(layer, () => this.addPulseRing(latlng));
         } else {
           this.addPulseRing(latlng);

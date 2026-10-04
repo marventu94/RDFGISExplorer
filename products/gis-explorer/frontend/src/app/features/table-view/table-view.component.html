@@ -26,6 +26,15 @@
         }
       </div>
 
+      <label class="page-size-selector">
+        <span>{{ 'Entidad principal' | translate }}</span>
+        <select [ngModel]="primaryVariable() ?? ''" (ngModelChange)="onPrimaryVariableChange($event)">
+          <option value="">{{ 'Automática' | translate }}</option>
+          @for (variable of entityVariables(); track variable) {
+            <option [value]="variable">{{ variable }}</option>
+          }
+        </select>
+      </label>
       <div class="page-size-selector">
         <span>{{ 'Filas:' | translate }}</span>
         <select [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
@@ -43,6 +52,11 @@
         [columnDefs]="columnDefs()"
         [defaultColDef]="defaultColDef"
         [rowSelection]="rowSelection"
+        [rowClassRules]="rowClassRules"
+        (bodyScrollEnd)="onViewportChanged()"
+        (paginationChanged)="onViewportChanged()"
+        (filterChanged)="onViewportChanged()"
+        (sortChanged)="onViewportChanged()"
         [pagination]="true"
         [paginationPageSize]="pageSize()"
         [paginationPageSizeSelector]="false"

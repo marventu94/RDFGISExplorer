@@ -6,9 +6,8 @@ import type { BindingValue, QueryResult } from '@shared/models';
  * por su cuenta. El lote pagina `bindings` (filas) en el orden original del
  * resultado — nunca se reordena: la query decide qué filas van primero.
  *
- * Los nodos visibles del lote son los URIs/bnodes que aparecen en las filas
- * del lote más sus vecinos inmediatos (1 salto por `edges`): así se recuperan
- * los nodos intermedios que el backend no expone en los bindings.
+ * Visible nodes include the row resources and their connected, unprojected
+ * structural nodes. Traversal stops at resources projected only by other rows.
  *
  * Los URIs pineados (la selección actual) se inyectan en el lote visible aunque
  * pertenezcan a otro lote: lo seleccionado siempre existe en todas las vistas.
@@ -43,11 +42,7 @@ export function computeLotCount(result: QueryResult | null, lotSize: number): nu
   return Math.max(1, Math.ceil(result.bindings.length / lotSize));
 }
 
-/**
- * Recorta un QueryResult a un conjunto de URIs: nodos, edges con ambos extremos
- * visibles y bindings que mencionan al menos un URI visible (misma lógica que
- * el filtrado geo/temporal de SelectionService).
- */
+/** Keep nodes and edges inside a URI set, plus rows mentioning those URIs. */
 export function restrictResultToUris(
   result: QueryResult,
   uris: ReadonlySet<string>,
@@ -74,12 +69,41 @@ function rowUris(row: QueryResult['bindings'][number]): string[] {
 }
 
 /**
- * Devuelve el resultado restringido al lote `currentLot` (1-based, se clampea)
- * más los URIs pineados que existan en el resultado. Los bindings visibles son
- * las filas del lote tal cual (en el orden original de la query); los nodos
- * visibles son los URIs/bnodes de esas filas más sus vecinos a 1 salto por
- * `edges`. Con un solo lote devuelve el resultado tal cual (misma identidad,
- * sin overhead).
+ * Keep every structural node on paths from the selected rows while stopping at
+ * resources projected only by other rows. Shared class/city nodes therefore do
+ * not pull unrelated entities into a filtered result or batch.
+ */
+export function expandRowTopology(
+  result: QueryResult,
+  rowIds: ReadonlySet<string>,
+): Set<string> {
+  const projected = new Set(result.bindings.flatMap(rowUris));
+  const adjacency = new Map<string, string[]>();
+  for (const edge of result.edges) {
+    const source = adjacency.get(edge.source) ?? [];
+    source.push(edge.target);
+    adjacency.set(edge.source, source);
+    const target = adjacency.get(edge.target) ?? [];
+    target.push(edge.source);
+    adjacency.set(edge.target, target);
+  }
+
+  const visible = new Set(rowIds);
+  const queue = [...rowIds];
+  for (let index = 0; index < queue.length; index++) {
+    for (const neighbor of adjacency.get(queue[index]) ?? []) {
+      if (visible.has(neighbor) || projected.has(neighbor)) continue;
+      visible.add(neighbor);
+      queue.push(neighbor);
+    }
+  }
+  return visible;
+}
+
+/**
+ * Slice rows in query order and retain their connected structural nodes.
+ * Pinned resources are included even when their rows belong to another batch.
+ * A single batch returns the original result unchanged.
  */
 export function sliceLot(
   result: QueryResult,
@@ -103,14 +127,7 @@ export function sliceLot(
       rowUrisSet.add(uri);
     }
   }
-  // Vecinos inmediatos de los URIs de las filas (1 salto, no recursivo):
-  // recupera los nodos intermedios que el backend no expone en los bindings
-  // (los recorta del SELECT con pickVariables).
-  const visibleUris = new Set(rowUrisSet);
-  for (const edge of result.edges) {
-    if (rowUrisSet.has(edge.source)) visibleUris.add(edge.target);
-    if (rowUrisSet.has(edge.target)) visibleUris.add(edge.source);
-  }
+  const visibleUris = expandRowTopology(result, rowUrisSet);
   for (const uri of pinnedUris) {
     visibleUris.add(uri);
   }

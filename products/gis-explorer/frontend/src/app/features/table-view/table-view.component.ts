@@ -1,7 +1,6 @@
 import { TranslatePipe } from '../../core/services/translate.pipe';
-import { Component, inject, signal, computed, effect, OnDestroy } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
-import { filter } from 'rxjs/operators';
+import { Component, inject, signal, computed, effect, OnDestroy, HostBinding, HostListener } from '@angular/core';
+import { Subject, takeUntil, debounceTime } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
 import type {
   ColDef,
@@ -12,6 +11,7 @@ import type {
   RowSelectedEvent,
   RowSelectionOptions,
   ICellRendererParams,
+  RowClassParams,
 } from 'ag-grid-community';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -67,6 +67,20 @@ export class TableViewComponent implements OnDestroy {
   private nodeByUri = new Map<string, NormalizedNode>();
   /** Selección vigente, para repintarla cada vez que la grilla rehace sus filas. */
   private currentSelection: Selection | null = null;
+  private focusedUris: ReadonlySet<string> = new Set();
+  private readonly viewportChange$ = new Subject<void>();
+  private suppressViewportEmit = false;
+  private suppressTimer?: ReturnType<typeof setTimeout>;
+  @HostBinding('class.is-active-view') activeView = false;
+  readonly primaryVariable = this.selectionService.primaryVariable;
+  readonly entityVariables = computed(() => {
+    const result = this.queryResult();
+    return result?.variables.filter((variable) => result.bindings.some((row) =>
+      row[variable]?.type === 'uri' || row[variable]?.type === 'bnode')) ?? [];
+  });
+  readonly rowClassRules = {
+    'coordinated-focus': (params: RowClassParams) => this.rowInFocus(params.data),
+  };
 
   readonly queryResult = signal<QueryResult | null>(null);
   /** Resultado crudo (sin lotes): el banner de truncamiento habla del total. */
@@ -190,11 +204,33 @@ export class TableViewComponent implements OnDestroy {
         // que moverle el scroll ni la página al usuario.
         this.applyRowSelection({ scroll: sel.source !== 'table' });
       });
+    this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((source) => {
+      this.activeView = source === 'table';
+    });
+    this.selectionService.focus$.pipe(takeUntil(this.destroy$)).subscribe((focus) => {
+      if (focus.source === 'table' || (focus.source !== null && this.activeView)) return;
+      this.focusedUris = focus.uris;
+      this.applyCoordinatedFocus();
+    });
+    this.viewportChange$.pipe(takeUntil(this.destroy$), debounceTime(500)).subscribe(() => {
+      if (this.suppressViewportEmit || this.selectionService.getActiveView() !== 'table' || !this.gridApi) return;
+      const uris: string[] = [];
+      const first = this.gridApi.getFirstDisplayedRowIndex();
+      const last = this.gridApi.getLastDisplayedRowIndex();
+      for (let i = first; i <= last; i++) {
+        const row = this.gridApi.getDisplayedRowAtIndex(i)?.data as ResultBinding | undefined;
+        if (!row) continue;
+        const entity = this.selectionService.entityForRow(row);
+        uris.push(...(entity ? [entity.uri] : rowUris(row)));
+      }
+      this.selectionService.setFocus(uris, 'table');
+    });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
   }
 
   onGridReady(event: GridReadyEvent): void {
@@ -210,6 +246,7 @@ export class TableViewComponent implements OnDestroy {
    * y se apagaba sola.
    */
   onRowDataUpdated(): void {
+    this.applyCoordinatedFocus();
     this.applyRowSelection({ scroll: false });
   }
 
@@ -223,9 +260,9 @@ export class TableViewComponent implements OnDestroy {
     // Cortafuegos: si la fila resuelve a lo que ya está seleccionado, no se
     // reemite. Así una selección aplicada por código (repintado de la grilla)
     // nunca puede realimentar el ciclo, aunque AG Grid avise tarde.
-    if (node.uri === this.currentSelection?.node?.uri) return;
+    if (node.uri === this.currentSelection?.node?.uri && rowData === this.currentSelection.row) return;
 
-    this.selectionService.select(node, 'table');
+    this.selectionService.select(node, 'table', rowData);
   }
 
   /**
@@ -243,10 +280,55 @@ export class TableViewComponent implements OnDestroy {
     // o atributos propios) y no la primera URI que aparezca: la primera suele
     // ser un nodo estructural que ni el mapa ni la timeline saben dibujar, y
     // entonces el click en la tabla no se veía en las otras vistas.
-    const entity = pickRowEntity(rowUris(rowData), this.nodeByUri);
+    const entity = this.selectionService.entityForRow(rowData) ?? pickRowEntity(rowUris(rowData), this.nodeByUri);
     if (entity) return entity;
     // Fallback: la fila no tiene nodo asociado en el resultado.
     return this.buildNodeFromRow(rowData);
+  }
+
+  @HostListener('pointerdown')
+  @HostListener('wheel')
+  onUserNavigation(): void {
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
+    this.suppressViewportEmit = false;
+    this.selectionService.markActiveView('table');
+  }
+
+  onViewportChanged(): void {
+    if (!this.suppressViewportEmit) this.viewportChange$.next();
+  }
+
+  onPrimaryVariableChange(variable: string): void {
+    this.selectionService.setPrimaryVariable(variable || null);
+  }
+
+  private rowInFocus(row: ResultBinding | undefined): boolean {
+    if (!row || this.focusedUris.size === 0) return false;
+    const entity = this.selectionService.entityForRow(row);
+    return entity ? this.focusedUris.has(entity.uri) : rowUris(row).some((id) => this.focusedUris.has(id));
+  }
+
+  private applyCoordinatedFocus(): void {
+    const api = this.gridApi;
+    if (!api) return;
+    api.redrawRows();
+    const indices: number[] = [];
+    api.forEachNodeAfterFilterAndSort((row) => {
+      if (row.rowIndex != null && this.rowInFocus(row.data)) indices.push(row.rowIndex);
+    });
+    if (!indices.length) return;
+    const first = Math.min(...indices);
+    const last = Math.max(...indices);
+    const size = api.paginationGetPageSize();
+    // Widely dispersed matches stay highlighted without jumping to one of them.
+    if (Math.floor(first / size) !== Math.floor(last / size)) return;
+    const viewportRows = Math.max(1, api.getLastDisplayedRowIndex() - api.getFirstDisplayedRowIndex() + 1);
+    if (last - first >= viewportRows) return;
+    this.suppressViewportEmit = true;
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
+    api.paginationGoToPage(Math.floor(first / size));
+    api.ensureIndexVisible(first, 'top');
+    this.suppressTimer = setTimeout(() => { this.suppressViewportEmit = false; }, 800);
   }
 
   onPageSizeChange(size: number): void {
@@ -420,6 +502,8 @@ export class TableViewComponent implements OnDestroy {
 
     const exact = new Set<string>([sel.node.uri]);
     const target =
+      rows.find((row) => row.data === sel.row) ??
+      rows.find((row) => sel.primaryUri && this.selectionService.entityForRow(row.data)?.uri === sel.primaryUri) ??
       rows.find((row) => this.rowMatches(row.data as Record<string, BindingValue>, exact)) ??
       rows.find((row) =>
         this.rowMatches(row.data as Record<string, BindingValue>, sel.relatedUris ?? exact),

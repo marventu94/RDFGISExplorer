@@ -49,7 +49,7 @@ export const UI_TRANSLATIONS = [
   ['Ejecutá una query con fechas para ver la línea de tiempo', 'Run a query with dates to see the timeline'],
   ['Ejecutá una query para ver resultados', 'Run a query to see results'], ['Ejecutá una query para ver el grafo', 'Run a query to see the graph'],
   ['Mapeo de Variables', 'Variable Mapping'], ['Buscar en todas las columnas…', 'Search all columns…'],
-  ['Limpiar', 'Clear'], ['Filas:', 'Rows:'], ['Mis tableros', 'My dashboards'],
+  ['Limpiar', 'Clear'], ['Filas:', 'Rows:'], ['Entidad principal', 'Primary entity'], ['Automática', 'Automatic'], ['Mis tableros', 'My dashboards'],
   ['No hay tableros guardados', 'No saved dashboards'], ['Generar tablero nuevo', 'Create new dashboard'],
   ['Ejecutar', 'Run'], ['Vista', 'View'], ['Resultado completo', 'Full result'], ['Entidad seleccionada', 'Selected entity'],
   ['Ver estructura', 'View structure'], ['Volver al resultado', 'Back to result'], ['Nivel', 'Level'],

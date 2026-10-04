@@ -92,9 +92,14 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   private resizeObserver?: ResizeObserver;
   private pendingRange?: { start: Date; end: Date };
   private allNodes: NormalizedNode[] = [];
+  private lastOriginalResult: QueryResult | null = null;
   /** Ficha marcada ahora mismo, para repintarla cuando se rehacen los items. */
   private selectedItemId: string | null = null;
+  private selectedItemIds: string[] = [];
+  private readonly eventItems = new Map<string, { node: NormalizedNode; field: string; isoDate: string }>();
   private suppressViewportEmit = false;
+  private suppressTimer?: ReturnType<typeof setTimeout>;
+  private focusedUris: ReadonlySet<string> = new Set();
   private readonly viewportChange$ = new Subject<{ start: Date; end: Date }>();
   private markActiveListener?: () => void;
   private redrawHandle?: number;
@@ -159,6 +164,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
       this.allNodes = [];
       this.items.clear();
+      this.eventItems.clear();
       this.groups.clear();
       this.timeline?.setItems(this.items);
       this.timeline?.setGroups(this.groups);
@@ -181,6 +187,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       );
       this.queryState = originalHasDates && lotState.lotCount > 1 ? 'no-dates-lot' : 'no-dates';
       this.items.clear();
+      this.eventItems.clear();
       this.groups.clear();
       this.timeline?.setItems(this.items);
       this.timeline?.setGroups(this.groups);
@@ -203,7 +210,9 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     } else {
       this.coverageLabel = '';
     }
-    this.renderItems(visible);
+    const resetViewport = original !== this.lastOriginalResult;
+    this.lastOriginalResult = original;
+    this.renderItems(visible, resetViewport);
     this.cdr.markForCheck();
   }
 
@@ -212,7 +221,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     if (!this.timeline) return;
     const id = this.selectedItemId;
     if (id && this.items.get(id)) {
-      this.timeline.setSelection([id]);
+      this.timeline.setSelection(this.selectedItemIds.length ? this.selectedItemIds : [id]);
     }
   }
 
@@ -251,6 +260,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
           // (selección vacía) ya pediría un deselect que nadie necesita.
           if (this.selectedItemId !== null) {
             this.selectedItemId = null;
+            this.selectedItemIds = [];
             this.timeline?.setSelection([]);
           }
           return;
@@ -258,20 +268,35 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
         this.selectedItemId = target.uri;
         if (this.timeline) {
-          const mostRecent = target.temporalEvents!.reduce((a, b) =>
-            a.isoDate > b.isoDate ? a : b,
-          );
-          this.timeline.setSelection([target.uri]);
-
-          const targetDate = new Date(mostRecent.isoDate);
+          const dates = new Set(Object.values(sel.row ?? {}).filter((value) => value.type === 'date').map((value) => value.value));
+          const all = [...this.eventItems].filter(([, item]) => item.node.uri === target.uri || sel.relatedUris?.has(item.node.uri));
+          const exact = all.filter(([, item]) => sel.event
+            ? item.field === sel.event.field && item.isoDate === sel.event.isoDate
+            : dates.has(item.isoDate));
+          const selected = exact.length ? exact : all;
+          this.selectedItemIds = selected.map(([id]) => id);
+          this.selectedItemId = this.selectedItemIds[0] ?? null;
+          this.timeline.setSelection(this.selectedItemIds);
+          // No arbitrary latest-event jump: keep all matching dates together.
+          const times = selected.map(([, item]) => new Date(item.isoDate).getTime());
+          if (!times.length) return;
+          const first = Math.min(...times);
+          const last = Math.max(...times);
+          const targetDate = new Date((first + last) / 2);
           const window = this.timeline.getWindow();
           const isVisible =
-            window && targetDate >= window.start && targetDate <= window.end;
+            window && first >= window.start.getTime() && last <= window.end.getTime();
 
           if (!isVisible) {
-            this.timeline.moveTo(targetDate, {
-              animation: { duration: 600, easingFunction: 'easeInOutQuad' },
-            });
+            this.suppressViewport();
+            if (first === last) {
+              this.timeline.moveTo(targetDate, { animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+            } else {
+              const pad = Math.max((last - first) * 0.2, WINDOW_PAD_MIN_MS);
+              this.timeline.setWindow(new Date(first - pad), new Date(last + pad), {
+                animation: { duration: 600, easingFunction: 'easeInOutQuad' },
+              });
+            }
           }
         }
       });
@@ -290,10 +315,8 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$),
         filter(
           (f) =>
-            f.source !== null &&
-            f.source !== 'timeline' &&
-            f.uris.size > 0 &&
-            this.selectionService.getActiveView() !== 'timeline',
+            f.source === null || (f.source !== 'timeline' &&
+            this.selectionService.getActiveView() !== 'timeline'),
         ),
       )
       .subscribe((f) => this.applyExternalFocus(f.uris));
@@ -312,14 +335,16 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       });
       if (inRange) uris.push(node.uri);
     }
-    if (uris.length === 0) return;
-    this.selectionService.markActiveView('timeline');
+    if (this.suppressViewportEmit || this.selectionService.getActiveView() !== 'timeline') return;
     this.selectionService.setFocus(uris, 'timeline');
   }
 
   private applyExternalFocus(uris: ReadonlySet<string>): void {
     if (!this.timeline || this.allNodes.length === 0) return;
 
+    this.focusedUris = uris;
+    this.applyFocusStyle();
+    if (uris.size === 0) return;
     let focusMin = Infinity;
     let focusMax = -Infinity;
     let totalMin = Infinity;
@@ -343,13 +368,13 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (!isFinite(totalMin) || !isFinite(totalMax)) return;
+    if (!isFinite(totalMin) || !isFinite(totalMax) || !isFinite(focusMin)) return;
 
     let winMin: number;
     let winMax: number;
 
     const coverage = totalWithDates > 0 ? focusedCount / totalWithDates : 0;
-    if (!isFinite(focusMin) || coverage >= 0.7) {
+    if (coverage >= 0.7) {
       winMin = totalMin;
       winMax = totalMax;
     } else {
@@ -368,25 +393,44 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       const currentStart = currentWindow.start.getTime();
       const currentEnd = currentWindow.end.getTime();
       
-      const allVisible = targetStart >= currentStart && targetEnd <= currentEnd;
-      if (allVisible) {
-        return;
-      }
+      const targetSpan = targetEnd - targetStart;
+      const currentSpan = currentEnd - currentStart;
+      // Widely separated dates should not undo a detailed inspection.
+      if (targetSpan > currentSpan * 4) return;
+      const tolerance = currentSpan * 0.05;
+      if (Math.abs(targetStart - currentStart) < tolerance &&
+          Math.abs(targetEnd - currentEnd) < tolerance) return;
     }
 
-    this.suppressViewportEmit = true;
+    this.suppressViewport();
     this.timeline.setWindow(new Date(targetStart), new Date(targetEnd), {
       animation: { duration: 600, easingFunction: 'easeInOutQuad' },
     });
-    setTimeout(() => {
+
+  }
+
+  private suppressViewport(): void {
+    this.suppressViewportEmit = true;
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
+    this.suppressTimer = setTimeout(() => {
       this.suppressViewportEmit = false;
+      this.suppressTimer = undefined;
     }, 800);
+  }
+
+  private applyFocusStyle(): void {
+    const updates = [...this.eventItems].map(([id, item]) => ({
+      id,
+      className: this.focusedUris.size && !this.focusedUris.has(item.node.uri) ? 'coordinated-muted' : '',
+    }));
+    if (updates.length) this.items.update(updates);
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
     this.resizeObserver?.disconnect();
+    if (this.suppressTimer) clearTimeout(this.suppressTimer);
     if (this.redrawHandle !== undefined) {
       cancelAnimationFrame(this.redrawHandle);
     }
@@ -462,9 +506,11 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
         break;
     }
 
+    this.selectionService.markActiveView('timeline');
     this.timeline.setWindow(start, end, {
       animation: { duration: 400, easingFunction: 'easeInOutQuad' },
     });
+    this.viewportChange$.next({ start, end });
   }
 
   openVariableMapping(): void {
@@ -500,23 +546,30 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.timeline = new Timeline(this.tlContainer.nativeElement, this.items, this.groups, options);
 
     const container = this.tlContainer.nativeElement;
-    const markActive = () => this.selectionService.markActiveView('timeline');
+    const markActive = () => {
+      if (this.suppressTimer) clearTimeout(this.suppressTimer);
+      this.suppressViewportEmit = false;
+      this.selectionService.markActiveView('timeline');
+    };
     this.markActiveListener = markActive;
     container.addEventListener('pointerdown', markActive, { capture: true });
     container.addEventListener('wheel', markActive, { passive: true, capture: true });
 
     this.timeline.on('select', (props: { items: string[] }) => {
       if (!props.items || props.items.length === 0) return;
-      const nodeUri = String(props.items[0]);
+      const itemId = String(props.items[0]);
+      const item = this.eventItems.get(itemId);
+      const nodeUri = item?.node.uri ?? itemId;
       // Cortafuegos: marcar por código no puede realimentar el ciclo.
-      if (nodeUri === this.selectedItemId) return;
+      if (itemId === this.selectedItemId) return;
       // Se recuerda antes de emitir: la emisión rehace los items y hay que
       // poder volver a marcar la ficha que el usuario clickeó.
-      this.selectedItemId = nodeUri;
+      this.selectedItemId = itemId;
+      this.selectedItemIds = [itemId];
       const node = this.allNodes.find((n) => n.uri === nodeUri);
       if (node) {
         this.ngZone.run(() => {
-          this.selectionService.select(node, 'timeline');
+          this.selectionService.select(node, 'timeline', undefined, item ? { field: item.field, isoDate: item.isoDate } : undefined);
         });
       }
     });
@@ -566,9 +619,10 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  private renderItems(result: QueryResult): void {
+  private renderItems(result: QueryResult, resetViewport = true): void {
     this.items.clear();
     this.groups.clear();
+    this.eventItems.clear();
 
     const groupCounts = new Map<string, number>();
     let minMs = Infinity;
@@ -580,24 +634,24 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       const type = node.classes?.[0] ?? node.queryVariable ?? 'unknown';
       groupCounts.set(type, (groupCounts.get(type) ?? 0) + 1);
 
-      const mostRecent = node.temporalEvents.reduce((a, b) => (a.isoDate > b.isoDate ? a : b));
-      const start = new Date(mostRecent.isoDate);
-      const ms = start.getTime();
-      if (!isNaN(ms)) {
-        if (ms < minMs) minMs = ms;
-        if (ms > maxMs) maxMs = ms;
-      }
-
+      const events = [...new Map(node.temporalEvents.map((event) => [JSON.stringify([event.field, event.isoDate]), event])).values()];
+      const mostRecent = events.reduce((a, b) => (a.isoDate > b.isoDate ? a : b));
       const color = this.colorService.colorForClass(node.classes?.[0]);
-
-      this.items.add({
-        id: node.uri,
-        group: type,
-        start,
-        content: node.label,
-        title: this.buildItemTooltip(node, start),
-        style: `color: ${color}; border-color: ${color};`,
-      } as DataItem);
+      for (const event of events) {
+        const start = new Date(event.isoDate);
+        const ms = start.getTime();
+        if (!Number.isFinite(ms)) continue;
+        minMs = Math.min(minMs, ms);
+        maxMs = Math.max(maxMs, ms);
+        const id = event === mostRecent ? node.uri : `event:${JSON.stringify([node.uri, event.field, event.isoDate])}`;
+        this.eventItems.set(id, { node, field: event.field, isoDate: event.isoDate });
+        this.items.add({
+          id, group: type, start,
+          content: this.escapeHtml(node.label),
+          title: this.buildItemTooltip(node, start),
+          style: `color: ${color}; border-color: ${color};`,
+        } as DataItem);
+      }
     }
 
     // El conteo se conoce recién al terminar el recorrido, así que los grupos se
@@ -615,8 +669,9 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     // porque el lote inyecta el nodo pineado): sin volver a aplicarla, la ficha
     // seleccionada —incluso la que el usuario acaba de clickear acá— se apagaba.
     this.reapplySelection();
+    this.applyFocusStyle();
 
-    if (this.timeline && isFinite(minMs) && isFinite(maxMs)) {
+    if (resetViewport && this.timeline && isFinite(minMs) && isFinite(maxMs)) {
       // Padding para que los items de los extremos no queden pegados al borde;
       // con todas las fechas iguales el span es 0 y el piso abre la ventana.
       const pad = Math.max((maxMs - minMs) * WINDOW_PAD_RATIO, WINDOW_PAD_MIN_MS);
@@ -648,7 +703,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
   /**
    * Tooltip con lo que la timeline no puede mostrar en el item: la fecha
-   * formateada, cuántos eventos tiene el nodo (solo se dibuja el más reciente) y
+   * formateada, cuántos eventos tiene el nodo y
    * las magnitudes numéricas que traiga la query — m2, precio o lo que sea.
    */
   private buildItemTooltip(node: NormalizedNode, start: Date): string {

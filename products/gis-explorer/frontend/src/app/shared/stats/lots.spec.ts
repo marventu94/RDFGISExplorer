@@ -81,7 +81,8 @@ describe('sliceLot', () => {
     const slice = sliceLot(result, 4, 1);
     expect(slice.lotCount).toBe(3);
     expect(slice.result.bindings).toEqual(bindings.slice(0, 4));
-    expect(slice.result.nodes.map((n) => n.uri)).toEqual(['n0', 'n1', 'n2', 'n3', 'n5', 'n6']);
+    // Projected resources from later rows do not leak into the current lot.
+    expect(slice.result.nodes.map((n) => n.uri)).toEqual(['n0', 'n1', 'n2', 'n3']);
   });
 
   it('keeps the lot rows as-is, even rows without visible URIs', () => {
@@ -154,6 +155,20 @@ describe('sliceLot', () => {
     // mid->n9 is excluded because n9 is not visible in batch 1; expansion is
     // one hop from rows and is not recursive.
     expect(slice.result.edges.map((e) => e.id)).not.toContain('mid->n9');
+  });
+
+  it('retains multi-hop structural paths without crossing into later rows', () => {
+    const result = makeResult(
+      [makeNode('n0'), makeNode('n1'), makeNode('mid-1'), makeNode('mid-2')],
+      [makeEdge('n0', 'mid-1'), makeEdge('mid-1', 'mid-2'), makeEdge('mid-2', 'n1')],
+      [makeRow('n0'), makeRow('n1')],
+    );
+
+    const first = sliceLot(result, 1, 1);
+    expect(first.result.nodes.map((node) => node.uri)).toEqual(['n0', 'mid-1', 'mid-2']);
+    expect(first.result.edges.map((edge) => edge.id)).toEqual([
+      'n0->mid-1', 'mid-1->mid-2',
+    ]);
   });
 
   it('clamps currentLot into the valid range', () => {

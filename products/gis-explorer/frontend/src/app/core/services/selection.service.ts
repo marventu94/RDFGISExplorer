@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
 import {
   BehaviorSubject,
   Observable,
@@ -8,26 +8,24 @@ import {
   shareReplay,
 } from 'rxjs';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import type { NormalizedNode, QueryResult, Selection, Filter } from '@shared/models';
+import type { NormalizedNode, QueryResult, ResultBinding, Selection, Filter } from '@shared/models';
 import {
   DEFAULT_LOT_SIZE,
   LOT_SIZE_OPTIONS,
   computeLotCount,
+  expandRowTopology,
   restrictResultToUris,
   sliceLot,
 } from '@shared/stats/lots';
-import {
-  buildRowIndex,
-  emptyRowIndex,
-  relatedUris,
-  type RowIndex,
-} from '@shared/selection/row-index';
+import { rowUris } from '@shared/selection/row-index';
+import { buildEntityContext, resolveEntityContext, resolveEntityFocus } from '@shared/selection/entity-context';
 import { LimitsService } from './limits.service';
 
-export type FocusSource = 'map' | 'graph' | 'timeline' | null;
+export type FocusSource = 'map' | 'graph' | 'timeline' | 'table' | null;
 
 export interface FocusState {
   uris: ReadonlySet<string>;
+  entityUris?: ReadonlySet<string>;
   source: FocusSource;
 }
 
@@ -77,7 +75,8 @@ export class SelectionService {
   );
   private readonly _currentLot$ = new BehaviorSubject<number>(1);
   /** Índice fila ↔ entidades del resultado actual (ver shared/selection). */
-  private rowIndex: RowIndex = emptyRowIndex();
+  private entityContext = buildEntityContext(null);
+  readonly primaryVariable = signal<string | null>(null);
   /** Memo del lote sin pin; la clave es la identidad de sus tres entradas. */
   private baseMemo: {
     filtered: QueryResult | null;
@@ -87,7 +86,7 @@ export class SelectionService {
     uris: ReadonlySet<string>;
   } | null = null;
   /** Memo del lote con un nodo de otro lote inyectado (caso poco frecuente). */
-  private pinMemo: { base: SliceView; pinned: string; view: SliceView } | null = null;
+  private pinMemo: { base: SliceView; pinned: string; row?: ResultBinding; view: SliceView } | null = null;
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
   readonly activeFilters$: Observable<Filter[]> = this._activeFilters$.asObservable();
@@ -113,10 +112,9 @@ export class SelectionService {
     shareReplay({ bufferSize: 1, refCount: true }),
   );
 
-  /** Solo la URI pineada: cambiar de nodo no importa si el lote no cambia. */
+  /** Every selection can change row/event context even when its URI is unchanged. */
   private readonly pinnedUri$: Observable<string | null> = this._selectedNode$.pipe(
     map((selection) => selection.node?.uri ?? null),
-    distinctUntilChanged(),
   );
 
   /**
@@ -186,15 +184,22 @@ export class SelectionService {
   private appliedLimits = this.limitsService.limits();
 
   /**
-   * Publica la selección junto con las entidades que comparten fila con ella:
-   * cada vista dibuja una entidad distinta de la misma fila, así que sin ese
-   * grupo una selección solo se veía en la vista que dibujaba ese nodo exacto.
+   * Publishes the exact resource and its object context for all four views.
+   * An event click also retains a matching source row for the table.
    */
-  select(node: NormalizedNode | null, source: Selection['source'] = 'external'): void {
+  select(node: NormalizedNode | null, source: Selection['source'] = 'external', row?: ResultBinding, event?: Selection['event']): void {
+    const context = node ? resolveEntityContext(this.entityContext, node.uri, row) : undefined;
+    if (!row && event && context) {
+      row = this._queryResult$.getValue()?.bindings.find((candidate) =>
+        this.entityContext.primaryByRow.get(candidate) === context.primaryUri &&
+        candidate[event.field]?.type === 'date' && candidate[event.field].value === event.isoDate);
+    }
     this._selectedNode$.next({
       node,
       source,
-      relatedUris: relatedUris(this.rowIndex, node?.uri),
+      ...context,
+      ...(row ? { row } : {}),
+      ...(event ? { event } : {}),
     });
   }
 
@@ -202,9 +207,23 @@ export class SelectionService {
     this._selectedNode$.next({ node: null, source: 'external' });
   }
 
-  /** Entidades que comparten fila con `uri` (la propia incluida). */
+  /** Representations of the same object; ambiguous shared resources stay exact. */
   relatedUrisFor(uri: string | null | undefined): ReadonlySet<string> {
-    return relatedUris(this.rowIndex, uri);
+    return uri ? resolveEntityContext(this.entityContext, uri).relatedUris : new Set();
+  }
+
+  setPrimaryVariable(variable: string | null): void {
+    this.primaryVariable.set(variable);
+    this.entityContext = buildEntityContext(this._queryResult$.getValue(), variable);
+    const selection = this._selectedNode$.getValue();
+    this.pinMemo = null;
+    this.select(selection.node, selection.source, selection.row, selection.event);
+    this.clearFocus();
+  }
+
+  entityForRow(row: ResultBinding): NormalizedNode | null {
+    const uri = this.entityContext.primaryByRow.get(row);
+    return uri ? this.entityContext.nodes.get(uri) ?? null : null;
   }
 
   addFilter(filter: Filter): void {
@@ -228,10 +247,11 @@ export class SelectionService {
     this._activeFilters$.next([]);
   }
 
-  setQueryResult(result: QueryResult | null): void {
+  setQueryResult(result: QueryResult | null, primaryVariable: string | null = null): void {
     // El índice fila ↔ entidades se arma una vez por query: lo consultan todas
     // las selecciones posteriores.
-    this.rowIndex = buildRowIndex(result);
+    this.primaryVariable.set(primaryVariable);
+    this.entityContext = buildEntityContext(result, primaryVariable);
     this._queryResult$.next(result);
     this._selectedNode$.next({ node: null, source: 'external' });
     this._activeFilters$.next([]);
@@ -274,7 +294,17 @@ export class SelectionService {
 
   setFocus(uris: Iterable<string>, source: Exclude<FocusSource, null>): void {
     if (!this._coordinatedViewEnabled$.getValue()) return;
-    this._focus$.next({ uris: new Set(uris), source });
+    const active = this.getActiveView();
+    if (active && active !== source) return;
+    const input = [...uris];
+    const resolved = resolveEntityFocus(this.entityContext, input);
+    const entityUris = new Set(input.map((uri) => resolveEntityContext(this.entityContext, uri).primaryUri));
+    const current = this._focus$.getValue();
+    if (current.source === source && current.uris.size === resolved.size &&
+        current.entityUris?.size === entityUris.size &&
+        [...entityUris].every((uri) => current.entityUris!.has(uri)) &&
+        [...resolved].every((uri) => current.uris.has(uri))) return;
+    this._focus$.next({ uris: resolved, entityUris, source });
   }
 
   clearFocus(): void {
@@ -362,14 +392,21 @@ export class SelectionService {
     const base = this.baseSlice(filtered, lotSize, currentLot);
     // El caso normal: el nodo seleccionado ya está en el lote, así que lo
     // visible es exactamente lo mismo de antes (mismo objeto, sin repintar).
-    if (pinned === null || base.uris.has(pinned)) return base.view;
+    if (pinned === null) return base.view;
+    const selection = this._selectedNode$.getValue();
+    const row = selection.row;
+    const related = this.relatedUrisFor(pinned);
+    const filteredIds = new Set(filtered?.nodes.map((node) => node.uri));
+    const hasAllRepresentations = [...related].every((id) => !filteredIds.has(id) || base.uris.has(id));
+    const hasRow = !row || !filtered?.bindings.includes(row) || base.view.result?.bindings.includes(row);
+    if (hasAllRepresentations && hasRow) return base.view;
 
     const memo = this.pinMemo;
-    if (memo && memo.base === base.view && memo.pinned === pinned) return memo.view;
+    if (memo && memo.base === base.view && memo.pinned === pinned && memo.row === row) return memo.view;
 
     // Selección de otro lote: ahí sí hay que inyectar el nodo y redibujar.
-    const view = this.buildSliceView(filtered, lotSize, currentLot, [pinned]);
-    this.pinMemo = { base: base.view, pinned, view };
+    const view = this.buildSliceView(filtered, lotSize, currentLot, [...this.relatedUrisFor(pinned)]);
+    this.pinMemo = { base: base.view, pinned, row, view };
     return view;
   }
 
@@ -387,6 +424,12 @@ export class SelectionService {
     }
 
     const slice = sliceLot(filtered, lotSize, currentLot, pinnedUris);
+    if (pinnedUris.length && slice.lotCount > 1) {
+      const selection = this._selectedNode$.getValue();
+      const extraRows = filtered.bindings.filter((row) => !slice.result.bindings.includes(row) &&
+        (selection.row ? row === selection.row : this.entityContext.primaryByRow.get(row) === selection.primaryUri));
+      if (extraRows.length) slice.result = { ...slice.result, bindings: [...slice.result.bindings, ...extraRows] };
+    }
     return {
       result: slice.result,
       state: {
@@ -403,11 +446,35 @@ export class SelectionService {
     if (!result) return null;
     if (filters.length === 0) return result;
 
-    const passingNodes = result.nodes.filter((node) =>
-      filters.every((f) => this.nodePassesFilter(node, f)),
+    const matchesByFilter = filters.map((filter) =>
+      new Set(
+        result.nodes.filter((node) => this.nodePassesFilter(node, filter)).map((node) => node.uri),
+      ),
     );
-    const passingUris = new Set(passingNodes.map((n) => n.uri));
+    const primaryRows = result.bindings.filter((row) => {
+      const uris = rowUris(row);
+      return matchesByFilter.every((matches) => uris.some((uri) => matches.has(uri)));
+    });
+    if (primaryRows.length > 0) {
+      // Different resources in one row may satisfy geo and temporal filters.
+      // Preserve the row's topology without importing other rows via a city.
+      const primary = new Set(primaryRows);
+      const sharedBnodes = new Set(
+        primaryRows.flatMap(rowUris).filter((uri) => uri.startsWith('_:')),
+      );
+      const bindings = result.bindings.filter((row) => {
+        return primary.has(row) || rowUris(row).some((uri) => sharedBnodes.has(uri));
+      });
+      const rowIds = new Set(bindings.flatMap(rowUris));
+      const displayUris = expandRowTopology(result, rowIds);
+      return restrictResultToUris({ ...result, bindings }, displayUris);
+    }
 
+    // Results without matching bindings retain the original node-based behavior.
+    const passingNodes = result.nodes.filter((node) =>
+      filters.every((filter) => this.nodePassesFilter(node, filter)),
+    );
+    const passingUris = new Set(passingNodes.map((node) => node.uri));
     const neighborUris = new Set<string>();
     for (const edge of result.edges) {
       if (passingUris.has(edge.source) && !passingUris.has(edge.target)) {

@@ -70,6 +70,8 @@ vi.mock('leaflet', () => {
     addLayer: vi.fn(),
     removeLayer: vi.fn(),
     addControl: vi.fn(),
+    stop: vi.fn(),
+    getBoundsZoom: vi.fn(() => 12),
     flyTo: vi.fn(),
     flyToBounds: vi.fn(),
     fitBounds: vi.fn(),
@@ -126,6 +128,7 @@ vi.mock('leaflet', () => {
     },
     divIcon: vi.fn(function () { return {}; }),
     latLngBounds: vi.fn(function () { return {}; }),
+    point: vi.fn((x: number, y: number) => ({ x, y })),
     Icon: {
       Default: {
         mergeOptions: vi.fn(),
@@ -557,4 +560,41 @@ describe('MapViewComponent', () => {
       }
     });
   });
+  describe('coordinated camera policy', () => {
+    beforeEach(async () => {
+      createSubjects();
+      await setUpModule();
+      component['initMap']();
+    });
+    it('zooms into compatible targets even when they are already inside the bounds', () => {
+      const result = createMockQueryResult([mockNode]);
+      queryResultSubject.next(result);
+      filteredSubject.next(result);
+      fixture.detectChanges();
+      const view = component as unknown as { map: { flyToBounds: ReturnType<typeof vi.fn> }; applyExternalFocus: (uris: Set<string>) => void };
+      view.map.flyToBounds.mockClear();
+      view.applyExternalFocus(new Set([mockNode.uri]));
+      expect(view.map.flyToBounds).toHaveBeenCalledOnce();
+    });
+
+    it('keeps the camera for distant targets and for an empty focus', () => {
+      const result = createMockQueryResult([mockNode]);
+      queryResultSubject.next(result);
+      filteredSubject.next(result);
+      fixture.detectChanges();
+      const view = component as unknown as { map: { flyToBounds: ReturnType<typeof vi.fn>; getBoundsZoom: ReturnType<typeof vi.fn> }; applyExternalFocus: (uris: Set<string>) => void };
+      view.map.flyToBounds.mockClear();
+      view.map.getBoundsZoom.mockReturnValueOnce(1);
+      view.applyExternalFocus(new Set([mockNode.uri]));
+      view.applyExternalFocus(new Set());
+      expect(view.map.flyToBounds).not.toHaveBeenCalled();
+    });
+
+    it('recognizes native wheel input as map navigation', () => {
+      const service = TestBed.inject(SelectionService);
+      fixture.nativeElement.querySelector('#map-container').dispatchEvent(new WheelEvent('wheel'));
+      expect(service.markActiveView).toHaveBeenCalledWith('map');
+    });
+  });
+
 });

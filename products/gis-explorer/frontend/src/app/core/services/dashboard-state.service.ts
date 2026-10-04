@@ -47,6 +47,7 @@ export interface GisDashboardPayload {
   };
   selection?: { selectedIds: string[]; pinnedId?: string };
   variableMapping?: Record<string, VariableRole>;
+  primaryVariable?: string;
 }
 
 const SLOT_COUNT_TO_PRESET: Record<number, 'single' | 'split-h' | 'split-v' | 'triple' | 'triple-inv' | 'triple-v' | 'triple-v-inv' | 'quad'> = {
@@ -142,6 +143,7 @@ export class DashboardStateService {
 
     const payload: GisDashboardPayload = {
       query: this.queryState.query(),
+      ...(this.selection.primaryVariable() ? { primaryVariable: this.selection.primaryVariable()! } : {}),
       backend: this.queryState.backend(),
       layout: {
         slotsCount: slotCount as 1 | 2 | 3 | 4,
@@ -219,7 +221,7 @@ export class DashboardStateService {
             result,
             payload.variableMapping ?? {},
           );
-          this.selection.setQueryResult(mappedResult);
+          this.selection.setQueryResult(mappedResult, payload.primaryVariable ?? null);
           // Si ninguna vista reportó (ningún slot montado), la etapa se cierra acá.
           this.progress.complete('process-results');
         }),

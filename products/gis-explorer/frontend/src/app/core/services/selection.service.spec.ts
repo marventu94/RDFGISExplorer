@@ -1,3 +1,4 @@
+import { c1Fixture } from '@shared/selection/testing/c1-fixture';
 import { TestBed } from '@angular/core/testing';
 import { Subscription } from 'rxjs';
 import { SelectionService } from './selection.service';
@@ -559,6 +560,43 @@ describe('SelectionService', () => {
     });
 
     describe('combined filters', () => {
+      it('matches geo and time on different resources of the same row', () => {
+        const nodes = [
+          makeNode({ uri: 'listing-a' }),
+          makeNode({ uri: 'geometry-a', coordinate: { lat: 0, lng: 0 } }),
+          makeNode({ uri: 'time-a', temporalEvents: [{ field: 'date', isoDate: '2020-06-01T00:00:00.000Z' }] }),
+          makeNode({ uri: 'listing-b' }),
+          makeNode({ uri: 'geometry-b', coordinate: { lat: 0, lng: 0 } }),
+          makeNode({ uri: 'time-b', temporalEvents: [{ field: 'date', isoDate: '2019-06-01T00:00:00.000Z' }] }),
+        ];
+        const row = (suffix: string) => ({
+          listing: { type: 'uri' as const, value: `listing-${suffix}` },
+          geometry: { type: 'uri' as const, value: `geometry-${suffix}` },
+          time: { type: 'uri' as const, value: `time-${suffix}` },
+        });
+        const result = makeQueryResult({
+          nodes,
+          edges: [
+            { id: 'geo-a', source: 'listing-a', target: 'geometry-a', predicate: 'p' },
+            { id: 'time-a', source: 'listing-a', target: 'time-a', predicate: 'p' },
+            { id: 'geo-b', source: 'listing-b', target: 'geometry-b', predicate: 'p' },
+            { id: 'time-b', source: 'listing-b', target: 'time-b', predicate: 'p' },
+          ],
+          bindings: [row('a'), row('b')],
+        });
+        let filtered: QueryResult | null = null;
+        service.filteredQueryResult$.subscribe((value) => (filtered = value));
+        service.setQueryResult(result);
+        service.addFilter(makeGeoFilter());
+        service.addFilter(makeTemporalFilter());
+
+        expect(filtered!.bindings).toEqual([result.bindings[0]]);
+        expect(filtered!.nodes.map((node) => node.uri)).toEqual([
+          'listing-a', 'geometry-a', 'time-a',
+        ]);
+        expect(filtered!.edges.map((edge) => edge.id)).toEqual(['geo-a', 'time-a']);
+      });
+
       it('should apply both geo and temporal filters simultaneously', () => {
         const insidePolygon: Polygon = {
           type: 'Polygon',
@@ -613,6 +651,55 @@ describe('SelectionService', () => {
     });
 
     describe('edges filtering', () => {
+      it.each(['geo', 'temporal'] as const)(
+        'preserves the selected rows and complete graph paths after a %s filter',
+        (kind) => {
+          const nodes = [
+            makeNode({ uri: 'listing-a', coordinate: { lat: 0, lng: 0 }, temporalEvents: [{ field: 'date', isoDate: '2020-06-01T00:00:00.000Z' }] }),
+            makeNode({ uri: 'estate-a' }),
+            makeNode({ uri: 'address-a' }),
+            makeNode({ uri: 'listing-b', coordinate: { lat: 55, lng: 55 }, temporalEvents: [{ field: 'date', isoDate: '2019-06-01T00:00:00.000Z' }] }),
+            makeNode({ uri: 'estate-b' }),
+            makeNode({ uri: 'address-b' }),
+            makeNode({ uri: 'city' }),
+            makeNode({ uri: 'hidden-1' }),
+            makeNode({ uri: 'hidden-2' }),
+            makeNode({ uri: 'house-class' }),
+          ];
+          const edge = (source: string, target: string) => ({
+            id: `${source}->${target}`, source, target, predicate: 'p',
+          });
+          const result = makeQueryResult({
+            nodes,
+            edges: [
+              edge('listing-a', 'estate-a'), edge('estate-a', 'hidden-1'),
+              edge('hidden-1', 'hidden-2'), edge('hidden-2', 'address-a'),
+              edge('address-a', 'city'), edge('listing-a', 'house-class'),
+              edge('listing-b', 'estate-b'), edge('estate-b', 'address-b'),
+              edge('address-b', 'city'), edge('listing-b', 'house-class'),
+            ],
+            bindings: ['a', 'b'].map((suffix) => ({
+              listing: { type: 'uri' as const, value: `listing-${suffix}` },
+              estate: { type: 'uri' as const, value: `estate-${suffix}` },
+              address: { type: 'uri' as const, value: `address-${suffix}` },
+              city: { type: 'uri' as const, value: 'city' },
+            })),
+          });
+          let filtered: QueryResult | null = null;
+          service.filteredQueryResult$.subscribe((value) => (filtered = value));
+          service.setQueryResult(result);
+          service.addFilter(kind === 'geo' ? makeGeoFilter() : makeTemporalFilter());
+
+          expect(filtered!.bindings).toEqual([result.bindings[0]]);
+          expect(filtered!.nodes.map((node) => node.uri)).toEqual([
+            'listing-a', 'estate-a', 'address-a', 'city', 'hidden-1', 'hidden-2', 'house-class',
+          ]);
+          expect(filtered!.edges.map((item) => item.id)).toEqual(
+            result.edges.slice(0, 6).map((item) => item.id),
+          );
+        },
+      );
+
       it('should keep neighbour nodes and edges connected to nodes that pass the filter', () => {
         const insidePolygon: Polygon = {
           type: 'Polygon',
@@ -947,8 +1034,8 @@ describe('SelectionService', () => {
       expect(visible?.nodes.map((n) => n.uri)).toContain('urn:n9');
       // Edge e89 is excluded because urn:n8 is hidden in batch 1.
       expect(visible?.edges.map((e) => e.id)).not.toContain('e89');
-      // Pinning adds no rows to the batch.
-      expect(visible?.bindings.length).toBe(4);
+      // The pinned row lets the table represent the same selected entity.
+      expect(visible?.bindings.length).toBe(5);
 
       // Deselecting stops injecting the pinned node.
       service.clearSelection();
@@ -1000,4 +1087,52 @@ describe('SelectionService', () => {
       expect(service.getLotSizeSnapshot()).toBe(300);
     });
   });
+  describe('C1 coordinated views', () => {
+    it('publishes the same object from geometry, time and an intermediate resource', () => {
+      const result = c1Fixture();
+      service.setQueryResult(result);
+      for (const uri of ['geometry-a', 'date-a', '_:site-a']) {
+        service.select(result.nodes.find((node) => node.uri === uri)!, 'graph');
+        expect(service.getSelectedNodeSnapshot().primaryUri).toBe('listing-a');
+        expect(service.getSelectedNodeSnapshot().relatedUris?.has('listing-b')).toBe(false);
+      }
+    });
+
+    it('translates viewport focus and ignores feedback from a different active view', () => {
+      service.setQueryResult(c1Fixture());
+      service.markActiveView('map');
+      service.setFocus(['geometry-a'], 'map');
+      expect(service.getFocusSnapshot().uris.has('date-a')).toBe(true);
+      expect([...service.getFocusSnapshot().entityUris!]).toEqual(['listing-a']);
+      service.setFocus(['geometry-b'], 'graph');
+      expect(service.getFocusSnapshot().source).toBe('map');
+      service.setFocus([], 'map');
+      expect(service.getFocusSnapshot().uris.size).toBe(0);
+    });
+
+    it('keeps click selection available with Coordinated disabled', () => {
+      const result = c1Fixture();
+      service.setQueryResult(result);
+      service.toggleCoordinatedView();
+      service.select(result.nodes.find((node) => node.uri === 'geometry-a')!, 'map');
+      service.setFocus(['geometry-b'], 'map');
+      expect(service.getSelectedNodeSnapshot().primaryUri).toBe('listing-a');
+      expect(service.getFocusSnapshot().uris.size).toBe(0);
+    });
+
+    it('pins the complete selected object and its table row across batches, then removes it', () => {
+      const result = c1Fixture();
+      service.setQueryResult(result);
+      service.setLotSize(1);
+      let visible: QueryResult | null = null;
+      service.visibleQueryResult$.subscribe((value) => visible = value);
+      service.select(result.nodes.find((node) => node.uri === 'geometry-b')!, 'map');
+      expect(visible!.nodes.map((node) => node.uri)).toEqual(expect.arrayContaining(['listing-b', 'date-b', 'geometry-b', '_:site-b']));
+      expect(visible!.bindings).toContain(result.bindings[1]);
+      service.clearSelection();
+      expect(visible!.bindings).toEqual([result.bindings[0]]);
+      expect(visible!.nodes.some((node) => node.uri === 'geometry-b')).toBe(false);
+    });
+  });
+
 });
