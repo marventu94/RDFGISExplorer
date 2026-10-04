@@ -21,6 +21,8 @@ export const CHILD_HEIGHT = 20;
 export const PADDING = 10;
 
 export interface FilterCatalog {
+  datatype: FilterMetadata;
+  equals: FilterMetadata;
   text: FilterMetadata;
   lang: FilterMetadata;
   regex: FilterMetadata;
@@ -47,6 +49,8 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
   readonly uriToNode = new Map<string, Node>();
 
   readonly filterCatalog: FilterCatalog = {
+    datatype: { name: 'datatype', inputs: 1, data: { datatype: { type: 'text' } } },
+    equals: { name: 'exact value', inputs: 3, data: { value: { type: 'text' }, datatype: { type: 'text' }, language: { type: 'text' } } },
     text: { name: 'contains', inputs: 1, data: { keyword: { type: 'text' } } },
     lang: { name: 'language', inputs: 1, data: { language: { type: 'text' } } },
     regex: { name: 'regex', inputs: 1, data: { regex: { type: 'text' } } },

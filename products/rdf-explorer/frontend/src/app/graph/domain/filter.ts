@@ -1,11 +1,13 @@
 import type { Variable } from './variable';
 import type { DomainEndpointAdapter } from './endpoint/adapter';
 
-export type FilterType = 'text' | 'lang' | 'regex' | 'leq' | 'geq' | 'isuri' | 'isliteral' | 'datefrom' | 'dateto';
+export type FilterType = 'text' | 'lang' | 'regex' | 'leq' | 'geq' | 'isuri' | 'isliteral' | 'datefrom' | 'dateto' | 'equals' | 'datatype' | 'isresource';
 
 export type DateGranularity = 'year' | 'month' | 'day';
 
 export interface FilterData {
+  value?: string;
+  datatype?: string;
   keyword?: string;
   language?: string;
   regex?: string;
@@ -70,6 +72,20 @@ export class Filter {
   serialize(adapter: DomainEndpointAdapter): string {
     const v = this.variable.toString();
     switch (this.type) {
+      case 'equals': {
+        const quote = (s: string) => '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"';
+        const checks = [`isLiteral(${v})`, `STR(${v}) = ${quote(this.data.value ?? '')}`];
+        if (this.data.language) checks.push(`LANG(${v}) = ${quote(this.data.language)}`);
+        if (this.data.datatype) checks.push(`STR(DATATYPE(${v})) = ${quote(this.data.datatype)}`);
+        return `FILTER (${checks.join(' && ')})\n`;
+      }
+      case 'datatype': {
+        const datatype = this.data.datatype ?? '';
+        if (!/^[a-z][a-z0-9+.-]*:[^\s<>"\\{}|^`]*$/i.test(datatype)) throw new Error('Invalid datatype IRI');
+        return `FILTER (DATATYPE(${v}) = <${datatype}>)\n`;
+      }
+      case 'isresource':
+        return `FILTER (!isLiteral(${v}))\n`;
       case 'lang':
         return `FILTER (lang(${v}) = "${this.data.language ?? ''}")\n`;
       case 'text':

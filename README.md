@@ -145,6 +145,47 @@ not inject them at execution time: every query must be self-contained.
 | `EXPORT_MIN_PAGE_SIZE` | `250` | Minimum retry page size |
 | `SUMMARY_TOP_CATEGORICAL_LIMIT` | `12` | Number of top categorical values |
 
+## Guided RDF discovery
+
+RDF Explorer starts with a searchable catalogue of **classes**, **relationships**,
+and **resources**. Class/property discovery combines terms used in triples with
+explicit RDF/RDFS/OWL declarations; labels are optional and URI names remain
+searchable. Browse classes without entering a keyword, or load subsequent pages.
+
+**Use class** creates a typed variable. **Explore connections** shows incoming and
+outgoing relationships for the selected query node, grouped by observed target
+class or literal datatype, including untyped and anonymous resources. Exploration
+breadcrumbs do not mutate the query. Add a whole path, require a relationship,
+make it optional, or filter by an example/exact literal. Compatible branches are
+reused to avoid creating independent address joins. Additions can be undone until
+a subsequent manual edit or workspace change makes their snapshot stale.
+
+Suggestions use the current connected query component and its filters. Switch to
+**Whole class** to inspect the first explicit class constraint independently.
+Counts describe distinct entities in bounded samples, not query rows or universal
+schema constraints. The endpoint's configured inference/dataset scope applies;
+the client does not add reasoning. Classes declared without instances can appear
+in the catalogue but have no observed connections. **Find connection to…** checks
+joined paths against data with bounded depth, request count and time. No result
+does not prove that a path does not exist. There is no AI or domain-specific C1
+recipe involved.
+
+Read-only discovery APIs belong to the Explorer backends:
+`GET /api/discovery/catalog?kind=class&q=House&offset=0`,
+`POST /api/discovery/connections`, and `POST /api/discovery/paths`.
+Shared request/result types live in `@rdfgis/contracts`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DISCOVERY_SAMPLE_SIZE` | `200` | Distinct focus entities inspected per neighborhood |
+| `DISCOVERY_RESULT_LIMIT` | `60` | Catalogue page size / connection groups per direction |
+| `DISCOVERY_TIMEOUT_MS` | `8000` | Timeout per discovery SPARQL request |
+| `DISCOVERY_CACHE_TTL_MS` | `60000` | Successful catalogue/context cache lifetime |
+| `DISCOVERY_PATH_TIMEOUT_MS` | `20000` | Total path search time budget |
+| `DISCOVERY_PATH_BUDGET` | `12` | Maximum neighborhoods inspected per path search |
+| `DISCOVERY_PATH_DEPTH` | `4` | Maximum additional path length (12 steps total) |
+| `DISCOVERY_PATH_RESULT_LIMIT` | `5` | Maximum verified paths returned |
+
 ## Demo dashboards
 
 `seed:demo-dashboards` is retained because it generates functional product examples:

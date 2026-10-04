@@ -6,6 +6,7 @@ import { SuggestionsModule } from './modules/suggestions/suggestions.module';
 import { HealthModule } from './modules/health/health.module';
 
 import { AppConfigModule } from './modules/app-config/app-config.module';
+import { DiscoveryModule } from './modules/discovery/discovery.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AppConfigModule } from './modules/app-config/app-config.module';
     SuggestionsModule,
     HealthModule,
     AppConfigModule,
+    DiscoveryModule,
   ],
 })
 export class AppModule {}

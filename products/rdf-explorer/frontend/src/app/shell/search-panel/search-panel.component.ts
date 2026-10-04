@@ -1,90 +1,62 @@
-import { TranslatePipe } from '../../core/translate.pipe';
-import { Component, inject, signal, effect } from '@angular/core';
+import { Component, inject, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { EntitySearchService } from '../../tools/search-panel/entity-search.service';
+import { Subscription } from 'rxjs';
+import type { DiscoveryKind, DiscoveryTerm } from '@rdfgis/contracts';
+import { TranslatePipe } from '../../core/translate.pipe';
 import { RequestService } from '../../core/request.service';
-import type { WikidataSearchResult } from '../../tools/search-panel/search-result.model';
+import { DiscoveryApiService } from '../../tools/discovery/discovery-api.service';
+import { DiscoveryStateService } from '../../tools/discovery/discovery-state.service';
 
 @Component({
-  selector: 'app-search-panel',
-  templateUrl: './search-panel.component.html',
-  styleUrl: './search-panel.component.scss',
-  imports: [FormsModule, TranslatePipe],
+  selector: 'app-search-panel', templateUrl: './search-panel.component.html',
+  styleUrl: './search-panel.component.scss', imports: [FormsModule, TranslatePipe],
 })
-export class SearchPanelComponent {
-  private readonly searchService = inject(EntitySearchService);
+export class SearchPanelComponent implements OnDestroy {
+  private readonly api = inject(DiscoveryApiService);
   private readonly request = inject(RequestService);
-
+  readonly discovery = inject(DiscoveryStateService);
+  readonly kind = signal<DiscoveryKind>('class');
+  readonly results = signal<DiscoveryTerm[]>([]);
+  readonly busy = signal(false);
+  readonly error = signal(false);
+  readonly active = signal(false);
+  readonly truncated = signal(false);
+  readonly nextOffset = signal<number | undefined>(undefined);
   searchInput = '';
-  searchResults = signal<WikidataSearchResult[]>([]);
-  searchActive = false;
-  searchWait = false;
-  searchError = false;
-  noResults = false;
-  lastSearch = '';
+  private subscription?: Subscription;
+  private timer?: ReturnType<typeof setTimeout>;
 
-  private abortController: AbortController | null = null;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
+  setKind(kind: DiscoveryKind): void { this.kind.set(kind); this.doSearch(); }
   onSearchChange(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-
-    if (!this.searchInput.trim()) {
-      this.abortController?.abort();
-      this.searchActive = false;
-      this.searchResults.set([]);
-      this.searchWait = false;
-      this.searchError = false;
-      this.noResults = false;
-      this.lastSearch = '';
-      return;
-    }
-
-    const now = this.searchInput + '';
-    this.debounceTimer = setTimeout(() => {
-      if (now && now === this.searchInput) {
-        this.doSearch();
-      }
-    }, 400);
+    clearTimeout(this.timer);
+    this.subscription?.unsubscribe();
+    this.results.set([]); this.busy.set(false); this.error.set(false);
+    this.nextOffset.set(undefined); this.truncated.set(false);
+    this.timer = setTimeout(() => this.doSearch(), 350);
   }
-
-  onInputFocus(): void {
-    this.searchActive = true;
+  doSearch(append = false): void {
+    clearTimeout(this.timer); this.subscription?.unsubscribe();
+    this.busy.set(true); this.active.set(true); this.error.set(false);
+    if (!append) { this.results.set([]); this.nextOffset.set(undefined); }
+    this.subscription = this.api.catalog(this.kind(), this.searchInput.trim(), append ? this.nextOffset() : 0).subscribe({
+      next: data => {
+        const terms = new Map(this.results().map(t => [t.uri, t]));
+        for (const term of data.items) {
+          const prior = terms.get(term.uri);
+          terms.set(term.uri, { ...term, evidence: [...new Set([...(prior?.evidence ?? []), ...term.evidence])] });
+        }
+        this.results.set([...terms.values()]); this.nextOffset.set(data.nextOffset);
+        this.truncated.set(data.truncated); this.busy.set(false);
+      },
+      error: () => { this.error.set(true); this.busy.set(false); },
+    });
   }
-
-  async doSearch(): Promise<void> {
-    if (!this.searchInput || this.searchInput === this.lastSearch) return;
-
-    const input = this.searchInput;
-    this.lastSearch = input;
-    this.searchWait = true;
-    this.searchError = false;
-    this.noResults = false;
-    this.searchActive = true;
-
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.abortController = new AbortController();
-
-    try {
-      const results = await this.searchService.search(input, this.abortController.signal);
-      this.searchResults.set(results);
-      this.searchError = false;
-      this.searchWait = false;
-      if (results.length === 0) this.noResults = true;
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      this.searchWait = false;
-      this.noResults = false;
-      this.searchError = true;
-      this.lastSearch = '';
-    }
-  }
-
-  onDragStart(event: DragEvent, result: WikidataSearchResult): void {
+  browse(): void { this.searchInput = ''; this.setKind('class'); }
+  onDragStart(event: DragEvent, result: DiscoveryTerm): void {
+    if (result.kind !== 'resource') { event.preventDefault(); return; }
     event.dataTransfer?.setData('uri', result.uri);
     event.dataTransfer?.setData('prop', '');
     this.request.setLabel(result.uri, result.label);
   }
+  ngOnDestroy(): void { clearTimeout(this.timer); this.subscription?.unsubscribe(); }
 }
