@@ -117,6 +117,16 @@ the pinned instance, here the selected node is added to the visible batch even
 if no row in that batch references it. The underlying idea is the same: the
 instance of interest remains fixed while the visible portion changes.
 
+**Known limitation.** Row batches do not preserve whole business objects, and
+pinning a selected node does not guarantee that its neighbors fit within the
+graph cap. The general graph can therefore show the selection as an isolated
+point. **View structure** provides detailed inspection of the retrieved
+relationships within a separate budget. Object batching remains deferred:
+query topology can suggest a root, but listing versus property grouping needs
+an explicit identity and backend truncation can prevent complete objects.
+See [GIS Explorer limits](../products/gis-explorer/frontend/README.md#known-limits-batches-and-graph-structure)
+for the workflow and the GraphDB C1 example.
+
 ## 6. Summary panel (aggregation over the complete result)
 
 **Rationale.** Andrienko et al. [2003]: views of individuals do not support
