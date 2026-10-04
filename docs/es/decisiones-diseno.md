@@ -124,6 +124,17 @@ nodo seleccionado se agrega al lote visible aunque ninguna fila del lote lo
 referencie — la idea subyacente es la misma: la instancia de interés
 permanece fija mientras la porción visible cambia.
 
+**Limitación conocida.** Los lotes de filas no preservan objetos de negocio
+completos, y fijar el nodo seleccionado no garantiza que sus vecinos entren
+en el límite del grafo. Por eso, el grafo general puede mostrar la selección
+como un punto aislado. **Ver estructura** permite inspeccionar las relaciones
+recuperadas dentro de un presupuesto independiente. El loteo por objetos
+queda postergado: la topología de la consulta permite sugerir una raíz, pero
+agrupar por aviso o por inmueble necesita una identidad explícita, y el
+truncamiento del backend puede impedir recuperar objetos completos.
+Ver [limitaciones de GIS Explorer](explorador-gis.md#limitaciones-conocidas-lotes-y-estructura-del-grafo)
+para el flujo de uso y el ejemplo de C1 de GraphDB.
+
 ## 6. Panel de resumen (agregación sobre el resultado completo)
 
 **Fundamento.** Andrienko et al. [2003]: las vistas de individuos no soportan
