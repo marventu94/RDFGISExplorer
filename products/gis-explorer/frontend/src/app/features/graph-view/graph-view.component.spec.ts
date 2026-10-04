@@ -741,6 +741,46 @@ describe('GraphViewComponent', () => {
   }
 
   describe('incremental updates', () => {
+    it.each(['geo', 'temporal'] as const)('repositions and frames the subset when a %s filter changes', (kind) => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      const view = component as unknown as { manualPositions: Map<string, { x: number; y: number }> };
+      view.manualPositions.set(mockNode.uri, { x: 9000, y: 8000 });
+      visibleQueryResultSubject.next(createMockQueryResult([mockNode], []));
+      const runsBeforeFilter = cy._layoutRuns.length;
+      cy.fit.mockClear();
+      const filter: Filter = kind === 'temporal'
+        ? { id: 'range', kind, from: '2024-01-01', to: '2024-12-31', label: 'Range' }
+        : { id: 'area', kind, polygon: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, label: 'Area' };
+
+      activeFiltersSubject.next([filter]);
+
+      expect(cy._ids()).toEqual([mockNode.uri]);
+      expect(cy._layoutRuns).toHaveLength(runsBeforeFilter + 1);
+      expect(cy._layoutRuns.at(-1)).toMatchObject({ name: component.currentLayout, animate: false });
+      expect(view.manualPositions.size).toBe(0);
+      cy._emit('layoutstop', null, {});
+      expect(cy.fit).toHaveBeenCalledWith(undefined, 50);
+
+      // Re-emitting the same filter and selecting a node must not disturb the layout.
+      activeFiltersSubject.next([{ ...filter }]);
+      selectedNodeSubject.next({ node: mockNode, source: 'map' });
+      expect(cy._layoutRuns).toHaveLength(runsBeforeFilter + 1);
+    });
+
+    it('repositions again when an existing range changes or is removed', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      const range: Filter = { id: 'range', kind: 'temporal', from: '2024-01-01', to: '2024-12-31', label: 'Range' };
+      activeFiltersSubject.next([range]);
+      const runsAfterFilter = cy._layoutRuns.length;
+
+      activeFiltersSubject.next([{ ...range, to: '2024-06-30' }]);
+      expect(cy._layoutRuns).toHaveLength(runsAfterFilter + 1);
+      activeFiltersSubject.next([]);
+      expect(cy._layoutRuns).toHaveLength(runsAfterFilter + 2);
+    });
+
     // Core regression guard: visibleQueryResult$ and lotState$ depend on
     // _selectedNode$, so every click re-emits. It must not recreate or relayout.
     it('instantiates cytoscape only once even when selection re-emits', () => {
@@ -1023,6 +1063,37 @@ describe('GraphViewComponent', () => {
       expect(cy._classesOf(mockNode2.uri)).not.toContain('is-selected');
     });
 
+    it.each(['pointerdown', 'wheel'])('clears coordinated styling on graph %s while keeping explicit selection', (event) => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      selectedNodeSubject.next({ node: mockNode, source: 'table' });
+      focusSubject.next({ uris: new Set([mockNode.uri, mockNode2.uri]), source: 'map' });
+      expect(cy._classesOf(mockNode2.uri)).toContain('is-muted');
+      expect(cy._classesOf(mockEdge.id)).toContain('is-focus-edge');
+
+      component.container.nativeElement.dispatchEvent(new Event(event));
+
+      expect(cy._classesOf(mockNode.uri)).toEqual(['is-selected']);
+      expect(cy._classesOf(mockNode2.uri)).toEqual([]);
+      expect(cy._classesOf(mockEdge.id)).toEqual([]);
+      const service = TestBed.inject(SelectionService);
+      expect(service.markActiveView).toHaveBeenCalledWith('graph');
+      expect(service.clearSelection).not.toHaveBeenCalled();
+    });
+
+    it('clears all coordinated dimming on reset even with an explicit selection', () => {
+      emitResult([mockNode, mockNode2], []);
+      const cy = lastCy();
+      selectedNodeSubject.next({ node: mockNode, source: 'map' });
+      focusSubject.next({ uris: new Set([mockNode.uri]), source: 'map' });
+      expect(cy._classesOf(mockNode2.uri)).toContain('is-dimmed');
+
+      focusSubject.next({ uris: new Set(), source: null });
+
+      expect(cy._classesOf(mockNode.uri)).toEqual(['is-selected']);
+      expect(cy._classesOf(mockNode2.uri)).toEqual([]);
+    });
+
     it('does not dim focus when nothing is selected', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
@@ -1056,7 +1127,7 @@ describe('GraphViewComponent', () => {
       expect(cy.animate).not.toHaveBeenCalled();
     });
 
-    it('honors a tight frame when focus fits without zooming out', () => {
+    it('uses a wider frame when focus fits without zooming out', () => {
       const nodes: NormalizedNode[] = Array.from({ length: 3 }, (_, i) => ({
         uri: `P${i}`,
         label: `N${i}`,
@@ -1072,9 +1143,27 @@ describe('GraphViewComponent', () => {
       fixture.detectChanges();
 
       const opts = cy.animate.mock.calls[0][0] as { zoom: number };
-      // It fits comfortably, so framing chooses zoom up to 5 rather than the floor.
+      // Compact roots retain context instead of zooming all the way into their tips.
       expect(opts.zoom).toBeGreaterThan(0.8);
-      expect(opts.zoom).toBeLessThanOrEqual(5);
+      expect(opts.zoom).toBeLessThanOrEqual(2);
+    });
+
+    it('frames the visible structure around a focused root with extra space', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      placeNode(cy, mockNode.uri, 20000, 20000);
+      placeNode(cy, mockNode2.uri, 20400, 20000);
+      cy.animate.mockClear();
+
+      const view = component as unknown as {
+        applyExternalFocus: (uris: Set<string>, entities: Set<string>) => void;
+      };
+      view.applyExternalFocus(new Set([mockNode.uri, mockNode2.uri]), new Set([mockNode.uri]));
+
+      const opts = cy.animate.mock.calls[0][0] as { zoom: number; pan: { x: number; y: number }; duration: number };
+      expect(opts.zoom).toBeCloseTo((800 - 80) / 410 * 0.8);
+      expect(opts.pan.x).toBeCloseTo(400 - 20200 * opts.zoom);
+      expect(opts.duration).toBe(600);
     });
   });
 

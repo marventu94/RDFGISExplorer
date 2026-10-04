@@ -149,7 +149,12 @@ export class MapViewComponent implements OnInit, OnDestroy {
       if (this.suppressTimer) clearTimeout(this.suppressTimer);
       this.suppressViewportEmit = false;
       this.map?.stop();
+      if (this.focusedUris.size) {
+        this.focusedUris = new Set();
+        this.applySelectionStyle(this.selectedUri);
+      }
       this.selectionService.markActiveView('map');
+      this.viewportChange$.next();
     };
     this.markActiveListener = markActive;
     this.container.nativeElement.addEventListener('pointerdown', markActive, { capture: true });

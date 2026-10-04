@@ -1,5 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { AgGridAngular } from 'ag-grid-angular';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -70,6 +72,7 @@ describe('TableViewComponent', () => {
     select: ReturnType<typeof vi.fn>;
     setQueryResult: ReturnType<typeof vi.fn>;
     clearSelection: ReturnType<typeof vi.fn>;
+    clearFocus: ReturnType<typeof vi.fn>;
     addFilter: ReturnType<typeof vi.fn>;
     removeFilter: ReturnType<typeof vi.fn>;
     focus$: BehaviorSubject<FocusState>;
@@ -93,6 +96,7 @@ describe('TableViewComponent', () => {
       select: vi.fn(),
       setQueryResult: vi.fn(),
       clearSelection: vi.fn(),
+      clearFocus: vi.fn(() => selectionServiceMock.focus$.next({ uris: new Set(), source: null })),
       addFilter: vi.fn(),
       removeFilter: vi.fn(),
       focus$: new BehaviorSubject<FocusState>({ uris: new Set(), source: null }),
@@ -395,24 +399,55 @@ describe('TableViewComponent', () => {
     expect(component.rowClassRules['coordinated-focus']({ data: row } as never)).toBe(false);
   });
 
-  it('emits viewport entities only for user navigation of the table', () => {
+  it('mutes rows outside coordinated focus and clears attenuation when focus clears', () => {
+    const matching = mockQueryResult.bindings[0];
+    const outside = { listing: { type: 'uri' as const, value: 'urn:outside-focus' } };
+    selectionServiceMock.entityForRow.mockImplementation((row) =>
+      row === matching ? mockQueryResult.nodes[0] : { uri: 'urn:outside-focus' });
+
+    selectionServiceMock.focus$.next({ uris: new Set([mockQueryResult.nodes[0].uri]), source: 'map' });
+
+    expect(component.rowClassRules['coordinated-muted']({ data: matching } as never)).toBe(false);
+    expect(component.rowClassRules['coordinated-muted']({ data: outside } as never)).toBe(true);
+    expect(component.rowClassRules['coordinated-focus']({ data: outside } as never)).toBe(false);
+    expect(selectionServiceMock.select).not.toHaveBeenCalled();
+
+    selectionServiceMock.focus$.next({ uris: new Set(), source: null });
+    expect(component.rowClassRules['coordinated-muted']({ data: outside } as never)).toBe(false);
+  });
+
+  it.each(['pointerdown', 'wheel', 'keydown'])('clears coordinated focus on table %s', (event) => {
+    const row = mockQueryResult.bindings[0];
+    selectionServiceMock.entityForRow.mockReturnValue(mockQueryResult.nodes[0]);
+    selectionServiceMock.focus$.next({ uris: new Set([mockQueryResult.nodes[0].uri]), source: 'map' });
+    expect(component.rowClassRules['coordinated-focus']({ data: row } as never)).toBe(true);
+
+    fixture.nativeElement.dispatchEvent(new Event(event));
+
+    expect(selectionServiceMock.clearFocus).toHaveBeenCalled();
+    expect(component.rowClassRules['coordinated-focus']({ data: row } as never)).toBe(false);
+    expect(component.rowClassRules['coordinated-muted']({ data: row } as never)).toBe(false);
+    expect(selectionServiceMock.clearSelection).not.toHaveBeenCalled();
+  });
+
+  it('keeps table navigation auxiliary without emitting focus or showing an active border', () => {
     vi.useFakeTimers();
     try {
-      selectionServiceMock.entityForRow.mockReturnValue(mockQueryResult.nodes[0]);
-      const api = {
-        sizeColumnsToFit: vi.fn(), getFirstDisplayedRowIndex: () => 0,
-        getLastDisplayedRowIndex: () => 0,
-        getDisplayedRowAtIndex: () => ({ data: mockQueryResult.bindings[0] }),
-      };
-      component.onGridReady({ api } as never);
-      component.onViewportChanged();
+      selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      host.dispatchEvent(new Event('pointerdown'));
+      host.dispatchEvent(new Event('wheel'));
+      const grid = fixture.debugElement.query(By.directive(AgGridAngular)).componentInstance as AgGridAngular;
+      grid.paginationChanged.emit({} as never);
+      grid.bodyScrollEnd.emit({} as never);
+      grid.sortChanged.emit({} as never);
+      grid.filterChanged.emit({} as never);
       vi.advanceTimersByTime(500);
       expect(selectionServiceMock.setFocus).not.toHaveBeenCalled();
-      selectionServiceMock.getActiveView.mockReturnValue('table');
-      component.onUserNavigation();
-      component.onViewportChanged();
-      vi.advanceTimersByTime(500);
-      expect(selectionServiceMock.setFocus).toHaveBeenCalledWith([mockQueryResult.nodes[0].uri], 'table');
+      expect(selectionServiceMock.markActiveView).not.toHaveBeenCalled();
+      expect(selectionServiceMock.clearFocus).toHaveBeenCalled();
+      expect(host.classList.contains('is-active-view')).toBe(false);
     } finally { vi.useRealTimers(); }
   });
 

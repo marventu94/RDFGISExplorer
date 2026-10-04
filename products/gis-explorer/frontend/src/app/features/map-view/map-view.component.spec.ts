@@ -202,6 +202,7 @@ describe('MapViewComponent', () => {
       clearSelection: vi.fn(),
       setQueryResult: vi.fn(),
       markActiveView: vi.fn(),
+      setFocus: vi.fn(),
       getActiveView: vi.fn(() => null),
     };
 
@@ -594,6 +595,21 @@ describe('MapViewComponent', () => {
       const service = TestBed.inject(SelectionService);
       fixture.nativeElement.querySelector('#map-container').dispatchEvent(new WheelEvent('wheel'));
       expect(service.markActiveView).toHaveBeenCalledWith('map');
+    });
+
+    it('clears the previous external focus when the user starts navigating the map', () => {
+      const view = component as unknown as {
+        focusedUris: ReadonlySet<string>;
+        applySelectionStyle: (uri: string | null) => void;
+      };
+      view.focusedUris = new Set([mockNode.uri]);
+      const restyle = vi.spyOn(view, 'applySelectionStyle');
+
+      fixture.nativeElement.querySelector('#map-container').dispatchEvent(new WheelEvent('wheel'));
+
+      expect(view.focusedUris.size).toBe(0);
+      expect(restyle).toHaveBeenCalled();
+      expect(TestBed.inject(SelectionService).clearSelection).not.toHaveBeenCalled();
     });
   });
 

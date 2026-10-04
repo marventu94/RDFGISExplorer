@@ -178,16 +178,20 @@ Four views are synchronized through `SelectionService` (BehaviorSubject):
 
 | View | Library | Filters by | Emits |
 |------|---------|------------|-------|
-| Table | AG Grid 35 (`rowSelection` with the object API ≥32.2) | Quick filter | select, focus |
+| Table | AG Grid 35 (`rowSelection` with the object API ≥32.2) | Quick filter | select |
 | Map | Leaflet 1.9 + markercluster + draw | GeoFilter (polygon) | select, focus |
 | Graph | Cytoscape 3.34 (cola+dagre) | Config-driven node cap (`limits.graphMaxNodes`, default 300; the selected node always enters the budget, and a runtime cap change rebuilds the view once). Top-N trimming and class coloring in pure `graph-view/graph-elements.ts` | select, focus |
 | Timeline | vis-timeline 8.x | TemporalFilter (range) | select, focus |
 
-**Coordinated View:** each view emits `setFocus(uris)` when panning/zooming.
+**Coordinated View:** map, graph, and timeline emit `setFocus(uris)` when panning/zooming.
 The others adjust their viewport. A global navbar toggle controls this
 behavior.
-The table participates through visible rows, scrolling and pagination. Click
-selection works independently of this toggle. `shared/selection/entity-context.ts`
+The table is auxiliary: it receives focus and highlights matching rows, but its
+scrolling, pagination, sorting, and quick filter never emit coordinated focus or
+activate the green view border. User navigation in the table releases the previous
+active view and clears coordinated styling in all four views, preserving explicit
+selection. Row clicks still select across views, independently
+of the coordination toggle. `shared/selection/entity-context.ts`
 resolves a directed row root (C1: listing) and its representations, including
 unprojected structural nodes. Shared cities/origins never pick an arbitrary owner.
 The table's primary-entity selector overrides ambiguous queries and is persisted

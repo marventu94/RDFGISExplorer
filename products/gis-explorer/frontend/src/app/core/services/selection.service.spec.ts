@@ -1110,6 +1110,20 @@ describe('SelectionService', () => {
       expect(service.getFocusSnapshot().uris.size).toBe(0);
     });
 
+    it('clears focus and releases the previous active view while retaining selection', () => {
+      const result = c1Fixture();
+      service.setQueryResult(result);
+      service.select(result.nodes.find((node) => node.uri === 'geometry-a')!, 'map');
+      service.markActiveView('map');
+      service.setFocus(['geometry-a'], 'map');
+
+      service.clearFocus();
+
+      expect(service.getActiveView()).toBeNull();
+      expect(service.getFocusSnapshot()).toMatchObject({ source: null, uris: new Set() });
+      expect(service.getSelectedNodeSnapshot().primaryUri).toBe('listing-a');
+    });
+
     it('keeps click selection available with Coordinated disabled', () => {
       const result = c1Fixture();
       service.setQueryResult(result);

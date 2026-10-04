@@ -549,7 +549,12 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     const markActive = () => {
       if (this.suppressTimer) clearTimeout(this.suppressTimer);
       this.suppressViewportEmit = false;
+      if (this.focusedUris.size) {
+        this.focusedUris = new Set();
+        this.applyFocusStyle();
+      }
       this.selectionService.markActiveView('timeline');
+      if (this.timeline) this.viewportChange$.next(this.timeline.getWindow());
     };
     this.markActiveListener = markActive;
     container.addEventListener('pointerdown', markActive, { capture: true });

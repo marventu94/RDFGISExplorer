@@ -1,6 +1,6 @@
 import { TranslatePipe } from '../../core/services/translate.pipe';
-import { Component, inject, signal, computed, effect, OnDestroy, HostBinding, HostListener } from '@angular/core';
-import { Subject, takeUntil, debounceTime } from 'rxjs';
+import { Component, inject, signal, computed, effect, OnDestroy, HostListener } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
 import type {
   ColDef,
@@ -68,10 +68,6 @@ export class TableViewComponent implements OnDestroy {
   /** Selección vigente, para repintarla cada vez que la grilla rehace sus filas. */
   private currentSelection: Selection | null = null;
   private focusedUris: ReadonlySet<string> = new Set();
-  private readonly viewportChange$ = new Subject<void>();
-  private suppressViewportEmit = false;
-  private suppressTimer?: ReturnType<typeof setTimeout>;
-  @HostBinding('class.is-active-view') activeView = false;
   readonly primaryVariable = this.selectionService.primaryVariable;
   readonly entityVariables = computed(() => {
     const result = this.queryResult();
@@ -80,6 +76,8 @@ export class TableViewComponent implements OnDestroy {
   });
   readonly rowClassRules = {
     'coordinated-focus': (params: RowClassParams) => this.rowInFocus(params.data),
+    'coordinated-muted': (params: RowClassParams) => !!params.data &&
+      this.focusedUris.size > 0 && !this.rowInFocus(params.data),
   };
 
   readonly queryResult = signal<QueryResult | null>(null);
@@ -204,33 +202,16 @@ export class TableViewComponent implements OnDestroy {
         // que moverle el scroll ni la página al usuario.
         this.applyRowSelection({ scroll: sel.source !== 'table' });
       });
-    this.selectionService.activeView$.pipe(takeUntil(this.destroy$)).subscribe((source) => {
-      this.activeView = source === 'table';
-    });
     this.selectionService.focus$.pipe(takeUntil(this.destroy$)).subscribe((focus) => {
-      if (focus.source === 'table' || (focus.source !== null && this.activeView)) return;
+      if (focus.source === 'table') return;
       this.focusedUris = focus.uris;
       this.applyCoordinatedFocus();
-    });
-    this.viewportChange$.pipe(takeUntil(this.destroy$), debounceTime(500)).subscribe(() => {
-      if (this.suppressViewportEmit || this.selectionService.getActiveView() !== 'table' || !this.gridApi) return;
-      const uris: string[] = [];
-      const first = this.gridApi.getFirstDisplayedRowIndex();
-      const last = this.gridApi.getLastDisplayedRowIndex();
-      for (let i = first; i <= last; i++) {
-        const row = this.gridApi.getDisplayedRowAtIndex(i)?.data as ResultBinding | undefined;
-        if (!row) continue;
-        const entity = this.selectionService.entityForRow(row);
-        uris.push(...(entity ? [entity.uri] : rowUris(row)));
-      }
-      this.selectionService.setFocus(uris, 'table');
     });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    if (this.suppressTimer) clearTimeout(this.suppressTimer);
   }
 
   onGridReady(event: GridReadyEvent): void {
@@ -288,14 +269,9 @@ export class TableViewComponent implements OnDestroy {
 
   @HostListener('pointerdown')
   @HostListener('wheel')
+  @HostListener('keydown')
   onUserNavigation(): void {
-    if (this.suppressTimer) clearTimeout(this.suppressTimer);
-    this.suppressViewportEmit = false;
-    this.selectionService.markActiveView('table');
-  }
-
-  onViewportChanged(): void {
-    if (!this.suppressViewportEmit) this.viewportChange$.next();
+    this.selectionService.clearFocus();
   }
 
   onPrimaryVariableChange(variable: string): void {
@@ -324,11 +300,8 @@ export class TableViewComponent implements OnDestroy {
     if (Math.floor(first / size) !== Math.floor(last / size)) return;
     const viewportRows = Math.max(1, api.getLastDisplayedRowIndex() - api.getFirstDisplayedRowIndex() + 1);
     if (last - first >= viewportRows) return;
-    this.suppressViewportEmit = true;
-    if (this.suppressTimer) clearTimeout(this.suppressTimer);
     api.paginationGoToPage(Math.floor(first / size));
     api.ensureIndexVisible(first, 'top');
-    this.suppressTimer = setTimeout(() => { this.suppressViewportEmit = false; }, 800);
   }
 
   onPageSizeChange(size: number): void {

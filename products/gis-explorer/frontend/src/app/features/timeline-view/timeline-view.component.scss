@@ -82,6 +82,7 @@
     border-color: var(--gis-accent);
 
     &:hover:not(:disabled) {
+      background: var(--gis-accent);
       filter: brightness(1.08);
     }
   }
