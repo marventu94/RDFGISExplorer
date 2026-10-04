@@ -1,7 +1,7 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import type { DiscoveryConnection, DiscoveryExample, DiscoveryFocus, DiscoveryStep, DiscoveryTerm } from '@rdfgis/contracts';
 import { PropertyGraphService } from '../../graph/property-graph.service';
-import { Node } from '../../graph/domain';
+import { Node, Property, Literal } from '../../graph/domain';
 import { discoveryFocus } from '../../graph/domain/discovery';
 import { RequestService } from '../../core/request.service';
 import { ToolService } from '../../tool/tool.service';
@@ -34,8 +34,12 @@ export class DiscoveryStateService {
     effect(() => {
       this.graph.revision();
       const selected = this.graph.selected();
+      const exploring = this.tools.active() === 'discovery';
       untracked(() => {
-        if (selected instanceof Node && this.tools.active() === 'discovery') this.selectNode(selected);
+        const node = selected instanceof Node ? selected
+          : selected instanceof Property ? selected.parentNode
+          : selected instanceof Literal ? selected.parent.parentNode : null;
+        if (node && exploring) this.selectNode(node);
         else if (this.source() && !this.graph.nodes().includes(this.source()!)) this.clear();
       });
     });

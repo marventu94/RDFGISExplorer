@@ -36,6 +36,9 @@ import { getTheme, onThemeChange } from '@rdfgis/platform-bridge';
 cytoscape.use(edgehandles);
 cytoscape.use(contextMenus);
 
+// Leave room around the first search result instead of enlarging it to fill the canvas.
+const DEFAULT_CANVAS_ZOOM = 0.85;
+
 /**
  * `<canvas-graph>` is the cytoscape.js-based visual canvas for the property graph.
  *
@@ -84,6 +87,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       elements: this.computeElements(),
       style: canvasStyles(getTheme() === 'dark'),
       layout: { name: 'preset' },
+      zoom: DEFAULT_CANVAS_ZOOM,
       // No pasar wheelSensitivity: el default ya es 1 y Cytoscape >= 3.31
       // normaliza el scroll por deltaMode (fix para Firefox/Linux integrado).
       // Definir la opción, incluso en 1.0, solo dispara el warning de consola.
@@ -255,6 +259,10 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
     if (!viewport) {
       if (this.cy.nodes('[kind = "node"]').nonempty()) {
         this.cy.fit(this.cy.elements(), 40);
+        if (this.cy.zoom() > DEFAULT_CANVAS_ZOOM) {
+          this.cy.zoom(DEFAULT_CANVAS_ZOOM);
+          this.cy.center(this.cy.elements());
+        }
       }
       return;
     }
@@ -366,7 +374,7 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       if (target !== this.cy) {
         const domain = target.data('domain') as RDFResource | undefined;
         if (domain) {
-          this.graph.setSelected(domain);
+          this.selectInPlace(domain);
           if (domain.isVariable()) {
             this.requestTool('edit', domain);
           }
@@ -399,10 +407,21 @@ export class CanvasGraphComponent implements OnInit, OnDestroy {
       if (target !== this.cy) {
         const domain = target.data('domain') as RDFResource | undefined;
         if (domain) {
-          this.graph.setSelected(domain);
+          this.selectInPlace(domain);
         }
       }
     });
+  }
+
+  private selectInPlace(resource: RDFResource): void {
+    // Selection refreshes the graph and may open the editor. Preserve the
+    // current camera before either operation can trigger another auto-fit.
+    this.autoFit = false;
+    this.graph.viewport.set({
+      zoom: this.cy.zoom(),
+      pan: { ...this.cy.pan() },
+    });
+    this.graph.setSelected(resource);
   }
 
   /* --- Context menu handlers --- */

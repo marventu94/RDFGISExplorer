@@ -1,200 +1,143 @@
 @if (selected(); as sel) {
-  <h3 class="ta-center ell">{{ 'Editar' | translate }} {{ sel.variable.toString() }} {{ isVariable ? '' : '(const)' }}</h3>
-
-  <ul class="nav nav-tabs nav-justified edit-tabs">
-    <li class="nav-item clickable">
-      <div class="nav-link" [class.active]="isVariable" (click)="mkVariable()">
-        <input type="checkbox" [checked]="isVariable" />
-        <span class="ml-1">{{ 'Variable' | translate }}</span>
-      </div>
-    </li>
-    <li class="nav-item clickable">
-      <div class="nav-link" [class.active]="!isVariable" [class.tab-hl]="added > 0" (click)="mkConst()">
-        <input type="checkbox" [checked]="isConst" />
-        <span class="ml-1">{{ 'Constraint' | translate }}</span>
-        @if (added > 0) {
-          <b class="ml-2">[+{{ added }}]</b>
-        }
-      </div>
-    </li>
-  </ul>
-
+  <header class="panel-heading">
+    <h3>{{ 'Editar' | translate }}</h3><code>{{ sel.variable.toString() }}</code>
+  </header>
+  <div class="mode-switch" role="group" [attr.aria-label]="'Editar' | translate">
+    <button type="button" [class.active]="isVariable" [attr.aria-pressed]="isVariable" (click)="mkVariable()">{{ 'Variable' | translate }}</button>
+    <button type="button" [class.active]="!isVariable" [attr.aria-pressed]="!isVariable" (click)="mkConst()">
+      {{ 'Restricción' | translate }}
+    </button>
+  </div>
   @if (!isVariable) {
-    <div class="constraint-section">
-      <div class="custom-container-title no-select mt-2 active">{{ 'Constraints' | translate }}</div>
-      <div class="custom-container-content active">
-        <div class="input-group input-group-sm mt-1 mb-1">
-          <input class="form-control" [type]="newValueType" [placeholder]="newValuePlaceholder" [(ngModel)]="newValue" />
-          <button id="edit-button-add" class="btn btn-outline-secondary btn-sm" type="button" (click)="addValue()">{{ 'add' | translate }}</button>
-        </div>
-        @if (!sel.hasUris()) {
-          <div class="alert alert-danger alert-sm mb-1">{{ 'Para usar este recurso como restricción necesitás agregar al menos un valor' | translate }}</div>
-        }
+    <section class="edit-card">
+      <h4>{{ 'Restricciones' | translate }}</h4>
+      <form novalidate class="value-entry" (submit)="addValue(); $event.preventDefault()">
+        <input [type]="newValueType" name="newValue" [placeholder]="newValuePlaceholder" [(ngModel)]="newValue"
+          [attr.aria-label]="'Agregar valor' | translate" />
+        <button id="edit-button-add" class="icon-button primary" type="submit" [disabled]="!newValue"
+          [attr.title]="'Agregar valor' | translate" [attr.aria-label]="'Agregar valor' | translate">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+      </form>
+      @if (!sel.hasUris()) {
+        <p class="notice warning">{{ 'Para usar este recurso como restricción necesitás agregar al menos un valor' | translate }}</p>
+      }
+      <div class="value-list">
         @for (value of sel.uris; track value) {
-          <div class="row uri-row">
-            <div class="col-md-12">
-              <span class="ell uri-value">
-                @if (!isLiteral) {
-                  <a [title]="value" (click)="$event.preventDefault()">{{ getLabel(value) }}</a>
-                }
-                @if (isLiteral) {
-                  <span>{{ value }}</span>
-                }
-              </span>
-              <span class="clickable pull-right" (click)="rmValue(value)">&#128465;</span>
-            </div>
+          <div class="value-row">
+            <span class="value-text" [title]="value">{{ isLiteral ? value : getLabel(value) }}</span>
+            <button class="icon-button" type="button" (click)="rmValue(value)"
+              [attr.title]="'Quitar valor' | translate" [attr.aria-label]="'Quitar valor' | translate">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" /></svg>
+            </button>
           </div>
         }
       </div>
       @if (selIsProperty()) {
-        <div class="form-check form-check-inline mt-1">
-          <input class="form-check-input" id="prop-star" type="checkbox" [checked]="sel.star" (change)="onStarChange($event)" />
-          <label class="form-check-label" for="prop-star">{{ 'Wildcard property' | translate }}</label>
-        </div>
-        <div class="form-check form-check-inline mt-1">
-          <input class="form-check-input" id="prop-optional" type="checkbox" [checked]="sel.optional" (change)="onOptionalChange($event)" />
-          <label class="form-check-label" for="prop-optional">OPTIONAL</label>
+        <div class="property-options">
+          <label class="toggle-row" for="prop-star"><span>{{ 'Wildcard property' | translate }}</span>
+            <input id="prop-star" class="switch" role="switch" type="checkbox" [checked]="sel.star" (change)="onStarChange($event)" />
+          </label>
+          <label class="toggle-row" for="prop-optional"><span>OPTIONAL</span>
+            <input id="prop-optional" class="switch" role="switch" type="checkbox" [checked]="sel.optional" (change)="onOptionalChange($event)" />
+          </label>
         </div>
       }
-    </div>
+    </section>
   }
-
   @if (isVariable) {
-    <div class="variable-section mt-3">
-      <div class="form-row">
-        <div class="input-group col-md-12">
-          <span class="input-group-text">{{ 'Variable name' | translate }}</span>
-          <span class="edit-var-name-prefix">?</span>
-          <input id="edit-var-name" class="form-control" type="text" autocomplete="off"
-            [ngModel]="sel.variable.alias"
-            (ngModelChange)="onAliasChange($event)"
-            [placeholder]="sel.variable.id" />
-        </div>
+    <section class="edit-card">
+      <label class="field-label" for="edit-var-name">{{ 'Variable name' | translate }}</label>
+      <div class="variable-input">
+        <span aria-hidden="true">?</span>
+        <input id="edit-var-name" type="text" autocomplete="off" [ngModel]="sel.variable.alias"
+          (ngModelChange)="onAliasChange($event)" [placeholder]="sel.variable.id" />
       </div>
-
-      <div class="form-row mt-2">
-        <div class="input-group" id="edit-filter-group">
-          <span class="input-group-text">{{ 'Possible results' | translate }}</span>
-          <input id="edit-filter-results" class="form-control" type="text" autocomplete="off"
-            [ngModel]="resultFilterValue" (ngModelChange)="resultFilterValue = $event; onFilterValueChange()"
-            [disabled]="resultFilterLoading()" />
-          <span class="input-group-text result-status" [class.loading]="resultFilterLoading()">
-            @if (resultFilterLoading()) {
-              <span class="edit-spinner" role="status" [attr.aria-label]="'Loading...' | translate"></span>
-            } @else {
-              @if (results().length === 0) {
-                &#9888;
-              } @else {
-                &#10003;
-              }
-            }
-          </span>
-        </div>
+    </section>
+    <section class="edit-card">
+      <label class="field-label" for="edit-filter-results">{{ 'Possible results' | translate }}</label>
+      <div class="result-search">
+        <input id="edit-filter-results" type="search" autocomplete="off" [ngModel]="resultFilterValue"
+          (ngModelChange)="resultFilterValue = $event; onFilterValueChange()" [disabled]="resultFilterLoading()" />
+        @if (resultFilterLoading()) { <span class="edit-spinner" role="status" [attr.aria-label]="'Loading...' | translate"></span> }
       </div>
-
-      <div class="custom-container-content active">
-        @if (loadError(); as err) {
-          <div class="alert alert-danger alert-sm mt-2 mb-1">{{ err }}</div>
-        }
-        @if (resultFilterLoading() && results().length === 0) {
-          <div class="result-loading-msg mt-2 mb-1">{{ 'Running query...' | translate }}</div>
-        }
-        @if (!resultFilterLoading() && results().length === 0) {
-          <div class="alert alert-warning alert-sm mt-2 mb-1">{{ 'Currently this variable has no partial results!' | translate }}</div>
-        }
+      @if (loadError(); as err) { <p class="notice error" role="alert">{{ err }}</p> }
+      @if (resultFilterLoading() && results().length === 0) { <p class="notice" role="status">{{ 'Running query...' | translate }}</p> }
+      @if (!resultFilterLoading() && !loadError() && results().length === 0) {
+        <p class="notice">{{ 'Currently this variable has no partial results!' | translate }}</p>
+      }
+      <div class="value-list">
         @for (elem of results(); track elem.value) {
-          <div class="row result-row" [title]="elem.value">
-            <div class="col-md-12">
-              <span class="ell result-value">
-                <a (click)="$event.preventDefault()">{{ getLabel(elem.value) }}</a>
-              </span>
-              <span class="pull-right clickable" (click)="addValue(elem.value)">&#10133;</span>
-            </div>
+          <div class="value-row">
+            <span class="value-text" [title]="elem.value">{{ getLabel(elem.value) }}</span>
+            <button class="icon-button" type="button" (click)="addValue(elem.value)"
+              [attr.title]="'Agregar valor' | translate" [attr.aria-label]="'Agregar valor' | translate">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
           </div>
         }
-        <div class="result-footer mt-1">
-          @if (results().length > 0) {
-            <span class="result-count">{{ 'Mostrando' | translate }} {{ results().length }} {{ 'resultados' | translate }}</span>
-          }
-          @if (hasMoreResults() || resultFilterLoading()) {
-            <button class="load-more-btn"
-              [disabled]="resultFilterLoading()"
-              (click)="loadMoreResults()">
-              @if (resultFilterLoading()) {
-                <span class="edit-spinner edit-spinner-sm" role="status"></span>
-                <span class="ml-1">{{ 'Loading...' | translate }}</span>
-              } @else {
-                Load more results
-              }
-            </button>
-          }
-        </div>
       </div>
-
-      <div class="custom-container-title no-select mt-2 clickable" [class.active]="showFilters" (click)="showFilters = !showFilters">
-        Filters
-        @if (sel.variable.filters.length > 0) {
-          <span class="ml-1">[{{ sel.variable.filters.length }}]</span>
+      <div class="result-footer">
+        @if (results().length > 0) { <small>{{ 'Mostrando' | translate }} {{ results().length }} {{ 'resultados' | translate }}</small> }
+        @if (hasMoreResults() || resultFilterLoading()) {
+          <button class="load-more-btn" type="button" [disabled]="resultFilterLoading()" (click)="loadMoreResults()">
+            {{ (resultFilterLoading() ? 'Loading...' : 'Cargar más resultados') | translate }}
+          </button>
         }
-        <span class="pull-right">{{ showFilters ? '&#9650;' : '&#9660;' }}</span>
       </div>
-
+    </section>
+    <section class="edit-card filters-card">
+      <button class="section-toggle" type="button" (click)="showFilters = !showFilters"
+        [attr.aria-expanded]="showFilters" aria-controls="edit-filters">
+        <svg class="chevron" [class.expanded]="showFilters" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+        <strong>{{ 'Filtros' | translate }}</strong>
+        @if (sel.variable.filters.length > 0) { <span class="count-badge">{{ sel.variable.filters.length }}</span> }
+      </button>
       @if (showFilters) {
-        <div class="custom-container-content active">
-          <div class="form-row mt-1">
-            <div class="input-group input-group-sm">
-              <select class="custom-select" [ngModel]="newFilterType" (ngModelChange)="onNewFilterTypeChange($event)">
-                <option value="">{{ '-- Select a new filter --' | translate }}</option>
-                @for (item of getFilterTypeOptions(); track item.key) {
-                  <option [value]="item.key">{{ item.metadata.name }}</option>
-                }
-              </select>
-              @for (field of newFilterFields; track field.key) {
+        <div id="edit-filters" class="filter-content">
+          <div class="filter-editor new-filter">
+            <select [ngModel]="newFilterType" (ngModelChange)="onNewFilterTypeChange($event)" [attr.aria-label]="'Filtros' | translate">
+              <option value="">{{ '-- Select a new filter --' | translate }}</option>
+              @for (item of getFilterTypeOptions(); track item.key) { <option [value]="item.key">{{ item.metadata.name }}</option> }
+            </select>
+            @for (field of newFilterFields; track field.key) {
+              <label class="filter-field"><span>{{ field.key }}</span>
                 @if (field.meta.type === 'select') {
-                  <select class="custom-select" [ngModel]="field.value" (ngModelChange)="updateNewFilterData(field.key, $event)">
-                    @for (opt of field.meta.options ?? []; track opt.value) {
-                      <option [value]="opt.value">{{ opt.label }}</option>
-                    }
+                  <select [ngModel]="field.value" (ngModelChange)="updateNewFilterData(field.key, $event)">
+                    @for (opt of field.meta.options ?? []; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
                   </select>
                 } @else {
-                  <input class="form-control" [type]="field.meta.type" autocomplete="off"
-                    [placeholder]="field.key"
-                    [ngModel]="field.value"
-                    (ngModelChange)="updateNewFilterData(field.key, $event)" />
+                  <input [type]="field.meta.type" autocomplete="off" [ngModel]="field.value" (ngModelChange)="updateNewFilterData(field.key, $event)" />
                 }
-              }
-              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="newFilter()">{{ 'Add' | translate }}</button>
-            </div>
+              </label>
+            }
+            <button class="primary" type="button" [disabled]="!newFilterType" (click)="newFilter()">{{ 'Add' | translate }}</button>
           </div>
-
-          @for (ef of existingFilters; track ef) {
-            <div class="form-row mt-1">
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">{{ ef.typeName }}</span>
-                @for (field of ef.fields; track field.key) {
+          @for (ef of existingFilters; track ef.filter) {
+            <div class="filter-editor">
+              <div class="filter-heading"><strong>{{ ef.typeName }}</strong>
+                <button class="icon-button" type="button" (click)="rmFilter(ef.filter)"
+                  [attr.title]="'Quitar filtro' | translate" [attr.aria-label]="'Quitar filtro' | translate">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" /></svg>
+                </button>
+              </div>
+              @for (field of ef.fields; track field.key) {
+                <label class="filter-field"><span>{{ field.key }}</span>
                   @if (field.meta.type === 'select') {
-                    <select class="custom-select" [ngModel]="field.value" (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)">
-                      @for (opt of field.meta.options ?? []; track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
-                      }
+                    <select [ngModel]="field.value" (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)">
+                      @for (opt of field.meta.options ?? []; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
                     </select>
                   } @else {
-                    <input class="form-control"
-                      [type]="field.meta.type"
-                      autocomplete="off"
-                      [placeholder]="field.key"
-                      [ngModel]="field.value"
-                      (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
+                    <input [type]="field.meta.type" autocomplete="off" [ngModel]="field.value" (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
                   }
-                }
-                <div class="input-group-append clickable" (click)="rmFilter(ef.filter)">
-                  <span class="input-group-text">&#128465;</span>
-                </div>
-              </div>
+                </label>
+              }
             </div>
           }
         </div>
       }
-    </div>
+    </section>
   }
+} @else {
+  <p class="notice">{{ 'Seleccioná un elemento del canvas para editarlo.' | translate }}</p>
 }

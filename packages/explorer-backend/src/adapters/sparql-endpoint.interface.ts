@@ -1,4 +1,5 @@
 import { QueryResult } from '../shared/dto/query-result.dto';
+import type { DiscoveryCatalog, DiscoveryKind } from '@rdfgis/contracts';
 
 export interface ExecuteOptions {
   timeoutMs: number;
@@ -10,6 +11,18 @@ export interface ExecuteOptions {
    */
   raw?: boolean;
   signal?: AbortSignal;
+  /** Discovery disables automatic retries to avoid amplifying endpoint overload. */
+  maxRetries?: number;
+  /** Hold discovery queue ownership until a bounded server request finishes. */
+  waitForServerOnCancel?: boolean;
+}
+
+export interface CatalogSearchOptions {
+  limit: number;
+  sampleSize: number;
+  offset: number;
+  timeoutMs: number;
+  signal?: AbortSignal;
 }
 
 export interface EntitySearchResult {
@@ -20,6 +33,10 @@ export interface EntitySearchResult {
 
 export interface EntitySearchOptions {
   limit: number;
+  offset?: number;
+  waitForServerOnCancel?: boolean;
+  signal?: AbortSignal;
+  timeoutMs?: number;
   /**
    * IRI de clase por la que filtrar. Ya viene validada por la capa HTTP: el
    * adapter la interpola en la query, asi que no acepta nada que no sea un IRI.
@@ -64,6 +81,14 @@ export interface EndpointSearchClass {
 export interface EndpointDescriptor {
   /** El endpoint entiende el servicio `wikibase:label`. */
   supportsWikibaseLabel: boolean;
+  discovery?: {
+    classPredicate: string;
+    subclassPredicate?: string;
+    /** Restrict exploration to application predicates (e.g. Wikidata direct claims). */
+    predicateNamespace?: string;
+    /** Resolve direct-claim property names through their Wikidata entities. */
+    wikidataLabels?: boolean;
+  };
   search: EndpointSearchDescriptor;
   describe: EndpointDescribeDescriptor;
   /** Clase preseleccionada en el buscador de entidades. */
@@ -83,6 +108,12 @@ export interface SparqlEndpoint {
     keyword: string,
     opts: EntitySearchOptions,
   ): Promise<EntitySearchResult[]>;
+  /** Optional indexed catalogue search; generic resources reuse searchEntities. */
+  searchCatalog?(
+    kind: DiscoveryKind,
+    text: string,
+    options: CatalogSearchOptions,
+  ): Promise<DiscoveryCatalog>;
   /** Capacidades y vocabulario de este backend, para `GET /api/config`. */
   describeEndpoint(): EndpointDescriptor;
   /** Identificador configurado para el endpoint SPARQL. */

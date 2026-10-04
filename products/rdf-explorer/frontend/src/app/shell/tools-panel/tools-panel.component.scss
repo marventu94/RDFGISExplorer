@@ -33,7 +33,7 @@
 .tool-btn:hover {
   background-color: var(--explorer-toolbar-btn-hover-bg, var(--color-bg-hover, #f1f3f5));
 }
-.discovery-btn { width: auto; padding-inline: 12px; }
+.tool-btn svg { width: 19px; height: 19px; }
 
 .tool-btn.active {
   background-color: var(--color-accent, var(--explorer-link, #0d6efd));

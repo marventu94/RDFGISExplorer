@@ -1,14 +1,13 @@
 import { Injectable, signal, inject, effect, untracked } from '@angular/core';
 import { GraphInteractionService } from '../graph/canvas-graph/interaction.service';
-import { DescribeService } from '../tools/describe-panel/describe.service';
+import { Node } from '../graph/domain';
 import { PropertyGraphService } from '../graph/property-graph.service';
 
-export type ToolName = 'describe' | 'edit' | 'sparql' | 'log' | 'discovery';
+export type ToolName = 'edit' | 'sparql' | 'discovery';
 
 @Injectable({ providedIn: 'root' })
 export class ToolService {
   private readonly interaction = inject(GraphInteractionService);
-  private readonly describeService = inject(DescribeService);
   private readonly graph = inject(PropertyGraphService);
   readonly active = signal<ToolName | 'none'>('none');
 
@@ -16,21 +15,16 @@ export class ToolService {
     effect(() => {
       const req = this.interaction.requestedTool();
       if (!req) return;
-      this.active.set(req.tool);
-      if (req.tool === 'describe') {
-        const uri = req.target.getUri();
-        if (uri) this.describeService.describe(uri, req.target);
-      }
+      this.active.set(req.tool === 'describe' ? 'discovery' : req.tool);
+      untracked(() => { if (this.graph.selected() !== req.target) this.graph.setSelected(req.target); });
     });
 
     effect(() => {
       const selected = this.graph.selected();
       if (!selected) return;
-      if (untracked(() => this.active()) === 'discovery') return;
-      const uri = selected.getUri();
-      if (!uri) return;
-      this.active.set('describe');
-      this.describeService.describe(uri, selected);
+      if (!(selected instanceof Node) && !selected.getUri()) return;
+      const active = untracked(() => this.active());
+      if (active === 'none' || active === 'discovery') this.active.set('discovery');
     });
   }
 

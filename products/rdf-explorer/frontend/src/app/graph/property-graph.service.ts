@@ -28,6 +28,29 @@ export class PropertyGraphService {
   readonly viewport = signal<{ zoom: number; pan: { x: number; y: number } } | null>(null);
 
   private readonly graphRef: PropertyGraph;
+  private dragSequence = 0;
+  private discoveryDrag?: { token: string; source: Node; step: DiscoveryStep; example?: DiscoveryExample };
+
+  prepareConnectionDrag(source: Node, step: DiscoveryStep, example?: DiscoveryExample): string {
+    const token = String(++this.dragSequence);
+    this.discoveryDrag = { token, source, step: { ...step }, example: example ? { ...example } : undefined };
+    return token;
+  }
+
+  replaceConstraintValue(resource: RDFResource, value: string): void {
+    for (const previous of [...resource.uris]) {
+      if (resource instanceof Node && this.graphRef.uriToNode.get(previous) === resource) {
+        this.graphRef.unregisterUriNode(previous);
+      }
+      resource.removeUri(previous);
+    }
+    resource.cur = -1;
+    resource.addUri(value);
+    resource.mkConst();
+    this.refresh();
+  }
+
+  clearConnectionDrag(): void { this.discoveryDrag = undefined; }
 
   readonly nodes = computed<Node[]>(() => {
     this.revision();
@@ -130,7 +153,16 @@ export class PropertyGraphService {
   }
 
   applyDrop(payload: DropPayload, at: { x: number; y: number }): void {
-    this.graphRef.applyDrop(payload, at);
+    if (payload.kind === 'connection') {
+      const drag = this.discoveryDrag;
+      this.clearConnectionDrag();
+      if (!drag || drag.token !== payload.token || !this.graphRef.nodes.includes(drag.source)) return;
+      const previousNodes = new Set(this.graphRef.nodes);
+      const target = addDiscoveryPath(this.graphRef, drag.source, [drag.step], false, drag.example);
+      if (target instanceof Node && !previousNodes.has(target)) target.setPosition(at.x, at.y);
+    } else {
+      this.graphRef.applyDrop(payload, at);
+    }
     this.bump();
   }
 

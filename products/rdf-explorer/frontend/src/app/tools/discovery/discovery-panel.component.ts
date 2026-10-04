@@ -1,12 +1,11 @@
 import { Component, computed, effect, inject, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import type { DiscoveryConnections, DiscoveryConnection, DiscoveryPaths, DiscoveryTerm, DiscoveryStep } from '@rdfgis/contracts';
+import type { DiscoveryConnections, DiscoveryConnection, DiscoveryExample } from '@rdfgis/contracts';
 import { TranslatePipe } from '../../core/translate.pipe';
+import { RequestService } from '../../core/request.service';
 import { DiscoveryApiService } from './discovery-api.service';
 import { DiscoveryStateService } from './discovery-state.service';
-import { DescribeService } from '../describe-panel/describe.service';
-import { ToolService } from '../../tool/tool.service';
 
 @Component({
   selector: 'app-discovery-panel', imports: [FormsModule, TranslatePipe],
@@ -15,35 +14,26 @@ import { ToolService } from '../../tool/tool.service';
 export class DiscoveryPanelComponent implements OnDestroy {
   readonly state = inject(DiscoveryStateService);
   private readonly api = inject(DiscoveryApiService);
-  private readonly describe = inject(DescribeService);
-  private readonly tools = inject(ToolService);
+  private readonly request = inject(RequestService);
   readonly data = signal<DiscoveryConnections | null>(null);
   readonly busy = signal(false);
   readonly error = signal(false);
   readonly filter = signal('');
-  readonly direction = signal<'all' | 'out' | 'in'>('all');
-  readonly connections = computed(() => (this.data()?.connections ?? []).filter(c =>
-    (this.direction() === 'all' || c.direction === this.direction())
-    && `${c.predicate} ${c.targetClass ?? ''} ${c.datatype ?? ''}`.toLowerCase().includes(this.filter().toLowerCase())));
-  readonly targets = signal<DiscoveryTerm[]>([]);
-  readonly paths = signal<DiscoveryPaths | null>(null);
-  readonly pathBusy = signal(false);
-  readonly pathError = signal(false);
-  readonly targetBusy = signal(false);
-  readonly targetError = signal(false);
-  readonly targetTruncated = signal(false);
-  targetText = '';
-  targetKind: 'class' | 'property' = 'class';
-  readonly values: Record<string, string> = {};
+  readonly concrete = computed(() => !!this.state.origin()?.uri);
+  readonly connections = computed(() => {
+    const text = this.filter().trim().toLowerCase();
+    return (this.data()?.connections ?? []).filter(connection =>
+      [connection.label, connection.predicate, connection.targetLabel, connection.targetClass,
+        connection.datatype, ...connection.examples.flatMap(example => [example.label, example.value])]
+        .filter(Boolean).join(' ').toLowerCase().includes(text))
+      .sort((a, b) => Number(a.direction === 'in') - Number(b.direction === 'in'));
+  });
   private connectionSub?: Subscription;
-  private targetSub?: Subscription;
-  private pathSub?: Subscription;
   constructor() {
-    effect(() => { const focus = this.state.focus(); this.load(focus); });
+    effect(() => { const focus = this.state.focus(); this.filter.set(''); this.load(focus); });
   }
   private load(focus = this.state.focus()): void {
-    this.connectionSub?.unsubscribe(); this.pathSub?.unsubscribe();
-    this.paths.set(null); this.pathBusy.set(false); this.pathError.set(false);
+    this.connectionSub?.unsubscribe();
     this.data.set(null); this.error.set(false); this.busy.set(!!focus);
     if (!focus) return;
     this.connectionSub = this.api.connections(focus).subscribe({
@@ -52,30 +42,31 @@ export class DiscoveryPanelComponent implements OnDestroy {
     });
   }
   retry(): void { this.load(); }
-  local(uri: string): string { return uri.split(/[/#]/).pop() || uri; }
-  key(c: DiscoveryConnection): string { return JSON.stringify([c.predicate, c.direction, c.targetClass, c.datatype, c.examples[0]?.kind, c.examples[0]?.lang]); }
-  filterValue(c: DiscoveryConnection): void {
-    const value = this.values[this.key(c)];
-    if (value === undefined || value === '') return;
-    this.state.add([c], false, { kind: 'literal', value, datatype: c.datatype });
+  key(connection: DiscoveryConnection): string {
+    return JSON.stringify([connection.predicate, connection.direction, connection.targetClass, connection.datatype]);
   }
-  inspect(uri: string): void { this.describe.describe(uri); this.tools.active.set('describe'); }
-  searchTargets(): void {
-    this.targetSub?.unsubscribe(); this.targets.set([]); this.targetError.set(false); this.targetBusy.set(true);
-    this.targetSub = this.api.catalog(this.targetKind, this.targetText.trim()).subscribe({
-      next: data => { this.targets.set(data.items); this.targetTruncated.set(data.truncated); this.targetBusy.set(false); },
-      error: () => { this.targetError.set(true); this.targetBusy.set(false); },
-    });
+  exampleLabel(example: DiscoveryExample): string {
+    if (example.kind === 'bnode') return 'Nodo anónimo';
+    return example.label ?? this.request.getLabel(example.value) ?? example.value;
   }
-  findPaths(term: DiscoveryTerm): void {
-    const focus = this.state.focus();
-    if (!focus || term.kind === 'resource') return;
-    this.pathSub?.unsubscribe(); this.paths.set(null); this.pathBusy.set(true); this.pathError.set(false);
-    this.pathSub = this.api.paths(focus, term.uri, term.kind).subscribe({
-      next: data => { this.paths.set(data); this.pathBusy.set(false); },
-      error: () => { this.pathError.set(true); this.pathBusy.set(false); },
-    });
+  dragConnection(event: DragEvent, connection: DiscoveryConnection, example?: DiscoveryExample): void {
+    // A concrete-resource card represents its displayed value, so dragging the
+    // card must carry the same constraint as dragging the value chip.
+    if (!example && this.concrete()) {
+      const displayed = connection.examples[0];
+      if (displayed?.kind !== 'bnode') example = displayed;
+    }
+    const source = this.state.source();
+    if (!source || !event.dataTransfer || example?.kind === 'bnode') { event.preventDefault(); return; }
+    this.request.setLabel(connection.predicate, connection.label);
+    if (connection.targetClass && connection.targetLabel) this.request.setLabel(connection.targetClass, connection.targetLabel);
+    if (example?.kind === 'uri' && example.label) this.request.setLabel(example.value, example.label);
+    const token = this.state.graph.prepareConnectionDrag(source, this.state.asStep(connection), example);
+    event.dataTransfer.setData('special', 'connection');
+    event.dataTransfer.setData('connection', token);
+    event.dataTransfer.effectAllowed = 'copy';
+    event.stopPropagation();
   }
-  pathText(path: DiscoveryStep[]): string { return path.map(s => `${s.direction === 'out' ? '→' : '←'} ${this.local(s.predicate)}${s.targetClass ? ' · ' + this.local(s.targetClass) : ''}`).join(' / '); }
-  ngOnDestroy(): void { this.connectionSub?.unsubscribe(); this.targetSub?.unsubscribe(); this.pathSub?.unsubscribe(); }
+  dragEnd(): void { this.state.graph.clearConnectionDrag(); }
+  ngOnDestroy(): void { this.connectionSub?.unsubscribe(); this.dragEnd(); }
 }
