@@ -150,6 +150,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private expandedSuperEdgeIds = new Set<string>();
   private expandedMotifIds = new Set<string>();
   private focusPins = new Set<string>();
+  private layoutRunning = false;
+  private pendingSelectionFocusUri: string | null = null;
   private readonly resultDetailLevels: ReadonlyArray<{
     value: GraphDetailLevel;
     label: UiTextKey;
@@ -335,6 +337,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.selectionService.selectedNode$
       .pipe(takeUntil(this.destroy$))
       .subscribe((sel: Selection) => {
+        this.pendingSelectionFocusUri = null;
         this.selectedUri = sel.node?.uri ?? null;
         this.selectedLabel = sel.node?.label ?? '';
         if (sel.node && this.isEntityMode) {
@@ -601,6 +604,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.shouldFitAfterLayout = true;
     }
 
+    this.cy.on('layoutstart', () => { this.layoutRunning = true; });
     this.cy.on('layoutstop', () => this.onLayoutStop());
     this.bindGraphEvents();
     // Calcular primero la geometría final evita que los componentes pequeños
@@ -610,6 +614,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   private onLayoutStop(): void {
     if (!this.cy) return;
+    this.layoutRunning = false;
     // El acomodo manual gana sobre lo que haya decidido el layout.
     this.applyManualPositions();
     if (this.pendingCamera) {
@@ -618,13 +623,16 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.suppressViewport();
       this.cy.zoom(camera.zoom);
       this.cy.pan(camera.pan);
-      return;
-    }
-    if (this.shouldFitAfterLayout) {
+    } else if (this.shouldFitAfterLayout) {
       this.shouldFitAfterLayout = false;
       this.suppressViewport();
       this.cy.fit(undefined, 50);
     }
+    // A selected node can enter through the drawing cap or batch pinning.
+    // Animated layouts move it after insertion; frame its final position.
+    const selectedUri = this.pendingSelectionFocusUri;
+    this.pendingSelectionFocusUri = null;
+    if (selectedUri) this.panToNode(selectedUri);
   }
 
   private destroyGraph(): void {
@@ -636,6 +644,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.cy = undefined;
     this.lastTopologyKey = null;
     this.pendingCamera = undefined;
+    this.layoutRunning = false;
+    this.pendingSelectionFocusUri = null;
   }
 
   /** Firma estable del conjunto de elementos: si no cambia, la topología es la misma. */
@@ -1408,6 +1418,10 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     if (!this.cy) return;
     const node = this.cy.getElementById(uri);
     if (node.empty()) return;
+    if (this.layoutRunning) {
+      this.pendingSelectionFocusUri = uri;
+      return;
+    }
     if (this.allInsideViewport(node) && this.cy.zoom() >= FOCUS_MIN_ZOOM) return;
 
     this.suppressViewport();
