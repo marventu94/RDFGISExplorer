@@ -14,6 +14,11 @@ describe('parseDropPayload', () => {
     expect(result).toEqual({ kind: 'example', exampleType: 'cats' });
   });
 
+  it('parses a class dropped from the unified search', () => {
+    expect(parseDropPayload(makeDataTransfer({ special: 'class', uri: 'urn:House' })))
+      .toEqual({ kind: 'class', uri: 'urn:House' });
+  });
+
   it('parses search drop', () => {
     const dt = makeDataTransfer({
       special: 'search',

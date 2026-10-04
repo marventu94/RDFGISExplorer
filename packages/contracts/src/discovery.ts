@@ -8,6 +8,8 @@ export interface DiscoveryTerm {
 }
 export interface DiscoveryCatalog {
   items: DiscoveryTerm[];
+  /** Preview over bounded statement samples; absence is not proof of absence. */
+  sampled?: boolean;
   truncated: boolean;
   nextOffset?: number;
 }
@@ -29,6 +31,7 @@ export interface DiscoveryFocus {
   steps?: DiscoveryStep[];
 }
 export interface DiscoveryExample {
+  label?: string;
   kind: 'uri' | 'bnode' | 'literal';
   value: string;
   datatype?: string;

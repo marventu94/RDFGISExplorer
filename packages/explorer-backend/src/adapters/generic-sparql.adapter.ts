@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { Generator, Parser } from 'sparqljs';
 import {
   SparqlEndpoint,
   ExecuteOptions,
@@ -50,6 +51,9 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
     const t0 = Date.now();
     const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
     const userAgent = this.resolveUserAgent();
+    const serverTimeoutParam =
+      process.env['SPARQL_SERVER_TIMEOUT_PARAM'] ??
+      (this.backendName === 'graphdb' ? 'timeout' : '');
 
     // La topología declarada por la consulta es la fuente de las aristas del grafo.
     // Si hay nodos intermedios sin proyectar (los bnodes de dirección, feature o
@@ -66,16 +70,30 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
         }
       : extractQueryTopology(query);
     const upstreamQuery = topology.rewritten ?? query;
+    const form = new URLSearchParams({ query: upstreamQuery });
+    if (serverTimeoutParam) {
+      // RDF4J/GraphDB accepts a per-query timeout in seconds. Give the server
+      // time to release its iterator before the HTTP deadline expires.
+      form.set(
+        serverTimeoutParam,
+        String(Math.max(1, Math.floor(timeoutMs / 1000) - 1)),
+      );
+    }
+    const deferCancellation =
+      !!serverTimeoutParam && !!opts.waitForServerOnCancel;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+    const onCallerAbort = () => {
+      if (!deferCancellation) controller.abort();
+    };
     if (opts.signal) {
       if (opts.signal.aborted) {
         clearTimeout(timer);
         controller.abort();
       } else {
-        opts.signal.addEventListener('abort', () => controller.abort(), {
+        opts.signal.addEventListener('abort', onCallerAbort, {
           once: true,
         });
       }
@@ -83,103 +101,114 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
 
     let lastErr: unknown;
 
-    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-      try {
-        const response = await axios.post<WikidataRawResponse>(
-          this.resolveEndpointUrl(),
-          new URLSearchParams({ query: upstreamQuery }),
-          {
-            headers: {
-              'User-Agent': userAgent,
-              Accept: 'application/sparql-results+json',
-              'Content-Type': 'application/x-www-form-urlencoded',
+    const retries = Math.min(
+      opts.maxRetries ?? RETRY_DELAYS_MS.length,
+      RETRY_DELAYS_MS.length,
+    );
+    try {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const response = await axios.post<WikidataRawResponse>(
+            this.resolveEndpointUrl(),
+            form,
+            {
+              headers: {
+                'User-Agent': userAgent,
+                Accept: 'application/sparql-results+json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              auth: this.resolveAuth(),
+              signal: controller.signal,
             },
-            auth: this.resolveAuth(),
-            signal: controller.signal,
-          },
-        );
-
-        clearTimeout(timer);
-
-        const rawBindings: WikidataRawBinding[] =
-          response.data?.results?.bindings ?? [];
-        const allVars: string[] = response.data?.head?.vars ?? [];
-
-        // Columnas que ve el usuario: las que pidió, sin los intermedios agregados.
-        const exposedVars: string[] = topology.projected
-          ? topology.projected.filter((v) => allVars.includes(v))
-          : allVars;
-
-        const truncated = opts.limit > 0 && rawBindings.length >= opts.limit;
-
-        // Filas completas (con intermedios) para armar el grafo...
-        const fullRows: ResultBinding[] = rawBindings
-          .slice(0, opts.limit)
-          .map((raw) => this.normalizeRow(raw, allVars));
-
-        // ...y filas recortadas a la proyección original para la tabla.
-        const bindings: ResultBinding[] = topology.rewritten
-          ? fullRows.map((row) => this.pickVariables(row, exposedVars))
-          : fullRows;
-
-        const { nodes, edges } = opts.raw
-          ? { nodes: [], edges: [] }
-          : this.buildGraph(fullRows, exposedVars, topology);
-
-        return {
-          variables: exposedVars,
-          bindings,
-          nodes,
-          edges,
-          meta: {
-            durationMs: Date.now() - t0,
-            truncated,
-            limitApplied: opts.limit,
-            backend: this.backendName,
-          },
-        };
-      } catch (err) {
-        clearTimeout(timer);
-
-        if (controller.signal.aborted) {
-          throw new TimeoutError(timeoutMs);
-        }
-
-        lastErr = err;
-
-        if (!this.isAxiosError(err)) {
-          throw err;
-        }
-
-        const status = err.response?.status ?? 0;
-        if (status === 429 && attempt < RETRY_DELAYS_MS.length) {
-          await this.delay(RETRY_DELAYS_MS[attempt]);
-          continue;
-        }
-        const upstreamBody = JSON.stringify(err.response?.data ?? {});
-        if (status === 429) {
-          throw new UpstreamError(
-            429,
-            `Retries exhausted (body: ${upstreamBody})`,
           );
-        }
-        if (status >= 500) {
+
+          clearTimeout(timer);
+          if (opts.signal?.aborted)
+            throw new DOMException('Request cancelled', 'AbortError');
+
+          const rawBindings: WikidataRawBinding[] =
+            response.data?.results?.bindings ?? [];
+          const allVars: string[] = response.data?.head?.vars ?? [];
+
+          // Columnas que ve el usuario: las que pidió, sin los intermedios agregados.
+          const exposedVars: string[] = topology.projected
+            ? topology.projected.filter((v) => allVars.includes(v))
+            : allVars;
+
+          const truncated = opts.limit > 0 && rawBindings.length >= opts.limit;
+
+          // Filas completas (con intermedios) para armar el grafo...
+          const fullRows: ResultBinding[] = rawBindings
+            .slice(0, opts.limit)
+            .map((raw) => this.normalizeRow(raw, allVars));
+
+          // ...y filas recortadas a la proyección original para la tabla.
+          const bindings: ResultBinding[] = topology.rewritten
+            ? fullRows.map((row) => this.pickVariables(row, exposedVars))
+            : fullRows;
+
+          const { nodes, edges } = opts.raw
+            ? { nodes: [], edges: [] }
+            : this.buildGraph(fullRows, exposedVars, topology);
+
+          return {
+            variables: exposedVars,
+            bindings,
+            nodes,
+            edges,
+            meta: {
+              durationMs: Date.now() - t0,
+              truncated,
+              limitApplied: opts.limit,
+              backend: this.backendName,
+            },
+          };
+        } catch (err) {
+          if (opts.signal?.aborted)
+            throw new DOMException('Request cancelled', 'AbortError');
+          if (controller.signal.aborted) {
+            throw new TimeoutError(timeoutMs);
+          }
+
+          lastErr = err;
+
+          if (!this.isAxiosError(err)) {
+            throw err;
+          }
+
+          const status = err.response?.status ?? 0;
+          if (status === 429 && attempt < retries) {
+            await this.delay(RETRY_DELAYS_MS[attempt]);
+            continue;
+          }
+          const upstreamBody = JSON.stringify(err.response?.data ?? {});
+          if (status === 429) {
+            throw new UpstreamError(
+              429,
+              `Retries exhausted (body: ${upstreamBody})`,
+            );
+          }
+          if (status >= 500) {
+            throw new UpstreamError(
+              status,
+              `${err.message} (body: ${upstreamBody})`,
+            );
+          }
           throw new UpstreamError(
             status,
             `${err.message} (body: ${upstreamBody})`,
           );
         }
-        throw new UpstreamError(
-          status,
-          `${err.message} (body: ${upstreamBody})`,
-        );
       }
-    }
 
-    if (lastErr instanceof UpstreamError) {
-      throw lastErr;
+      if (lastErr instanceof UpstreamError) {
+        throw lastErr;
+      }
+      throw new UpstreamError(0, 'Retries exhausted');
+    } finally {
+      clearTimeout(timer);
+      opts.signal?.removeEventListener('abort', onCallerAbort);
     }
-    throw new UpstreamError(0, 'Retries exhausted');
   }
 
   async getPredicates(): Promise<string[]> {
@@ -222,7 +251,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
   /**
    * Busqueda por texto contra un endpoint SPARQL generico: `regex` sobre los
    * labels. La query es configurable por `SPARQL_ENTITY_SEARCH_QUERY` con los
-   * placeholders `$keyword` y `$limit`; si se define una propia, el filtro de
+   * placeholders `$keyword`, `$limit` y opcionalmente `$offset`; si se define una propia, el filtro de
    * clase NO se inyecta (la plantilla manda).
    */
   async searchEntities(
@@ -245,27 +274,41 @@ LIMIT $limit`;
     // Forma funcion de replace: un keyword con `$&`/`$'` inyectaria patrones
     // de sustitucion si se pasara como string de reemplazo.
     const escapedKeyword = escapeSparqlLiteral(keyword);
+    const offset = opts.offset ?? 0;
+    const hasOffset = template.includes('$offset');
     const query = template
       .replace(/\$keyword/g, () => escapedKeyword)
-      .replace(/\$limit/g, () => String(opts.limit));
+      .replace(/\$limit/g, () => String(opts.limit))
+      .replace(/\$offset/g, () => String(offset));
+    let pagedQuery = query;
+    if (offset && !hasOffset) {
+      const ast = new Parser().parse(query);
+      if (ast.type !== 'query' || ast.queryType !== 'SELECT')
+        throw new Error('Entity search must be a SELECT query');
+      ast.offset = (ast.offset ?? 0) + offset;
+      ast.limit = opts.limit;
+      pagedQuery = new Generator().stringify(ast);
+    }
+    const response = await this.execute(pagedQuery, {
+      limit: opts.limit,
+      timeoutMs: opts.timeoutMs ?? 8000,
+      raw: true,
+      signal: opts.signal,
+      maxRetries: 0,
+      waitForServerOnCancel: opts.waitForServerOnCancel,
+    });
 
-    const response = await axios.post<WikidataRawResponse>(
-      this.resolveEndpointUrl(),
-      new URLSearchParams({ query }),
-      {
-        headers: {
-          'User-Agent': this.resolveUserAgent(),
-          Accept: 'application/sparql-results+json',
-          'Content-Type': 'application/x-www-form-urlencoded',
+    return response.bindings.flatMap((row) => {
+      const uri = row['uri'];
+      if (uri?.type !== 'uri') return [];
+      const label = row['label']?.value;
+      return [
+        {
+          uri: uri.value,
+          label: typeof label === 'string' ? label : uri.value,
         },
-        auth: this.resolveAuth(),
-      },
-    );
-
-    return (response.data?.results?.bindings ?? []).map((b) => ({
-      uri: b['uri']?.value ?? '',
-      label: b['label']?.value ?? b['uri']?.value ?? '',
-    }));
+      ];
+    });
   }
 
   /**
@@ -586,8 +629,14 @@ LIMIT $limit`;
     boundResources: ReadonlySet<string>,
   ): NormalizedNode | null {
     for (const link of topology.links) {
-      if (link.object !== varName || !boundResources.has(link.subject)) continue;
-      return this.ensureNode(nodeMap, row, link.subject, topology.classAssertions);
+      if (link.object !== varName || !boundResources.has(link.subject))
+        continue;
+      return this.ensureNode(
+        nodeMap,
+        row,
+        link.subject,
+        topology.classAssertions,
+      );
     }
     return null;
   }

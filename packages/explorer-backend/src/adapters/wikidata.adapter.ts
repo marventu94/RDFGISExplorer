@@ -1,7 +1,9 @@
 import axios from 'axios';
+import type { DiscoveryCatalog, DiscoveryKind } from '@rdfgis/contracts';
 
 import { GenericSparqlAdapter } from './generic-sparql.adapter';
 import type {
+  CatalogSearchOptions,
   EndpointDescriptor,
   EntitySearchOptions,
   EntitySearchResult,
@@ -29,6 +31,12 @@ export class WikidataAdapter extends GenericSparqlAdapter {
   override describeEndpoint(): EndpointDescriptor {
     return {
       supportsWikibaseLabel: true,
+      discovery: {
+        classPredicate: WikidataAdapter.P31,
+        subclassPredicate: 'http://www.wikidata.org/prop/direct/P279',
+        predicateNamespace: 'http://www.wikidata.org/prop/direct/',
+        wikidataLabels: true,
+      },
       search: {
         mode: 'wikidata-api',
         endpoint: 'https://www.wikidata.org/w/api.php',
@@ -68,6 +76,155 @@ export class WikidataAdapter extends GenericSparqlAdapter {
     };
   }
 
+  /** The public text index and bounded entity metadata avoid WDQS label/type scans. */
+  async searchCatalog(
+    kind: DiscoveryKind,
+    text: string,
+    options: CatalogSearchOptions,
+  ): Promise<DiscoveryCatalog> {
+    const started = Date.now();
+    const requestOptions = () => ({
+      headers: { 'User-Agent': this.resolveUserAgent() },
+      signal: options.signal,
+      timeout: Math.max(1, options.timeoutMs - (Date.now() - started)),
+    });
+    if (!text) {
+      const pattern =
+        kind === 'class'
+          ? '?uri <http://www.wikidata.org/prop/direct/P279> ?superClass'
+          : kind === 'property'
+            ? '?property <http://wikiba.se/ontology#directClaim> ?uri'
+            : '?uri <http://www.wikidata.org/prop/direct/P31> ?class';
+      // Only read a bounded stream of assertions; deduplication and paging are local.
+      const rows = await this.execute(
+        `SELECT ?uri WHERE { ${pattern} } LIMIT ${options.sampleSize}`,
+        {
+          raw: true,
+          limit: options.sampleSize,
+          signal: options.signal,
+          timeoutMs: options.timeoutMs,
+          maxRetries: 0,
+        },
+      );
+      const uris = [
+        ...new Set(
+          rows.bindings.map((row) =>
+            row['uri']?.type === 'uri' ? row['uri'].value : '',
+          ),
+        ),
+      ].filter((value) =>
+        /^http:\/\/www\.wikidata\.org\/(entity\/Q|prop\/direct\/P)[0-9]+$/.test(
+          value,
+        ),
+      );
+      const page = uris.slice(
+        options.offset,
+        options.offset + Math.min(options.limit, 50),
+      );
+      if (!page.length) return { items: [], sampled: true, truncated: true };
+      const ids = page.map((uri) => uri.split('/').pop()!);
+      const metadata = await axios.get<{
+        entities?: Record<
+          string,
+          { labels?: Record<string, { value: string }> }
+        >;
+        error?: { info?: string };
+      }>('https://www.wikidata.org/w/api.php', {
+        ...requestOptions(),
+        params: {
+          action: 'wbgetentities',
+          format: 'json',
+          props: 'labels',
+          languages: 'en',
+          ids: ids.join('|'),
+        },
+      });
+      if (metadata.data.error)
+        throw new Error(metadata.data.error.info ?? 'Wikidata labels failed');
+      const more = options.offset + page.length < uris.length;
+      return {
+        items: page.map((uri, index) => ({
+          uri,
+          label:
+            metadata.data.entities?.[ids[index]]?.labels?.['en']?.value ??
+            ids[index],
+          kind,
+          evidence: [kind === 'resource' ? 'observed' : 'declared'],
+        })),
+        sampled: true,
+        truncated: true,
+        nextOffset: more ? options.offset + page.length : undefined,
+      };
+    }
+    const response = await axios.get<{
+      search?: Array<{ id: string; label?: string }>;
+      'search-continue'?: number;
+      error?: { info?: string };
+    }>('https://www.wikidata.org/w/api.php', {
+      ...requestOptions(),
+      params: {
+        action: 'wbsearchentities',
+        format: 'json',
+        language: 'en',
+        uselang: 'en',
+        type: kind === 'property' ? 'property' : 'item',
+        limit: Math.min(options.limit, 50),
+        continue: options.offset,
+        search: text,
+      },
+    });
+    if (response.data.error)
+      throw new Error(response.data.error.info ?? 'Wikidata search failed');
+    const candidates = (response.data.search ?? []).filter((item) =>
+      (kind === 'property' ? /^P[0-9]+$/ : /^Q[0-9]+$/).test(item.id),
+    );
+    let matching = candidates;
+    if (kind === 'class' && candidates.length) {
+      const metadata = await axios.get<{
+        entities?: Record<
+          string,
+          { claims?: Record<string, Array<{ mainsnak: { snaktype: string } }>> }
+        >;
+        error?: { info?: string };
+      }>('https://www.wikidata.org/w/api.php', {
+        ...requestOptions(),
+        params: {
+          action: 'wbgetentities',
+          format: 'json',
+          props: 'claims',
+          ids: candidates.map((item) => item.id).join('|'),
+        },
+      });
+      if (metadata.data.error)
+        throw new Error(
+          metadata.data.error.info ?? 'Wikidata class metadata failed',
+        );
+      // A P279 assertion identifies a class, without treating every item as one.
+      // Classes with only incoming assertions may be absent from this preview.
+      matching = candidates.filter((item) =>
+        metadata.data.entities?.[item.id]?.claims?.['P279']?.some(
+          (claim) => claim.mainsnak.snaktype === 'value',
+        ),
+      );
+    }
+    const nextOffset = response.data['search-continue'];
+    const more =
+      typeof nextOffset === 'number' &&
+      Number.isInteger(nextOffset) &&
+      nextOffset > options.offset;
+    return {
+      items: matching.map((item) => ({
+        uri: `http://www.wikidata.org/${kind === 'property' ? 'prop/direct' : 'entity'}/${item.id}`,
+        label: item.label ?? item.id,
+        kind,
+        evidence: [kind === 'resource' ? 'observed' : 'declared'],
+      })),
+      sampled: kind === 'class',
+      truncated: kind === 'class' || more,
+      nextOffset: more ? nextOffset : undefined,
+    };
+  }
+
   override async searchEntities(
     keyword: string,
     opts: EntitySearchOptions,
@@ -92,6 +249,8 @@ export class WikidataAdapter extends GenericSparqlAdapter {
       }>;
     }>(`https://www.wikidata.org/w/api.php?${params.toString()}`, {
       headers: { 'User-Agent': this.resolveUserAgent() },
+      signal: opts.signal,
+      timeout: opts.timeoutMs,
     });
 
     const candidates = (response.data.search ?? []).map((r) => ({

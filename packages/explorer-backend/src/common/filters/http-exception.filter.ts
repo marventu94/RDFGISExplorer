@@ -20,6 +20,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    if (exception instanceof DOMException && exception.name === 'AbortError') {
+      if (!response.destroyed)
+        response
+          .status(499)
+          .json({ error: 'CANCELLED', message: 'Request cancelled' });
+      return;
+    }
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let body: Record<string, unknown> = {
@@ -44,10 +51,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       body = { error: 'INTERNAL_ERROR', message: exception.message };
     }
 
-    this.logger.error(
-      `${request.method} ${request.url} → ${status} ${JSON.stringify(body)}`,
-      exception instanceof Error ? exception.stack : undefined,
-    );
+    const message = `${request.method} ${request.url} → ${status} ${JSON.stringify(body)}`;
+    if (body.error === 'DISCOVERY_COOLDOWN') {
+      response.setHeader('Retry-After', String(body.retryAfterSeconds));
+      this.logger.warn(message);
+    } else {
+      this.logger.error(
+        message,
+        exception instanceof Error ? exception.stack : undefined,
+      );
+    }
 
     response.status(status).json(body);
   }

@@ -12,6 +12,7 @@ import type { DomainEndpointAdapter } from './endpoint/adapter';
 import { GenericAdapter } from './endpoint/generic-adapter';
 import type { Prefix } from '../../core/services/app-config.service';
 import type { DropPayload } from './drop-payload';
+import { addClassNode } from './discovery';
 import { createCatsExample, createW3cExample, createMosquitoExample, createCancerExample } from './examples/canned-examples';
 
 export const NODE_WIDTH = 220;
@@ -300,6 +301,10 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
 
   applyDrop(payload: DropPayload, at: { x: number; y: number }): void {
     switch (payload.kind) {
+      case 'class': {
+        this.setSelected(addClassNode(this, payload.uri, at.x, at.y));
+        break;
+      }
       case 'example':
         this.applyExampleDrop(payload.exampleType, at);
         break;

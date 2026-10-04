@@ -54,6 +54,63 @@ describe('GenericSparqlAdapter', () => {
       expect(result.variables).toContain('city');
     });
 
+    it('sends GraphDB a server execution deadline before the HTTP timeout', async () => {
+      const scope = nock(WIKIDATA_BASE)
+        .post(WIKIDATA_PATH, (body) => {
+          const values =
+            typeof body === 'string'
+              ? Object.fromEntries(new URLSearchParams(body))
+              : (body as Record<string, string>);
+          return (
+            values['timeout'] === '7' &&
+            values['query'] === 'SELECT * WHERE { ?s ?p ?o }'
+          );
+        })
+        .reply(200, FIXTURE);
+      await new GenericSparqlAdapter('graphdb').execute(
+        'SELECT * WHERE { ?s ?p ?o }',
+        { timeoutMs: 8000, limit: 50, raw: true },
+      );
+      expect(scope.isDone()).toBe(true);
+    });
+    it('does not add GraphDB protocol extensions to generic endpoints', async () => {
+      const scope = nock(WIKIDATA_BASE)
+        .post(WIKIDATA_PATH, (body) => {
+          const values =
+            typeof body === 'string'
+              ? Object.fromEntries(new URLSearchParams(body))
+              : (body as Record<string, string>);
+          return !('timeout' in values);
+        })
+        .reply(200, FIXTURE);
+      await new GenericSparqlAdapter('custom').execute(
+        'SELECT * WHERE { ?s ?p ?o }',
+        defaultOpts,
+      );
+      expect(scope.isDone()).toBe(true);
+    });
+    it('keeps an abandoned GraphDB discovery request alive until its bounded server execution finishes', async () => {
+      const caller = new AbortController();
+      nock(WIKIDATA_BASE).post(WIKIDATA_PATH).delay(100).reply(200, FIXTURE);
+      let settled = false;
+      const work = new GenericSparqlAdapter('graphdb')
+        .execute('SELECT * WHERE { ?s ?p ?o }', {
+          ...defaultOpts,
+          raw: true,
+          signal: caller.signal,
+          waitForServerOnCancel: true,
+        })
+        .finally(() => {
+          settled = true;
+        });
+      const cancelled = expect(work).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+      caller.abort();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(settled).toBe(false);
+      await cancelled;
+    });
     it('sends User-Agent header', async () => {
       const scope = nock(WIKIDATA_BASE)
         .post(WIKIDATA_PATH)
@@ -814,6 +871,35 @@ describe('GenericSparqlAdapter', () => {
       ).rejects.toThrow(UpstreamError);
     });
 
+    it('does not retry a rate-limited discovery request', async () => {
+      const upstream = nock(WIKIDATA_BASE)
+        .post(WIKIDATA_PATH)
+        .reply(429, 'Rate limited');
+      const extra = nock(WIKIDATA_BASE).post(WIKIDATA_PATH).reply(200, FIXTURE);
+      await expect(
+        adapter.execute('SELECT * WHERE { ?s ?p ?o }', {
+          ...defaultOpts,
+          maxRetries: 0,
+        }),
+      ).rejects.toThrow(UpstreamError);
+      expect(upstream.isDone()).toBe(true);
+      expect(extra.isDone()).toBe(false);
+    });
+    it('propagates caller cancellation as AbortError and removes its listener', async () => {
+      nock(WIKIDATA_BASE).post(WIKIDATA_PATH).delay(500).reply(200, FIXTURE);
+      const controller = new AbortController();
+      const remove = jest.spyOn(controller.signal, 'removeEventListener');
+      const work = adapter.execute('SELECT * WHERE { ?s ?p ?o }', {
+        ...defaultOpts,
+        signal: controller.signal,
+      });
+      const cancelled = expect(work).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+      controller.abort();
+      await cancelled;
+      expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+    });
     it('retries on 429 and eventually succeeds', async () => {
       nock(WIKIDATA_BASE)
         .post(WIKIDATA_PATH)
@@ -1016,6 +1102,39 @@ describe('GenericSparqlAdapter.searchEntities', () => {
     expect(sentQuery).not.toContain('x\\" }');
     // $& was not expanded as a replacement pattern, which would duplicate the query.
     expect(sentQuery).toContain('#$&');
+  });
+
+  it('pages legacy templates without requiring a new placeholder', async () => {
+    const captured = captureQuery();
+    await adapter.searchEntities('Casa', { limit: 51, offset: 50 });
+    expect(captured.get()).toContain('LIMIT 51');
+    expect(captured.get()).toContain('OFFSET 50');
+    expect(captured.get()).toContain('PREFIX rdfs:');
+  });
+
+  it('supports explicit offsets in indexed search templates', async () => {
+    process.env['SPARQL_ENTITY_SEARCH_QUERY'] =
+      'SELECT ?uri ?label WHERE { ?uri ?p "$keyword" } LIMIT $limit OFFSET $offset';
+    const captured = captureQuery();
+    await adapter.searchEntities('Casa', { limit: 51, offset: 50 });
+    expect(captured.get()).toContain('LIMIT 51 OFFSET 50');
+    expect(captured.get()).not.toContain('LIMIT 101');
+  });
+
+  it('uses the bounded GraphDB execution path for legacy entity searches', async () => {
+    adapter = new GenericSparqlAdapter('graphdb');
+    let timeout = '';
+    nock('http://localhost:7200')
+      .post('/repositories/test', (body: unknown) => {
+        timeout =
+          typeof body === 'string'
+            ? (new URLSearchParams(body).get('timeout') ?? '')
+            : (body as Record<string, string>).timeout;
+        return true;
+      })
+      .reply(200, { head: { vars: [] }, results: { bindings: [] } });
+    await adapter.searchEntities('Casa', { limit: 51, timeoutMs: 2500 });
+    expect(timeout).toBe('1');
   });
 
   it('honors a custom template and does NOT inject the class filter', async () => {

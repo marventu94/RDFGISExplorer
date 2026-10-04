@@ -59,7 +59,6 @@ export class EditPanelComponent implements OnDestroy {
   private previewAbort: AbortController | null = null;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
 
-  added = 0;
   newFilterType: FilterType | '' = '';
   newFilterData: Record<string, string | number> = {};
   showFilters = true;
@@ -124,7 +123,6 @@ export class EditPanelComponent implements OnDestroy {
   mkConst(): void {
     const sel = this.selected();
     if (!sel) return;
-    this.added = 0;
     sel.mkConst();
     this.isVariable = false;
     this.isConst = true;
@@ -137,14 +135,13 @@ export class EditPanelComponent implements OnDestroy {
     const val = newV ?? this.newValue;
     if (!val) return;
     this.newValue = '';
-    if (sel.addUri(val)) {
-      if (sel.uris.length === 1) {
-        this.mkConst();
-      } else {
-        this.added += 1;
-      }
-    }
-    this.graph.refresh();
+    this.previewAbort?.abort();
+    this.previewAbort = null;
+    this.resultFilterLoading.set(false);
+    this.hasMoreResults.set(false);
+    this.isVariable = false;
+    this.isConst = true;
+    this.graph.replaceConstraintValue(sel, val);
   }
 
   rmValue(value: string): void {

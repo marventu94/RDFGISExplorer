@@ -1,5 +1,5 @@
 import type { DiscoveryExample, DiscoveryFocus, DiscoveryStep } from '@rdfgis/contracts';
-import { PropertyGraph } from './graph';
+import type { PropertyGraph } from './graph';
 import { Node } from './node';
 import type { RDFResource } from './rdf-resource';
 import { Filter } from './filter';
@@ -9,12 +9,34 @@ const validIri = (uri: string) => /^[a-z][a-z0-9+.-]*:[^\s<>"\\{}|^`]*$/i.test(u
 
 export function nodeClasses(graph: PropertyGraph, node: Node): string[] {
   return graph.edges.filter(e => e.source.parentNode === node && !e.source.isVariable()
-    && e.source.getUri() === TYPE_URI && !e.target.isVariable()).flatMap(e => e.target.uris);
+    && e.source.getUri() === (graph.endpointAdapter.classPredicate ?? TYPE_URI) && !e.target.isVariable()).flatMap(e => e.target.uris);
 }
 export function discoveryFocus(node: Node): DiscoveryFocus | null {
   if (!node.isVariable()) return node.getUri() ? { uri: node.getUri()! } : null;
   const query = node.createQuery()?.toSparqlFullProjection();
   return query ? { query, variable: node.variable.getName() } : null;
+}
+/** Give new discovery variables stable, readable names without changing existing branches. */
+function nameVariable(graph: PropertyGraph, resource: RDFResource, uri: string): void {
+  let local = uri.split(/[#/:]/).filter(Boolean).pop() ?? '';
+  try { local = decodeURIComponent(local); } catch { /* Keep malformed percent escapes as text. */ }
+  const text = graph.labelProvider.getLabel(uri) || local;
+  const words = text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').split(/[^a-zA-Z0-9_]+/).filter(Boolean);
+  let base = words.map((word, index) => index ? word[0].toUpperCase() + word.slice(1) : word[0].toLowerCase() + word.slice(1)).join('');
+  if (!base) base = 'value';
+  if (/^[0-9]/.test(base)) base = 'value' + base;
+  // Generated IDs are query names too, even though they are absent from usedAliases.
+  const names = new Set(graph.usedAliases);
+  for (const node of graph.nodes) {
+    names.add(node.variable.getName());
+    for (const property of node.properties) {
+      names.add(property.variable.getName());
+      if (property.literal) names.add(property.literal.variable.getName());
+    }
+  }
+  let alias = base;
+  for (let suffix = 2; names.has(alias); suffix++) alias = base + suffix;
+  resource.variable.setAlias(alias, graph);
 }
 function connect(graph: PropertyGraph, from: Node, predicate: string, to: Node, optional: boolean): void {
   const p = from.newProp();
@@ -24,9 +46,10 @@ function connect(graph: PropertyGraph, from: Node, predicate: string, to: Node, 
 export function addClassNode(graph: PropertyGraph, uri: string, x = 0, y = 0): Node {
   if (!validIri(uri)) throw new Error('Invalid class IRI');
   const node = graph.addNode().setPosition(x, y);
+  nameVariable(graph, node, uri);
   const type = graph.addNode().setPosition(x + 240, y - 120);
   type.addUri(uri); type.mkConst();
-  connect(graph, node, TYPE_URI, type, false);
+  connect(graph, node, graph.endpointAdapter.classPredicate ?? TYPE_URI, type, false);
   return node;
 }
 /** Atomic caller snapshots this mutation. Literal values remain typed filters, not interpolated constants. */
@@ -51,6 +74,7 @@ export function addDiscoveryPath(
       prop.addUri(step.predicate); prop.mkConst(); prop.optional = optional;
       const lit = prop.literal ?? prop.mkLiteral()!;
       if (!existing) {
+        nameVariable(graph, lit, step.predicate);
         lit.variable.filters.push(new Filter(lit.variable, 'isliteral', {}));
         if (step.datatype) lit.variable.filters.push(new Filter(lit.variable, 'datatype', { datatype: step.datatype }));
       }
@@ -74,14 +98,14 @@ export function addDiscoveryPath(
       continue;
     }
     const next = graph.addNode().setPosition(current.x + 320, current.y + i * 100);
+    nameVariable(graph, next, step.predicate);
     if (example?.kind === 'uri' && last) { next.addUri(example.value); next.mkConst(); }
-    else next.variable.filters.push(new Filter(next.variable, 'isresource', {}));
     if (step.direction === 'out') connect(graph, current, step.predicate, next, optional);
     else connect(graph, next, step.predicate, current, optional);
     if (step.targetClass) {
       const type = graph.addNode().setPosition(next.x + 160, next.y - 140);
       type.addUri(step.targetClass); type.mkConst();
-      connect(graph, next, TYPE_URI, type, optional);
+      connect(graph, next, graph.endpointAdapter.classPredicate ?? TYPE_URI, type, optional);
     }
     current = next;
   }

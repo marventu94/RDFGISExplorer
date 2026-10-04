@@ -15,6 +15,7 @@ class TempResource extends RDFResource {
 }
 
 export class WikidataAdapter implements DomainEndpointAdapter {
+  readonly classPredicate = 'http://www.wikidata.org/prop/direct/P31';
   textFilterTriple(variable: string, keyword: string): string {
     return variable + ' bif:contains "\'' + keyword + '\'" .';
   }

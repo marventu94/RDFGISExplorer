@@ -1,41 +1,44 @@
 <div class="search-container" id="search-container">
   <div class="search-input-container" id="search-input-container">
+    <button class="toggle-results" type="button" (click)="toggleResults()"
+      [attr.aria-expanded]="active()" aria-controls="search-results-panel"
+      [attr.aria-label]="(active() ? 'Ocultar resultados' : 'Mostrar resultados') | translate"
+      [attr.title]="(active() ? 'Ocultar resultados' : 'Mostrar resultados') | translate">
+      <svg [class.expanded]="active()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="m9 5 7 7-7 7" />
+      </svg>
+    </button>
     <form id="step1" (submit)="doSearch(); $event.preventDefault()">
-      <input type="search" class="search-input" id="search-input" autocomplete="off" name="searchInput"
-        [placeholder]="'Buscar clases, relaciones o recursos' | translate" [attr.aria-label]="'Buscar clases, relaciones o recursos' | translate"
-        [(ngModel)]="searchInput" (ngModelChange)="onSearchChange()" [class.loading]="busy()" [class.error]="error()" />
+      <input #searchField type="search" class="search-input" id="search-input" autocomplete="off" name="searchInput"
+        [placeholder]="'Buscar...' | translate" [attr.aria-label]="'Buscar clases o recursos' | translate"
+        [(ngModel)]="searchInput" (ngModelChange)="onSearchChange()" [attr.aria-busy]="busy()" [class.error]="error()" />
       <span class="search-icon" aria-hidden="true">&#128269;</span>
+      @if (searchInput.length) {
+        <button class="clear-search" type="button" [attr.aria-label]="'Borrar búsqueda' | translate"
+          [attr.title]="'Borrar búsqueda' | translate" (click)="clearSearch(); searchField.focus()">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      }
     </form>
-    <div class="search-kinds" role="group" [attr.aria-label]="'Tipo de búsqueda' | translate">
-      <button type="button" [attr.aria-pressed]="kind() === 'class'" (click)="setKind('class')">{{ 'Clases' | translate }}</button>
-      <button type="button" [attr.aria-pressed]="kind() === 'property'" (click)="setKind('property')">{{ 'Relaciones' | translate }}</button>
-      <button type="button" [attr.aria-pressed]="kind() === 'resource'" (click)="setKind('resource')">{{ 'Recursos' | translate }}</button>
-    </div>
-    @if (!active()) {
-      <p class="search-hint">{{ 'Descubrí qué existe antes de construir la consulta.' | translate }}</p>
-      <button class="browse" type="button" (click)="browse()">{{ 'Explorar clases' | translate }}</button>
-    } @else { <button class="collapse" type="button" (click)="active.set(false)">{{ 'Ocultar resultados' | translate }}</button> }
   </div>
-  @if (active()) {
-    <div class="search-results-panel" id="search-results-panel">
+    <div class="search-results-panel" id="search-results-panel" [hidden]="!active()">
       @if (busy()) { <p role="status">{{ 'Buscando...' | translate }}</p> }
-      @if (error()) { <p role="alert">{{ 'No se pudo completar la búsqueda.' | translate }} <button type="button" (click)="doSearch()">{{ 'Reintentar' | translate }}</button></p> }
+      @if (error()) { <p role="alert">{{ 'No se pudo completar la búsqueda.' | translate }}</p> }
       @if (!busy() && !error() && !results().length) { <p>{{ 'No se encontraron resultados' | translate }}</p> }
+      @if (sampled() && !busy() && !error()) { <p class="search-hint">{{ 'Las clases son una vista previa de una muestra.' | translate }}</p> }
       @if (truncated() && !busy()) { <p class="search-hint">{{ 'Resultados parciales; refiná la búsqueda.' | translate }}</p> }
-      @for (result of results(); track result.uri) {
-        <article class="fake-rect" [class.class-result]="result.kind === 'class'" [draggable]="result.kind === 'resource'" (dragstart)="onDragStart($event, result)" [title]="result.uri">
+      @for (result of results(); track result.kind + ':' + result.uri; let index = $index) {
+        @if (index === 0 || results()[index - 1].kind !== result.kind) {
+          <h3 class="result-group">{{ (result.kind === 'class' ? 'Clases' : 'Recursos') | translate }}</h3>
+        }
+        <article class="fake-rect" [class.class-result]="result.kind === 'class'" [draggable]="true" (dragstart)="onDragStart($event, result)" [title]="result.uri">
           <strong>{{ result.label }}</strong><small class="term-uri">{{ result.uri }}</small>
           <div class="classes">
             @if (result.evidence.includes('observed')) { <span>{{ 'En los datos' | translate }}</span> }
             @if (result.evidence.includes('declared')) { <span> · {{ 'Declarado' | translate }}</span> }
           </div>
-          <div class="result-actions">
-            <button type="button" (click)="discovery.explore(result)">{{ (result.kind === 'property' ? 'Ver usos' : 'Explorar') | translate }}</button>
-            @if (result.kind === 'class') { <button type="button" (click)="discovery.useClass(result)">{{ 'Usar clase' | translate }}</button> }
-          </div>
         </article>
       }
-      @if (nextOffset() !== undefined) { <button type="button" [disabled]="busy()" (click)="doSearch(true)">{{ 'Cargar más resultados' | translate }}</button> }
+      @if (hasMore()) { <button type="button" [disabled]="busy()" (click)="doSearch(true)">{{ 'Cargar más resultados' | translate }}</button> }
     </div>
-  }
 </div>

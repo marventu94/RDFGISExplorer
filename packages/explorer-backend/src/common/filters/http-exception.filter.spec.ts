@@ -1,5 +1,5 @@
 import { HttpExceptionFilter } from './http-exception.filter';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import {
   TimeoutError,
   UpstreamError,
@@ -8,13 +8,15 @@ import {
 function createMockHost() {
   const json = jest.fn();
   const status = jest.fn().mockReturnValue({ json });
-  const getResponse = jest.fn().mockReturnValue({ status });
+  const setHeader = jest.fn();
+  const getResponse = jest.fn().mockReturnValue({ status, setHeader });
   const getRequest = jest.fn().mockReturnValue({ url: '/test', method: 'GET' });
   const switchToHttp = jest.fn().mockReturnValue({ getResponse, getRequest });
   return {
     switchToHttp,
     json,
     status,
+    setHeader,
   };
 }
 
@@ -75,5 +77,30 @@ describe('HttpExceptionFilter', () => {
     expect(host.json).toHaveBeenCalledWith(
       expect.objectContaining({ error: 'INTERNAL_ERROR' }),
     );
+  });
+  it('returns Retry-After for a local cooldown and logs a warning without a stack trace', () => {
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const error = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const host = createMockHost();
+      filter.catch(
+        new HttpException(
+          { error: 'DISCOVERY_COOLDOWN', retryAfterSeconds: 12 },
+          503,
+        ),
+        host as never,
+      );
+      expect(host.status).toHaveBeenCalledWith(503);
+      expect(host.setHeader).toHaveBeenCalledWith('Retry-After', '12');
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
   });
 });

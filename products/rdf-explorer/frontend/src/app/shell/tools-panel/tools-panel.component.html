@@ -1,55 +1,28 @@
 <div class="tools" id="tools">
   <div class="right-buttons" id="right-buttons">
-    <button class="tool-btn discovery-btn" type="button" [class.active]="toolService.active() === 'discovery'"
-      (click)="discovery.openSelected()">{{ 'Explorar conexiones' | translate }}</button>
-
-    <button
-      class="tool-btn"
-      [class.active]="toolService.active() === 'describe'"
-      (click)="toolService.toggle('describe')"
-      type="button"
-    >&#9776;</button>
-    <button
-      class="tool-btn"
-      [class.active]="toolService.active() === 'edit'"
-      (click)="toolService.toggle('edit')"
-      type="button"
-    >&#9998;</button>
-    <button
-      class="tool-btn"
-      [class.active]="toolService.active() === 'sparql'"
-      (click)="toolService.toggle('sparql')"
-      type="button"
-    >&lt;/&gt;</button>
-    <button
-      class="tool-btn"
-      [class.active]="toolService.active() === 'log'"
-      (click)="toolService.toggle('log')"
-      type="button"
-    >&#128196;</button>
+    <button class="tool-btn" type="button" [class.active]="toolService.active() === 'discovery'"
+      [attr.aria-label]="'Explorador' | translate" [attr.title]="'Explorador' | translate"
+      (click)="openExplorer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" /><circle cx="4" cy="4" r="2" /><circle cx="20" cy="5" r="2" /><circle cx="5" cy="20" r="2" />
+        <path d="m6 6 4 4m4 0 4-4m-8 8-4 4" />
+      </svg>
+    </button>
+    <button class="tool-btn" type="button" [class.active]="toolService.active() === 'edit'"
+      [attr.aria-label]="'Editar' | translate" [attr.title]="'Editar' | translate" (click)="toolService.toggle('edit')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z" /></svg>
+    </button>
+    <button class="tool-btn" type="button" [class.active]="toolService.active() === 'sparql'"
+      [attr.aria-label]="'Consulta SPARQL' | translate" [attr.title]="'Consulta SPARQL' | translate" (click)="toolService.toggle('sparql')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 4l-4 16" /></svg>
+    </button>
   </div>
-
   @if (toolService.active() !== 'none') {
     <div class="right-panel" id="right-panel">
       @switch (toolService.active()) {
         @case ('discovery') { <app-discovery-panel /> }
-        @case ('describe') {
-          <app-describe-panel />
-        }
-        @case ('edit') {
-          <app-edit-panel />
-        }
-        @case ('sparql') {
-          <app-sparql-panel />
-        }
-        @case ('log') {
-          <app-log-panel />
-        }
-        @default {
-          <div class="tool-placeholder">
-            Tool: <strong>{{ toolService.active() }}</strong>
-          </div>
-        }
+        @case ('edit') { <app-edit-panel /> }
+        @case ('sparql') { <app-sparql-panel /> }
       }
     </div>
   }

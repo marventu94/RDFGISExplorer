@@ -5,6 +5,7 @@ import type { Query } from '../query';
 import type { GraphContext } from '../rdf-resource';
 
 export interface DomainEndpointAdapter {
+  readonly classPredicate?: string;
   textFilterTriple(variable: string, keyword: string): string;
 
   labelService?(language: string): string | null;

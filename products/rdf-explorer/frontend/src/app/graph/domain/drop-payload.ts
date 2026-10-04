@@ -1,4 +1,6 @@
 export type DropPayload =
+  | { kind: 'connection'; token: string; }
+  | { kind: 'class'; uri: string; }
   | { kind: 'uri';      uri: string;                                        }
   | { kind: 'uri+prop'; uri: string; prop: string;                           }
   | { kind: 'prop';     prop: string;                                        }

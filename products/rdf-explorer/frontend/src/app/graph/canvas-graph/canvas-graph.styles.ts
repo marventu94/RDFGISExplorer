@@ -195,6 +195,10 @@ export const CYTOSCAPE_STYLES: cytoscape.StylesheetCSS[] = [
   {
     selector: 'edge',
     css: {
+      // Draw the entire connection above compound children so its property origin stays visible.
+      'z-compound-depth': 'top',
+      'z-index-compare': 'manual',
+      'z-index': 10,
       'width': 3,
       'line-color': '#333',
       'target-arrow-color': '#333',
