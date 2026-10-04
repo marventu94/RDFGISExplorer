@@ -1,0 +1,96 @@
+<header>
+  <h3>{{ 'Explorar conexiones' | translate }}</h3>
+  <button type="button" [disabled]="!state.canUndo()" (click)="state.undo()">{{ 'Deshacer incorporación' | translate }}</button>
+</header>
+@if (state.focus()) {
+  <nav class="trail" [attr.aria-label]="'Recorrido de exploración' | translate">
+    <button type="button" (click)="state.backTo(0)">{{ state.title() }}</button>
+    @for (step of state.steps(); track $index) {
+      <span>{{ step.direction === 'out' ? '→' : '←' }}</span>
+      <button type="button" [title]="step.predicate" (click)="state.backTo($index + 1)">{{ local(step.predicate) }} @if (step.targetClass) { · {{ local(step.targetClass) }} }</button>
+    }
+  </nav>
+  @if (state.origin()?.propertyUri) { <p class="hint">{{ 'Explorando sujetos que utilizan esta relación.' | translate }}</p> }
+  @if (state.classUri()) {
+    <label class="scope">{{ 'Alcance' | translate }}
+      <select [ngModel]="state.scope()" (ngModelChange)="state.scope.set($event)">
+        <option value="query">{{ 'Consulta actual' | translate }}</option>
+        <option value="class">{{ 'Toda la clase' | translate }}</option>
+      </select>
+    </label>
+  }
+  @if (!state.source() || state.steps().length) {
+    <button class="primary wide" type="button" (click)="state.add()">{{ 'Agregar recorrido a la consulta' | translate }}</button>
+  }
+  <p class="hint">{{ 'Explorar no modifica la consulta. Agregar una relación obligatoria puede excluir entidades; una opcional conserva las que no tienen ese dato.' | translate }}</p>
+  <div class="filters">
+    <input [attr.aria-label]="'Filtrar conexiones' | translate" [placeholder]="'Filtrar conexiones' | translate" [ngModel]="filter()" (ngModelChange)="filter.set($event)" />
+    <select [attr.aria-label]="'Dirección' | translate" [ngModel]="direction()" (ngModelChange)="direction.set($event)">
+      <option value="all">{{ 'Ambas direcciones' | translate }}</option>
+      <option value="out">{{ 'Salientes' | translate }}</option>
+      <option value="in">{{ 'Entrantes' | translate }}</option>
+    </select>
+  </div>
+  @if (busy()) { <p role="status">{{ 'Descubriendo conexiones…' | translate }}</p> }
+  @if (error()) { <p role="alert">{{ 'No se pudo explorar este conjunto.' | translate }} <button type="button" (click)="retry()">{{ 'Reintentar' | translate }}</button></p> }
+  @if (data(); as result) {
+    <p class="coverage" role="status">{{ 'Entidades inspeccionadas' | translate }}: {{ result.sampledEntities }} · {{ 'Datos observados' | translate }}
+      @if (result.sampled) { <strong> · {{ 'Muestra parcial' | translate }}</strong> }
+    </p>
+    @if (result.truncated) { <p class="hint">{{ 'Hay más conexiones. Explorá una rama para acotar el conjunto.' | translate }}</p> }
+    @if (result.failedDirections.length) { <p role="alert">{{ 'Algunas direcciones no pudieron consultarse.' | translate }} {{ result.failedDirections.join(', ') }} <button type="button" (click)="retry()">{{ 'Reintentar' | translate }}</button></p> }
+    @if (!connections().length) { <p>{{ 'No se encontraron conexiones en este alcance.' | translate }}</p> }
+    @for (connection of connections(); track key(connection)) {
+      <article class="connection">
+        <div class="relation"><span class="arrow">{{ connection.direction === 'out' ? '→' : '←' }}</span><strong [title]="connection.predicate">{{ connection.label }}</strong>
+          <span class="badge">{{ (connection.direction === 'out' ? 'Saliente' : 'Entrante') | translate }}</span></div>
+        <div class="destination" [title]="connection.targetClass || connection.datatype || ''">{{ connection.targetLabel || (connection.kind === 'literal' ? ('Valor literal' | translate) : ('Recurso sin clase observada' | translate)) }}</div>
+        <small>{{ connection.entityCount }} / {{ result.sampledEntities }} {{ 'entidades de la muestra' | translate }}</small>
+        <div class="actions">
+          @if (connection.kind === 'resource' && state.steps().length < 12) { <button type="button" (click)="state.traverse(connection)">{{ 'Explorar' | translate }}</button> }
+          <button type="button" (click)="state.add([connection])">{{ 'Exigir dato' | translate }}</button>
+          <button type="button" (click)="state.add([connection], true)">{{ 'Dato opcional' | translate }}</button>
+        </div>
+        <details>
+          <summary>{{ 'Ejemplos y filtros' | translate }}</summary>
+          @for (example of connection.examples; track $index) {
+            <code class="example">{{ example.kind === 'bnode' ? ('Nodo anónimo' | translate) : example.value }}</code>
+            @if (example.kind !== 'bnode') {
+              <button type="button" (click)="state.add([connection], false, example)">{{ 'Filtrar por este valor' | translate }}</button>
+            }
+            @if (example.kind === 'uri') { <button type="button" (click)="inspect(example.value)">{{ 'Ver ejemplo' | translate }}</button> }
+          }
+          @if (connection.kind === 'literal') {
+            <form class="value-filter" (submit)="filterValue(connection); $event.preventDefault()">
+              <input [name]="key(connection)" [(ngModel)]="values[key(connection)]" [placeholder]="'Valor exacto' | translate" [attr.aria-label]="'Valor exacto' | translate" />
+              <button type="submit">{{ 'Filtrar' | translate }}</button>
+            </form>
+          }
+        </details>
+      </article>
+    }
+  }
+  <details class="path-finder">
+    <summary>{{ 'Encontrar conexión con…' | translate }}</summary>
+    <p class="hint">{{ 'Buscá una clase o relación de destino. Los caminos se verifican sobre datos, dentro de un presupuesto acotado.' | translate }}</p>
+    <form (submit)="searchTargets(); $event.preventDefault()" class="target-form">
+      <select name="targetKind" [(ngModel)]="targetKind" [attr.aria-label]="'Tipo de destino' | translate"><option value="class">{{ 'Clases' | translate }}</option><option value="property">{{ 'Relaciones' | translate }}</option></select>
+      <input name="targetText" [(ngModel)]="targetText" [attr.aria-label]="'Destino' | translate" [placeholder]="'Destino' | translate" />
+      <button type="submit">{{ 'Buscar' | translate }}</button>
+    </form>
+    @if (targetBusy()) { <p role="status">{{ 'Buscando...' | translate }}</p> }
+    @if (targetError() || pathError()) { <p role="alert">{{ 'No se pudo completar la búsqueda.' | translate }}</p> }
+    @if (targetTruncated()) { <p class="hint">{{ 'Resultados parciales; refiná la búsqueda.' | translate }}</p> }
+    @for (target of targets(); track target.uri) { <button class="target" [title]="target.uri" type="button" [disabled]="pathBusy()" (click)="findPaths(target)">{{ target.label }} →</button> }
+    @if (pathBusy()) { <p role="status">{{ 'Buscando caminos…' | translate }}</p> }
+    @if (paths(); as result) {
+      <p class="hint">{{ 'Búsqueda acotada: la ausencia de caminos no demuestra que no existan.' | translate }}</p>
+      @if (!result.paths.length) { <p>{{ 'No se encontraron caminos dentro del presupuesto.' | translate }}</p> }
+      @for (path of result.paths; track $index) {
+        <article class="connection"><p>{{ pathText(path) }}</p><button type="button" (click)="state.add(path)">{{ 'Agregar recorrido a la consulta' | translate }}</button></article>
+      }
+    }
+  </details>
+} @else {
+  <p>{{ 'Buscá una clase o seleccioná una variable del grafo para descubrir sus conexiones.' | translate }}</p>
+}

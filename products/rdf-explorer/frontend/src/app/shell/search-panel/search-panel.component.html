@@ -1,51 +1,41 @@
-<!-- SPDX-FileCopyrightText: 2024 RDFExplorer Contributors -->
 <div class="search-container" id="search-container">
   <div class="search-input-container" id="search-input-container">
     <form id="step1" (submit)="doSearch(); $event.preventDefault()">
-      <input
-        type="text"
-        class="search-input"
-        id="search-input"
-        [attr.placeholder]="'Search...' | translate"
-        autocomplete="off"
-        name="searchInput"
-        [(ngModel)]="searchInput"
-        (ngModelChange)="onSearchChange()"
-        (focus)="onInputFocus()"
-        [class.active]="searchActive"
-        [class.loading]="searchWait"
-        [class.error]="searchError"
-      />
-      <span class="search-icon" id="search-icon">&#128269;</span>
+      <input type="search" class="search-input" id="search-input" autocomplete="off" name="searchInput"
+        [placeholder]="'Buscar clases, relaciones o recursos' | translate" [attr.aria-label]="'Buscar clases, relaciones o recursos' | translate"
+        [(ngModel)]="searchInput" (ngModelChange)="onSearchChange()" [class.loading]="busy()" [class.error]="error()" />
+      <span class="search-icon" aria-hidden="true">&#128269;</span>
     </form>
+    <div class="search-kinds" role="group" [attr.aria-label]="'Tipo de búsqueda' | translate">
+      <button type="button" [attr.aria-pressed]="kind() === 'class'" (click)="setKind('class')">{{ 'Clases' | translate }}</button>
+      <button type="button" [attr.aria-pressed]="kind() === 'property'" (click)="setKind('property')">{{ 'Relaciones' | translate }}</button>
+      <button type="button" [attr.aria-pressed]="kind() === 'resource'" (click)="setKind('resource')">{{ 'Recursos' | translate }}</button>
+    </div>
+    @if (!active()) {
+      <p class="search-hint">{{ 'Descubrí qué existe antes de construir la consulta.' | translate }}</p>
+      <button class="browse" type="button" (click)="browse()">{{ 'Explorar clases' | translate }}</button>
+    } @else { <button class="collapse" type="button" (click)="active.set(false)">{{ 'Ocultar resultados' | translate }}</button> }
   </div>
-  @if (searchActive) {
+  @if (active()) {
     <div class="search-results-panel" id="search-results-panel">
-      @if (noResults && searchResults().length === 0) {
-        <div class="alert alert-warning" role="alert">
-          <strong>{{ 'No results found!' | translate }}</strong>
-        </div>
-      }
-      @if (searchWait) {
-        <div class="search-wait">{{ 'Searching...' | translate }}</div>
-      }
-      @for (result of searchResults(); track result.uri; let idx = $index) {
-        <div
-          class="fake-rect"
-          [id]="'result' + idx"
-          style="border-color: #1f77b4;"
-          draggable="true"
-          (dragstart)="onDragStart($event, result)"
-          [title]="result.uri"
-        >
-          <div>{{ result.label }}</div>
+      @if (busy()) { <p role="status">{{ 'Buscando...' | translate }}</p> }
+      @if (error()) { <p role="alert">{{ 'No se pudo completar la búsqueda.' | translate }} <button type="button" (click)="doSearch()">{{ 'Reintentar' | translate }}</button></p> }
+      @if (!busy() && !error() && !results().length) { <p>{{ 'No se encontraron resultados' | translate }}</p> }
+      @if (truncated() && !busy()) { <p class="search-hint">{{ 'Resultados parciales; refiná la búsqueda.' | translate }}</p> }
+      @for (result of results(); track result.uri) {
+        <article class="fake-rect" [class.class-result]="result.kind === 'class'" [draggable]="result.kind === 'resource'" (dragstart)="onDragStart($event, result)" [title]="result.uri">
+          <strong>{{ result.label }}</strong><small class="term-uri">{{ result.uri }}</small>
           <div class="classes">
-            @if (result.description) {
-              <span>{{ result.description }}</span>
-            }
+            @if (result.evidence.includes('observed')) { <span>{{ 'En los datos' | translate }}</span> }
+            @if (result.evidence.includes('declared')) { <span> · {{ 'Declarado' | translate }}</span> }
           </div>
-        </div>
+          <div class="result-actions">
+            <button type="button" (click)="discovery.explore(result)">{{ (result.kind === 'property' ? 'Ver usos' : 'Explorar') | translate }}</button>
+            @if (result.kind === 'class') { <button type="button" (click)="discovery.useClass(result)">{{ 'Usar clase' | translate }}</button> }
+          </div>
+        </article>
       }
+      @if (nextOffset() !== undefined) { <button type="button" [disabled]="busy()" (click)="doSearch(true)">{{ 'Cargar más resultados' | translate }}</button> }
     </div>
   }
 </div>

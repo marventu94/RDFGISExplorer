@@ -20,6 +20,12 @@ function compactFilterValue(value: unknown): string {
 /** Human-readable, compact representation of the actual SPARQL constraint. */
 export function filterLabel(filter: Filter): string {
   switch (filter.type) {
+    case 'equals':
+      return `⌕ = “${compactFilterValue(filter.data.value)}”`;
+    case 'datatype':
+      return `⌕ datatype · ${compactFilterValue(filter.data.datatype)}`;
+    case 'isresource':
+      return '⌕ IRI / blank node';
     case 'text':
       return `⌕ text · “${compactFilterValue(filter.data.keyword)}”`;
     case 'lang':

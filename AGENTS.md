@@ -153,6 +153,25 @@ The heart of rdf_explorer is a pure domain model (without Angular) in
 - **`PropertyGraphService`**: Angular wrapper with signals and a `revision` counter for reactivity.
 - **`CanvasGraphComponent`**: Cytoscape.js with compound nodes, edgehandles, context menus, and drag-and-drop.
 
+## RDF Explorer — guided discovery
+
+`tools/discovery/` and backend `modules/discovery/` implement read-only structural
+exploration, with shared types in `packages/contracts/src/discovery.ts`. Catalogue
+search separates classes, properties and resources, includes observed/declared
+terms, and falls back to URI matching when labels are missing. Neighborhoods query
+incoming/outgoing relationships over bounded distinct-entity samples, using the
+current connected SELECT or a class/resource/property focus. Exploration paths
+are re-evaluated as joined patterns; never send returned blank-node identifiers
+back as constants. Path search validates the full chain and remains explicitly
+incomplete under its depth/time/request budgets.
+
+`graph/domain/discovery.ts` adds typed variables and paths to the existing domain
+model, preserves optional branch semantics, and reuses compatible branches.
+Literal example filters use escaped `equals` plus datatype/language constraints;
+resource constraints retain blank nodes. `DiscoveryStateService` owns transient
+breadcrumbs and guarded undo snapshots, not persisted schema state. See README
+for the `DISCOVERY_*` backend environment variables and limitations.
+
 ## RDF GIS Explorer — coordinated views
 
 Four views are synchronized through `SelectionService` (BehaviorSubject):

@@ -1,9 +1,9 @@
-import { Injectable, signal, inject, effect } from '@angular/core';
+import { Injectable, signal, inject, effect, untracked } from '@angular/core';
 import { GraphInteractionService } from '../graph/canvas-graph/interaction.service';
 import { DescribeService } from '../tools/describe-panel/describe.service';
 import { PropertyGraphService } from '../graph/property-graph.service';
 
-export type ToolName = 'describe' | 'edit' | 'sparql' | 'log';
+export type ToolName = 'describe' | 'edit' | 'sparql' | 'log' | 'discovery';
 
 @Injectable({ providedIn: 'root' })
 export class ToolService {
@@ -26,6 +26,7 @@ export class ToolService {
     effect(() => {
       const selected = this.graph.selected();
       if (!selected) return;
+      if (untracked(() => this.active()) === 'discovery') return;
       const uri = selected.getUri();
       if (!uri) return;
       this.active.set('describe');

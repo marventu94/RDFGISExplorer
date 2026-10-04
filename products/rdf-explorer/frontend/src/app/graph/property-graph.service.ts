@@ -15,6 +15,8 @@ import {
 import type { DropPayload } from './domain';
 import type { QueryRetriever } from './domain';
 import { serializeGraph, deserializeGraph, type ExplorerSerializedGraph } from './domain/graph-serializer';
+import { addClassNode, addDiscoveryPath, nodeClasses } from './domain/discovery';
+import type { DiscoveryExample, DiscoveryStep } from '@rdfgis/contracts';
 
 @Injectable({ providedIn: 'root' })
 export class PropertyGraphService {
@@ -96,6 +98,23 @@ export class PropertyGraphService {
 
   refresh(): void {
     this.bump();
+  }
+
+  classesFor(node: Node): string[] { return nodeClasses(this.graphRef, node); }
+
+  addDiscoveredClass(uri: string): Node {
+    const node = addClassNode(this.graphRef, uri, this.nodes().length * 100, 0);
+    this.graphRef.setSelected(node);
+    this.bump();
+    return node;
+  }
+
+  addDiscoveredPath(source: Node, steps: DiscoveryStep[], optional = false, example?: DiscoveryExample): RDFResource {
+    if (!this.graphRef.nodes.includes(source)) throw new Error('Discovery source is no longer in the graph');
+    const target = addDiscoveryPath(this.graphRef, source, steps, optional, example);
+    this.graphRef.setSelected(target);
+    this.bump();
+    return target;
   }
 
   addNode(): Node {

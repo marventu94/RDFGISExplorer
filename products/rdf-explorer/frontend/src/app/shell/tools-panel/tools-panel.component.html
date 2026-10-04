@@ -1,5 +1,7 @@
 <div class="tools" id="tools">
   <div class="right-buttons" id="right-buttons">
+    <button class="tool-btn discovery-btn" type="button" [class.active]="toolService.active() === 'discovery'"
+      (click)="discovery.openSelected()">{{ 'Explorar conexiones' | translate }}</button>
 
     <button
       class="tool-btn"
@@ -30,6 +32,7 @@
   @if (toolService.active() !== 'none') {
     <div class="right-panel" id="right-panel">
       @switch (toolService.active()) {
+        @case ('discovery') { <app-discovery-panel /> }
         @case ('describe') {
           <app-describe-panel />
         }
