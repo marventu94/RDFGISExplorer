@@ -59,7 +59,7 @@ function storeFilter(filter: FilterKind): void {
           </div>
           <div class="welcome__cta-text">
             <span class="welcome__cta-title">{{ 'Explorar en GIS' | translate }}</span>
-            <span class="welcome__cta-sub">RDF GIS Explorer</span>
+            <span class="welcome__cta-sub">GIS Explorer</span>
           </div>
         </a>
       </section>
