@@ -12,17 +12,22 @@
       <button type="button" class="icon-button" [attr.aria-label]="'Borrar búsqueda' | translate" (click)="filter.set('')">×</button>
     }
   </div>
+  <p class="hint">{{ 'Los filtros de valores se aplican al ejecutar la consulta, no a la exploración.' | translate }}</p>
   <p class="hint">{{ 'Arrastrá una propiedad o un valor al canvas para agregarlo a la consulta.' | translate }}</p>
-  @if (busy()) { <p role="status">{{ 'Cargando conexiones…' | translate }}</p> }
+  @if (busy()) { <p role="status">{{ ((data()?.pendingDirections?.length ? 'Cargando conexiones restantes…' : 'Cargando conexiones…')) | translate }}</p> }
   @if (error()) {
-    <p role="alert">{{ 'No se pudo explorar este conjunto.' | translate }}
-      <button type="button" class="icon-button" [attr.aria-label]="'Reintentar' | translate" [attr.title]="'Reintentar' | translate" (click)="retry()">↻</button>
+    <p role="alert">{{ errorMessage() | translate }}
+      <button type="button" class="icon-button" [attr.aria-label]="'Reintentar' | translate" [attr.title]="'Reintentar' | translate" [disabled]="busy() || retryIn() > 0" (click)="retry()">↻</button>
     </p>
   }
+  @if (retryIn()) { <p role="status">{{ 'Podés reintentar en' | translate }} {{ retryIn() }} s.</p> }
   @if (data(); as result) {
+    @if (result.relationsSampled) { <p class="hint">{{ 'Exploración limitada: pueden faltar propiedades y valores.' | translate }}</p> }
     @if (concrete() || result.sampled || result.truncated) { <p class="hint">{{ 'Vista previa de propiedades y valores.' | translate }}</p> }
-    @if (result.failedDirections.length) { <p role="alert">{{ 'Algunas conexiones no pudieron consultarse.' | translate }}</p> }
-    @if (!connections().length && !result.failedDirections.length) { <p>{{ 'No se encontraron conexiones en este alcance.' | translate }}</p> }
+    @if (result.failedDirections.length) { <p role="alert">{{ 'Algunas conexiones no pudieron consultarse.' | translate }}
+      <button type="button" [disabled]="busy() || retryIn() > 0" (click)="retry()">{{ 'Reintentar' | translate }}</button>
+    </p> }
+    @if (!busy() && !connections().length && !result.failedDirections.length) { <p>{{ 'No se encontraron conexiones en este alcance.' | translate }}</p> }
     @for (connection of connections(); track key(connection)) {
       <article class="connection" [draggable]="!!state.source()"
         (dragstart)="dragConnection($event, connection)" (dragend)="dragEnd()" [title]="connection.predicate">
@@ -37,7 +42,14 @@
         <div class="destination" [title]="connection.targetClass || connection.datatype || ''">
           {{ connection.targetLabel || (connection.kind === 'literal' ? ('Valor literal' | translate) : ('Recurso sin clase observada' | translate)) }}
         </div>
-        @if (!concrete()) { <small>{{ connection.entityCount }} / {{ result.sampledEntities }} {{ 'entidades de la muestra' | translate }}</small> }
+        <div class="connection-meta">
+          @if (state.source() && (connection.targetClass || connection.datatype)) {
+            <button type="button" (pointerdown)="$event.stopPropagation()" (click)="state.add([connection], false, undefined, true)">
+              {{ 'Agregar con tipo observado' | translate }}
+            </button>
+          }
+          @if (!concrete()) { <small>{{ connection.entityCount }} / {{ result.sampledEntities }} {{ 'entidades de la muestra' | translate }}</small> }
+        </div>
         @if (concrete()) {
           <div class="values">
             @for (example of connection.examples; track $index) {

@@ -10,6 +10,31 @@ import type { DiscoveryFocus } from '@rdfgis/contracts';
 
 describe('discovery SPARQL', () => {
   const parser = new Parser();
+  it('caps sampled relation rows before grouping and reuses URI seeds', () => {
+    const query = connectionsQuery({ classUri: 'urn:House' }, 'in', 200, 61, {
+      sampleIris: ['urn:house'],
+      relationLimit: 2000,
+    });
+    const ast = parser.parse(query);
+    if (ast.type !== 'query') throw new Error('Query required');
+    const pattern = ast.where![0];
+    if (pattern.type !== 'group' || pattern.patterns[0].type !== 'query')
+      throw new Error('Bounded relation subquery required');
+    expect(pattern.patterns[0].limit).toBe(2000);
+    expect(query).toContain('VALUES ?__d_focus { <urn:house> }');
+    expect(query).not.toContain('<urn:House>');
+  });
+  it('keeps blank-node fallback as a joined pattern alongside URI seeds', () => {
+    const query = connectionsQuery({ classUri: 'urn:House' }, 'out', 200, 61, {
+      sampleIris: ['urn:house'],
+      requeryNonIris: true,
+      relationLimit: 2000,
+    });
+    expect(() => parser.parse(query)).not.toThrow();
+    expect(query).toContain('UNION');
+    expect(query).toContain('FILTER(!isIRI(?__d_focus))');
+    expect(query).toContain('<urn:House>');
+  });
   it.each(['class', 'property'] as const)(
     'builds a safe %s catalogue including unlabelled URI matches',
     (kind) => {

@@ -4,7 +4,7 @@ import { withRequestCancellation } from './request-cancellation';
 import { DiscoveryService } from './discovery.service';
 import {
   DiscoveryCatalogDto,
-  DiscoveryFocusDto,
+  DiscoveryConnectionsDto,
   DiscoveryPathsDto,
 } from './discovery.dto';
 
@@ -20,11 +20,12 @@ export class DiscoveryController {
     );
   }
   @Post('connections') connections(
-    @Body() dto: DiscoveryFocusDto,
+    @Body() dto: DiscoveryConnectionsDto,
     @Res({ passthrough: true }) response: Response,
   ) {
+    const { direction, ...focus } = dto;
     return withRequestCancellation(response, (signal) =>
-      this.discovery.connections(dto, signal),
+      this.discovery.connections(focus, signal, direction),
     );
   }
   @Post('paths') paths(

@@ -8,6 +8,15 @@ export type UiTranslation = Readonly<{ es: string; en: string }>;
  * through this catalog.
  */
 export const UI_TRANSLATIONS = [
+  ['Cargando conexiones restantes…', 'Loading remaining connections…'],
+  ['Exploración limitada: pueden faltar propiedades y valores.', 'Limited exploration: properties and values may be missing.'],
+  ['Agregar con tipo observado', 'Add with observed type'],
+  ["El servidor está en pausa después de un error.", "The server is paused after an error."],
+  ["La exploración tardó demasiado. Podés reintentar o explorar un alcance más simple.", "Exploration took too long. Retry or explore a simpler scope."],
+  ["El servidor RDF no pudo completar la exploración.", "The RDF server could not complete exploration."],
+  ["No se pudo conectar con el servidor. Comprobá la conexión y reintentá.", "Could not connect to the server. Check the connection and retry."],
+  ["Podés reintentar en", "You can retry in"],
+  ["Los filtros de valores se aplican al ejecutar la consulta, no a la exploración.", "Value filters apply when executing the query, not during exploration."],
   ["Borrar búsqueda", "Clear search"],
   ["Expandir consulta", "Expand query"],
   ["Minimizar consulta", "Collapse query"],
@@ -126,7 +135,7 @@ export const UI_TRANSLATIONS = [
   ['Todavía no se cargaron propiedades de objeto.', 'No object properties loaded yet.'], ['Filtrar...', 'Filter...'],
   ['No hay URIs para describir', 'No URIs to describe'], ['Copiar URI', 'Copy URI'],
   ['⇧ + arrastrar: nueva arista', '⇧ + drag: new edge'], ['⇧ + clic: nuevo recurso', '⇧ + click: new resource'],
-  ['⇧ + arrastrar : nueva arista', '⇧ + drag : new edge'], ['⇧ + clic : nuevo recurso', '⇧ + click : new resource'],
+  ['SHIFT + clic: nuevo recurso', 'SHIFT + click: new resource'], ['CTRL + arrastrar: nueva conexión', 'CTRL + drag: new connection'],
   ['Modo conexión — arrastrá de nodo a nodo | soltá Ctrl para salir', 'Connect mode — drag from node to node | release Ctrl to exit'],
   ['Centrar en el mapa', 'Center on map'],
   ['Comenzar', 'Get started'], ['Siguiente', 'Next'], ['Anterior', 'Previous'], ['Atrás', 'Back'], ['Finalizar', 'Finish'],

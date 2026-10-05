@@ -42,7 +42,7 @@ describe('unified explorer panel', () => {
     component = TestBed.runInInjectionContext(() => new DiscoveryPanelComponent());
     TestBed.tick();
   });
-  afterEach(() => component.ngOnDestroy());
+  afterEach(() => { component.ngOnDestroy(); vi.useRealTimers(); });
   it('filters by readable labels, target types and values without another server request', () => {
     responses[0].next({ connections: [connection], sampledEntities: 2, sampleLimit: 200, sampled: false, truncated: false, failedDirections: [] });
     for (const text of ['dirección', 'domicilio', 'berisso', 'addressfeature']) {
@@ -77,6 +77,54 @@ describe('unified explorer panel', () => {
     expect(component.busy()).toBe(false);
     expect(responses).toHaveLength(2);
   });
+  it('blocks retries during cooldown, then recovers without extending the pause', () => {
+    vi.useFakeTimers();
+    responses[0].error({ status: 502, error: { error: 'UPSTREAM_ERROR', retryAfterSeconds: 2 } });
+    expect(component.busy()).toBe(false);
+    expect(component.errorMessage()).toBe('El servidor RDF no pudo completar la exploración.');
+    component.retry(); expect(responses).toHaveLength(1);
+    vi.advanceTimersByTime(2000);
+    expect(component.retryIn()).toBe(0);
+    component.retry(); component.retry(); expect(responses).toHaveLength(2);
+    responses[1].next({ connections: [connection], sampledEntities: 2, sampleLimit: 200, sampled: false, truncated: false, failedDirections: [] });
+    expect(component.error()).toBe(false);
+    expect(component.busy()).toBe(false);
+    expect(component.connections()).toEqual([connection]);
+  });
+  it('keeps successful directions while retrying a partial response and clears cooldown on a new focus', () => {
+    vi.useFakeTimers();
+    responses[0].next({ connections: [connection], sampledEntities: 2, sampleLimit: 200, sampled: false, truncated: false, failedDirections: ['in'], retryAfterSeconds: 1 });
+    vi.advanceTimersByTime(1000); component.retry();
+    expect(component.connections()).toEqual([connection]);
+    responses[1].error({ error: { error: 'DISCOVERY_COOLDOWN', retryAfterSeconds: 30 } });
+    focus.set({ uri: 'urn:other' }); TestBed.tick();
+    expect(component.retryIn()).toBe(0);
+    expect(component.data()).toBeNull();
+    expect(responses).toHaveLength(3);
+  });
+  it('releases loading when a request never responds and cancels abandoned timers', () => {
+    vi.useFakeTimers();
+    // Restart the subscription after enabling fake timers.
+    focus.set({ uri: 'urn:slow' }); TestBed.tick();
+    vi.advanceTimersByTime(60000);
+    expect(component.busy()).toBe(false);
+    expect(component.errorMessage()).toContain('tardó demasiado');
+    expect(responses[1].observed).toBe(false);
+    component.retry();
+    responses[2].error({ error: { error: 'DISCOVERY_COOLDOWN', retryAfterSeconds: 30 } });
+    component.ngOnDestroy();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('shows outgoing cards while incoming is pending and retries only the failed direction', () => {
+    const partial = { connections: [connection], sampledEntities: 2, sampleLimit: 200, sampled: false, truncated: false, failedDirections: [], pendingDirections: ['in'] as ['in'] };
+    responses[0].next(partial);
+    expect(component.busy()).toBe(true);
+    expect(component.connections()).toEqual([connection]);
+    responses[0].next({ ...partial, pendingDirections: [], failedDirections: ['in'] });
+    expect(component.busy()).toBe(false);
+    component.retry();
+    expect(TestBed.inject(DiscoveryApiService).connections).toHaveBeenLastCalledWith(focus(), ['in'], expect.objectContaining({connections:[connection]}));
+  });
   it('drags a scoped connection with its direction, class and source', () => {
     const data: Record<string, string> = {};
     const transfer = { setData: (key: string, value: string) => { data[key] = value; }, getData: (key: string) => data[key] ?? '' } as unknown as DataTransfer;
@@ -101,13 +149,12 @@ describe('unified explorer panel', () => {
   });
   it.each([
     ['author', 'Q482980'], ['teacher', 'Q37226'], ['novelist', 'Q49757'],
-  ])('drags the entire concrete occupation card with its displayed %s value', (label, id) => {
+  ])('keeps the concrete %s property card free until a value is explicitly dragged', (label, id) => {
     origin.set({ uri: 'http://www.wikidata.org/entity/Q909' });
     const example = { kind: 'uri' as const, value: `http://www.wikidata.org/entity/${id}`, label };
     const event = { dataTransfer: { setData: vi.fn() }, stopPropagation: vi.fn() } as unknown as DragEvent;
     component.dragConnection(event, { ...connection, predicate: 'http://www.wikidata.org/prop/direct/P106', examples: [example] });
-    expect(prepareDrag).toHaveBeenCalledWith(source, expect.objectContaining({ predicate: 'http://www.wikidata.org/prop/direct/P106' }), example);
-    expect(TestBed.inject(RequestService).setLabel).toHaveBeenCalledWith(example.value, label);
+    expect(prepareDrag).toHaveBeenCalledWith(source, expect.objectContaining({ predicate: 'http://www.wikidata.org/prop/direct/P106' }), undefined);
   });
   it('keeps variable-set cards unconstrained by preview examples', () => {
     const event = { dataTransfer: { setData: vi.fn() }, stopPropagation: vi.fn() } as unknown as DragEvent;

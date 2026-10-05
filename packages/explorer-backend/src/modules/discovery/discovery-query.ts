@@ -104,13 +104,21 @@ export function focusPattern(
   }
   return { pattern, current };
 }
-export function focusSample(
+export function focusSampleQuery(
   focus: DiscoveryFocus,
   limit: number,
   classPredicate = RDF_TYPE,
 ): string {
   const { pattern, current } = focusPattern(focus, classPredicate);
-  return `{ SELECT DISTINCT (${current} AS ?__d_focus) WHERE { ${pattern} } LIMIT ${limit} }`;
+  return `SELECT DISTINCT (${current} AS ?__d_focus) WHERE { ${pattern} } LIMIT ${limit}`;
+}
+
+export function focusSample(
+  focus: DiscoveryFocus,
+  limit: number,
+  classPredicate = RDF_TYPE,
+): string {
+  return `{ ${focusSampleQuery(focus, limit, classPredicate)} }`;
 }
 
 /** Bound statement scans BEFORE DISTINCT, text matching or sorting. */
@@ -162,6 +170,9 @@ export function connectionsQuery(
     classPredicate?: string;
     predicateNamespace?: string;
     wikidataLabels?: boolean;
+    sampleIris?: string[];
+    requeryNonIris?: boolean;
+    relationLimit?: number;
   } = {},
 ): string {
   const classPredicate = vocabulary.classPredicate ?? RDF_TYPE;
@@ -169,17 +180,43 @@ export function connectionsQuery(
     direction === 'out'
       ? '?__d_focus ?predicate ?neighbor'
       : '?neighbor ?predicate ?__d_focus';
+  const seeds = vocabulary.sampleIris
+    ? [
+        ...(vocabulary.sampleIris.length
+          ? [
+              `VALUES ?__d_focus { ${vocabulary.sampleIris.map(iri).join(' ')} }`,
+            ]
+          : []),
+        ...(vocabulary.requeryNonIris
+          ? [
+              `${focusSample(focus, sample, classPredicate)} FILTER(!isIRI(?__d_focus))`,
+            ]
+          : []),
+      ]
+    : [];
+  const anchor = vocabulary.sampleIris
+    ? seeds.map((seed) => `{ ${seed} }`).join(' UNION ') || 'FILTER(false)'
+    : focus.uri && !focus.steps?.length
+      ? `BIND(${iri(focus.uri)} AS ?__d_focus)`
+      : focusSample(focus, sample, classPredicate);
+  const statementPattern =
+    focus.uri && !focus.steps?.length && !vocabulary.sampleIris
+      ? `${direction === 'out' ? `${iri(focus.uri)} ?predicate ?neighbor` : `?neighbor ?predicate ${iri(focus.uri)}`} . ${anchor}`
+      : `{ ${anchor} } ${edge} .`;
+  const namespace = vocabulary.predicateNamespace
+    ? `FILTER(STRSTARTS(STR(?predicate), ${literal(vocabulary.predicateNamespace)}))`
+    : '';
+  // Bound raw relations BEFORE type enrichment and aggregate sorting. The
+  // result intentionally reports incomplete coverage when this budget is used.
+  const statements = vocabulary.relationLimit
+    ? `{ SELECT ?__d_focus ?predicate ?neighbor WHERE { ${statementPattern} ${namespace} } LIMIT ${vocabulary.relationLimit} }`
+    : `${statementPattern} ${namespace}`;
   const aggregate = `SELECT ?predicate ?targetClass ?kind ?datatype
     (COUNT(DISTINCT ?__d_focus) AS ?entities)
     (SAMPLE(STR(?neighbor)) AS ?example) (SAMPLE(?exampleKind) AS ?exampleKindValue)
     (SAMPLE(?language) AS ?languageValue)
     WHERE {
-      ${
-        focus.uri && !focus.steps?.length
-          ? `${direction === 'out' ? `${iri(focus.uri)} ?predicate ?neighbor` : `?neighbor ?predicate ${iri(focus.uri)}`} . BIND(${iri(focus.uri)} AS ?__d_focus)`
-          : `${focusSample(focus, sample, classPredicate)} ${edge} .`
-      }
-      ${vocabulary.predicateNamespace ? `FILTER(STRSTARTS(STR(?predicate), ${literal(vocabulary.predicateNamespace)}))` : ''}
+      ${statements}
       BIND(IF(isLiteral(?neighbor), "literal", "resource") AS ?kind)
       BIND(IF(isLiteral(?neighbor), "literal", IF(isBlank(?neighbor), "bnode", "uri")) AS ?exampleKind)
       BIND(IF(isLiteral(?neighbor), DATATYPE(?neighbor), <urn:rdfgis:no-datatype>) AS ?datatype)

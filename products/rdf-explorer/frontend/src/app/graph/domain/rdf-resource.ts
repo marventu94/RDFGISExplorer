@@ -161,10 +161,13 @@ export abstract class RDFResource {
 
   labelOf(uri: string): string {
     const cached = this.ctx?.labelProvider.getLabel(uri);
-    if (cached !== undefined) return cached;
-    const prefixes = this.ctx?.prefixes;
-    if (!prefixes) return '<' + uri + '>';
-    return curieLocal(uri, prefixes)[0];
+    if (cached?.trim()) return cached;
+    const [curie, prefix] = curieLocal(uri, this.ctx?.prefixes ?? []);
+    if (prefix) return curie;
+    // Display fallback only: SPARQL still uses curieLocal's full IRI.
+    const local = uri.split(/[#/:]/).filter(Boolean).pop();
+    if (!local) return curie;
+    try { return decodeURIComponent(local); } catch { return local; }
   }
 }
 

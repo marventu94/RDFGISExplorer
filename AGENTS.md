@@ -160,12 +160,12 @@ exploration, with shared types in `packages/contracts/src/discovery.ts`. Catalog
 search separates classes, properties and resources, includes observed/declared
 terms, and falls back to URI matching when labels are missing. Neighborhoods query
 incoming/outgoing relationships over bounded distinct-entity samples, using the
-current connected SELECT or a class/resource/property focus. Exploration paths
+current connected structural SELECT (without value filters) or a class/resource/property focus. Exploration paths
 are re-evaluated as joined patterns; never send returned blank-node identifiers
 back as constants. Path search validates the full chain and remains explicitly
 incomplete under its depth/time/request budgets.
 
-`graph/domain/discovery.ts` adds typed variables and paths to the existing domain
+`graph/domain/discovery.ts` adds free variables and paths by default; observed class/datatype constraints require the explicit type action. It uses the existing domain
 model, preserves optional branch semantics, and reuses compatible branches.
 Literal example filters use escaped `equals` plus datatype/language constraints;
 resource constraints retain blank nodes. `DiscoveryStateService` owns transient

@@ -20,11 +20,16 @@ export interface DiscoveryStep {
   kind: 'resource' | 'literal';
   datatype?: string;
 }
+export type DiscoveryDirection = 'out' | 'in';
+export interface DiscoveryConnectionsRequest extends DiscoveryFocus {
+  /** Omit to inspect both directions (legacy and path callers). */
+  direction?: DiscoveryDirection;
+}
 export interface DiscoveryFocus {
   classUri?: string;
   propertyUri?: string;
   uri?: string;
-  /** Self-contained SELECT generated from the current connected query component. */
+  /** Self-contained structural SELECT from the connected component, without value filters. */
   query?: string;
   variable?: string;
   /** Re-evaluated as a joined pattern; never carry blank-node IDs between queries. */
@@ -50,7 +55,14 @@ export interface DiscoveryConnections {
   sampleLimit: number;
   sampled: boolean;
   truncated: boolean;
-  failedDirections: Array<'out' | 'in'>;
+  failedDirections: DiscoveryDirection[];
+  /** Client-side progress while the remaining direction is requested. */
+  pendingDirections?: DiscoveryDirection[];
+  /** Relation scans are capped before enrichment/aggregation, so coverage is incomplete. */
+  relationsSampled?: boolean;
+  relationLimit?: number;
+  /** Remaining upstream cooldown after a partial failure. */
+  retryAfterSeconds?: number;
 }
 export interface DiscoveryPaths {
   paths: DiscoveryStep[][];

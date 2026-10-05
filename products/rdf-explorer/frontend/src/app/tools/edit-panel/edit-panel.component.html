@@ -58,7 +58,7 @@
       <label class="field-label" for="edit-filter-results">{{ 'Possible results' | translate }}</label>
       <div class="result-search">
         <input id="edit-filter-results" type="search" autocomplete="off" [ngModel]="resultFilterValue"
-          (ngModelChange)="resultFilterValue = $event; onFilterValueChange()" [disabled]="resultFilterLoading()" />
+          (ngModelChange)="resultFilterValue = $event; onFilterValueChange()" />
         @if (resultFilterLoading()) { <span class="edit-spinner" role="status" [attr.aria-label]="'Loading...' | translate"></span> }
       </div>
       @if (loadError(); as err) { <p class="notice error" role="alert">{{ err }}</p> }

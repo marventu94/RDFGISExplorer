@@ -52,8 +52,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     const message = `${request.method} ${request.url} → ${status} ${JSON.stringify(body)}`;
-    if (body.error === 'DISCOVERY_COOLDOWN') {
+    if (typeof body.retryAfterSeconds === 'number') {
       response.setHeader('Retry-After', String(body.retryAfterSeconds));
+    }
+    if (body.error === 'DISCOVERY_COOLDOWN') {
       this.logger.warn(message);
     } else {
       this.logger.error(

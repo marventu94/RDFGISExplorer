@@ -13,11 +13,11 @@ export function nodeClasses(graph: PropertyGraph, node: Node): string[] {
 }
 export function discoveryFocus(node: Node): DiscoveryFocus | null {
   if (!node.isVariable()) return node.getUri() ? { uri: node.getUri()! } : null;
-  const query = node.createQuery()?.toSparqlFullProjection();
+  const query = node.createQuery()?.toSparql({ structural: true });
   return query ? { query, variable: node.variable.getName() } : null;
 }
 /** Give new discovery variables stable, readable names without changing existing branches. */
-function nameVariable(graph: PropertyGraph, resource: RDFResource, uri: string): void {
+function nameVariable(graph: PropertyGraph, resource: RDFResource, uri: string, suffix = '', owner = ''): void {
   let local = uri.split(/[#/:]/).filter(Boolean).pop() ?? '';
   try { local = decodeURIComponent(local); } catch { /* Keep malformed percent escapes as text. */ }
   const text = graph.labelProvider.getLabel(uri) || local;
@@ -25,6 +25,8 @@ function nameVariable(graph: PropertyGraph, resource: RDFResource, uri: string):
   let base = words.map((word, index) => index ? word[0].toUpperCase() + word.slice(1) : word[0].toLowerCase() + word.slice(1)).join('');
   if (!base) base = 'value';
   if (/^[0-9]/.test(base)) base = 'value' + base;
+  if (owner) base = owner + base[0].toUpperCase() + base.slice(1);
+  if (suffix && !base.toLowerCase().endsWith(suffix.toLowerCase())) base += suffix;
   // Generated IDs are query names too, even though they are absent from usedAliases.
   const names = new Set(graph.usedAliases);
   for (const node of graph.nodes) {
@@ -54,7 +56,7 @@ export function addClassNode(graph: PropertyGraph, uri: string, x = 0, y = 0): N
 }
 /** Atomic caller snapshots this mutation. Literal values remain typed filters, not interpolated constants. */
 export function addDiscoveryPath(
-  graph: PropertyGraph, source: Node, steps: DiscoveryStep[], optional = false, example?: DiscoveryExample,
+  graph: PropertyGraph, source: Node, steps: DiscoveryStep[], optional = false, example?: DiscoveryExample, constrainObserved = false,
 ): RDFResource {
   for (const [i, step] of steps.entries()) {
     if (!validIri(step.predicate) || (step.targetClass && !validIri(step.targetClass))
@@ -69,14 +71,18 @@ export function addDiscoveryPath(
     const last = i === steps.length - 1;
     if (step.kind === 'literal') {
       const existing = current.properties.find(p => !p.isVariable() && p.getUri() === step.predicate && p.optional === optional && p.literal
-        && p.literal.variable.filters.find(f => f.type === 'datatype')?.data.datatype === step.datatype);
+        && (!constrainObserved || !p.literal.variable.filters.some(f => f.type === 'datatype')
+          || p.literal.variable.filters.some(f => f.type === 'datatype' && f.data.datatype === step.datatype)));
       const prop = existing ?? current.newProp();
       prop.addUri(step.predicate); prop.mkConst(); prop.optional = optional;
       const lit = prop.literal ?? prop.mkLiteral()!;
       if (!existing) {
-        nameVariable(graph, lit, step.predicate);
-        lit.variable.filters.push(new Filter(lit.variable, 'isliteral', {}));
-        if (step.datatype) lit.variable.filters.push(new Filter(lit.variable, 'datatype', { datatype: step.datatype }));
+        nameVariable(graph, lit, step.predicate, '', current.variable.getName());
+      }
+      if (constrainObserved) {
+        if (!lit.variable.filters.some(f => f.type === 'isliteral')) lit.variable.filters.push(new Filter(lit.variable, 'isliteral', {}));
+        if (step.datatype && !lit.variable.filters.some(f => f.type === 'datatype' && f.data.datatype === step.datatype))
+          lit.variable.filters.push(new Filter(lit.variable, 'datatype', { datatype: step.datatype }));
       }
       if (example && last) lit.variable.filters.push(new Filter(lit.variable, 'equals', {
         value: example.value, datatype: example.datatype, language: example.lang,
@@ -90,19 +96,21 @@ export function addDiscoveryPath(
       const anchor = step.direction === 'out' ? edge.source.parentNode : edge.target;
       return anchor === current && !edge.source.isVariable() && edge.source.getUri() === step.predicate
         && edge.source.optional === optional && neighbor.isVariable()
-        && (step.targetClass ? nodeClasses(graph, neighbor).includes(step.targetClass) : nodeClasses(graph, neighbor).length === 0);
+        && (!constrainObserved || !step.targetClass || nodeClasses(graph, neighbor).length === 0 || nodeClasses(graph, neighbor).includes(step.targetClass));
     });
+    let next: Node;
     if (existing) {
-      current = step.direction === 'out' ? existing.target : existing.source.parentNode;
-      if (last && example?.kind === 'uri') { current.addUri(example.value); current.mkConst(); }
-      continue;
+      next = step.direction === 'out' ? existing.target : existing.source.parentNode;
+    } else {
+      next = graph.addNode().setPosition(current.x + 320, current.y + i * 100);
+      const predicateName = step.predicate.split(/[#/:]/).pop();
+      const suffix = step.targetClass && predicateName === 'hasFeature' ? 'Feature' : '';
+      nameVariable(graph, next, step.targetClass ?? step.predicate, suffix);
+      if (step.direction === 'out') connect(graph, current, step.predicate, next, optional);
+      else connect(graph, next, step.predicate, current, optional);
     }
-    const next = graph.addNode().setPosition(current.x + 320, current.y + i * 100);
-    nameVariable(graph, next, step.predicate);
     if (example?.kind === 'uri' && last) { next.addUri(example.value); next.mkConst(); }
-    if (step.direction === 'out') connect(graph, current, step.predicate, next, optional);
-    else connect(graph, next, step.predicate, current, optional);
-    if (step.targetClass) {
+    if (constrainObserved && step.targetClass && !nodeClasses(graph, next).includes(step.targetClass)) {
       const type = graph.addNode().setPosition(next.x + 160, next.y - 140);
       type.addUri(step.targetClass); type.mkConst();
       connect(graph, next, graph.endpointAdapter.classPredicate ?? TYPE_URI, type, optional);
