@@ -75,8 +75,7 @@ representation without relying on a specific domain.
 Results are explored through four coordinated views: map, timeline, table, and
 graph.
 
-![Coordinated result exploration in GIS
-Explorer](docs/assets/03-gis-explorer.png)
+![Coordinated result exploration in GIS Explorer](docs/assets/03-gis-explorer.png)
 
 ## Technology stack
 
