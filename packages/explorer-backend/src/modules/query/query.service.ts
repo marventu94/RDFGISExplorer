@@ -33,6 +33,7 @@ const SAFE_VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 @Injectable()
 export class QueryService {
   private readonly logger = new Logger(QueryService.name);
+  private traceSequence = 0;
 
   constructor(
     @Inject(SPARQL_ENDPOINT) private readonly endpoint: SparqlEndpoint,
@@ -80,30 +81,36 @@ export class QueryService {
     }
 
     const timeout = this.intConfig('SPARQL_TIMEOUT_MS', 30000);
-    const preview =
-      sparql.length > MAX_QUERY_LOG_LEN
-        ? sparql.slice(0, MAX_QUERY_LOG_LEN) + '...'
-        : sparql;
+    const trace = `execute-${++this.traceSequence}`;
+    const startedAt = Date.now();
     this.logger.debug(
-      `Executing SPARQL (limit=${resolvedLimit}, timeout=${timeout}ms): ${preview}`,
+      `[${trace}] Executing SPARQL backend=${this.endpoint.backendName} limit=${resolvedLimit} timeoutMs=${timeout} raw=${!!raw}\nSPARQL:\n${sparql}\n[${trace}] end SPARQL`,
     );
 
     try {
-      return await this.endpoint.execute(sparql, {
+      const result = await this.endpoint.execute(sparql, {
         timeoutMs: timeout,
         limit: resolvedLimit,
         raw,
       });
+      this.logger.debug(
+        `[${trace}] success elapsedMs=${Date.now() - startedAt} rows=${result.bindings.length} truncated=${result.meta.truncated}`,
+      );
+      return result;
     } catch (e) {
       if (e instanceof TimeoutError) {
-        this.logger.error(`Timeout after ${e.timeoutMs}ms: ${preview}`);
+        this.logger.error(
+          `[${trace}] Timeout after ${e.timeoutMs}ms elapsedMs=${Date.now() - startedAt}\nSPARQL:\n${sparql}\n[${trace}] end SPARQL`,
+        );
         throw new HttpException(
           { error: 'TIMEOUT', message: e.message, timeoutMs: e.timeoutMs },
           HttpStatus.REQUEST_TIMEOUT,
         );
       }
       if (e instanceof UpstreamError) {
-        this.logger.error(`Upstream error status=${e.status}: ${e.message}`);
+        this.logger.error(
+          `[${trace}] Upstream error status=${e.status} elapsedMs=${Date.now() - startedAt}: ${e.message}\nSPARQL:\n${sparql}\n[${trace}] end SPARQL`,
+        );
         throw new HttpException(
           { error: 'UPSTREAM_ERROR', message: e.message },
           HttpStatus.BAD_GATEWAY,

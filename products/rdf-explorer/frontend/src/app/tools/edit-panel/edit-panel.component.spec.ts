@@ -29,7 +29,35 @@ describe('editing a single resource constraint', () => {
     component = TestBed.runInInjectionContext(() => new EditPanelComponent());
     TestBed.tick();
   });
-  afterEach(() => component.ngOnDestroy());
+  afterEach(() => { component.ngOnDestroy(); vi.useRealTimers(); });
+  it('debounces result searches and resets pagination when the text changes', () => {
+    vi.useFakeTimers();
+    const preview = vi.mocked(selected.loadPreview);
+    preview.mockClear();
+    component.resultOffset = 20;
+    component.resultFilterValue = 'Be'; component.onFilterValueChange();
+    vi.advanceTimersByTime(200);
+    component.resultFilterValue = 'Berisso'; component.onFilterValueChange();
+    vi.advanceTimersByTime(399);
+    expect(preview).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(preview).toHaveBeenCalledOnce();
+    expect(preview.mock.calls[0][0]).toMatchObject({ varFilter: 'Berisso', offset: 0, appendResults: false });
+    expect(component.resultOffset).toBe(0);
+  });
+  it('keeps the latest search loading when an obsolete callback arrives', () => {
+    vi.useFakeTimers();
+    const preview = vi.mocked(selected.loadPreview);
+    const old = preview.mock.calls[0][0];
+    component.resultFilterValue = 'Berisso'; component.onFilterValueChange();
+    vi.advanceTimersByTime(400);
+    expect((old['canceller'] as AbortSignal).aborted).toBe(true);
+    (old['callback'] as () => void)();
+    expect(component.resultFilterLoading()).toBe(true);
+    const latest = preview.mock.calls.at(-1)![0];
+    (latest['callback'] as () => void)();
+    expect(component.resultFilterLoading()).toBe(false);
+  });
   it('replaces the previous result and keeps the query and Explorer on the same resource', () => {
     component.addValue(first);
     component.mkVariable();

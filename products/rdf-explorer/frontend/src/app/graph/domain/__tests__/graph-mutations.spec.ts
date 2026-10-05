@@ -121,6 +121,70 @@ describe('PropertyGraph mutations', () => {
       expect(graph.edges.length).toBe(0);
     });
 
+    it('removes newly orphaned incoming/outgoing neighbors and leaves unrelated isolated nodes', () => {
+      const center = graph.addNode();
+      const incoming = graph.addNode();
+      const outgoing = graph.addNode(); outgoing.addUri('urn:Class'); outgoing.mkConst();
+      const independent = graph.addNode();
+      graph.addEdge(incoming.newProp(), center);
+      graph.addEdge(center.newProp(), outgoing);
+      graph.removeNode(center);
+      expect(graph.nodes).toEqual([independent]);
+      expect(graph.edges).toEqual([]);
+      expect(graph.getNodeByUri('urn:Class')).toBeNull();
+    });
+
+    it('preserves connected branches and shared class nodes', () => {
+      const removed = graph.addNode();
+      const remaining = graph.addNode();
+      const type = graph.addNode(); type.addUri('urn:Class'); type.mkConst();
+      graph.addEdge(removed.newProp(), type);
+      graph.addEdge(remaining.newProp(), type);
+      graph.removeNode(removed);
+      expect(graph.nodes).toEqual([remaining, type]);
+      expect(graph.edges).toHaveLength(1);
+      expect(graph.getNodeByUri('urn:Class')).toBe(type);
+    });
+
+    it('keeps URI lookup for a surviving duplicate class node', () => {
+      const removed = graph.addNode();
+      const removedType = graph.addNode(); removedType.addUri('urn:Class');
+      graph.addEdge(removed.newProp(), removedType);
+      const remaining = graph.addNode();
+      const remainingType = graph.addNode(); remainingType.addUri('urn:Class');
+      graph.addEdge(remaining.newProp(), remainingType);
+      graph.removeNode(removed);
+      expect(graph.getNodeByUri('urn:Class')).toBe(remainingType);
+      expect(graph.nodes).toEqual([remaining, remainingType]);
+    });
+
+    it('keeps a neighbor with a literal relationship as an independent query', () => {
+      const removed = graph.addNode();
+      const remaining = graph.addNode();
+      graph.addEdge(remaining.newProp(), removed);
+      const label = remaining.newProp(); label.addUri('urn:label'); label.mkConst(); label.mkLiteral();
+      graph.removeNode(removed);
+      expect(graph.nodes).toEqual([remaining]);
+      expect(remaining.properties).toEqual([label]);
+      expect(remaining.createQuery()!.toSparql()).toContain('<urn:label>');
+    });
+
+    it('clears selection and aliases of deleted children and orphan neighbors', () => {
+      const removed = graph.addNode(); removed.variable.setAlias('city', graph);
+      const type = graph.addNode(); type.variable.setAlias('cityType', graph);
+      graph.addEdge(removed.newProp(), type);
+      const property = removed.newProp(); property.variable.setAlias('labelProperty', graph);
+      const label = property.mkLiteral()!; label.variable.setAlias('cityLabel', graph);
+      graph.setSelected(label);
+      graph.removeNode(removed);
+      expect(graph.getSelected()).toBeNull();
+      expect(graph.usedAliases.size).toBe(0);
+      expect(graph.nodes).toEqual([]);
+      // A stale delete must not remove another item.
+      graph.removeNode(removed);
+      expect(graph.nodes).toEqual([]);
+    });
+
     it('clears selected when deleting selected node', () => {
       const n = graph.addNode();
       graph.setSelected(n);

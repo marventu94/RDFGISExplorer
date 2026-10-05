@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { QueryResult, ResultBinding } from '@rdfgis/contracts';
 import type { SparqlEndpoint } from '../../adapters/sparql-endpoint.interface';
+import { UpstreamError } from '../../adapters/sparql-endpoint.interface';
 import { DiscoveryService } from './discovery.service';
 
 const lit = (value: string) => ({ type: 'literal' as const, value });
@@ -287,7 +288,10 @@ describe('DiscoveryService', () => {
     // Mock the async port with synchronous fixture construction.
     // eslint-disable-next-line @typescript-eslint/require-await
     execute.mockImplementation(async (query: string) => {
-      if (query.includes('COUNT(*)')) return result([{ total: lit('3') }]);
+      if (query.startsWith('SELECT DISTINCT ('))
+        return result(
+          [0, 1, 2].map((i) => ({ __d_focus: uri(`urn:house${i}`) })),
+        );
       if (query.includes('?neighbor ?predicate ?__d_focus'))
         throw new Error('timeout');
       return result([
@@ -302,10 +306,92 @@ describe('DiscoveryService', () => {
     });
     const response = await service.connections({ classUri: 'urn:House' });
     expect(response.sampled).toBe(true);
+    expect(execute.mock.calls[0][0]).not.toContain('COUNT(*)');
+    expect(execute.mock.calls[0][1].limit).toBe(3);
     expect(response.sampledEntities).toBe(2);
     expect(response.failedDirections).toEqual(['in']);
+    expect(response.retryAfterSeconds).toBe(30);
     expect(response.connections[0].examples[0].kind).toBe('bnode');
     expect(execute.mock.calls.every(([, options]) => options.raw)).toBe(true);
+  });
+  it('reports a retry delay on the original upstream error and recovers after the pause', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      execute.mockRejectedValueOnce(
+        new UpstreamError(500, 'this.index is null'),
+      );
+      await expect(
+        service.connections({ classUri: 'urn:House' }),
+      ).rejects.toMatchObject({
+        status: 502,
+        response: { error: 'UPSTREAM_ERROR', retryAfterSeconds: 30 },
+      });
+      clock.mockReturnValue(2000);
+      await expect(
+        service.connections({ classUri: 'urn:House' }),
+      ).rejects.toMatchObject({
+        response: { error: 'DISCOVERY_COOLDOWN', retryAfterSeconds: 29 },
+      });
+      expect(execute).toHaveBeenCalledTimes(1);
+      clock.mockReturnValue(31001);
+      execute.mockResolvedValue(result([]));
+      expect(
+        (await service.connections({ classUri: 'urn:House' })).failedDirections,
+      ).toEqual([]);
+      expect(execute).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it('reuses one named-entity sample across directional requests and incoming retries', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      execute
+        .mockResolvedValueOnce(
+          result([
+            { __d_focus: uri('urn:a') },
+            { __d_focus: uri('urn:b') },
+            { __d_focus: uri('urn:lookahead') },
+          ]),
+        )
+        .mockResolvedValueOnce(result([]))
+        .mockRejectedValueOnce(new UpstreamError(503, 'too long'));
+      const focus = { classUri: 'urn:House' };
+      const outgoing = await service.connections(focus, undefined, 'out');
+      expect(outgoing.relationsSampled).toBe(true);
+      const incoming = await service.connections(focus, undefined, 'in');
+      expect(incoming.failedDirections).toEqual(['in']);
+      expect(execute).toHaveBeenCalledTimes(3);
+      for (const query of execute.mock.calls.slice(1).map((call) => call[0])) {
+        expect(query).toContain('VALUES ?__d_focus { <urn:a> <urn:b> }');
+        expect(query).not.toContain('urn:House');
+        expect(query).not.toContain('urn:lookahead');
+        expect(query).toContain('LIMIT 2000');
+      }
+      clock.mockReturnValue(31001);
+      execute.mockResolvedValueOnce(result([]));
+      await service.connections(focus, undefined, 'in');
+      expect(execute).toHaveBeenCalledTimes(4);
+      expect(execute.mock.calls[3][0]).toContain('VALUES');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it('re-evaluates anonymous entities as patterns without reusing their result identifiers', async () => {
+    execute
+      .mockResolvedValueOnce(
+        result([
+          { __d_focus: uri('urn:a') },
+          { __d_focus: { type: 'bnode', value: 'opaque-123' } },
+        ]),
+      )
+      .mockResolvedValue(result([]));
+    await service.connections({ classUri: 'urn:House' });
+    const query = execute.mock.calls[1][0];
+    expect(query).toContain('VALUES ?__d_focus { <urn:a> }');
+    expect(query).toContain('FILTER(!isIRI(?__d_focus))');
+    expect(query).toContain('urn:House');
+    expect(query).not.toContain('opaque-123');
   });
   it('uses adapter vocabulary and returns readable Wikidata properties, types and values', async () => {
     service = new DiscoveryService(
@@ -322,7 +408,7 @@ describe('DiscoveryService', () => {
       new ConfigService(),
     );
     execute
-      .mockResolvedValueOnce(result([{ total: lit('1') }]))
+      .mockResolvedValueOnce(result([{ __d_focus: uri('urn:house') }]))
       .mockResolvedValueOnce(
         result([
           {
@@ -352,7 +438,7 @@ describe('DiscoveryService', () => {
     expect(execute.mock.calls[1][0]).toContain('"urn:direct:"');
   });
   it('does not query relationships for an empty set', async () => {
-    execute.mockResolvedValue(result([{ total: lit('0') }]));
+    execute.mockResolvedValue(result([]));
     expect(
       (await service.connections({ classUri: 'urn:Empty' })).connections,
     ).toEqual([]);
@@ -362,10 +448,15 @@ describe('DiscoveryService', () => {
     // Mock the async port with synchronous fixture construction.
     // eslint-disable-next-line @typescript-eslint/require-await
     execute.mockImplementation(async (query: string) => {
-      if (query.includes('COUNT(*)')) return result([{ total: lit('1') }]);
-      if (query.includes('?__d_step0')) {
-        expect(query).toContain('?__d_step0 <urn:about> ?__d_root');
-        return query.includes('?__d_focus ?predicate ?neighbor')
+      if (query.startsWith('SELECT DISTINCT (')) {
+        if (query.includes('?__d_step0')) {
+          expect(query).toContain('?__d_step0 <urn:about> ?__d_root');
+          return result([{ __d_focus: uri('urn:listing') }]);
+        }
+        return result([{ __d_focus: uri('urn:house') }]);
+      }
+      if (query.includes('<urn:listing>')) {
+        return query.includes('?__d_focus ?predicate ?neighbor .')
           ? result([
               {
                 predicate: uri('urn:function'),

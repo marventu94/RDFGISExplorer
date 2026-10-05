@@ -16,7 +16,7 @@ import { ThemeToggleComponent } from '../core/theme-toggle.component';
           <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z" />
           <path d="M2 12h20" />
         </svg>
-        <span class="top-bar__title">RDF GIS Platform</span>
+        <span class="top-bar__title">RDF GIS Explorer</span>
       </div>
 
       <nav class="top-bar__breadcrumb">

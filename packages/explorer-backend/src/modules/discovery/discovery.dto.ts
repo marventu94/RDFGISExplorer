@@ -40,6 +40,9 @@ export class DiscoveryFocusDto implements DiscoveryFocus {
   @Type(() => DiscoveryStepDto)
   steps?: DiscoveryStepDto[];
 }
+export class DiscoveryConnectionsDto extends DiscoveryFocusDto {
+  @IsOptional() @IsIn(['out', 'in']) direction?: 'out' | 'in';
+}
 export class DiscoveryPathsDto {
   @IsDefined()
   @ValidateNested()

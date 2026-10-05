@@ -35,11 +35,21 @@ describe('DiscoveryStateService', () => {
   it('adds the explored path atomically and undoes it', () => {
     state.explore(house); state.traverse(feature); state.add();
     TestBed.tick();
-    expect(graph.nodes()).toHaveLength(4);
+    expect(graph.nodes()).toHaveLength(3);
     expect(state.canUndo()).toBe(true);
     state.undo();
     expect(graph.nodes()).toHaveLength(0);
     expect(state.origin()).toBeNull();
+  });
+  it('applies observed types only through the explicit add action', () => {
+    state.useClass(house); TestBed.tick();
+    state.add([{ ...feature, targetLabel: 'Domicilio' }], false, undefined, true); TestBed.tick();
+    const request = TestBed.inject(RequestService);
+    expect(request.setLabel).toHaveBeenCalledWith('urn:feature', 'feature');
+    expect(request.setLabel).toHaveBeenCalledWith('urn:Address', 'Domicilio');
+    expect(graph.nodes()).toHaveLength(4);
+    expect(graph.classesFor(state.source()!)).toContain('urn:Address');
+    expect(state.canUndo()).toBe(true);
   });
   it('does not undo later manual edits or another workspace', () => {
     state.useClass(house);
@@ -57,6 +67,7 @@ describe('DiscoveryStateService', () => {
     graph.addDiscoveredPath(source, [{ predicate: 'urn:label', direction: 'out', kind: 'literal' }], false, { kind: 'literal', value: 'Berisso' });
     graph.setSelected(source); TestBed.tick();
     expect(state.focus()!.query).not.toBe(old);
-    expect(state.focus()!.query).toContain('Berisso');
+    expect(state.focus()!.query).not.toContain('Berisso');
+    expect(source.createQuery()!.toSparqlFullProjection()).toContain('Berisso');
   });
 });

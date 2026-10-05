@@ -25,9 +25,10 @@ describe('connection drops on the canvas', () => {
     expect(graph.selected()).toBe(other);
     const connection = graph.edges().find(edge => edge.source.getUri() === step.predicate)!;
     const target = direction === 'out' ? connection.target : connection.source.parentNode;
-    expect(target.variable.get()).toBe('?addressFeature');
+    expect(target.variable.get()).toBe('?address');
     expect(target.variable.filters.some(filter => filter.type === 'isresource')).toBe(false);
-    expect(graph.classesFor(target)).toEqual(['urn:Address']);
+    expect(graph.classesFor(target)).toEqual([]);
+    expect(source.createQuery()!.toSparqlFullProjection()).not.toContain('<urn:Address>');
     expect({ x: target.x, y: target.y }).toEqual({ x: 600, y: 300 });
     const edge = graph.edges().find(edge => edge.source.getUri() === step.predicate)!;
     expect(edge.source.parentNode).toBe(direction === 'out' ? source : target);

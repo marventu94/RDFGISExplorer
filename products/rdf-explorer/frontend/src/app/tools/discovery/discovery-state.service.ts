@@ -76,9 +76,15 @@ export class DiscoveryStateService {
   asStep(c: DiscoveryStep): DiscoveryStep {
     return { predicate: c.predicate, direction: c.direction, kind: c.kind, targetClass: c.targetClass, datatype: c.datatype };
   }
-  add(steps: DiscoveryStep[] = [], optional = false, example?: DiscoveryExample): void {
+  add(steps: (DiscoveryStep & { label?: string; targetLabel?: string })[] = [], optional = false, example?: DiscoveryExample, constrainObserved = false): void {
     const origin = this.origin();
     if (!origin) return;
+    for (const step of steps) {
+      if (step.label) this.request.setLabel(step.predicate, step.label);
+      if (step.targetClass && step.targetLabel) {
+        this.request.setLabel(step.targetClass, step.targetLabel);
+      }
+    }
     const path = [...this.steps(), ...steps.map(s => this.asStep(s))];
     this.mutate(() => {
       let source = this.source();
@@ -95,7 +101,7 @@ export class DiscoveryStateService {
         }
       }
       if (!source) return;
-      this.graph.addDiscoveredPath(source, path, optional, example);
+      this.graph.addDiscoveredPath(source, path, optional, example, constrainObserved);
       this.steps.set([]);
       const selected = this.graph.selected();
       if (selected instanceof Node) this.selectNode(selected);

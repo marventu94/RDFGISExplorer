@@ -1,8 +1,27 @@
 import { ValidationPipe } from '@nestjs/common';
-import { DiscoveryFocusDto, DiscoveryPathsDto } from './discovery.dto';
+import {
+  DiscoveryConnectionsDto,
+  DiscoveryFocusDto,
+  DiscoveryPathsDto,
+} from './discovery.dto';
 
 describe('discovery request validation', () => {
   const pipe = new ValidationPipe({ transform: true, whitelist: true });
+  it('accepts optional connection direction and rejects unknown directions', async () => {
+    for (const direction of [undefined, 'in', 'out']) {
+      const result: DiscoveryConnectionsDto = (await pipe.transform(
+        { classUri: 'urn:C', direction },
+        { type: 'body', metatype: DiscoveryConnectionsDto },
+      )) as DiscoveryConnectionsDto;
+      expect(result.direction).toBe(direction);
+    }
+    await expect(
+      pipe.transform(
+        { classUri: 'urn:C', direction: 'both' },
+        { type: 'body', metatype: DiscoveryConnectionsDto },
+      ),
+    ).rejects.toThrow();
+  });
   it('rejects missing path focus and invalid nested directions', async () => {
     await expect(
       pipe.transform(

@@ -1,7 +1,7 @@
 import { RDFResource, curieLocal } from './rdf-resource';
 import type { GraphContext } from './rdf-resource';
-import { Variable } from './variable';
 import { Filter } from './filter';
+import type { Variable } from './variable';
 import { Node } from './node';
 import { Property } from './property';
 import { Literal } from './literal';
@@ -32,6 +32,13 @@ export class Query {
   limit = 0;
   offset = 0;
   private cache: string | null = null;
+  private previewSearch?: { variables: Variable[]; text: string };
+
+  /** Temporary result search; never changes canvas filters or persisted state. */
+  setPreviewSearch(variables: Variable[], text: string): void {
+    this.previewSearch = { variables, text };
+    this.cache = null;
+  }
 
   constructor(
     private readonly ctx: GraphContext,
@@ -105,8 +112,9 @@ export class Query {
     this.cache = null;
   }
 
-  toSparql(): string | null {
-    if (this.cache) return this.cache;
+  toSparql(opts?: { structural?: boolean }): string | null {
+    const structural = opts?.structural === true;
+    if (!structural && this.cache) return this.cache;
     if (this.triples.length === 0) return null;
     const values = new Set<RDFResource>();
     const prefixes = new Set<Prefix>();
@@ -143,42 +151,55 @@ export class Query {
       }).join(' ') + ' .\n';
     };
 
-    const labelSvc = this.ctx.endpointAdapter.labelService?.(this.ctx.lang) ?? null;
-    const selectVars = [...new Set(this.select.filter(r => !r.hide).map(r => String(r.variable)))];
+    const labelSvc = structural ? null : this.ctx.endpointAdapter.labelService?.(this.ctx.lang) ?? null;
+    const selectVars = structural ? [String(this.root.variable)]
+      : [...new Set(this.select.filter(r => !r.hide).map(r => String(r.variable)))];
+    const includeFilter = (filter: Filter) => !structural
+      || ['isuri', 'isliteral', 'isresource', 'datatype'].includes(filter.type);
     const selectWithLabels = labelSvc
       ? [...new Set([...selectVars, ...selectVars.filter(v => !v.endsWith('Label')).map(v => v + 'Label')])]
       : selectVars;
     let q = 'SELECT DISTINCT ' + selectWithLabels.join(' ') + ' WHERE {\n';
 
+    // A variable can occur in several triples. Emit each constraint once per
+    // group; OPTIONAL groups need their own set to preserve filter scope.
+    const writeFilter = (filter: Filter, emitted: Set<string>, indent: string): string => {
+      const serialized = filter.serialize(this.ctx.endpointAdapter);
+      if (emitted.has(serialized)) return '';
+      emitted.add(serialized);
+      return indent + serialized;
+    };
+    const requiredFilters = new Set<string>();
     this.triples.forEach(t => {
       q += '  ' + writeTriple(t);
       const allFilters: Filter[] = [];
       t.filter(r => r.isVariable()).forEach(r => {
-        r.variable.filters.forEach(f => allFilters.push(f));
+        r.variable.filters.filter(includeFilter).forEach(f => allFilters.push(f));
       });
-      allFilters.forEach(f => { q += '  ' + f.serialize(this.ctx.endpointAdapter); });
+      allFilters.forEach(f => { q += writeFilter(f, requiredFilters, '  '); });
       if (t[1].isVariable() && t[2].isVariable()) {
         const nf = t[2] instanceof Literal
           ? new Filter(t[2].variable, 'isliteral', {})
           : new Filter(t[2].variable, 'isuri', {});
-        q += '  ' + nf.serialize(this.ctx.endpointAdapter);
+        q += writeFilter(nf, requiredFilters, '  ');
       }
     });
 
     this.optionals.forEach(opt => {
+      const optionalFilters = new Set<string>();
       q += '  OPTIONAL {\n';
       opt.forEach(t => {
         q += '    ' + writeTriple(t);
         const allFilters: Filter[] = [];
         t.filter(r => r.isVariable()).forEach(r => {
-          r.variable.filters.forEach(f => allFilters.push(f));
+          r.variable.filters.filter(includeFilter).forEach(f => allFilters.push(f));
         });
-        allFilters.forEach(f => { q += '    ' + f.serialize(this.ctx.endpointAdapter); });
+        allFilters.forEach(f => { q += writeFilter(f, optionalFilters, '    '); });
         if (t[1].isVariable() && t[2].isVariable()) {
           const nf = t[2] instanceof Literal
             ? new Filter(t[2].variable, 'isliteral', {})
             : new Filter(t[2].variable, 'isuri', {});
-          q += '    ' + nf.serialize(this.ctx.endpointAdapter);
+          q += writeFilter(nf, optionalFilters, '    ');
         }
       });
       q += '  }\n';
@@ -206,9 +227,16 @@ export class Query {
       }
     }
 
+    if (!structural && this.previewSearch) {
+      const text = this.previewSearch.text.replace(/[\\"']/g, char => '\\' + char)
+        .replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+      const checks = this.previewSearch.variables.map(variable =>
+        `CONTAINS(LCASE(STR(${variable})), LCASE("${text}"))`);
+      q += '  FILTER (' + checks.join(' || ') + ')\n';
+    }
     q += '}';
-    if (this.limit) q += ' LIMIT ' + this.limit;
-    if (this.offset) q += ' OFFSET ' + this.offset;
+    if (!structural && this.limit) q += ' LIMIT ' + this.limit;
+    if (!structural && this.offset) q += ' OFFSET ' + this.offset;
 
     let h = '';
     for (const p of prefixes) {
@@ -221,7 +249,7 @@ export class Query {
       h = 'PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n' + h;
     }
     q = h + q;
-    this.cache = q;
+    if (!structural) this.cache = q;
     return q;
   }
 
@@ -319,6 +347,7 @@ export class Query {
     const n = this.select.filter(r => r.variable.isBinded() && (isAppend || r.variable.query !== q)).length;
     if (q && n > 0) {
       retriever.execQuery(q, { signal: cfg.canceller }).then(data => {
+        if (cfg.canceller?.aborted) return;
         if (data.results.bindings.length > 0) {
           this.select.forEach(r => {
             const variable = r.variable;
@@ -343,6 +372,7 @@ export class Query {
         }
         if (cfg.callback) cfg.callback();
       }).catch((err: unknown) => {
+        if (cfg.canceller?.aborted) return;
         if (cfg.onError) cfg.onError(err);
         if (cfg.callback) cfg.callback();
       });

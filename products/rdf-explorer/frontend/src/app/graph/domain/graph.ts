@@ -127,6 +127,12 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
   }
 
   removeNodeFromGraph(node: Node): void {
+    if (!this.nodes.includes(node)) return;
+    const neighbors = new Set(this.edges.flatMap(edge => {
+      if (edge.target === node) return [edge.source.parentNode];
+      if (edge.source.parentNode === node) return [edge.target];
+      return [];
+    }));
     for (let i = this.edges.length - 1; i >= 0; i--) {
       const edge = this.edges[i];
       if (edge.target === node) {
@@ -148,24 +154,41 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     }
 
     for (const uri of node.uris) {
+      if (this.uriToNode.get(uri) !== node) continue;
       this.uriToNode.delete(uri);
+      const remaining = this.nodes.find(other => other !== node && other.uris.includes(uri));
+      if (remaining) this.uriToNode.set(uri, remaining);
     }
 
     if (this.selected === node) {
       this.selected = null;
     } else {
       for (const p of node.properties) {
-        if (this.selected === p) this.selected = null;
+        if (this.selected === p || this.selected === p.literal) this.selected = null;
       }
     }
 
+    this.usedAliases.delete(node.variable.alias);
+    for (const prop of node.properties) {
+      this.usedAliases.delete(prop.variable.alias);
+      if (prop.literal) this.usedAliases.delete(prop.literal.variable.alias);
+    }
     const idx = this.nodes.indexOf(node);
     if (idx >= 0) {
       this.nodes.splice(idx, 1);
     }
+    // Only clean up neighbors orphaned by this removal. Independent queries
+    // and isolated nodes with literal relations remain meaningful canvas items.
+    for (const neighbor of neighbors) {
+      if (this.nodes.includes(neighbor) && !neighbor.literalRelations().length
+        && !this.edges.some(edge => edge.target === neighbor || edge.source.parentNode === neighbor)) {
+        neighbor.delete();
+      }
+    }
   }
 
   removeProperty(prop: Property): void {
+    if (!prop.parentNode.properties.includes(prop)) return;
     for (let i = this.edges.length - 1; i >= 0; i--) {
       if (this.edges[i].source === prop) {
         this.edges.splice(i, 1);
@@ -178,7 +201,9 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
       prop.parentNode.properties[j].index -= 1;
     }
 
-    if (this.selected === prop) {
+    this.usedAliases.delete(prop.variable.alias);
+    if (prop.literal) this.usedAliases.delete(prop.literal.variable.alias);
+    if (this.selected === prop || this.selected === prop.literal) {
       this.selected = null;
     }
   }
@@ -199,13 +224,11 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     if (this.endpointAdapter.loadNodePreview) {
       this.endpointAdapter.loadNodePreview(this, node, q, config);
     } else {
+      const label = q.addOptLabel(node);
       if (config['varFilter']) {
-        const label = q.addLabel(node);
-        if (label) {
-          label.variable.addFilter('regex', { regex: config['varFilter'] as string }, this);
-        }
-      } else {
-        q.addOptLabel(node);
+        // Search labels in any language, with URI fallback for unlabelled terms.
+        label.variable.filters = [];
+        q.setPreviewSearch([node.variable, label.variable], config['varFilter'] as string);
       }
       q.retrieve(config);
     }
@@ -219,6 +242,11 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     if (this.endpointAdapter.loadPropertyPreview) {
       this.endpointAdapter.loadPropertyPreview(this, prop, q, config);
     } else {
+      if (config['varFilter']) {
+        const label = q.addOptLabel(prop);
+        label.variable.filters = [];
+        q.setPreviewSearch([prop.variable, label.variable], config['varFilter'] as string);
+      }
       q.retrieve(config);
     }
   }
@@ -231,6 +259,7 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
     if (this.endpointAdapter.loadLiteralPreview) {
       this.endpointAdapter.loadLiteralPreview(this, lit, q, config);
     } else {
+      if (config['varFilter']) q.setPreviewSearch([lit.variable], config['varFilter'] as string);
       q.retrieve(config);
     }
   }

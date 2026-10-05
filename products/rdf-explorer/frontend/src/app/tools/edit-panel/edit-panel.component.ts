@@ -336,7 +336,8 @@ export class EditPanelComponent implements OnDestroy {
       return;
     }
 
-    this.previewAbort = new AbortController();
+    const controller = new AbortController();
+    this.previewAbort = controller;
     this.resultFilterLoading.set(true);
     this.loadError.set(null);
 
@@ -346,6 +347,7 @@ export class EditPanelComponent implements OnDestroy {
       appendResults: isLoadMore && this.resultOffset > 0,
       canceller: this.previewAbort.signal,
       callback: () => {
+        if (this.previewAbort !== controller || controller.signal.aborted) return;
         this.resultFilterLoading.set(false);
         this.previewAbort = null;
         const rlen = sel.variable.results.length;
@@ -353,6 +355,7 @@ export class EditPanelComponent implements OnDestroy {
         this.resultsVersion.update(v => v + 1);
       },
       onError: (err: unknown) => {
+        if (this.previewAbort !== controller || controller.signal.aborted) return;
         this.resultFilterLoading.set(false);
         this.previewAbort = null;
         const body = (err as Record<string, unknown>)?.['error'] as Record<string, unknown> | undefined;

@@ -31,6 +31,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--color-accen
 .relation { display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
 .direction { flex: 0 0 20px; width: 20px; height: 20px; color: var(--color-accent, #2865b1); }
 .destination { margin: 6px 0 4px 28px; overflow-wrap: anywhere; }
+.connection-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; }
 .values { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .value { color: var(--explorer-text, var(--color-text, #212529)); padding: 5px 8px; border-radius: 5px; background: var(--explorer-panel-bg, var(--color-bg-surface, #edf1f7)); overflow-wrap: anywhere; max-width: 100%; white-space: pre-wrap; }
 .value[draggable="true"] { cursor: grab; }
+
+button:disabled { cursor: default; opacity: .5; }

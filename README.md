@@ -162,16 +162,27 @@ The right-hand **Explorer** icon replaces the separate description and connectio
 tabs. It uses the same bounded connection API for variables and concrete resources;
 concrete resources also show a preview value per observed relationship/type.
 A single local filter matches relation names, URIs, target types and preview values.
-Drag a relationship onto the canvas to add its typed variable/literal branch, or
-drag a concrete value to constrain that branch. Direction and the original source
+Drag a relationship onto the canvas to add a free variable/literal branch.
+Use **Agregar con tipo observado** to explicitly require its observed class or
+literal datatype, or drag a concrete value to constrain that branch. Direction and the original source
 are retained even if selection changes during the drag. Existing compatible
-branches are reused. The newly added element becomes the exploration focus.
+branches are reused. The newly added element becomes the exploration focus. Literal variables include
+the owner name (for example, `?cityLabel`); compatible existing branches keep
+their aliases.
 There are no separate required/optional/example controls, per-property filters,
 or path-finder controls in this panel. Optionality and filters remain editable
-through the existing editor.
+through the existing editor. The editor’s **Possible results** search filters
+literal values as case-insensitive text, and generic resource/predicate previews
+match labels or URIs. Search is temporary and does not add canvas filters.
+Deleting a node also removes neighbors that lose their last connection and have
+no literal relations. Shared nodes and independent query branches are retained.
 
-Suggestions use the current connected query component and its filters. Counts
-refer to distinct entities in bounded samples, not universal schema constraints.
+Suggestions use the connected graph structure and term types, excluding value
+filters from the canvas. Those filters apply when executing the query. Counts
+refer to distinct entities in bounded entity and relation samples, not universal schema constraints.
+URI entity samples are reused for both directions; blank nodes are re-evaluated
+as joined patterns. Outgoing connections appear first while incoming ones load.
+Retry reloads only failed directions and retains successful connections.
 The endpoint's configured inference/dataset scope applies; the client does not add
 reasoning. Classes declared without instances may have no observed connections.
 The path API remains available, but the simplified panel does not call it.
@@ -224,6 +235,7 @@ The server's own timeout remains a backstop if it does not honor per-query limit
 | Variable | Default | Meaning |
 |---|---|---|
 | `DISCOVERY_SAMPLE_SIZE` | `200` | Distinct focus entities inspected per neighborhood |
+| `DISCOVERY_RELATION_SAMPLE_SIZE` | `2000` | Relation rows per direction before enrichment and aggregation; counts are lower bounds |
 | `DISCOVERY_RESULT_LIMIT` | `60` | Connection groups per direction |
 | `DISCOVERY_TIMEOUT_MS` | `8000` | Timeout per discovery SPARQL request |
 | `DISCOVERY_CACHE_TTL_MS` | `60000` | Successful resource/context cache lifetime |
@@ -239,6 +251,10 @@ The server's own timeout remains a backstop if it does not honor per-query limit
 | `DISCOVERY_PATH_BUDGET` | `12` | Maximum neighborhoods inspected per path search |
 | `DISCOVERY_PATH_DEPTH` | `4` | Maximum additional path length (12 steps total) |
 | `DISCOVERY_PATH_RESULT_LIMIT` | `5` | Maximum verified paths returned |
+
+Discovery uses the connected graph structure and term types, without canvas value filters (regex, text, numeric, dates, or literal examples). Those filters still apply when executing the query. On upstream failure, the explorer shows the reason and the remaining retry delay, retains partial connections, and enables retry when the pause ends.
+
+Discovery debug logs include the complete SPARQL and a shared `connections-N` trace for the sample, outgoing (`out`), and incoming (`in`) requests. Each request reports backend, limit, timeout, regex presence, elapsed time, and row count. Failed requests also log the upstream status and complete query at warning level. Normal query execution uses separate `execute-N` traces and logs complete queries, so editor requests can be distinguished from structural exploration.
 
 ## Demo dashboards
 

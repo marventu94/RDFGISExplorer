@@ -1,7 +1,8 @@
 import { Component, computed, effect, inject, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subscription, timeout } from 'rxjs';
 import type { DiscoveryConnections, DiscoveryConnection, DiscoveryExample } from '@rdfgis/contracts';
+import type { UiTextKey } from '@rdfgis/platform-bridge';
 import { TranslatePipe } from '../../core/translate.pipe';
 import { RequestService } from '../../core/request.service';
 import { DiscoveryApiService } from './discovery-api.service';
@@ -18,6 +19,9 @@ export class DiscoveryPanelComponent implements OnDestroy {
   readonly data = signal<DiscoveryConnections | null>(null);
   readonly busy = signal(false);
   readonly error = signal(false);
+  readonly errorMessage = signal<UiTextKey>('No se pudo explorar este conjunto.');
+  readonly retryIn = signal(0);
+  private retryTimer?: ReturnType<typeof setInterval>;
   readonly filter = signal('');
   readonly concrete = computed(() => !!this.state.origin()?.uri);
   readonly connections = computed(() => {
@@ -32,16 +36,54 @@ export class DiscoveryPanelComponent implements OnDestroy {
   constructor() {
     effect(() => { const focus = this.state.focus(); this.filter.set(''); this.load(focus); });
   }
-  private load(focus = this.state.focus()): void {
+  private load(focus = this.state.focus(), preserve = false): void {
     this.connectionSub?.unsubscribe();
-    this.data.set(null); this.error.set(false); this.busy.set(!!focus);
+    this.stopRetryTimer();
+    if (!preserve) this.data.set(null);
+    this.error.set(false); this.busy.set(!!focus);
     if (!focus) return;
-    this.connectionSub = this.api.connections(focus).subscribe({
-      next: data => { this.data.set(data); this.busy.set(false); },
-      error: () => { this.error.set(true); this.busy.set(false); },
+    const previous = preserve ? this.data() : null;
+    const directions = previous?.failedDirections.length ? previous.failedDirections : undefined;
+    this.connectionSub = this.api.connections(focus, directions, previous).pipe(timeout(60000)).subscribe({
+      next: data => {
+        this.data.set(data); this.busy.set(!!data.pendingDirections?.length);
+        this.startRetryTimer(data.retryAfterSeconds);
+      },
+      error: (error: unknown) => {
+        const failure = error as { status?: number; name?: string; error?: { error?: string; retryAfterSeconds?: number } };
+        const code = failure?.error?.error;
+        this.errorMessage.set(code === 'DISCOVERY_COOLDOWN'
+          ? 'El servidor está en pausa después de un error.'
+          : code === 'TIMEOUT' || failure?.name === 'TimeoutError' || failure?.status === 408
+            ? 'La exploración tardó demasiado. Podés reintentar o explorar un alcance más simple.'
+            : code === 'UPSTREAM_ERROR' || failure?.status === 502
+              ? 'El servidor RDF no pudo completar la exploración.'
+              : failure?.status === 0
+                ? 'No se pudo conectar con el servidor. Comprobá la conexión y reintentá.'
+                : 'No se pudo explorar este conjunto.');
+        this.error.set(true); this.busy.set(false);
+        this.startRetryTimer(failure?.error?.retryAfterSeconds);
+      },
     });
   }
-  retry(): void { this.load(); }
+  private stopRetryTimer(): void {
+    if (this.retryTimer) clearInterval(this.retryTimer);
+    this.retryTimer = undefined;
+    this.retryIn.set(0);
+  }
+  private startRetryTimer(seconds?: number): void {
+    this.stopRetryTimer();
+    if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return;
+    const until = Date.now() + Math.ceil(seconds) * 1000;
+    this.retryIn.set(Math.ceil(seconds));
+    this.retryTimer = setInterval(() => {
+      this.retryIn.set(Math.max(0, Math.ceil((until - Date.now()) / 1000)));
+      if (!this.retryIn()) this.stopRetryTimer();
+    }, 250);
+  }
+  retry(): void {
+    if (!this.busy() && !this.retryIn()) this.load(this.state.focus(), true);
+  }
   key(connection: DiscoveryConnection): string {
     return JSON.stringify([connection.predicate, connection.direction, connection.targetClass, connection.datatype]);
   }
@@ -50,12 +92,6 @@ export class DiscoveryPanelComponent implements OnDestroy {
     return example.label ?? this.request.getLabel(example.value) ?? example.value;
   }
   dragConnection(event: DragEvent, connection: DiscoveryConnection, example?: DiscoveryExample): void {
-    // A concrete-resource card represents its displayed value, so dragging the
-    // card must carry the same constraint as dragging the value chip.
-    if (!example && this.concrete()) {
-      const displayed = connection.examples[0];
-      if (displayed?.kind !== 'bnode') example = displayed;
-    }
     const source = this.state.source();
     if (!source || !event.dataTransfer || example?.kind === 'bnode') { event.preventDefault(); return; }
     this.request.setLabel(connection.predicate, connection.label);
@@ -68,5 +104,5 @@ export class DiscoveryPanelComponent implements OnDestroy {
     event.stopPropagation();
   }
   dragEnd(): void { this.state.graph.clearConnectionDrag(); }
-  ngOnDestroy(): void { this.connectionSub?.unsubscribe(); this.dragEnd(); }
+  ngOnDestroy(): void { this.connectionSub?.unsubscribe(); this.stopRetryTimer(); this.dragEnd(); }
 }

@@ -132,9 +132,9 @@ export class PropertyGraphService {
     return node;
   }
 
-  addDiscoveredPath(source: Node, steps: DiscoveryStep[], optional = false, example?: DiscoveryExample): RDFResource {
+  addDiscoveredPath(source: Node, steps: DiscoveryStep[], optional = false, example?: DiscoveryExample, constrainObserved = false): RDFResource {
     if (!this.graphRef.nodes.includes(source)) throw new Error('Discovery source is no longer in the graph');
-    const target = addDiscoveryPath(this.graphRef, source, steps, optional, example);
+    const target = addDiscoveryPath(this.graphRef, source, steps, optional, example, constrainObserved);
     this.graphRef.setSelected(target);
     this.bump();
     return target;

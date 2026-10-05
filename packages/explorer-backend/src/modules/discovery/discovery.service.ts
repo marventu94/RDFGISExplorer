@@ -1,6 +1,9 @@
 import {
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -16,13 +19,15 @@ import type {
 } from '@rdfgis/contracts';
 import {
   SPARQL_ENDPOINT,
+  TimeoutError,
+  UpstreamError,
   type SparqlEndpoint,
 } from '../../adapters/sparql-endpoint.interface';
 import {
   catalogQuery,
   connectionsQuery,
   focusPattern,
-  focusSample,
+  focusSampleQuery,
   iri,
   RDF_TYPE,
 } from './discovery-query';
@@ -41,6 +46,12 @@ export class DiscoveryService {
   private readonly cache = new Map<
     string,
     { expires: number; data: unknown }
+  >();
+  private readonly logger = new Logger(DiscoveryService.name);
+  private traceSequence = 0;
+  private readonly samples = new Map<
+    string,
+    { expires: number; rows: ResultBinding[] }
   >();
   private upstreamCooldownUntil = 0;
   private readonly failures = new Map<string, number>();
@@ -73,8 +84,26 @@ export class DiscoveryService {
     limit: number,
     timeout?: number,
     signal?: AbortSignal,
+    context = 'discovery',
   ): Promise<ResultBinding[]> {
-    this.checkUpstream();
+    const trace = `${context}/query-${++this.traceSequence}`;
+    const timeoutMs = Math.min(
+      timeout ?? Infinity,
+      this.setting('DISCOVERY_TIMEOUT_MS', 8000),
+    );
+    try {
+      this.checkUpstream();
+    } catch (error) {
+      this.logger.debug(
+        `[${trace}] skipped: upstream cooldown; no SPARQL sent`,
+      );
+      throw error;
+    }
+    const startedAt = Date.now();
+    const details = `backend=${this.endpoint.backendName} limit=${limit} timeoutMs=${timeoutMs} regex=${/\bregex\s*\(/i.test(query)}`;
+    this.logger.debug(
+      `[${trace}] start ${details}\nSPARQL:\n${query}\n[${trace}] end SPARQL`,
+    );
     const result = await this.endpoint
       .execute(query, {
         raw: true,
@@ -82,15 +111,44 @@ export class DiscoveryService {
         signal,
         maxRetries: 0,
         waitForServerOnCancel: true,
-        timeoutMs: Math.min(
-          timeout ?? Infinity,
-          this.setting('DISCOVERY_TIMEOUT_MS', 8000),
-        ),
+        timeoutMs,
       })
       .catch((error: unknown) => {
-        if (!signal?.aborted) this.coolDown();
+        const reason = error instanceof Error ? error.message : String(error);
+        const status =
+          error instanceof UpstreamError ? error.status : undefined;
+        const outcome = signal?.aborted ? 'cancelled' : 'failed';
+        const message = `[${trace}] ${outcome} ${details} elapsedMs=${Date.now() - startedAt} upstreamStatus=${status ?? 'n/a'} reason=${reason}`;
+        if (signal?.aborted) this.logger.debug(message);
+        else
+          this.logger.warn(
+            `${message}\nSPARQL:\n${query}\n[${trace}] end SPARQL`,
+          );
+        if (!signal?.aborted) {
+          this.coolDown();
+          if (error instanceof TimeoutError || error instanceof UpstreamError) {
+            throw new HttpException(
+              {
+                error:
+                  error instanceof TimeoutError ? 'TIMEOUT' : 'UPSTREAM_ERROR',
+                message: error.message,
+                retryAfterSeconds: Math.max(
+                  1,
+                  Math.ceil((this.upstreamCooldownUntil - Date.now()) / 1000),
+                ),
+              },
+              error instanceof TimeoutError
+                ? HttpStatus.REQUEST_TIMEOUT
+                : HttpStatus.BAD_GATEWAY,
+              { cause: error },
+            );
+          }
+        }
         throw error;
       });
+    this.logger.debug(
+      `[${trace}] success elapsedMs=${Date.now() - startedAt} endpointDurationMs=${result.meta.durationMs} rows=${result.bindings.length} truncated=${result.meta.truncated}`,
+    );
     return result.bindings;
   }
   private coolDown(): void {
@@ -255,6 +313,7 @@ export class DiscoveryService {
           this.catalogRows + 1,
           undefined,
           jobSignal,
+          `catalog:${kind}`,
         );
         return {
           items: this.terms(rows.slice(0, this.catalogRows), kind),
@@ -277,11 +336,12 @@ export class DiscoveryService {
   connections(
     focus: DiscoveryFocus,
     signal?: AbortSignal,
+    direction?: 'out' | 'in',
   ): Promise<DiscoveryConnections> {
     focusPattern(focus);
     return this.cached(
-      `connections:${JSON.stringify(focus)}`,
-      (jobSignal) => this.inspect(focus, undefined, jobSignal),
+      `connections:${direction ?? 'both'}:${JSON.stringify(focus)}`,
+      (jobSignal) => this.inspect(focus, undefined, jobSignal, direction),
       (data) => data.failedDirections.length === 0,
       signal,
     );
@@ -290,7 +350,13 @@ export class DiscoveryService {
     focus: DiscoveryFocus,
     timeout?: number,
     signal?: AbortSignal,
+    requestedDirection?: 'out' | 'in',
   ): Promise<DiscoveryConnections> {
+    const trace = `connections-${++this.traceSequence}`;
+    const { query, ...focusDetails } = focus;
+    this.logger.debug(
+      `[${trace}] focus=${JSON.stringify(focusDetails)} scope=${query ? 'connected-query' : 'term'} sampleLimit=${this.sample} resultLimit=${this.rows}`,
+    );
     const result: DiscoveryConnections = {
       connections: [],
       sampledEntities: 0,
@@ -298,33 +364,69 @@ export class DiscoveryService {
       sampled: false,
       truncated: false,
       failedDirections: [],
+      relationsSampled: true,
+      relationLimit: this.setting('DISCOVERY_RELATION_SAMPLE_SIZE', 2000),
     };
     const vocabulary = this.endpoint.describeEndpoint?.().discovery;
     const classPredicate =
       this.config.get<string>('DISCOVERY_CLASS_PREDICATE') ||
       vocabulary?.classPredicate ||
       RDF_TYPE;
-    // One aggregate over a capped distinct sample: rows are not entity counts.
-    const countRows = await this.run(
-      `SELECT (COUNT(*) AS ?total) WHERE { ${focusSample(focus, this.sample + 1, classPredicate)} }`,
-      1,
-      timeout,
-      signal,
+    const sampleKey = JSON.stringify([focus, this.sample, classPredicate]);
+    const cachedSample = this.samples.get(sampleKey);
+    let countRows: ResultBinding[];
+    if (cachedSample && cachedSample.expires > Date.now()) {
+      countRows = cachedSample.rows;
+      this.logger.debug(
+        `[${trace}] reusing entity sample rows=${countRows.length}`,
+      );
+    } else {
+      countRows = await this.run(
+        focusSampleQuery(focus, this.sample + 1, classPredicate),
+        this.sample + 1,
+        timeout,
+        signal,
+        `${trace}/sample`,
+      );
+      if (signal?.aborted) throw cancelled();
+      if (this.samples.size >= 100)
+        this.samples.delete(this.samples.keys().next().value!);
+      this.samples.set(sampleKey, {
+        rows: countRows,
+        expires: Date.now() + this.setting('DISCOVERY_CACHE_TTL_MS', 60000),
+      });
+    }
+    const entities = countRows.slice(0, this.sample);
+    const sampleIris = entities.flatMap((row) =>
+      row.__d_focus?.type === 'uri' ? [row.__d_focus.value] : [],
     );
-    const total = Number(value(countRows[0] ?? {}, 'total'));
+    // Blank-node identifiers never leave their original query as constants.
+    const requeryNonIris = entities.some(
+      (row) => row.__d_focus?.type !== 'uri',
+    );
+    const total = countRows.length;
     result.sampled = total > this.sample;
     result.sampledEntities = Math.min(total, this.sample);
-    if (!total) return result;
-    for (const direction of ['out', 'in'] as const) {
+    if (!total) {
+      result.relationsSampled = false;
+      return result;
+    }
+    for (const direction of requestedDirection
+      ? [requestedDirection]
+      : (['out', 'in'] as const)) {
       try {
         const rows = await this.run(
           connectionsQuery(focus, direction, this.sample, this.rows + 1, {
             ...vocabulary,
             classPredicate,
+            sampleIris,
+            requeryNonIris,
+            relationLimit: result.relationLimit,
           }),
           this.rows + 1,
           timeout,
           signal,
+          `${trace}/${direction}`,
         );
         result.truncated ||= rows.length > this.rows;
         for (const row of rows.slice(0, this.rows)) {
@@ -362,9 +464,16 @@ export class DiscoveryService {
             });
           result.connections.push(connection);
         }
-      } catch {
+      } catch (error) {
         if (signal?.aborted) throw cancelled();
+        this.logger.warn(
+          `[${trace}] Discovery ${direction} connections failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
         result.failedDirections.push(direction);
+        result.retryAfterSeconds = Math.max(
+          1,
+          Math.ceil((this.upstreamCooldownUntil - Date.now()) / 1000),
+        );
       }
     }
     result.connections.sort(

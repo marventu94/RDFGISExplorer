@@ -90,6 +90,50 @@ describe('Query.toSparql() golden tests', () => {
     graph = createGraph();
   });
 
+  it('emits a shared city variable filter once across its relationship and label triples', () => {
+    const postal = graph.addNode(); postal.variable.setAlias('postalAddress', graph);
+    const city = graph.addNode(); city.variable.setAlias('city', graph);
+    const relation = postal.newProp(); relation.addUri('urn:city'); relation.mkConst();
+    graph.addEdge(relation, city);
+    const label = city.newProp(); label.addUri('http://www.w3.org/2000/01/rdf-schema#label'); label.mkConst();
+    const literal = label.mkLiteral()!; literal.variable.setAlias('label', graph);
+    city.variable.addFilter('regex', { regex: '^berisso$' }, graph);
+    const query = postal.createQuery()!;
+    expect(query.toSparql()!.match(/FILTER regex/g)).toHaveLength(1);
+    expect(query.toSparql()!).toContain('FILTER regex(?city, "^berisso$", "i")');
+    expect(query.toSparql({ structural: true })).not.toContain('regex');
+    expect(query.toSparqlFullProjection()!.match(/FILTER regex/g)).toHaveLength(1);
+    // Moving the filter to the label explicitly targets the city name.
+    city.variable.removeFilter(city.variable.filters[0]);
+    literal.variable.addFilter('regex', { regex: '^berisso$' }, graph);
+    query.update(postal);
+    expect(query.toSparql()!).toContain('FILTER regex(?label, "^berisso$", "i")');
+    expect(query.toSparql()!).not.toContain('regex(?city');
+  });
+
+  it('deduplicates identical filters while preserving different regex constraints', () => {
+    const seed = createCatsExample(graph, 0, 0);
+    for (const regex of ['^berisso$', '^berisso$', 'ber']) seed.variable.addFilter('regex', { regex }, graph);
+    const sparql = seed.createQuery()!.toSparql()!;
+    expect(sparql.match(/FILTER regex/g)).toHaveLength(2);
+    expect(seed.variable.filters).toHaveLength(3);
+  });
+
+  it('deduplicates within an OPTIONAL chain without removing filters in another scope', () => {
+    const postal = graph.addNode();
+    const city = graph.addNode();
+    const relation = postal.newProp(); relation.addUri('urn:city'); relation.mkConst();
+    graph.addEdge(relation, city);
+    city.variable.addFilter('regex', { regex: '^berisso$' }, graph);
+    const query = postal.createQuery()!;
+    const first = query.createTripleLabel(city);
+    const second = query.createTripleLabel(city);
+    query.optionals = [[first, second], [first]];
+    const sparql = query.toSparql()!;
+    // One in the required group and one in each distinct OPTIONAL group.
+    expect(sparql.match(/FILTER regex/g)).toHaveLength(3);
+  });
+
   it('cats — matches legacy output', () => {
     const seed = createCatsExample(graph, 0, 0);
     const q = seed.createQuery();

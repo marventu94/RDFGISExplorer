@@ -88,19 +88,12 @@ export class WikidataAdapter implements DomainEndpointAdapter {
   }
 
   loadLiteralPreview(
-    ctx: GraphContext,
+    _ctx: GraphContext,
     lit: Literal,
     query: Query,
     config: Record<string, unknown>,
   ): void {
-    const cfg = config as Record<string, unknown>;
-    let tmpF = null;
-    if (cfg['varFilter']) {
-      tmpF = lit.variable.addFilter('regex', { regex: cfg['varFilter'] as string }, ctx);
-    }
-    query.retrieve(cfg);
-    if (tmpF) {
-      lit.variable.removeFilter(tmpF);
-    }
+    if (config['varFilter']) query.setPreviewSearch([lit.variable], config['varFilter'] as string);
+    query.retrieve(config);
   }
 }
