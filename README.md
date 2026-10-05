@@ -17,6 +17,43 @@ Process and responsibility boundaries are detailed in
 are documented in [docs/design-decisions.md](docs/design-decisions.md) and
 [docs/graph-rendering-decisions.md](docs/graph-rendering-decisions.md).
 
+## Quick start with Wikidata demo dashboards
+
+With nvm and corepack/pnpm installed, run these commands from the repository
+root to create the demo dashboards and start the platform with the bundled
+Wikidata configuration:
+
+```bash
+nvm use
+corepack enable
+pnpm install
+pnpm --dir products/shell/backend run seed:demo-dashboards
+./start.sh
+```
+
+Open http://localhost:4200 and choose a demo dashboard from the welcome page.
+The seed creates five RDF Explorer workspaces and five equivalent GIS dashboards in
+`products/shell/backend/data/wikidata.sqlite` by default. Opening a dashboard
+executes its saved query against live Wikidata to populate the views.
+
+The seed validates the queries against Wikidata before saving. To create the
+dashboards without that remote validation, use:
+
+```bash
+pnpm --dir products/shell/backend run seed:demo-dashboards -- --no-validate
+```
+
+Wikidata access is still required when opening the dashboards. To preview and
+validate the seed without writing to SQLite, use:
+
+```bash
+pnpm --dir products/shell/backend run seed:demo-dashboards -- --dry-run
+```
+
+Running the seed again replaces demo dashboards with matching names. If you
+override `DASHBOARDS_SQLITE_PATH`, check the target database before running it;
+relative paths are resolved from `products/shell/backend`.
+
 ## Visual tour
 
 ### Shell
@@ -38,16 +75,25 @@ representation without relying on a specific domain.
 Results are explored through four coordinated views: map, timeline, table, and
 graph.
 
-![Coordinated result exploration in GIS
-Explorer](docs/assets/03-gis-explorer.png)
+![Coordinated result exploration in GIS Explorer](docs/assets/03-gis-explorer.png)
 
-## Stack
+## Technology stack
 
-- Angular 21 with Native Federation for the Shell and both remotes.
-- NestJS 11 for the three backend processes.
-- SQLite for Shell dashboards.
-- Cytoscape, Leaflet, vis-timeline, and AG Grid in GIS Explorer.
-- pnpm workspaces, Jest, and Vitest.
+| Area | Technologies | Role |
+| --- | --- | --- |
+| Language and runtime | TypeScript 5.9, Node.js 24.18.0 | Shared contracts, frontend and backend code |
+| Frontend | Angular 21, Angular Material/CDK, SCSS | Standalone components, UI controls and styling |
+| Microfrontends | Native Federation 21 | Shell host and independently deployable RDF/GIS remotes |
+| Reactive state | Angular Signals, RxJS 7 | Application state and coordinated view updates |
+| Backend | NestJS 11, class-validator, class-transformer | REST APIs, dependency injection and request validation |
+| Persistence | SQLite, better-sqlite3 | Saved dashboards and workspaces in the Shell |
+| RDF queries | SPARQL 1.1, sparqljs 3 | Configurable endpoint access and query parsing/validation |
+| Graphs | Cytoscape.js 3, cola and dagre layouts | Visual query builder and graph exploration |
+| Maps | Leaflet 1.9, markercluster, leaflet-draw, Turf.js | Geographic visualization, clustering and polygon filtering |
+| Tables and timeline | AG Grid 35, vis-timeline 8 | Tabular results and temporal exploration |
+| Query editor and export | CodeMirror 6, ExcelJS 4 | SPARQL editing and XLSX export |
+| Workspace and deployment | pnpm workspaces, Docker Compose | Monorepo dependencies and containerized services |
+| Tests and linting | Jest 30, Vitest 4, nock, supertest, ESLint 9 | Backend/frontend tests, HTTP mocks and static checks |
 
 ## Local development
 
@@ -148,129 +194,34 @@ not inject them at execution time: every query must be self-contained.
 
 ## Guided RDF discovery
 
-RDF Explorer starts with one search field for **classes** and **resources**.
-Classes appear first in green, followed by resources in blue; there is no
-relationship search tab. Class discovery combines terms used in triples with
-explicit RDF/RDFS/OWL declarations; labels are optional and URI names remain
-searchable. Resource search reuses the endpoint's configured entity search (by
-default `rdfs:label`). Requests run sequentially, classes then resources, and
-pagination keeps each group's own offset. Enter text to start a search.
+RDF Explorer searches **classes** and **resources** by label or URI. Drag a class
+onto the canvas to create a typed variable, or a resource to add that specific
+entity. Resource search uses the endpoint's configured entity search; Wikidata
+uses its public search API.
 
-Drag a class onto the canvas to create a named typed variable, or drag a resource
-to add the concrete resource. Search results have no exploration buttons.
-The right-hand **Explorer** icon replaces the separate description and connection
-tabs. It uses the same bounded connection API for variables and concrete resources;
-concrete resources also show a preview value per observed relationship/type.
-A single local filter matches relation names, URIs, target types and preview values.
-Drag a relationship onto the canvas to add a free variable/literal branch.
-Use **Agregar con tipo observado** to explicitly require its observed class or
-literal datatype, or drag a concrete value to constrain that branch. Direction and the original source
-are retained even if selection changes during the drag. Existing compatible
-branches are reused. The newly added element becomes the exploration focus. Literal variables include
-the owner name (for example, `?cityLabel`); compatible existing branches keep
-their aliases.
-There are no separate required/optional/example controls, per-property filters,
-or path-finder controls in this panel. Optionality and filters remain editable
-through the existing editor. The editor’s **Possible results** search filters
-literal values as case-insensitive text, and generic resource/predicate previews
-match labels or URIs. Search is temporary and does not add canvas filters.
-Deleting a node also removes neighbors that lose their last connection and have
-no literal relations. Shared nodes and independent query branches are retained.
+The right-hand **Explorer** panel shows incoming and outgoing relationships for
+the selected variable or resource. Filter connections locally, then drag a
+relationship onto the canvas to add a branch. **Agregar con tipo observado**
+explicitly applies the observed class/datatype; dragging a concrete value
+constrains the branch. Compatible existing branches are reused. Optionality and
+value filters remain editable in the query editor.
 
-Suggestions use the connected graph structure and term types, excluding value
-filters from the canvas. Those filters apply when executing the query. Counts
-refer to distinct entities in bounded entity and relation samples, not universal schema constraints.
-URI entity samples are reused for both directions; blank nodes are re-evaluated
-as joined patterns. Outgoing connections appear first while incoming ones load.
-Retry reloads only failed directions and retains successful connections.
-The endpoint's configured inference/dataset scope applies; the client does not add
-reasoning. Classes declared without instances may have no observed connections.
-The path API remains available, but the simplified panel does not call it.
+Suggestions follow the connected graph structure and term types; canvas value
+filters apply only when executing the query. Catalogues and connections use
+bounded samples, so missing terms and counts do not describe the complete dataset
+or universal schema constraints. The endpoint's inference and dataset scope apply.
 
-Read-only discovery APIs belong to the Explorer backends:
-`GET /api/discovery/catalog?kind=class&q=House&offset=0`,
-`POST /api/discovery/connections`, and `POST /api/discovery/paths`.
-Shared request/result types live in `@rdfgis/contracts`.
+Discovery is read-only, with caching, bounded queues and timeouts. Upstream
+failures temporarily pause new discovery requests while cached results remain
+available. Tune sampling, result limits, caching and request budgets through
+`DISCOVERY_*` environment variables; defaults are defined in
+[discovery.service.ts](packages/explorer-backend/src/modules/discovery/discovery.service.ts).
+Resource search can be customized with `SPARQL_ENTITY_SEARCH_QUERY`.
 
-Typing waits 350 ms before searching. Identical submits/page clicks do not
-restart work, and abandoned HTTP requests cancel queued or active discovery work.
-All discovery endpoints share a bounded queue per backend process (one active
-job by default); incoming and outgoing queries run sequentially. Identical jobs
-share their upstream execution. Resource searches reuse the existing entity search
-adapter and `SPARQL_ENTITY_SEARCH_QUERY` configuration: by default they search
-`rdfs:label`, not all literal predicates. Custom templates return `?uri ?label`
-and accept `$keyword`, `$limit` and optionally `$offset`; templates without
-`$offset` receive OFFSET/LIMIT through the SPARQL parser. An indexed search or additional
-literal predicates can be configured in that template. Class/property searches read bounded
-samples of observed and declared **statements** (1000 each by default, without
-DISTINCT, sorting or text matching). Deduplication and URI/label matching happen
-only over these samples, then page distinct terms (50 by default). Labels and
-evidence are resolved only for that page. One extra term detects another page.
-The UI identifies catalogue previews as samples: terms outside them may be absent,
-even when searching by their exact name. `sampled` and `truncated` are true for
-generic class/property previews; `nextOffset` exists only when the sample has another page.
-Each category/text/page is cached separately, and abandoned searches cancel when
-no other caller needs them. No full class/property inventory is loaded.
-
-Wikidata typed searches use its public
-text index, then check bounded entity metadata for `P279` class declarations;
-properties become `wdt:P…` predicates. Classes with only incoming assertions may
-be absent from this preview. Wikidata class browsing samples `P279` assertions, resolves labels through its
-API and deduplicates/pages locally. Property browsing samples `wikibase:directClaim`.
-Generic RDF endpoints default to `rdf:type` and OWL/RDFS declarations.
-Discovery does not automatically retry upstream 429 responses. An upstream
-failure pauses new upstream discovery work for the configured cooldown; cached
-results remain available. Cooldown responses include `retryAfterSeconds` and a
-`Retry-After` header; blocked requests do not extend that pause. Catalogue search displays a short failure message, without a countdown or
-a retry button; editing the text or submitting explicitly starts a new request.
-These controls apply per backend process, not to other
-applications or manual SPARQL queries. Cancelling HTTP limits client-side work;
-GraphDB requests also carry the RDF4J `timeout` parameter (one second before the
-HTTP deadline, rounded down, minimum one second). An abandoned discovery request
-keeps its queue slot until that bounded execution finishes, preventing typing from
-launching overlapping server queries. Other endpoints may configure the supported
-parameter with `SPARQL_SERVER_TIMEOUT_PARAM`; an empty value disables it.
-The server's own timeout remains a backstop if it does not honor per-query limits.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `DISCOVERY_SAMPLE_SIZE` | `200` | Distinct focus entities inspected per neighborhood |
-| `DISCOVERY_RELATION_SAMPLE_SIZE` | `2000` | Relation rows per direction before enrichment and aggregation; counts are lower bounds |
-| `DISCOVERY_RESULT_LIMIT` | `60` | Connection groups per direction |
-| `DISCOVERY_TIMEOUT_MS` | `8000` | Timeout per discovery SPARQL request |
-| `DISCOVERY_CACHE_TTL_MS` | `60000` | Successful resource/context cache lifetime |
-| `DISCOVERY_CATALOG_TTL_MS` | `300000` | Successful catalogue page cache lifetime |
-| `DISCOVERY_CLASS_PREDICATE` | `rdf:type` | Full IRI for observed classes in the generic SPARQL catalogue |
-| `DISCOVERY_SUBCLASS_PREDICATE` | unset | Optional full IRI for subclass declarations in the generic SPARQL catalogue |
-| `DISCOVERY_CATALOG_SAMPLE_SIZE` | `1000` | Statement rows per observed/declared catalogue sample, before distinct/filter/sort |
-| `DISCOVERY_CATALOG_PAGE_SIZE` | `50` | Terms per catalogue page (SPARQL uses one lookahead; Wikidata API caps pages at 50) |
-| `DISCOVERY_MAX_CONCURRENT` | `1` | Maximum active discovery jobs per backend process |
-| `DISCOVERY_QUEUE_LIMIT` | `4` | Maximum waiting distinct jobs; overflow returns 429 |
-| `DISCOVERY_FAILURE_COOLDOWN_MS` | `30000` | Pause new upstream discovery work after a failure |
-| `DISCOVERY_PATH_TIMEOUT_MS` | `20000` | Total path search time budget |
-| `DISCOVERY_PATH_BUDGET` | `12` | Maximum neighborhoods inspected per path search |
-| `DISCOVERY_PATH_DEPTH` | `4` | Maximum additional path length (12 steps total) |
-| `DISCOVERY_PATH_RESULT_LIMIT` | `5` | Maximum verified paths returned |
-
-Discovery uses the connected graph structure and term types, without canvas value filters (regex, text, numeric, dates, or literal examples). Those filters still apply when executing the query. On upstream failure, the explorer shows the reason and the remaining retry delay, retains partial connections, and enables retry when the pause ends.
-
-Discovery debug logs include the complete SPARQL and a shared `connections-N` trace for the sample, outgoing (`out`), and incoming (`in`) requests. Each request reports backend, limit, timeout, regex presence, elapsed time, and row count. Failed requests also log the upstream status and complete query at warning level. Normal query execution uses separate `execute-N` traces and logs complete queries, so editor requests can be distinguished from structural exploration.
-
-## Demo dashboards
-
-`seed:demo-dashboards` is retained because it generates functional product examples:
-visual-builder workspaces and their equivalent GIS dashboards. It uses the
-public endpoint configured by default, not evaluation scenarios or proprietary
-extensions.
-
-```bash
-cd products/shell/backend
-pnpm run seed:demo-dashboards -- --dry-run
-pnpm run seed:demo-dashboards
-```
-
-Do not run seeds against a persistent database without first checking
-`DASHBOARDS_SQLITE_PATH`.
+Explorer backends expose `GET /api/discovery/catalog`,
+`POST /api/discovery/connections` and `POST /api/discovery/paths`, with shared types
+in `@rdfgis/contracts`. The simplified panel uses catalogue and connections;
+the path API remains available separately.
 
 ## Quality checks
 
