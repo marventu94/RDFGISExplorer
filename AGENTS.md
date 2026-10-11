@@ -369,6 +369,7 @@ There is no `LOG_LEVEL` or `SQLITE_PATH`.
 
 ## Important notes
 
+- **Node 24 only** (`.nvmrc`: 24.18.0; root `engines`; Docker and CI use the same version). `better-sqlite3` is native: built with one major and loaded with another, it fails with `NODE_MODULE_VERSION`. Root `dev`, `test`, and `seed:*` scripts run `scripts/check-node.cjs` and stop on another major. Agent shells may inherit an older Node in `PATH`: prefix Node/pnpm commands with `source ~/.nvm/nvm.sh && nvm use` when `node -v` is not 24.
 - There are **no NgModules** in the frontend. Everything uses standalone components + `provideX()` in `app.config.ts`.
 - The Shell **does NOT expose components** as a remote; it only consumes remotes. Its `app.config.ts` has no initializers (the former Shell `SettingsService` was removed because nothing consumed its result).
 - **Frontend tests:** each `angular.json` test target sets `buildTarget: <project>:esbuild:development` + `runner: vitest` (the native-federation `build` target cannot compile tests). `tsconfig.spec.json` must include `src/polyfills.ts`. In specs, `vi.mock` factories are hoisted; helpers shared by the factory and tests belong inside `vi.hoisted()` (see the `graph-view` and `timeline-view` specs).
