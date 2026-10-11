@@ -5,250 +5,95 @@ import Database from 'better-sqlite3';
 import { PropertyGraph } from '../../../rdf-explorer/frontend/src/app/graph/domain/graph';
 import { deserializeGraph } from '../../../rdf-explorer/frontend/src/app/graph/domain/graph-serializer';
 import { GenericAdapter } from '../../../rdf-explorer/frontend/src/app/graph/domain/endpoint/generic-adapter';
-import {
-  buildEvaluationRows,
-  seedEvaluationDatabase,
-  GIS_RESULT_LIMITS,
-} from './evaluation-dashboards';
+import { buildEvaluationRows, buildEvaluationQueries, seedEvaluationDatabase } from './evaluation-dashboards';
 
-describe('evaluation dashboards seed', () => {
-  const inm =
-    'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#';
-  const dc = 'http://purl.org/dc/elements/1.1/';
+describe('evaluation scenario seed', () => {
+  const inm = 'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#';
+  const queries = () => buildEvaluationQueries().map(item => item.query);
 
-  it('builds four GIS cases plus DRAFT Explorer workspaces for C1-C4 and C5', () => {
+  it('creates exactly five ordered Explorer workspaces, each with one matching tab', () => {
     const rows = buildEvaluationRows();
-
-    expect(rows.map((row) => row.id)).toEqual([
-      'eval-c1',
-      'eval-c2',
-      'eval-c3',
-      'eval-c4',
-      'draft-explorer-c1',
-      'draft-explorer-c2',
-      'draft-explorer-c3',
-      'draft-explorer-c4',
-      'eval-c5',
-    ]);
-    expect(rows.filter((row) => row.kind === 'gis')).toHaveLength(4);
-    expect(rows.filter((row) => row.kind === 'explorer')).toHaveLength(5);
-    expect(
-      rows
-        .filter((row) => row.kind === 'gis')
-        .map(
-          (row) =>
-            (row.payload as { filters: { graph: { layout: string } } }).filters
-              .graph.layout,
-        ),
-    ).toEqual(['dagre', 'dagre', 'dagre', 'dagre']);
-    expect(rows.map((row) => row.name)).toEqual([
-      'C1 · Casas en venta en Berisso',
-      'C2 · Producto típico de City Bell',
-      'C3 · Departamentos a estrenar y usados en Berisso',
-      'C4 · Fechas de publicación y tandas de lectura',
-      'DRAFT · C1 · Casas en venta en Berisso',
-      'DRAFT · C2 · Producto típico de City Bell',
-      'DRAFT · C3 · Departamentos a estrenar y usados en Berisso',
-      'DRAFT · C4 · Fechas de publicación y tandas de lectura',
-      'C5 · Construcción visual y handoff',
-    ]);
+    expect(rows.map(row => row.id)).toEqual([1, 2, 3, 4, 5].map(n => `eval-explorer-d${n}`));
+    expect(rows.every(row => row.kind === 'explorer')).toBe(true);
+    rows.forEach((row, i) => {
+      const panels = row.payload.panels as Array<{ name: string }>;
+      expect(panels).toHaveLength(1);
+      expect(panels[0].name).toBe(row.name);
+      expect(row.name).toMatch(new RegExp(`^D${i + 1} ·`));
+    });
   });
 
-  it('derives every GIS C1-C4 query from its RDF Explorer graph', () => {
-    const rows = buildEvaluationRows();
-
-    for (const suffix of ['c1', 'c2', 'c3', 'c4'] as const) {
-      const explorer = rows.find(
-        (row) => row.id === `draft-explorer-${suffix}`,
-      );
-      const gis = rows.find((row) => row.id === `eval-${suffix}`);
-      expect(explorer?.kind).toBe('explorer');
-      expect(gis?.kind).toBe('gis');
-
-      const panel = (
-        explorer!.payload as {
-          panels: Array<{ graph: { nodes: never[]; edges: never[] } }>;
-        }
-      ).panels[0];
-      const prefixes = JSON.parse(
-        fs.readFileSync(
-          path.resolve(
-            __dirname,
-            '../../../../packages/explorer-backend/config/prefixes.graphdb.example.json',
-          ),
-          'utf8',
-        ),
-      ) as Record<string, string>;
-      const graph = new PropertyGraph({
-        labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
-        lang: 'es',
-        prefixes: Object.entries(prefixes).map(([prefix, uri]) => ({
-          prefix,
-          uri,
-        })),
-        endpointAdapter: new GenericAdapter(),
-      });
+  it('audits the exact full projection produced by handoff after loading each graph', () => {
+    const prefixes = JSON.parse(fs.readFileSync(path.resolve(__dirname,
+      '../../../../packages/explorer-backend/config/prefixes.graphdb.example.json'), 'utf8')) as Record<string, string>;
+    buildEvaluationRows().forEach((row, i) => {
+      const graph = new PropertyGraph({ labelUri: 'http://www.w3.org/2000/01/rdf-schema#label',
+        lang: 'es', prefixes: Object.entries(prefixes).map(([prefix, uri]) => ({ prefix, uri })),
+        endpointAdapter: new GenericAdapter() });
+      const panel = (row.payload.panels as Array<{ graph: Parameters<typeof deserializeGraph>[1]; generatedQuery: string }>)[0];
       deserializeGraph(graph, panel.graph);
-      const queries = graph.getQueriesForGraph().queries;
-      expect(queries).toHaveLength(1);
-      const limit = GIS_RESULT_LIMITS[suffix];
-      const handoff = queries[0].toSparqlFullProjection(
-        limit === null ? {} : { limit },
-      );
-      expect((gis!.payload as { query: string }).query).toBe(handoff);
-    }
+      const built = graph.getQueriesForGraph().queries;
+      expect(built).toHaveLength(1);
+      expect(built[0].toSparql()).toBe(panel.generatedQuery);
+      expect(built[0].toSparqlFullProjection()).toBe(queries()[i]);
+      expect(queries()[i]).not.toMatch(/\bLIMIT\b/);
+    });
   });
 
-  it('seeds C1 and C3 without a query LIMIT so the views see every row', () => {
-    const rows = buildEvaluationRows();
-    const queryOf = (suffix: string) =>
-      (
-        rows.find((row) => row.id === `eval-${suffix}`)!.payload as {
-          query: string;
-        }
-      ).query;
-
-    // Sin LIMIT propio el recorte lo hace el backend, que marca el truncamiento
-    // y deja que el resumen y el export vayan por el resultado completo.
-    expect(queryOf('c1')).not.toMatch(/\bLIMIT\b/);
-    expect(queryOf('c3')).not.toMatch(/\bLIMIT\b/);
-    expect(queryOf('c2')).toMatch(/LIMIT 500\s*$/);
-    expect(queryOf('c4')).toMatch(/LIMIT 500\s*$/);
-    expect(GIS_RESULT_LIMITS).toEqual({ c1: null, c2: 500, c3: null, c4: 500 });
+  it('keeps the administrative scope and mandatory geometry in all scenarios', () => {
+    queries().forEach((q, i) => {
+      expect(q).toContain('geo:asWKT ?wkt');
+      if (i === 3) expect(q).toContain('regex(?barrioLabel, "^city bell$", "i")');
+      else {
+        expect(q).toContain(`<${inm}city> ?ciudad`);
+        expect(q).toContain('regex(?ciudadLabel, "^berisso$", "i")');
+      }
+      expect(q).toContain(`<${inm}hasOrigin> ?origenDireccion`);
+    });
   });
 
-  it('scopes C1 and C3 to the Berisso district, not to address text or a barrio', () => {
-    const rows = buildEvaluationRows();
-    const queryOf = (suffix: string) =>
-      (
-        rows.find((row) => row.id === `eval-${suffix}`)!.payload as {
-          query: string;
-        }
-      ).query;
-
-    for (const suffix of ['c1', 'c3']) {
-      const query = queryOf(suffix);
-      expect(query).toContain(`<${inm}city> ?ciudad`);
-      expect(query).toContain('regex(?ciudadLabel, "^berisso$", "i")');
-      // El texto libre de la dirección trae calles homónimas de otros partidos
-      // y se pierde la mayoría de los avisos: no puede ser el filtro.
-      expect(query).not.toContain('regex(?direccion');
-      expect(query).not.toContain('?barrioLabel');
-    }
-
-    // C2 sigue por barrio: City Bell no existe como inm:city en el dataset.
-    expect(queryOf('c2')).toContain('regex(?barrioLabel, "^city bell$", "i")');
+  it('gives D2 and D3 the same clean dataset, one publication date and explicit age provenance', () => {
+    const [, d2, d3] = queries();
+    expect(d2).toBe(d3);
+    expect(d3).toContain('<http://purl.org/dc/elements/1.1/date> ?fechaPublicacion');
+    expect(d3).toContain(`?featureAntiguedad <${inm}hasOrigin> ?origenAntiguedad`);
+    expect(d3).not.toContain('?fechaLectura');
+    expect(d3).not.toMatch(/OPTIONAL\s*\{[^}]*date>/s);
   });
 
-  it('projects the source of every feature that repeats per row', () => {
-    const rows = buildEvaluationRows();
-    const queryOf = (suffix: string) =>
-      (
-        rows.find((row) => row.id === `eval-${suffix}`)!.payload as {
-          query: string;
-        }
-      ).query;
-
-    // Un inmueble trae una dirección por fuente (Scraper y AVE): sin el origen
-    // las filas repetidas del mismo aviso quedan indistinguibles en la tabla.
-    // Vale para los cuatro casos, incluso donde la dirección es solo el filtro:
-    // la proyección completa del handoff lleva igual esa rama al GIS.
-    const originFeature: Record<string, string> = {
-      c1: '?addressFeature',
-      c2: '?locationFeature',
-      c3: '?locationFeature',
-      c4: '?cityFeature',
-    };
-    for (const [suffix, feature] of Object.entries(originFeature)) {
-      const query = queryOf(suffix);
-      expect(query).toContain(
-        `${feature} <${inm}hasOrigin> ?origenDireccion`,
-      );
-      expect(query.slice(0, query.indexOf('WHERE'))).toContain(
-        '?origenDireccion',
-      );
-      // El origen es funcional por feature: se suma como triple obligatorio
-      // porque no agrega ni descarta filas.
-      expect(query).not.toMatch(
-        new RegExp(
-          `OPTIONAL\\s*\\{[^}]*<${inm}hasOrigin>\\s+\\?origenDireccion`,
-          's',
-        ),
-      );
-    }
-
-    // C3 ya lo hacía con la antigüedad; el patrón es el mismo.
-    expect(queryOf('c3')).toContain(
-      `?featureAntiguedad <${inm}hasOrigin> ?origenAntiguedad`,
-    );
+  it('restricts D4 measurements to surfaces, without calling every area covered', () => {
+    const d4 = queries()[3];
+    expect(d4).toContain(`?surfaceFeature rdf:type <${inm}Surface>`);
+    expect(d4).toContain('?superficie');
+    expect(d4).not.toContain('?superficieCubierta');
   });
 
-  it('requires publication date in the C3 Explorer graph and GIS handoff', () => {
-    const rows = buildEvaluationRows();
-    const c3 = rows.find((row) => row.id === 'eval-c3');
-    const query = (c3!.payload as { query: string }).query;
-
-    expect(query).toContain(`<${dc}date> ?fechaPublicacion`);
-    expect(query).not.toMatch(
-      new RegExp(`OPTIONAL\\s*\\{[^}]*<${dc}date>\\s+\\?fechaPublicacion`, 's'),
-    );
+  it('starts D5 with a bounded sale/house/location pattern ready to extend with price', () => {
+    const d5 = queries()[4];
+    expect(d5).toContain(`<${inm}House>`);
+    expect(d5).toContain('<http://purl.org/goodrelations/v1#Sell>');
+    expect(d5).not.toContain('?precio');
+    expect(queries()[0]).toContain('?precio');
   });
 
-  it('uses typed date bounds rather than regex for C4 read dates', () => {
-    const rows = buildEvaluationRows();
-    const c4 = rows.find((row) => row.id === 'eval-c4');
-    const query = (c4!.payload as { query: string }).query;
-
-    expect(query).toContain('?fechaLectura >=');
-    expect(query).toContain('?fechaLectura <=');
-    expect(query).not.toContain('regex(?fechaLectura');
-  });
-
-  it('recreates the target database with only the nine evaluation dashboards', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdfgis-eval-'));
+  it('resets legacy and manual dashboards atomically to five scenarios on the live connection', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdfgis-scenarios-'));
     const dbPath = path.join(dir, 'evaluation.sqlite');
-    const initial = new Database(dbPath);
-    initial.exec(`
-      CREATE TABLE dashboards (
-        id TEXT PRIMARY KEY,
-        kind TEXT NOT NULL,
-        name TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      INSERT INTO dashboards VALUES ('extra', 'gis', 'extra', '{}', 'x', 'x');
-    `);
-    initial.close();
-
-    seedEvaluationDatabase(dbPath);
-    seedEvaluationDatabase(dbPath);
-
-    const db = new Database(dbPath, { readonly: true });
-    const rows = db
-      .prepare(
-        'SELECT id, kind, name, json_valid(payload) AS valid FROM dashboards ORDER BY id',
-      )
-      .all() as Array<{
-      id: string;
-      kind: string;
-      name: string;
-      valid: number;
-    }>;
-    db.close();
-
-    expect(rows).toHaveLength(9);
-    expect(rows.every((row) => row.valid === 1)).toBe(true);
-    expect(rows.map((row) => row.id)).toEqual([
-      'draft-explorer-c1',
-      'draft-explorer-c2',
-      'draft-explorer-c3',
-      'draft-explorer-c4',
-      'eval-c1',
-      'eval-c2',
-      'eval-c3',
-      'eval-c4',
-      'eval-c5',
-    ]);
+    try {
+      seedEvaluationDatabase(dbPath);
+      const live = new Database(dbPath);
+      try {
+        live.prepare('INSERT INTO dashboards VALUES (?, ?, ?, ?, ?, ?)').run('personal', 'gis', 'Mi tablero', '{}', 'old', 'old');
+        for (const id of ['eval-c1', 'eval-c5', 'draft-explorer-c3'])
+          live.prepare('INSERT INTO dashboards VALUES (?, ?, ?, ?, ?, ?)').run(id, 'gis', 'Legacy', '{}', 'old', 'old');
+        seedEvaluationDatabase(dbPath);
+        seedEvaluationDatabase(dbPath);
+        const rows = live.prepare('SELECT id, kind, json_valid(payload) AS valid FROM dashboards').all() as Array<{id: string; kind: string; valid: number}>;
+        expect(rows).toHaveLength(5);
+        expect(rows.filter(row => row.kind === 'explorer')).toHaveLength(5);
+        expect(rows.some(row => row.id === 'personal')).toBe(false);
+        expect(rows.every(row => row.valid === 1)).toBe(true);
+      } finally { live.close(); }
+    } finally { fs.rmSync(dir, {recursive: true, force: true}); }
   });
 });

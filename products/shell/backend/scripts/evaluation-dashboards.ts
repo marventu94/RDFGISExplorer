@@ -19,34 +19,10 @@ export interface EvaluationDashboardRow {
   payload: Record<string, unknown>;
 }
 
-const CONFIG_DIR = path.resolve(__dirname, '../config/evaluation');
 const PREFIXES_PATH = path.resolve(
   __dirname,
   '../../../../packages/explorer-backend/config/prefixes.graphdb.example.json',
 );
-const RESULT_LIMIT = 500;
-
-/**
- * LIMIT propio de la query de cada tablero GIS. `null` = sin LIMIT.
- *
- * C1 y C3 se siembran sin LIMIT a propósito: son los casos donde interesa el
- * total de elementos. Un LIMIT propio recorta en el endpoint antes del tope del
- * backend y, al llegar menos filas que ese tope, `meta.truncated` queda en false:
- * el tablero trata el recorte como el resultado completo y tanto el panel de
- * resumen como el export se quedan con esa muestra. Sin LIMIT el recorte lo hace
- * el backend (`SPARQL_MAX_LIMIT`), que sí marca el truncamiento, y las vistas
- * paginan el volumen en lotes.
- */
-export const GIS_RESULT_LIMITS: Record<
-  EvaluationCaseDefinition['suffix'],
-  number | null
-> = {
-  c1: null,
-  c2: RESULT_LIMIT,
-  c3: null,
-  c4: RESULT_LIMIT,
-};
-
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
 const INM = 'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#';
@@ -60,12 +36,8 @@ const TIME = 'http://www.w3.org/2006/time#';
 const DC = 'http://purl.org/dc/elements/1.1/';
 
 interface EvaluationCaseDefinition {
-  suffix: 'c1' | 'c2' | 'c3' | 'c4';
+  suffix: 'd1' | 'd2' | 'd3' | 'd4' | 'd5';
   title: string;
-  center: [number, number];
-  zoom: number;
-  rangeStart: string;
-  rangeEnd: string;
   build: (graph: PropertyGraph) => void;
 }
 
@@ -297,12 +269,8 @@ function addPrice(
 
 const CASES: EvaluationCaseDefinition[] = [
   {
-    suffix: 'c1',
-    title: 'C1 · Casas en venta en Berisso',
-    center: [-34.87, -57.88],
-    zoom: 12,
-    rangeStart: '2018-01-01T00:00:00.000Z',
-    rangeEnd: '2026-01-01T00:00:00.000Z',
+    suffix: 'd1',
+    title: 'D1 · Encontrar y verificar una casa de Berisso',
     build(graph) {
       const listing = varNode(graph, 'listing', 120, 180);
       const realEstate = varNode(graph, 'realEstate', 440, 180);
@@ -345,12 +313,52 @@ const CASES: EvaluationCaseDefinition[] = [
     },
   },
   {
-    suffix: 'c2',
-    title: 'C2 · Producto típico de City Bell',
-    center: [-34.86, -58.05],
-    zoom: 12,
-    rangeStart: '2018-01-01T00:00:00.000Z',
-    rangeEnd: '2026-01-01T00:00:00.000Z',
+    suffix: 'd2',
+    title: 'D2 · Entender la antigüedad y su procedencia en Berisso',
+    build(graph) {
+      const listing = varNode(graph, 'listing', 120, 180);
+      const realEstate = varNode(graph, 'realEstate', 420, 180);
+      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
+      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
+      // La fecha es obligatoria: C3 debe conservar dimensiones G+S+T.
+      literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
+      addCityFilter(graph, realEstate, 'berisso', 640, -20);
+
+      const ageFeature = varNode(graph, 'featureAntiguedad', 680, 220, false);
+      connect(graph, realEstate, `${INM}hasFeature`, ageFeature);
+      typeIs(graph, ageFeature, `${INM}PropertyAge`, 900, 120);
+      literalProp(graph, ageFeature, `${INM}hasValue`, 'antiguedad');
+      const origin = varNode(graph, 'origenAntiguedad', 920, 300);
+      connect(graph, ageFeature, `${INM}hasOrigin`, origin);
+
+      addRequiredGeometry(graph, realEstate, 700, 480);
+    },
+  },
+  {
+    suffix: 'd3',
+    title: 'D3 · Explorar departamentos de Berisso por fecha y zona',
+    build(graph) {
+      const listing = varNode(graph, 'listing', 120, 180);
+      const realEstate = varNode(graph, 'realEstate', 420, 180);
+      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
+      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
+      // La fecha es obligatoria: C3 debe conservar dimensiones G+S+T.
+      literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
+      addCityFilter(graph, realEstate, 'berisso', 640, -20);
+
+      const ageFeature = varNode(graph, 'featureAntiguedad', 680, 220, false);
+      connect(graph, realEstate, `${INM}hasFeature`, ageFeature);
+      typeIs(graph, ageFeature, `${INM}PropertyAge`, 900, 120);
+      literalProp(graph, ageFeature, `${INM}hasValue`, 'antiguedad');
+      const origin = varNode(graph, 'origenAntiguedad', 920, 300);
+      connect(graph, ageFeature, `${INM}hasOrigin`, origin);
+
+      addRequiredGeometry(graph, realEstate, 700, 480);
+    },
+  },
+  {
+    suffix: 'd4',
+    title: 'D4 · Explorar lotes y exportar departamentos de City Bell',
     build(graph) {
       const listing = varNode(graph, 'listing', 120, 180);
       const realEstate = varNode(graph, 'realEstate', 420, 180);
@@ -376,8 +384,10 @@ const CASES: EvaluationCaseDefinition[] = [
       connect(graph, realEstate, `${REC}includes`, siteSurface);
       typeIs(graph, siteSurface, `${REC}Site`, 680, 520);
       connect(graph, siteSurface, `${INM}hasFeature`, surfaceFeature);
+      // Dimensions también usa gr:hasValue, pero sus valores son longitudes.
+      typeIs(graph, surfaceFeature, `${INM}Surface`, 1080, 520);
       connect(graph, surfaceFeature, `${INM}hasValue`, surfaceSpec);
-      literalProp(graph, surfaceSpec, `${GR}hasValue`, 'superficieCubierta');
+      literalProp(graph, surfaceSpec, `${GR}hasValue`, 'superficie');
       literalProp(
         graph,
         surfaceSpec,
@@ -390,90 +400,18 @@ const CASES: EvaluationCaseDefinition[] = [
     },
   },
   {
-    suffix: 'c3',
-    title: 'C3 · Departamentos a estrenar y usados en Berisso',
-    center: [-34.87, -57.88],
-    zoom: 12,
-    rangeStart: '2020-01-01T00:00:00.000Z',
-    rangeEnd: '2026-01-01T00:00:00.000Z',
+    suffix: 'd5',
+    title: 'D5 · Construir y guardar una consulta de casas de Berisso',
     build(graph) {
+      // Punto de partida acotado. El participante agrega precio y moneda,
+      // ejecuta, guarda una copia y transfiere el resultado a GIS.
       const listing = varNode(graph, 'listing', 120, 180);
       const realEstate = varNode(graph, 'realEstate', 420, 180);
-      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
+      addListingCore(graph, listing, realEstate, `${INM}House`);
+      connect(graph, listing, `${GR}hasBusinessFunction`,
+        constNode(graph, `${GR}Sell`, 80, 360));
       literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      // La fecha es obligatoria: C3 debe conservar dimensiones G+S+T.
-      literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
       addCityFilter(graph, realEstate, 'berisso', 640, -20);
-
-      const ageFeature = varNode(graph, 'featureAntiguedad', 680, 220, false);
-      connect(graph, realEstate, `${INM}hasFeature`, ageFeature);
-      typeIs(graph, ageFeature, `${INM}PropertyAge`, 900, 120);
-      literalProp(graph, ageFeature, `${INM}hasValue`, 'antiguedad');
-      const origin = varNode(graph, 'origenAntiguedad', 920, 300);
-      connect(graph, ageFeature, `${INM}hasOrigin`, origin);
-
-      addRequiredGeometry(graph, realEstate, 700, 480);
-    },
-  },
-  {
-    suffix: 'c4',
-    title: 'C4 · Fechas de publicación y tandas de lectura',
-    center: [-38.0, -57.55],
-    zoom: 10,
-    rangeStart: '2018-01-01T00:00:00.000Z',
-    rangeEnd: '2026-01-01T00:00:00.000Z',
-    build(graph) {
-      const listing = varNode(graph, 'listing', 120, 180);
-      const realEstate = varNode(graph, 'realEstate', 420, 180);
-      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
-      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
-      const readAt = literalProp(
-        graph,
-        listing,
-        `${SIOC}read_at`,
-        'fechaLectura',
-      );
-      readAt
-        .getLiteral()
-        ?.addFilter(
-          'datefrom',
-          { date: '2023-05-01', granularity: 'day' },
-          graph,
-        );
-      readAt
-        .getLiteral()
-        ?.addFilter(
-          'dateto',
-          { date: '2025-04-30', granularity: 'day' },
-          graph,
-        );
-
-      const cityFeature = varNode(graph, 'cityFeature', 660, -20, false);
-      const cityValue = varNode(graph, 'cityValue', 840, -20, false);
-      const city = varNode(graph, 'city', 1020, -20, false);
-      connect(graph, realEstate, `${INM}hasFeature`, cityFeature);
-      connect(graph, cityFeature, `${INM}hasValue`, cityValue);
-      connect(graph, cityValue, `${INM}city`, city);
-      // Misma razón que en `addLocationAddress`: una dirección por fuente.
-      const cityOrigin = varNode(graph, 'origenDireccion', 660, -160);
-      connect(graph, cityFeature, `${INM}hasOrigin`, cityOrigin);
-      const cityLabel = literalProp(graph, city, `${RDFS}label`, 'ciudadLabel');
-      cityLabel
-        .getLiteral()
-        ?.addFilter('regex', { regex: '^mar del plata$' }, graph);
-
-      const building = varNode(graph, 'building', 680, 220, false);
-      connect(graph, realEstate, `${REC}includes`, building);
-      typeIs(graph, building, `${REC}Building`, 900, 140);
-      const rooms = literalProp(
-        graph,
-        building,
-        `${PRONTO}has_number_of_rooms`,
-        'ambientes',
-      );
-      rooms.getLiteral()?.addFilter('geq', { number: 0 }, graph);
-      rooms.getLiteral()?.addFilter('leq', { number: 2 }, graph);
       addRequiredGeometry(graph, realEstate, 700, 480);
     },
   },
@@ -497,10 +435,8 @@ function buildCaseArtifacts(
     );
   }
   const explorerQuery = queries[0].toSparql();
-  const gisLimit = GIS_RESULT_LIMITS[definition.suffix];
-  const gisQuery = queries[0].toSparqlFullProjection(
-    gisLimit === null ? {} : { limit: gisLimit },
-  );
+  // Mismo método y alcance que el handoff real; el backend aplica su tope.
+  const gisQuery = queries[0].toSparqlFullProjection();
   if (!explorerQuery || !gisQuery) {
     throw new Error(`[${definition.title}] no se pudo generar la consulta`);
   }
@@ -539,7 +475,7 @@ function explorerPayload(artifacts: CaseArtifacts): Record<string, unknown> {
     panels: [
       {
         id: 'panel-0',
-        name: `DRAFT · ${artifacts.definition.title}`,
+        name: artifacts.definition.title,
         graph: artifacts.snapshot,
         generatedQuery: artifacts.explorerQuery,
         variables: artifacts.variables,
@@ -550,113 +486,62 @@ function explorerPayload(artifacts: CaseArtifacts): Record<string, unknown> {
   };
 }
 
-function gisPayload(artifacts: CaseArtifacts): Record<string, unknown> {
-  const definition = artifacts.definition;
-  return {
-    query: artifacts.gisQuery,
-    backend: 'graphdb',
-    layout: {
-      slotsCount: 4,
-      preset: 'quad',
-      slots: [
-        { id: 'slot-0', view: 'map' },
-        { id: 'slot-1', view: 'timeline' },
-        { id: 'slot-2', view: 'table' },
-        { id: 'slot-3', view: 'graph' },
-      ],
-    },
-    filters: {
-      map: { center: definition.center, zoom: definition.zoom },
-      timeline: {
-        rangeStart: definition.rangeStart,
-        rangeEnd: definition.rangeEnd,
-      },
-      table: { pageSize: 100 },
-      graph: { layout: 'dagre' },
-    },
-  };
+/** Consultas de auditoría derivadas de los mismos grafos que carga la interfaz. */
+export function buildEvaluationQueries(): Array<{ id: string; query: string }> {
+  return CASES.map(buildCaseArtifacts).map((item) => ({
+    id: `eval-explorer-${item.definition.suffix}`,
+    query: item.gisQuery,
+  }));
 }
 
 export function buildEvaluationRows(): EvaluationDashboardRow[] {
-  const artifacts = CASES.map(buildCaseArtifacts);
-  const rows: EvaluationDashboardRow[] = artifacts.map((item) => ({
-    id: `eval-${item.definition.suffix}`,
-    kind: 'gis',
-    name: item.definition.title,
-    payload: gisPayload(item),
-  }));
-
-  rows.push(
-    ...artifacts.map((item) => ({
-      id: `draft-explorer-${item.definition.suffix}`,
-      kind: 'explorer' as const,
-      name: `DRAFT · ${item.definition.title}`,
-      payload: explorerPayload(item),
-    })),
-  );
-
-  const explorerPayloadC5 = JSON.parse(
-    fs.readFileSync(path.join(CONFIG_DIR, 'c5-explorer.json'), 'utf8'),
-  ) as Record<string, unknown>;
-  rows.push({
-    id: 'eval-c5',
+  return CASES.map(buildCaseArtifacts).map((item) => ({
+    id: `eval-explorer-${item.definition.suffix}`,
     kind: 'explorer',
-    name: 'C5 · Construcción visual y handoff',
-    payload: explorerPayloadC5,
-  });
-  return rows;
+    name: item.definition.title,
+    payload: explorerPayload(item),
+  }));
 }
 
-const MIGRATIONS_SQL = `
-CREATE TABLE dashboards (
-  id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL CHECK (kind IN ('gis','explorer')),
-  name TEXT NOT NULL,
-  payload TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX idx_dashboards_updated ON dashboards(updated_at DESC);
-`;
-
+/** Restablece la base a los cinco escenarios de evaluación.
+ * Borra también tableros manuales. Usa una transacción sobre el mismo archivo
+ * para que el servidor activo vea el cambio sin reemplazar su conexión SQLite.
+ */
 export function seedEvaluationDatabase(targetPath: string): void {
+  const rows = buildEvaluationRows();
   const resolved = path.resolve(targetPath);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
-  const tempPath = `${resolved}.tmp-${process.pid}`;
-  for (const suffix of ['', '-wal', '-shm']) {
-    fs.rmSync(`${tempPath}${suffix}`, { force: true });
-  }
-
-  const db = new Database(tempPath);
+  const db = new Database(resolved);
   try {
-    db.pragma('journal_mode = WAL');
-    db.exec(MIGRATIONS_SQL);
-    const insert = db.prepare(`
+    db.pragma('busy_timeout = 5000');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS dashboards (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('gis','explorer')),
+        name TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_dashboards_updated ON dashboards(updated_at DESC);
+    `);
+    const remove = db.prepare('DELETE FROM dashboards');
+    const upsert = db.prepare(`
       INSERT INTO dashboards (id, kind, name, payload, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        kind = excluded.kind, name = excluded.name, payload = excluded.payload,
+        updated_at = excluded.updated_at
     `);
-    const baseTime = Date.now();
-    const transaction = db.transaction((rows: EvaluationDashboardRow[]) => {
+    db.transaction(() => {
+      remove.run();
+      const baseTime = Date.now();
       rows.forEach((row, index) => {
         const timestamp = new Date(baseTime - index * 1000).toISOString();
-        insert.run(
-          row.id,
-          row.kind,
-          row.name,
-          JSON.stringify(row.payload),
-          timestamp,
-          timestamp,
-        );
+        upsert.run(row.id, row.kind, row.name, JSON.stringify(row.payload), timestamp, timestamp);
       });
-    });
-    transaction(buildEvaluationRows());
-    db.pragma('wal_checkpoint(TRUNCATE)');
+    })();
   } finally {
     db.close();
   }
-
-  for (const suffix of ['-wal', '-shm']) {
-    fs.rmSync(`${resolved}${suffix}`, { force: true });
-  }
-  fs.renameSync(tempPath, resolved);
 }
