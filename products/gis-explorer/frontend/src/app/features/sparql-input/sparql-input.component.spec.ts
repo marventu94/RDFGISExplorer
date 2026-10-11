@@ -59,7 +59,6 @@ describe('SparqlInputComponent', () => {
   let appConfigMock: { load: ReturnType<typeof vi.fn>; config: ReturnType<typeof vi.fn> };
   let realSnackBar: MatSnackBar;
   let realDialog: MatDialog;
-  let originalConfirm: typeof window.confirm;
   let unregisterHost: () => void;
   const bridgeMocks = {
     load: vi.fn().mockResolvedValue(undefined),
@@ -110,9 +109,6 @@ describe('SparqlInputComponent', () => {
     vi.spyOn(MatSnackBar.prototype, 'open').mockImplementation(() => ({ onAction: () => ({ unsubscribe: () => {} }) } as any));
     vi.spyOn(MatDialog.prototype, 'open').mockReturnValue({ afterClosed: () => of(null) } as any);
 
-    originalConfirm = window.confirm;
-    window.confirm = vi.fn().mockReturnValue(true);
-
     fixture = TestBed.createComponent(SparqlInputComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -122,7 +118,6 @@ describe('SparqlInputComponent', () => {
     unregisterHost();
     localStorage.clear();
     vi.clearAllMocks();
-    window.confirm = originalConfirm;
   });
 
   function asAny(): any {
@@ -137,13 +132,11 @@ describe('SparqlInputComponent', () => {
     expect(asAny().hasContent()).toBe(false);
   });
 
-  it('renders the dashboards button', () => {
+  it('does not render a dashboards menu in the editor toolbar', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    const buttons = compiled.querySelectorAll('button');
-    const tablerosBtn = Array.from(buttons).find(
-      (b) => b.textContent?.includes('Tableros'),
-    );
-    expect(tablerosBtn).toBeTruthy();
+    const labels = Array.from(compiled.querySelectorAll('button')).map((b) => b.textContent ?? '');
+    expect(labels.some((label) => label.includes('Tableros'))).toBe(false);
+    expect(compiled.querySelector('[aria-haspopup="menu"]')).toBeNull();
   });
 
   it('should render the execute button', () => {
@@ -165,43 +158,6 @@ describe('SparqlInputComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const editorArea = compiled.querySelector('.editor-area');
     expect(editorArea).toBeTruthy();
-  });
-
-  describe('loadDashboard', () => {
-    const dashboard = { id: 'dash-1', kind: 'gis' as const, name: 'Test Dashboard', payload: {}, createdAt: '', updatedAt: '' };
-
-    it('should prompt for confirmation when editor has content', () => {
-      vi.useFakeTimers();
-      asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
-      asAny().loadDashboard(dashboard);
-      vi.advanceTimersByTime(0);
-      expect(realDialog.open).toHaveBeenCalled();
-      vi.useRealTimers();
-    });
-
-    it('should load dashboard when editor is empty', () => {
-      asAny().loadDashboard(dashboard);
-      expect(bridgeMocks.load).toHaveBeenCalledWith('dash-1');
-    });
-  });
-
-  describe('newDashboard', () => {
-    it('should show confirmation popup', () => {
-      asAny().newDashboard();
-      expect(window.confirm).toHaveBeenCalled();
-    });
-
-    it('should clear state when confirmed', () => {
-      window.confirm = vi.fn().mockReturnValue(true);
-      asAny().newDashboard();
-      expect(persistenceMock.clearCurrent).toHaveBeenCalled();
-    });
-
-    it('should not clear state when cancelled', () => {
-      window.confirm = vi.fn().mockReturnValue(false);
-      asAny().newDashboard();
-      expect(persistenceMock.clearCurrent).not.toHaveBeenCalled();
-    });
   });
 
   describe('execute', () => {

@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { DialogModule, DialogRef, DIALOG_DATA } from '@angular/cdk/dialog';
 import { I18nService } from '../core/i18n.service';
+import { DIALOG_STYLES } from './dialog.styles';
 
 export interface MessageDialogAction {
   label: string;
@@ -8,6 +9,8 @@ export interface MessageDialogAction {
   value: string;
   /** Botón destacado (el de la acción principal). */
   primary?: boolean;
+  /** Acción destructiva (eliminar): botón destacado en rojo. */
+  danger?: boolean;
 }
 
 export interface MessageDialogData {
@@ -22,23 +25,24 @@ export interface MessageDialogData {
  * shell sirve para confirmaciones (se va solo); cuando hay algo que perder, el
  * usuario tiene que elegir.
  *
- * Es el gemelo del diálogo del RDF Explorer: los dos remotes y el host son
- * bundles distintos, así que el componente no se puede compartir.
+ * Usa el mismo diseño que los diálogos de GIS y del RDF Explorer (ver
+ * `DIALOG_STYLES`): son bundles distintos, así que se comparte el estilo.
  */
 @Component({
   selector: 'app-message-dialog',
   standalone: true,
   imports: [DialogModule],
   template: `
-    <div class="dialog">
+    <div class="dialog-container">
       <h3>{{ data.title }}</h3>
       <p>{{ data.message }}</p>
       <div class="actions">
         @for (action of actions; track action.value) {
           <button
             type="button"
-            [class.btn-primary]="action.primary"
-            [class.btn-secondary]="!action.primary"
+            [class.btn-primary]="action.primary && !action.danger"
+            [class.btn-danger]="action.danger"
+            [class.btn-secondary]="!action.primary && !action.danger"
             (click)="close(action.value)"
           >
             {{ action.label }}
@@ -47,52 +51,7 @@ export interface MessageDialogData {
       </div>
     </div>
   `,
-  styles: `
-    .dialog {
-      padding: 1.5rem;
-      background: var(--color-bg-elevated, #fff);
-      color: var(--color-text, #1a1a1a);
-      border-radius: 8px;
-      min-width: 340px;
-      max-width: 520px;
-      border-top: 4px solid var(--color-accent, #1f77b4);
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
-    }
-    h3 {
-      margin: 0 0 0.75rem;
-      font-size: 1.125rem;
-    }
-    p {
-      margin: 0 0 1.25rem;
-      line-height: 1.5;
-      color: var(--color-text-muted, #555);
-    }
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    button {
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      cursor: pointer;
-      border: 1px solid var(--color-border, #ddd);
-    }
-    .btn-primary {
-      background: var(--color-accent, #1f77b4);
-      color: var(--color-text-on-accent, #fff);
-      border-color: var(--color-accent, #1f77b4);
-    }
-    .btn-secondary {
-      background: var(--color-bg-elevated, #fff);
-      color: var(--color-text, #1a1a1a);
-    }
-    button:hover {
-      filter: brightness(0.95);
-    }
-  `,
+  styles: [DIALOG_STYLES],
 })
 export class MessageDialogComponent {
   protected readonly data = inject<MessageDialogData>(DIALOG_DATA);
