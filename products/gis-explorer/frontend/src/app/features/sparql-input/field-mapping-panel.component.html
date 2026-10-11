@@ -1,14 +1,22 @@
 <div class="mapping-panel">
-  <button
-    mat-button
-    class="toggle-btn"
-    [matBadge]="overridesCount() > 0 ? overridesCount() + ' overrides' : null"
-    [matBadgeHidden]="overridesCount() === 0"
-    (click)="toggle()"
-  >
-    <mat-icon>{{ expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
-    {{ 'Mapeo vars' | translate }}
-  </button>
+  <!-- Una sola fila: el mapeo a la izquierda y las acciones del editor
+       (Ejecutar) proyectadas a la derecha. -->
+  <div class="panel-header">
+    <button
+      mat-button
+      class="toggle-btn"
+      [matBadge]="overridesCount() > 0 ? overridesCount() + ' overrides' : null"
+      [matBadgeHidden]="overridesCount() === 0"
+      [attr.aria-expanded]="expanded"
+      (click)="toggle()"
+    >
+      <mat-icon>{{ expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}</mat-icon>
+      {{ 'Mapeo vars' | translate }}
+    </button>
+    <div class="panel-actions">
+      <ng-content select="[panelActions]" />
+    </div>
+  </div>
 
   @if (expanded) {
     <div class="mapping-content">
@@ -16,7 +24,7 @@
         @for (field of fields; track field.variable) {
           <div class="field-row">
             <span class="field-name">{{ field.variable }}</span>
-            <span class="field-detected">Auto-detect: {{ typeLabel(field.detectedType) }}</span>
+            <span class="field-detected">{{ 'Detección automática:' | translate }} {{ typeLabel(field.detectedType) }}</span>
             <mat-select
               class="field-select"
               [value]="field.override"

@@ -1,24 +1,6 @@
 <div class="sparql-input" (keydown)="$event.stopPropagation()">
   <div class="editor-area" #editorContainer></div>
 
-  <div class="toolbar">
-    <div class="toolbar-right">
-      @if (executing()) {
-        <mat-spinner diameter="24"></mat-spinner>
-      }
-
-      <button
-        mat-flat-button
-        color="primary"
-        [disabled]="!hasContent() || executing()"
-        (click)="execute()"
-      >
-        <mat-icon>play_arrow</mat-icon>
-        {{ 'Ejecutar' | translate }}
-      </button>
-    </div>
-  </div>
-
   <app-field-mapping-panel
     [variables]="lastResult()?.variables ?? []"
     [bindings]="lastResult()?.bindings ?? []"
@@ -26,5 +8,20 @@
     [overridesCount]="overridesCount()"
     (applyMapping)="onApplyMapping($event)"
     (restoreAuto)="onRestoreAuto()"
-  />
+  >
+    <ng-container panelActions>
+      @if (executing()) {
+        <mat-spinner diameter="20"></mat-spinner>
+      }
+      <button
+        type="button"
+        class="run-btn"
+        [disabled]="!hasContent() || executing()"
+        (click)="execute()"
+      >
+        <mat-icon>play_arrow</mat-icon>
+        <span>{{ 'Ejecutar' | translate }}</span>
+      </button>
+    </ng-container>
+  </app-field-mapping-panel>
 </div>

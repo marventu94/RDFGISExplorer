@@ -12,7 +12,6 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -44,7 +43,6 @@ import { VariableMappingService } from '@core/services/variable-mapping.service'
     TranslatePipe,
     CommonModule,
     FormsModule,
-    MatButtonModule,
     MatIconModule,
     MatDialogModule,
     MatSnackBarModule,
