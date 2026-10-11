@@ -216,6 +216,15 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private markActiveListener?: () => void;
   /** Firma del conjunto de elementos dibujado; si no cambia, no se re-corre layout. */
   private lastTopologyKey: string | null = null;
+  /**
+   * Pedido de acomodo completo (filtro, lote o query nuevos). Dura hasta el fin
+   * de la ráfaga síncrona de emisiones: el resultado del lote y su lotState
+   * llegan por separado y en cualquier orden, y el pedido tiene que alcanzar a
+   * los elementos nuevos aunque lleguen en la emisión siguiente.
+   */
+  private relayoutPending = false;
+  /** Topología ya reacomodada en esta ráfaga: las reemisiones no la repiten. */
+  private relayoutDoneKey: string | null = null;
   private lastAppliedFiltersKey = '[]';
   private shouldFitAfterLayout = false;
   private pendingCamera?: { pan: { x: number; y: number }; zoom: number };
@@ -240,6 +249,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   /** Resultado completo: el modo entidad lo usa cuando la raíz no está en el lote. */
   private lastOriginalResult: QueryResult | null = null;
   private lastLotState: { lotCount: number; currentLot: number } = { lotCount: 1, currentLot: 1 };
+  /** Lote dibujado (`tamaño:número`): si cambia, el subconjunto es otro y se reacomoda entero. */
+  private lastLotKey: string | null = null;
 
   // ---------------------------------------------------------------------------
   // Modo entidad (etapa 5). Todo este estado es TRANSITORIO: no se persiste en
@@ -523,9 +534,14 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (resetLayout) {
+    // Si se va la mayoría de lo dibujado (otro lote, otra query) es otro
+    // subconjunto, no un agregado: el layout incremental dejaría los nodos que
+    // siguen (ciudad, barrio) bloqueados en su lugar viejo, lejos del resto.
+    const requested = resetLayout && key !== this.relayoutDoneKey;
+    if (requested || (key !== this.lastTopologyKey && this.replacesMostNodes(elements))) {
       this.patchGraph(elements, false);
       this.lastTopologyKey = key;
+      this.relayoutDoneKey = key;
       this.resetFilteredLayout();
       return;
     }
@@ -662,6 +678,17 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   /** Firma estable del conjunto de elementos: si no cambia, la topología es la misma. */
+  /** True when fewer than half of the drawn nodes survive into `elements`. */
+  private replacesMostNodes(elements: cytoscape.ElementDefinition[]): boolean {
+    const cy = this.cy;
+    if (!cy) return false;
+    const drawn = cy.nodes();
+    if (drawn.length === 0) return false;
+    const next = new Set(elements.map((e) => String((e.data as { id?: unknown })?.id ?? '')));
+    const kept = drawn.filter((n) => next.has(n.id())).length;
+    return kept < drawn.length / 2;
+  }
+
   private topologyKey(elements: cytoscape.ElementDefinition[]): string {
     const ids = elements.map((e) => String((e.data as { id?: unknown })?.id ?? ''));
     ids.sort();
@@ -905,6 +932,28 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     }
 
     if (original !== this.lastOriginalResult) this.focusPins.clear();
+    // Solo con un grafo ya dibujado: el primer render respeta la disposición y
+    // la cámara guardadas en el tablero.
+    const resultChanged = !!this.cy && original !== this.lastOriginalResult;
+    // Otro lote (o tamaño de lote, o query nueva) es otro subconjunto de filas,
+    // igual que un filtro: se reacomoda entero. El layout incremental deja los
+    // nodos compartidos entre lotes (ciudad, barrio) bloqueados en su posición
+    // del lote anterior, lejos del árbol nuevo y con aristas larguísimas.
+    const lotKey = `${lotState.lotSize}:${lotState.currentLot}`;
+    const lotChanged = !!this.cy && this.lastLotKey !== null && lotKey !== this.lastLotKey;
+    this.lastLotKey = lotKey;
+    const subsetChanged = filtersChanged || lotChanged || resultChanged;
+    if (subsetChanged) {
+      this.relayoutDoneKey = null;
+      if (!this.relayoutPending) {
+        this.relayoutPending = true;
+        queueMicrotask(() => {
+          this.relayoutPending = false;
+          this.relayoutDoneKey = null;
+        });
+      }
+    }
+    const relayout = this.relayoutPending;
     this.filteredNodeCount = visible.nodes.length;
     this.originalNodeCount = original?.nodes.length ?? visible.nodes.length;
     this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
@@ -916,7 +965,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       // Filtros y lotes siguen mandando sobre los datos; la exploración se
       // recalcula sobre el nuevo resultado visible sin perder raíz ni ramas.
       this.syncEntityMode();
-      if (filtersChanged) this.resetFilteredLayout();
+      if (subsetChanged) this.resetFilteredLayout();
       this.cdr.markForCheck();
       return;
     }
@@ -928,11 +977,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       lotState.lotCount,
       lotState.currentLot,
     );
-    this.syncGraph(built.elements, filtersChanged);
+    this.syncGraph(built.elements, relayout);
     this.cdr.markForCheck();
   }
 
-  /** A new filter defines a new exploration subset, so place and frame it afresh. */
+  /** A new filter, lot or result defines a new subset, so place and frame it afresh. */
   private resetFilteredLayout(): void {
     const cy = this.cy;
     if (!cy) return;
