@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { firstValueFrom } from 'rxjs';
 
+import { I18nService } from './i18n.service';
 import { readGisSessionState } from './gis-session-channel';
 import { MessageDialogComponent } from '../shell/message-dialog.component';
 import type { MessageDialogData } from '../shell/message-dialog.component';
@@ -27,6 +28,7 @@ export type OpenDecision =
 @Injectable({ providedIn: 'root' })
 export class GisOpenGuardService {
   private readonly dialog = inject(Dialog);
+  private readonly i18n = inject(I18nService);
 
   /**
    * @param targetName nombre del tablero que se quiere abrir, para el mensaje.
@@ -38,24 +40,28 @@ export class GisOpenGuardService {
     const openName = gis.dashboardName;
     const reopeningSame = gis.dashboardId !== null && gis.dashboardId === targetId;
 
+    const t = this.i18n;
     const data: MessageDialogData = {
       title: reopeningSame
-        ? `Vas a volver a cargar "${targetName}"`
+        ? t.text('Vas a volver a cargar "{name}"', { name: targetName })
         : openName
-          ? `Vas a reemplazar "${openName}" en GIS`
-          : 'Vas a reemplazar la vista de GIS',
+          ? t.text('Vas a reemplazar "{name}" en GIS', { name: openName })
+          : t.text('Vas a reemplazar la vista de GIS'),
       message: reopeningSame
-        ? 'Se vuelve a cargar el tablero como está guardado: los cambios que hayas ' +
-          'hecho y no guardaste se pierden.'
+        ? t.text('Se vuelve a cargar el tablero como está guardado: los cambios que hayas hecho y no guardaste se pierden.')
         : openName
-          ? `En GIS tenés abierto el tablero "${openName}". Al abrir "${targetName}" se ` +
-            'reemplaza su consulta, su layout y sus filtros: lo que no hayas guardado se pierde.'
-          : `En GIS hay una vista sin guardar. Al abrir "${targetName}" se reemplaza su ` +
-            'consulta, su layout y sus filtros: si no la guardás, se pierde.',
+          ? t.text(
+              'En GIS tenés abierto el tablero "{open}". Al abrir "{target}" se reemplaza su consulta, su layout y sus filtros: lo que no hayas guardado se pierde.',
+              { open: openName, target: targetName },
+            )
+          : t.text(
+              'En GIS hay una vista sin guardar. Al abrir "{target}" se reemplaza su consulta, su layout y sus filtros: si no la guardás, se pierde.',
+              { target: targetName },
+            ),
       actions: [
-        { label: 'Cancelar', value: 'cancel' },
-        { label: 'Ir a GIS a guardar', value: 'go-save' },
-        { label: 'Abrir igual', value: 'open', primary: true },
+        { label: t.text('Cancelar'), value: 'cancel' },
+        { label: t.text('Ir a GIS a guardar'), value: 'go-save' },
+        { label: t.text('Abrir igual'), value: 'open', primary: true },
       ],
     };
 
@@ -72,17 +78,21 @@ export class GisOpenGuardService {
     const gis = readGisSessionState();
     if (!gis?.hasWorkAtRisk) return 'proceed';
 
+    const t = this.i18n;
     const data: MessageDialogData = {
       title: gis.dashboardName
-        ? `Vas a reemplazar "${gis.dashboardName}" en GIS`
-        : 'Vas a reemplazar la vista de GIS',
+        ? t.text('Vas a reemplazar "{name}" en GIS', { name: gis.dashboardName })
+        : t.text('Vas a reemplazar la vista de GIS'),
       message: gis.dashboardName
-        ? `En GIS tenés abierto el tablero "${gis.dashboardName}". Al explorar esta consulta se reemplazan su consulta, layout y filtros: lo que no hayas guardado se pierde.`
-        : 'En GIS hay una vista sin guardar. Al explorar esta consulta se reemplazan su consulta, layout y filtros.',
+        ? t.text(
+            'En GIS tenés abierto el tablero "{name}". Al explorar esta consulta se reemplazan su consulta, layout y filtros: lo que no hayas guardado se pierde.',
+            { name: gis.dashboardName },
+          )
+        : t.text('En GIS hay una vista sin guardar. Al explorar esta consulta se reemplazan su consulta, layout y filtros.'),
       actions: [
-        { label: 'Cancelar', value: 'cancel' },
-        { label: 'Ir a GIS a guardar', value: 'go-save' },
-        { label: 'Explorar igual', value: 'open', primary: true },
+        { label: t.text('Cancelar'), value: 'cancel' },
+        { label: t.text('Ir a GIS a guardar'), value: 'go-save' },
+        { label: t.text('Explorar igual'), value: 'open', primary: true },
       ],
     };
     const choice = await firstValueFrom(this.dialog.open<string>(MessageDialogComponent, { data }).closed);

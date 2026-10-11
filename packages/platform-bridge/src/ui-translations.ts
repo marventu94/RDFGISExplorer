@@ -346,6 +346,21 @@ export const UI_TRANSLATIONS = [
   ['No se pudo copiar la vista explorada:', 'Could not copy the explored view:'],
   ['No se pudo copiar la estructura disponible:', 'Could not copy the available structure:'],
   ['El editor tiene contenido. Si cargás otra query se perderá lo que escribiste.', 'The editor contains text. Loading another query will discard what you wrote.'],
+  ['Sobrescribir "{name}"', 'Overwrite "{name}"'],
+  ['Explorar igual', 'Explore anyway'],
+  ['Vas a volver a cargar "{name}"', 'You are about to reload "{name}"'],
+  ['Vas a reemplazar "{name}" en GIS', 'You are about to replace "{name}" in GIS'],
+  ['Vas a reemplazar la vista de GIS', 'You are about to replace the GIS view'],
+  ['Se vuelve a cargar el tablero como está guardado: los cambios que hayas hecho y no guardaste se pierden.', 'The dashboard is reloaded as saved; any unsaved changes will be lost.'],
+  ['En GIS tenés abierto el tablero "{open}". Al abrir "{target}" se reemplaza su consulta, su layout y sus filtros: lo que no hayas guardado se pierde.', 'The dashboard "{open}" is open in GIS. Opening "{target}" replaces its query, layout, and filters; any unsaved changes will be lost.'],
+  ['En GIS hay una vista sin guardar. Al abrir "{target}" se reemplaza su consulta, su layout y sus filtros: si no la guardás, se pierde.', 'GIS has an unsaved view. Opening "{target}" replaces its query, layout, and filters; if you do not save it, it will be lost.'],
+  ['En GIS tenés abierto el tablero "{name}". Al explorar esta consulta se reemplazan su consulta, layout y filtros: lo que no hayas guardado se pierde.', 'The dashboard "{name}" is open in GIS. Exploring this query replaces its query, layout, and filters; any unsaved changes will be lost.'],
+  ['En GIS hay una vista sin guardar. Al explorar esta consulta se reemplazan su consulta, layout y filtros.', 'GIS has an unsaved view. Exploring this query replaces its query, layout, and filters.'],
+  ['No hay consulta para explorar', 'No query to explore'],
+  ['El panel activo no tiene un patrón completo. Agregá al menos un nodo con una propiedad y su valor.', 'The active panel does not have a complete pattern. Add at least one node with a property and its value.'],
+  ['Elegí una consulta', 'Choose a query'],
+  ['El panel genera varias consultas separadas. Elegí cuál querés explorar en GIS.', 'The panel generates several separate queries. Choose which one to explore in GIS.'],
+  ['Consultas disponibles', 'Available queries'],
 ] as const satisfies readonly (readonly [string, string])[];
 
 export type UiTextKey = (typeof UI_TRANSLATIONS)[number][0] | (typeof UI_TRANSLATIONS)[number][1];

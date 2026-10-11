@@ -13,7 +13,7 @@
     <div class="mode-selector">
       <label>
         <input type="radio" name="saveMode" value="overwrite" [ngModel]="mode" (ngModelChange)="setMode($event)" />
-        Sobrescribir "{{ data.currentName }}"
+        {{ 'Sobrescribir "{name}"' | translate: { name: data.currentName ?? '' } }}
       </label>
       <label>
         <input type="radio" name="saveMode" value="copy" [ngModel]="mode" (ngModelChange)="setMode($event)" />
