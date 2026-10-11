@@ -11,10 +11,16 @@ import { ThemeToggleComponent } from '../core/theme-toggle.component';
   template: `
     <header class="top-bar">
       <div class="top-bar__left">
-        <svg class="top-bar__logo" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z" />
-          <path d="M2 12h20" />
+        <!-- Pin de grafo (mismo dibujo que favicon.svg): el pin usa el acento
+             y el grafo el fondo de la barra, así sigue al tema. -->
+        <svg class="top-bar__logo" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+          <path fill="currentColor" d="M16 2.5c-6.4 0-11.3 4.9-11.3 11.1C4.7 21.5 16 29.5 16 29.5s11.3-8 11.3-15.9C27.3 7.4 22.4 2.5 16 2.5z" />
+          <path d="M11 10.6 21 9.6 16 18.3Z" fill="none" stroke="var(--top-bar-bg)" stroke-width="1.9" stroke-linejoin="round" />
+          <g fill="var(--top-bar-bg)">
+            <circle cx="11" cy="10.6" r="2.6" />
+            <circle cx="21" cy="9.6" r="2.6" />
+            <circle cx="16" cy="18.3" r="3" />
+          </g>
         </svg>
         <span class="top-bar__title">RDF GIS Explorer</span>
       </div>

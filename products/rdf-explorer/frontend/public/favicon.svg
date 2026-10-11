@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Pin de grafo: un grafo RDF de tres nodos dentro de un pin geográfico. -->
+  <style>
+    .pin { fill: #0d6efd; }
+    .ink { fill: #ffffff; stroke: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .pin { fill: #79a7e3; }
+      .ink { fill: #202124; stroke: #202124; }
+    }
+  </style>
+  <path class="pin" d="M16 2.5c-6.4 0-11.3 4.9-11.3 11.1C4.7 21.5 16 29.5 16 29.5s11.3-8 11.3-15.9C27.3 7.4 22.4 2.5 16 2.5z"/>
+  <path class="ink" d="M11 10.6 21 9.6 16 18.3Z" fill="none" style="fill:none" stroke-width="1.9" stroke-linejoin="round"/>
+  <circle class="ink" cx="11" cy="10.6" r="2.6" stroke-width="0"/>
+  <circle class="ink" cx="21" cy="9.6" r="2.6" stroke-width="0"/>
+  <circle class="ink" cx="16" cy="18.3" r="3" stroke-width="0"/>
+</svg>
