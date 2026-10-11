@@ -94,6 +94,18 @@ describe('QueryService', () => {
     }
   });
 
+  it.each([
+    'INSERT DATA { <urn:a> <urn:b> <urn:c> }',
+    'DELETE WHERE { ?s ?p ?o }',
+    'CLEAR ALL',
+  ])('should reject SPARQL Update with 400 READ_ONLY: %s', async (update) => {
+    await expect(service.execute(update)).rejects.toMatchObject({
+      status: 400,
+      response: expect.objectContaining({ error: 'READ_ONLY' }),
+    });
+    expect(mockSparqlEndpoint.execute).not.toHaveBeenCalled();
+  });
+
   it('should throw 413 LIMIT_EXCEEDED when limit > 2000', async () => {
     try {
       await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 3000);
