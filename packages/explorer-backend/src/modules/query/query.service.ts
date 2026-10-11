@@ -56,12 +56,25 @@ export class QueryService {
     raw?: boolean,
   ): Promise<QueryResult> {
     const parser = new Parser();
+    let parsed: { type?: string };
     try {
-      parser.parse(sparql);
+      parsed = parser.parse(sparql) as { type?: string };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new HttpException(
         { error: 'INVALID_SPARQL', message: msg },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    // Herramienta de solo lectura: un SPARQL Update (INSERT/DELETE/LOAD/CLEAR…)
+    // también es SPARQL válido. Se corta acá y no se confía en que el endpoint
+    // lo rechace, sobre todo ahora que un agente de IA puede redactar queries.
+    if (parsed.type === 'update') {
+      throw new HttpException(
+        {
+          error: 'READ_ONLY',
+          message: 'Solo se permiten consultas de lectura; SPARQL Update está deshabilitado.',
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
