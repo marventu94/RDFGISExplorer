@@ -10,7 +10,6 @@ import { OverwriteDashboardDialogComponent } from './overwrite-dashboard-dialog.
 import { ExportCapDialogComponent } from './export-cap-dialog.component';
 import { ExportProgressDialogComponent } from './export-progress-dialog.component';
 import { ErrorDialogComponent } from '@features/sparql-input/error-dialog.component';
-import { ConfirmReplaceDialogComponent } from '@features/sparql-input/confirm-replace-dialog.component';
 
 const dialogRef = { close: () => undefined };
 
@@ -48,14 +47,8 @@ describe('GIS popup internationalization', () => {
     expect(el.querySelector('.actions .btn-primary')?.textContent).toContain('Save and replace');
   });
 
-  it('renders query replacement and error actions in English while preserving raw errors', async () => {
-    let el = await render(ConfirmReplaceDialogComponent, null);
-    expect(el.textContent).toContain('Replace current query?');
-    expect(el.textContent).toContain('Loading another query will discard what you wrote.');
-    expect(el.textContent).toContain('Cancel');
-
-    TestBed.resetTestingModule();
-    el = await render(ErrorDialogComponent, {
+  it('renders error actions in English while preserving raw errors', async () => {
+    const el = await render(ErrorDialogComponent, {
       title: 'Endpoint title',
       message: 'Endpoint message',
       detail: 'Error crudo: valor del usuario',

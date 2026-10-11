@@ -83,6 +83,7 @@ cd products/<product>/frontend && pnpm test
 
 - **QueryHandoffService** is deliberately duplicated in `rdf_explorer` and `rdf_gis_explorer`; application services cannot be shared through federation. It uses `sessionStorage` + `CustomEvent('query-handoff')` + the `storage` event, a 5-minute TTL, and one-time `consume()` semantics.
 - **Dashboards:** only the Shell exposes `/api/dashboards` and registers `DashboardHost` in `@rdfgis/platform-bridge`. Integrated remotes use that mediation; standalone mode hides persistence.
+- **Dialogs:** Shell, GIS, and Explorer dialogs share one visual design (bordered container, `h3`, labelled fields, 4px buttons; `.btn-danger` for destructive actions). The Shell's copy lives in `shell/dialog.styles.ts`. Do not use `window.prompt`/`window.confirm`.
 - **Explorer APIs:** standalone mode uses `/api`; the Shell configures `/rdf-api` and `/gis-api`, always as relative URLs.
 
 ## Backend modules
@@ -283,8 +284,9 @@ autofilter, content-adjusted widths, typed number/date cells) and a
 `Proveniencia` sheet (backend, query, ISO timestamp, rows,
 `PARCIAL` marker); each row retains full URIs and opaque bnodes.
 
-**Staged loading dialog:** when opening a dashboard (`?dashboardId=…` or the
-`Tableros` menu), the `features/dashboard/load-progress` overlay shows the required
+**Staged loading dialog:** when opening a dashboard (`?dashboardId=…`, from the
+Shell's dashboard list; GIS has no dashboards menu of its own), the
+`features/dashboard/load-progress` overlay shows the required
 stages and duration: `Recuperando el tablero` (`GET /api/dashboards/:id` plus layout/filters),
 `Ejecutando la consulta` (`POST /api/query/execute`; final detail includes rows, endpoint
 `meta.durationMs`, and truncation), `Procesando resultados`, and `Renderizando vistas`.

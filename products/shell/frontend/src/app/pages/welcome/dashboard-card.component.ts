@@ -1,10 +1,17 @@
 import { Component, input, inject, signal } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { DashboardStoreService } from '../../core/dashboard-store.service';
 import { SnackbarService } from '../../core/snackbar.service';
 import { relativeDate, type Dashboard } from '../../core/dashboard.model';
 import { TranslatePipe } from '../../core/translate.pipe';
 import { I18nService } from '../../core/i18n.service';
+import { MessageDialogComponent, type MessageDialogData } from '../../shell/message-dialog.component';
+import {
+  RenameDashboardDialogComponent,
+  type RenameDashboardDialogData,
+} from '../../shell/rename-dashboard-dialog.component';
 
 @Component({
   selector: 'app-dashboard-card',
@@ -166,6 +173,7 @@ export class DashboardCardComponent {
   private readonly store = inject(DashboardStoreService);
   private readonly snackbar = inject(SnackbarService);
   private readonly i18n = inject(I18nService);
+  private readonly dialog = inject(Dialog);
 
   protected openLabel(): string {
     return `${this.i18n.text('Abrir')} ${this.dashboard().name} (${this.dashboard().kind === 'gis' ? 'GIS' : 'Explorer'})`;
@@ -183,15 +191,18 @@ export class DashboardCardComponent {
     this.router.navigate(['/dashboards', this.dashboard().id]);
   }
 
-  rename(): void {
+  async rename(): Promise<void> {
     this.isMenuOpen.set(false);
-    const newName = window.prompt(this.i18n.text('Nuevo nombre:'), this.dashboard().name);
-    if (newName && newName.trim()) {
-      this.store.rename(this.dashboard().id, newName.trim()).subscribe({
-        next: () => this.snackbar.show(this.i18n.text('Tablero renombrado')),
-        error: () => this.snackbar.show(this.i18n.text('Error al renombrar')),
-      });
-    }
+    const newName = await firstValueFrom(
+      this.dialog.open<string>(RenameDashboardDialogComponent, {
+        data: { currentName: this.dashboard().name } satisfies RenameDashboardDialogData,
+      }).closed,
+    );
+    if (!newName) return;
+    this.store.rename(this.dashboard().id, newName).subscribe({
+      next: () => this.snackbar.show(this.i18n.text('Tablero renombrado')),
+      error: () => this.snackbar.show(this.i18n.text('Error al renombrar')),
+    });
   }
 
   duplicate(): void {
@@ -202,14 +213,24 @@ export class DashboardCardComponent {
     });
   }
 
-  deleteDashboard(): void {
+  async deleteDashboard(): Promise<void> {
     this.isMenuOpen.set(false);
-    const deletePrompt = `${this.i18n.text('Eliminar')} "${this.dashboard().name}"?`;
-    if (window.confirm(deletePrompt)) {
-      this.store.delete(this.dashboard().id).subscribe({
-        next: () => this.snackbar.show(this.i18n.text('Tablero eliminado')),
-        error: () => this.snackbar.show(this.i18n.text('Error al eliminar')),
-      });
-    }
+    const choice = await firstValueFrom(
+      this.dialog.open<string>(MessageDialogComponent, {
+        data: {
+          title: this.i18n.text('¿Eliminar "{name}"?', { name: this.dashboard().name }),
+          message: this.i18n.text('El tablero se elimina definitivamente. Esta acción no se puede deshacer.'),
+          actions: [
+            { label: this.i18n.text('Cancelar'), value: 'cancel' },
+            { label: this.i18n.text('Eliminar'), value: 'delete', danger: true },
+          ],
+        } satisfies MessageDialogData,
+      }).closed,
+    );
+    if (choice !== 'delete') return;
+    this.store.delete(this.dashboard().id).subscribe({
+      next: () => this.snackbar.show(this.i18n.text('Tablero eliminado')),
+      error: () => this.snackbar.show(this.i18n.text('Error al eliminar')),
+    });
   }
 }

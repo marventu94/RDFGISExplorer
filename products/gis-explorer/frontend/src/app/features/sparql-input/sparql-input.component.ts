@@ -13,12 +13,10 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDividerModule } from '@angular/material/divider';
 import { HttpErrorResponse } from '@angular/common/http';
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
@@ -34,11 +32,8 @@ import { DashboardLayoutService } from '@core/services/dashboard-layout.service'
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { I18nService } from '@core/services/i18n.service';
-import type { Dashboard } from '@rdfgis/contracts';
-import { dashboardHost, isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { FieldMappingPanelComponent } from './field-mapping-panel.component';
 import type { VariableRole } from './mapping-overrides.util';
-import { ConfirmReplaceDialogComponent } from './confirm-replace-dialog.component';
 import { ErrorDialogComponent, type ErrorDialogData } from './error-dialog.component';
 import { VariableMappingService } from '@core/services/variable-mapping.service';
 
@@ -50,19 +45,16 @@ import { VariableMappingService } from '@core/services/variable-mapping.service'
     CommonModule,
     FormsModule,
     MatButtonModule,
-    MatMenuModule,
     MatIconModule,
     MatDialogModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
-    MatDividerModule,
     FieldMappingPanelComponent,
   ],
   templateUrl: './sparql-input.component.html',
   styleUrl: './sparql-input.component.scss',
 })
 export class SparqlInputComponent implements OnInit, OnDestroy {
-  protected readonly dashboardsAvailable = isDashboardHostAvailable();
   @ViewChild('editorContainer', { static: true })
   private readonly editorContainer!: ElementRef<HTMLElement>;
 
@@ -88,10 +80,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected readonly lastResult = this.variableMapping.sourceResult;
   protected readonly mappingOverrides = this.variableMapping.overrides;
   protected readonly overridesCount = () => Object.keys(this.mappingOverrides()).length;
-
-
-  protected readonly gisDashboards = signal<Dashboard[]>([]);
-  protected readonly loadingDashboards = signal(false);
 
   constructor() {
     effect(() => {
@@ -176,9 +164,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         extensions: [
           basicSetup,
           sparqlLang,
-          cmPlaceholder(
-            '-- Escribí tu query SPARQL acá, o usá [▼ Tableros] para cargar un tablero guardado',
-          ),
+          cmPlaceholder(this.i18n.text('-- Escribí tu query SPARQL acá')),
           updateHasContent,
           ctrlEnterKeymap,
           EditorView.lineWrapping,
@@ -226,62 +212,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         },
       });
     }
-  }
-
-  protected loadDashboards(): void {
-    this.loadingDashboards.set(true);
-    dashboardHost()
-      .list('gis')
-      .then(
-        (dashboards) => {
-          this.gisDashboards.set(dashboards);
-          this.loadingDashboards.set(false);
-        },
-        () => {
-          this.gisDashboards.set([]);
-          this.loadingDashboards.set(false);
-        },
-      );
-  }
-
-  protected loadDashboard(dashboard: Dashboard): void {
-    const current = this.sparqlText;
-    const doLoad = () => {
-      this.dashboardState.beginLoad();
-      dashboardHost()
-        .load(dashboard.id)
-        .catch(() => this.dashboardState.failLoad());
-    };
-    if (current.length > 0) {
-      setTimeout(() => {
-        const dialogRef = this.dialog.open(ConfirmReplaceDialogComponent, {
-          width: '360px',
-        });
-        dialogRef.afterClosed().subscribe((confirmed) => {
-          if (confirmed) {
-            doLoad();
-          }
-        });
-      });
-    } else {
-      doLoad();
-    }
-  }
-
-  protected newDashboard(): void {
-    const ok = window.confirm(
-      `${this.i18n.text('¿Crear tablero nuevo?')}\n\n${this.i18n.text('Se perderán todos los cambios que no hayas guardado.')}`,
-    );
-    if (ok) {
-      this.clearForNewDashboard();
-    }
-  }
-
-  private clearForNewDashboard(): void {
-    this.setEditorContent(this.buildPrefixBlock(this.appConfig.config()?.defaultPrefixes));
-    this.queryState.query.set('');
-    this.variableMapping.setSourceResult(null);
-    this.dashboardState.clearCurrent();
   }
 
   public execute(options?: { configureLayout?: boolean; showLoadProgress?: boolean }): void {
