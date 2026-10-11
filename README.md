@@ -176,26 +176,84 @@ looking for geometry, dates, and relationships, and proposes dashboards before
 creating any. There are no tools to modify data or to update or delete
 dashboards.
 
-The server is disabled until `MCP_TOKEN` is set:
+### Enable and connect the MCP server
+
+The server is **off by default**: `/api/mcp` answers `404` until `MCP_TOKEN` is
+set in the environment of the Shell backend.
+
+1. **Choose a token** and add it to the environment file you start the app
+   with (`.env` by default, or the file passed to `./start.sh --env …`):
+
+   ```bash
+   openssl rand -hex 32          # any long random string works
+   ```
+
+   ```dotenv
+   MCP_TOKEN=<the-token>
+   # Base URL used in the dashboard links the agent returns:
+   MCP_PUBLIC_APP_URL=https://<host>
+   ```
+
+   With Docker Compose, put the same variables in the `.env` file next to
+   `docker-compose.yml` (or export them) before `docker compose up`; the
+   compose file already points the tools at the GIS backend.
+
+2. **Restart** the app (`./start.sh` or `docker compose up -d shell-backend`).
+   The Shell backend reads the variables only at startup.
+
+3. **Check** that the endpoint answers. The URL is the app's URL plus
+   `/api/mcp` (`http://localhost:4200/api/mcp` in development):
+
+   ```bash
+   curl -s -X POST http://localhost:4200/api/mcp \
+     -H "Authorization: Bearer <the-token>" \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+   ```
+
+   `404` means `MCP_TOKEN` is not set (or the app was not restarted); `401`
+   means the token does not match.
+
+4. **Connect your AI client.** Claude Code:
+
+   ```bash
+   claude mcp add --transport http rdfgis http://localhost:4200/api/mcp \
+     --header "Authorization: Bearer <the-token>"
+   ```
+
+   Clients configured with JSON (Claude Desktop, Cursor, VS Code, Gemini CLI,
+   and others) take the same URL and header; the key names vary by client.
+   Clients that only run local (stdio) servers can use the `mcp-remote` bridge:
+
+   ```json
+   {
+     "mcpServers": {
+       "rdfgis": {
+         "command": "npx",
+         "args": ["mcp-remote", "http://localhost:4200/api/mcp",
+                  "--header", "Authorization: Bearer <the-token>"]
+       }
+     }
+   }
+   ```
+
+5. **Try it**: ask the agent a question about the data, or run the
+   `suggest_dashboards` prompt (in Claude Code,
+   `/mcp__rdfgis__suggest_dashboards`; other clients list MCP prompts in their
+   own menus).
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `MCP_TOKEN` | — (disabled) | Bearer token required by `/api/mcp` |
-| `MCP_EXPLORER_API_URL` | `http://localhost:3002/api` | Explorer backend the tools call (`http://gis-backend:3002/api` in Docker) |
+| `MCP_TOKEN` | — (server off) | Bearer token required by `/api/mcp` |
 | `MCP_PUBLIC_APP_URL` | `http://localhost:4200` | Base URL used in dashboard links |
+| `MCP_EXPLORER_API_URL` | `http://localhost:3002/api` | Explorer backend the tools call (`http://gis-backend:3002/api` in Docker) |
 | `MCP_MAX_ROWS` | `100` | Rows returned to the agent per query |
 | `MCP_EXPLORER_TIMEOUT_MS` | `120000` | Timeout for each explorer call |
 
-Browser requests must also come from an origin in `CORS_ORIGINS`. Connect a
-client with the app's URL and the token, for example:
-
-```bash
-claude mcp add --transport http rdfgis https://<host>/api/mcp \
-  --header "Authorization: Bearer <MCP_TOKEN>"
-```
-
-Clients that only support stdio servers can use the `mcp-remote` bridge:
-`npx mcp-remote https://<host>/api/mcp --header "Authorization: Bearer <MCP_TOKEN>"`.
+Requests sent from a browser must also come from an origin listed in
+`CORS_ORIGINS`; command-line and desktop clients send no origin. Keep the token
+secret: anyone with it can query the endpoint and create dashboards.
 
 Query results reach the model provider the client uses. Check that this is
 acceptable for the data before connecting a cloud-hosted model.
