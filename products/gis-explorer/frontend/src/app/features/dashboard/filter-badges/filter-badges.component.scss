@@ -1,0 +1,48 @@
+// Antes vivían en app.scss, pero ese estilo está encapsulado en App y no
+// llegaba a este componente (las píldoras y el aviso salían sin formato).
+.filter-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  line-height: 1.5;
+}
+
+.badge-remove {
+  background: none;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  padding: 0 2px;
+  opacity: 0.7;
+}
+
+.badge-remove:hover {
+  opacity: 1;
+}
+
+// Alcance de los filtros activos: aclara que se evaluaron todas las filas
+// recuperadas y no solo el lote visible (detalle en el tooltip).
+.filter-scope {
+  font-size: 12px;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+  cursor: help;
+}
+
+.filter-scope--partial {
+  color: var(--gis-warning-text, #8d4b00);
+}

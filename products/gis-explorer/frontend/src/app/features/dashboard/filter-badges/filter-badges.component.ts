@@ -15,6 +15,7 @@ export interface FilterScope {
   selector: 'app-filter-badges',
   standalone: true,
   templateUrl: './filter-badges.component.html',
+  styleUrl: './filter-badges.component.scss',
 })
 export class FilterBadgesComponent {
   private readonly selectionService = inject(SelectionService);
