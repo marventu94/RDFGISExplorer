@@ -1,5 +1,6 @@
 import type cytoscape from 'cytoscape';
 import type { GraphDetailLevel } from './graph-layouts';
+import { LIGHT_EDGE_COLOR } from './graph-style';
 
 /**
  * Etapa 5: reglas de estilo adicionales del modo entidad.
@@ -86,8 +87,8 @@ export function entityModeStyleRules(
       selector: 'edge.entity-edge',
       style: {
         width: 2,
-        'line-color': () => (isDark() ? '#64748b' : '#90A4AE'),
-        'target-arrow-color': () => (isDark() ? '#64748b' : '#90A4AE'),
+        'line-color': () => (isDark() ? '#64748b' : LIGHT_EDGE_COLOR),
+        'target-arrow-color': () => (isDark() ? '#64748b' : LIGHT_EDGE_COLOR),
       } as cytoscape.Css.Edge,
     },
   ];
