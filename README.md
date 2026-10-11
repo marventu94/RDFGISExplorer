@@ -4,7 +4,8 @@ A data exploration platform for graph databases accessible through SPARQL 1.1.
 It integrates three deployable products:
 
 - **Shell**: navigation, integration, and dashboard persistence.
-- **RDF Explorer**: visual SPARQL query construction.
+- **RDF Explorer**: visual SPARQL query construction, based on the original
+  [RDF Explorer](https://github.com/hvarg/RDFExplorer) (see [Credits](#credits)).
 - **GIS Explorer**: coordinated analysis through table, graph, map, and timeline views.
 
 The platform is independent of both the data domain and any specific engine.
@@ -231,6 +232,29 @@ pnpm -r --if-present build
 docker compose config --quiet
 git diff --check
 ```
+
+## Credits
+
+The RDF Explorer product builds on
+[**RDF Explorer**](https://github.com/hvarg/RDFExplorer), the visual SPARQL
+query builder and RDF explorer by Hernán Vargas, Carlos Buil-Aranda, Aidan
+Hogan, and Claudia López ([live demo](https://rdfexplorer.org)). Its
+graph-based query model (nodes, properties, and literals whose interactive
+exploration builds the SPARQL query) is the foundation of this product.
+
+This repository reimplements and extends that work: the Angular 21 frontend,
+the configurable SPARQL backend, guided discovery, persistence, the Shell
+integration, and the handoff to the GIS Explorer are new.
+
+The original project is licensed under
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+
+If you use the RDF Explorer approach in academic work, please cite:
+
+> Hernán Vargas, Carlos Buil-Aranda, Aidan Hogan, and Claudia López.
+> *RDF Explorer: A Visual SPARQL Query Builder.* In *The Semantic Web – ISWC
+> 2019*, LNCS 11778, pp. 647–663. Springer, 2019.
+> [doi:10.1007/978-3-030-30793-6_37](https://doi.org/10.1007/978-3-030-30793-6_37)
 
 ## Contact
 
