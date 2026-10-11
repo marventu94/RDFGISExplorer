@@ -851,6 +851,41 @@ describe('GraphViewComponent', () => {
       expect(kept.locked()).toBe(false);
     });
 
+    // Regression: an incremental layout kept nodes shared between lots (a city)
+    // locked at their old coordinates, far from the new lot's tree.
+    it.each([
+      ['another lot', { currentLot: 2 }],
+      ['another lot size', { lotSize: 100 }],
+    ] as const)('repositions the whole graph and frames it when moving to %s', (_case, change) => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      const extra: NormalizedNode = { uri: 'http://www.wikidata.org/entity/Q999', label: 'Otro lote', attributes: {} };
+      const runsBefore = cy._layoutRuns.length;
+      cy.fit.mockClear();
+
+      lotStateSubject.next({ lotSize: 300, currentLot: 1, lotCount: 4, totalRows: 1000, visibleNodes: 2, ...change });
+      visibleQueryResultSubject.next(createMockQueryResult([mockNode2, extra], [mockEdge]));
+      fixture.detectChanges();
+
+      const lastRun = cy._layoutRuns.at(-1)!;
+      expect(cy._layoutRuns.length).toBeGreaterThan(runsBefore);
+      expect(lastRun['centerGraph']).not.toBe(false);
+      expect(lastRun).toMatchObject({ name: component.currentLayout, animate: false });
+      cy._emit('layoutstop', null, {});
+      expect(cy.fit).toHaveBeenCalledWith(undefined, 50);
+    });
+
+    it('repositions the whole graph when a new query result arrives', () => {
+      emitResult([mockNode, mockNode2], [mockEdge]);
+      const cy = lastCy();
+      const runsBefore = cy._layoutRuns.length;
+
+      emitResult([mockNode2], []);
+
+      expect(cy._layoutRuns.length).toBeGreaterThan(runsBefore);
+      expect(cy._layoutRuns.at(-1)!['centerGraph']).not.toBe(false);
+    });
+
     it('removes nodes that left the result from the graph', () => {
       emitResult([mockNode, mockNode2], [mockEdge]);
       const cy = lastCy();
