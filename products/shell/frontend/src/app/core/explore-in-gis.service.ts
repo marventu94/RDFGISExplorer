@@ -9,6 +9,7 @@ import {
   type QueryExportCandidate,
 } from '@rdfgis/platform-bridge';
 import { GisOpenGuardService } from './gis-open-guard.service';
+import { I18nService } from './i18n.service';
 import { MessageDialogComponent, type MessageDialogData } from '../shell/message-dialog.component';
 import {
   QuerySelectionDialogComponent,
@@ -20,6 +21,7 @@ export class ExploreInGisService {
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
   private readonly gisGuard = inject(GisOpenGuardService);
+  private readonly i18n = inject(I18nService);
 
   constructor() {
     const unregister = onQueryExportRequest(() => void this.explore());
@@ -31,8 +33,8 @@ export class ExploreInGisService {
     if (candidates.length === 0) {
       this.dialog.open(MessageDialogComponent, {
         data: {
-          title: 'No hay consulta para explorar',
-          message: 'El panel activo no tiene un patrón completo. Agregá al menos un nodo con una propiedad y su valor.',
+          title: this.i18n.text('No hay consulta para explorar'),
+          message: this.i18n.text('El panel activo no tiene un patrón completo. Agregá al menos un nodo con una propiedad y su valor.'),
         } satisfies MessageDialogData,
       });
       return;

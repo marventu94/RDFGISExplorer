@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { DialogModule, DialogRef, DIALOG_DATA } from '@angular/cdk/dialog';
+import { I18nService } from '../core/i18n.service';
 
 export interface MessageDialogAction {
   label: string;
@@ -15,10 +16,6 @@ export interface MessageDialogData {
   /** Botones; por defecto uno solo de cerrar. */
   actions?: readonly MessageDialogAction[];
 }
-
-const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
-  { label: 'Entendido', value: 'ok', primary: true },
-];
 
 /**
  * Popup para decisiones que no pueden pasar desapercibidas. El snackbar del
@@ -100,9 +97,10 @@ const DEFAULT_ACTIONS: readonly MessageDialogAction[] = [
 export class MessageDialogComponent {
   protected readonly data = inject<MessageDialogData>(DIALOG_DATA);
   private readonly dialogRef = inject<DialogRef<string>>(DialogRef);
+  private readonly i18n = inject(I18nService);
 
   protected get actions(): readonly MessageDialogAction[] {
-    return this.data.actions ?? DEFAULT_ACTIONS;
+    return this.data.actions ?? [{ label: this.i18n.text('Entendido'), value: 'ok', primary: true }];
   }
 
   protected close(value: string): void {

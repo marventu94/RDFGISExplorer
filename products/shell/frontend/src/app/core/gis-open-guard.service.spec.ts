@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
+import { setLanguage } from '@rdfgis/platform-bridge';
 
 import { GisOpenGuardService } from './gis-open-guard.service';
 import { GIS_SESSION_CHANNEL_KEY, type GisSessionState } from './gis-session-channel';
@@ -43,6 +44,7 @@ describe('GisOpenGuardService', () => {
   });
 
   afterEach(() => {
+    localStorage.clear();
     delete (window as unknown as Record<string, unknown>)[GIS_SESSION_CHANNEL_KEY];
   });
 
@@ -81,6 +83,31 @@ describe('GisOpenGuardService', () => {
     await service.askBeforeOpen('dash-2', 'Departamentos');
 
     expect(opened!.title).toContain('reemplazar la vista de GIS');
+  });
+
+  it('shows the Explore in GIS warning in the selected language', async () => {
+    setLanguage('en');
+    publishSession({ dashboardId: null, dashboardName: null });
+
+    await service.askBeforeHandoff();
+
+    expect(opened!.title).toBe('You are about to replace the GIS view');
+    expect(opened!.message).toContain('GIS has an unsaved view');
+    expect(opened!.actions!.map((action) => action.label)).toEqual([
+      'Cancel',
+      'Go to GIS to save',
+      'Explore anyway',
+    ]);
+  });
+
+  it('interpolates dashboard names into the translated copy', async () => {
+    setLanguage('en');
+    publishSession({ dashboardId: 'dash-1', dashboardName: 'Casas en Berisso' });
+
+    await service.askBeforeOpen('dash-2', 'Departamentos');
+
+    expect(opened!.title).toBe('You are about to replace "Casas en Berisso" in GIS');
+    expect(opened!.message).toContain('Opening "Departamentos" replaces');
   });
 
   it.each([

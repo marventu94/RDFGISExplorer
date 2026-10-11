@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { DialogModule, DialogRef, DIALOG_DATA } from '@angular/cdk/dialog';
 import type { QueryExportCandidate } from '@rdfgis/platform-bridge';
+import { TranslatePipe } from '../core/translate.pipe';
 
 export interface QuerySelectionDialogData {
   candidates: readonly QueryExportCandidate[];
@@ -9,13 +10,13 @@ export interface QuerySelectionDialogData {
 @Component({
   selector: 'app-query-selection-dialog',
   standalone: true,
-  imports: [DialogModule],
+  imports: [DialogModule, TranslatePipe],
   template: `
     <div class="dialog">
-      <h3>Elegí una consulta</h3>
-      <p>El panel genera varias consultas separadas. Elegí cuál querés explorar en GIS.</p>
+      <h3>{{ 'Elegí una consulta' | translate }}</h3>
+      <p>{{ 'El panel genera varias consultas separadas. Elegí cuál querés explorar en GIS.' | translate }}</p>
 
-      <div class="options" role="radiogroup" aria-label="Consultas disponibles">
+      <div class="options" role="radiogroup" [attr.aria-label]="'Consultas disponibles' | translate">
         @for (candidate of data.candidates; track candidate.id) {
           <button
             type="button"
@@ -32,8 +33,8 @@ export interface QuerySelectionDialogData {
       </div>
 
       <div class="actions">
-        <button type="button" class="btn-secondary" (click)="dialogRef.close()">Cancelar</button>
-        <button type="button" class="btn-primary" (click)="confirm()">Explorar en GIS</button>
+        <button type="button" class="btn-secondary" (click)="dialogRef.close()">{{ 'Cancelar' | translate }}</button>
+        <button type="button" class="btn-primary" (click)="confirm()">{{ 'Explorar en GIS' | translate }}</button>
       </div>
     </div>
   `,
