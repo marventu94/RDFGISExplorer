@@ -60,6 +60,16 @@ describe('createGraphStyle', () => {
     expect((edge['text-background-color'] as () => string)()).toBe('#242321');
   });
 
+  it('keeps node borders and edges legible on the light canvas', () => {
+    const styles = createGraphStyle({ colorForClass: () => '#E69F00' } as never, () => false, () => 'detail');
+    const node = styles.find((style) => style.selector === 'node')!.style as Record<string, unknown>;
+    const edge = styles.find((style) => style.selector === 'edge')!.style as Record<string, unknown>;
+
+    // Se oscurece (no se aclara) sobre fondo blanco: #E69F00 → #a16f00.
+    expect((node['border-color'] as (n: cytoscape.NodeSingular) => string)(element({}))).toBe('#a16f00');
+    expect((edge['line-color'] as () => string)()).toBe('#78909C');
+  });
+
   it('keeps unselected nodes visible', () => {
     const styles = createGraphStyle(colorService as never, () => false, () => 'detail');
     const dimmed = styles.find((style) => style.selector === '.is-dimmed')!.style as Record<string, unknown>;

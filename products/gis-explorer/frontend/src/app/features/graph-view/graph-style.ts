@@ -2,6 +2,9 @@ import type cytoscape from 'cytoscape';
 import type { EntityColorService } from '@core/services/entity-color.service';
 import type { GraphDetailLevel } from './graph-layouts';
 
+/** Aristas en tema claro: ≥3:1 sobre blanco (el #B0BEC5 anterior quedaba en 1.9:1). */
+export const LIGHT_EDGE_COLOR = '#78909C';
+
 export function createGraphStyle(
   colorService: EntityColorService,
   isDark: () => boolean,
@@ -15,7 +18,8 @@ export function createGraphStyle(
           colorService.colorForClass(ele.data('classUri') as string | undefined),
         'border-color': (ele: cytoscape.NodeSingular) => {
           const c = colorService.colorForClass(ele.data('classUri') as string | undefined);
-          return isDark() ? shade(c, -0.3) : shade(c, -0.4);
+          // Mismo contraste en ambos temas: el borde se aleja del fondo del lienzo.
+          return isDark() ? shade(c, -0.3) : shade(c, 0.3);
         },
         'border-width': 1.5,
         width: (ele: cytoscape.NodeSingular) => {
@@ -60,8 +64,8 @@ export function createGraphStyle(
           detailLevel() === 'summary'
             ? 1
             : Math.min(5, 1.5 + (((ele.data('multiplicity') as number) ?? 1) - 1) * 0.75),
-        'line-color': () => (isDark() ? '#68615b' : '#B0BEC5'),
-        'target-arrow-color': () => (isDark() ? '#68615b' : '#B0BEC5'),
+        'line-color': () => (isDark() ? '#68615b' : LIGHT_EDGE_COLOR),
+        'target-arrow-color': () => (isDark() ? '#68615b' : LIGHT_EDGE_COLOR),
         'target-arrow-shape': 'triangle',
         'font-size': '9px',
         'text-wrap': 'wrap',
@@ -169,7 +173,7 @@ export function createGraphStyle(
 
 function shade(hex: string, percent: number): string {
   // Lighten (negative percent) or darken (positive) a hex color by mixing
-  // toward black or white. Used to derive a node border from its background.
+  // toward white or black. Used to derive a node border from its background.
   const m = hex.replace('#', '');
   if (m.length !== 6) return hex;
   const r = parseInt(m.slice(0, 2), 16);

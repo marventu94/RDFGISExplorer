@@ -9,10 +9,24 @@ describe('canvasStyles', () => {
     canvasStyles(dark).find((rule) => rule.selector === 'node[kind = "filter"]')
       ?.css as unknown as Record<string, unknown>;
 
-  it('keeps the light Cytoscape palette in light mode', () => {
+  it('separates canvas, node and row layers in light mode', () => {
     const css = cssForNode(false);
-    expect(css['background-color']).toBe('#f8f8f8');
+    expect(css['background-color']).toBe('#f3f1ee');
     expect(css['color']).toBe('#333');
+    const property = canvasStyles(false).find((rule) => rule.selector === 'node[kind = "property"]')
+      ?.css as unknown as Record<string, unknown>;
+    expect(property['background-color']).toBe('#ffffff');
+  });
+
+  it('darkens low-contrast domain borders in light mode only', () => {
+    const border = (dark: boolean, color: string): unknown => {
+      const value = cssForNode(dark)['border-color'];
+      return typeof value === 'function' ? value({ data: () => color }) : value;
+    };
+    expect(border(false, '#ff7f0e')).toBe('#b85a00');
+    expect(border(false, '#2ca02c')).toBe('#238823');
+    expect(border(false, '#1f77b4')).toBe('#1f77b4');
+    expect(border(true, '#ff7f0e')).toBe('data(color)');
   });
 
   it('returns high-contrast canvas colors in dark mode', () => {
@@ -23,6 +37,7 @@ describe('canvasStyles', () => {
 
   it('gives filter rows a readable accent in both themes', () => {
     expect(cssForFilter(false)['background-color']).toBe('#fff4dc');
+    expect(cssForFilter(false)['border-color']).toBe('#9a6a1c');
     expect(cssForFilter(false)['color']).toBe('#684712');
     expect(cssForFilter(true)['background-color']).toBe('#463a28');
     expect(cssForFilter(true)['color']).toBe('#f1d49b');
