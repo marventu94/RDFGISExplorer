@@ -15,5 +15,7 @@ import { DASHBOARDS_DB } from './dashboards.db-token';
       },
     },
   ],
+  // El servidor MCP crea y lee tableros con el mismo servicio y la misma base.
+  exports: [DashboardsService],
 })
 export class DashboardsModule {}
