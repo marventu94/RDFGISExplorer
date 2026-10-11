@@ -1,92 +1,67 @@
-import { INestApplication } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
-import request from 'supertest';
-import { DashboardsService } from '../dashboards/dashboards.service';
-import { ExplorerApiClient } from './explorer-api.client';
+import { EventEmitter } from 'node:events';
+import { ConfigService } from '@nestjs/config';
+import type { Request, Response } from 'express';
+import { createMcpServer } from './mcp-server';
 import { McpController } from './mcp.controller';
-import { McpGuard } from './mcp.guard';
+import type { ExplorerApiClient } from './explorer-api.client';
+import type { DashboardsService } from '../dashboards/dashboards.service';
 
-const INITIALIZE = {
-  jsonrpc: '2.0',
-  id: 1,
-  method: 'initialize',
-  params: {
-    protocolVersion: '2025-06-18',
-    capabilities: {},
-    clientInfo: { name: 'supertest', version: '1.0.0' },
-  },
-};
+// Sin sockets: el guard de CI bloquea la red. La prueba HTTP real está en
+// test/mcp.e2e-spec.ts (`pnpm test:e2e`).
+const transport = { handleRequest: jest.fn(), close: jest.fn() };
+jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => ({
+  StreamableHTTPServerTransport: jest.fn(() => transport),
+}));
+const server = { connect: jest.fn(), close: jest.fn() };
+jest.mock('./mcp-server', () => ({ createMcpServer: jest.fn(() => server) }));
 
-describe('McpController (HTTP)', () => {
-  let app: INestApplication;
-  const savedEnv = { ...process.env };
+function controller(env: Record<string, string | undefined> = {}): McpController {
+  return new McpController(
+    { get: (key: string) => env[key] } as unknown as ConfigService,
+    {} as ExplorerApiClient,
+    {} as DashboardsService,
+  );
+}
 
-  async function boot(env: Record<string, string | undefined>): Promise<void> {
-    process.env = { ...savedEnv, ...env };
-    const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ ignoreEnvFile: true })],
-      controllers: [McpController],
-      providers: [
-        McpGuard,
-        { provide: ExplorerApiClient, useValue: { get: jest.fn(), post: jest.fn() } },
-        { provide: DashboardsService, useValue: { findAll: jest.fn(() => []), findOne: jest.fn(), create: jest.fn() } },
-      ],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api');
-    await app.init();
-  }
+describe('McpController', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-  afterEach(async () => {
-    await app?.close();
-    process.env = { ...savedEnv };
+  it('serves each POST with a fresh server and stateless transport', async () => {
+    const { StreamableHTTPServerTransport } = jest.requireMock(
+      '@modelcontextprotocol/sdk/server/streamableHttp.js',
+    );
+    const req = { body: { jsonrpc: '2.0', method: 'tools/list' } } as Request;
+    const res = new EventEmitter() as unknown as Response;
+
+    await controller({ MCP_PUBLIC_APP_URL: 'https://rdfgis.vpn/', MCP_MAX_ROWS: '25' }).handle(req, res);
+
+    expect(createMcpServer).toHaveBeenCalledWith(
+      expect.objectContaining({ appUrl: 'https://rdfgis.vpn', maxRows: 25 }),
+    );
+    expect(StreamableHTTPServerTransport).toHaveBeenCalledWith({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
+    expect(server.connect).toHaveBeenCalledWith(transport);
+    expect(transport.handleRequest).toHaveBeenCalledWith(req, res, req.body);
+
+    (res as unknown as EventEmitter).emit('close');
+    expect(transport.close).toHaveBeenCalled();
+    expect(server.close).toHaveBeenCalled();
   });
 
-  function post() {
-    return request(app.getHttpServer())
-      .post('/api/mcp')
-      .set('Accept', 'application/json, text/event-stream')
-      .set('Content-Type', 'application/json');
-  }
-
-  it('does not exist unless MCP_TOKEN is configured', async () => {
-    await boot({ MCP_TOKEN: undefined });
-    await post().send(INITIALIZE).expect(404);
+  it('falls back to safe defaults for links and row caps', async () => {
+    const res = new EventEmitter() as unknown as Response;
+    await controller({ MCP_MAX_ROWS: 'abc' }).handle({ body: {} } as Request, res);
+    expect(createMcpServer).toHaveBeenCalledWith(
+      expect.objectContaining({ appUrl: 'http://localhost:4200', maxRows: 100 }),
+    );
   });
 
-  it('rejects a missing or wrong bearer token', async () => {
-    await boot({ MCP_TOKEN: 'secret' });
-    await post().send(INITIALIZE).expect(401);
-    await post().set('Authorization', 'Bearer nope').send(INITIALIZE).expect(401);
-  });
-
-  it('rejects browser requests from an origin outside CORS_ORIGINS', async () => {
-    await boot({ MCP_TOKEN: 'secret', CORS_ORIGINS: 'https://rdfgis.vpn' });
-    await post()
-      .set('Authorization', 'Bearer secret')
-      .set('Origin', 'https://evil.example')
-      .send(INITIALIZE)
-      .expect(403);
-  });
-
-  it('initializes and lists tools with a valid token', async () => {
-    await boot({ MCP_TOKEN: 'secret' });
-    const init = await post().set('Authorization', 'Bearer secret').send(INITIALIZE).expect(200);
-    expect(init.body.result.serverInfo.name).toBe('rdf-gis-explorer');
-
-    const list = await post()
-      .set('Authorization', 'Bearer secret')
-      .send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })
-      .expect(200);
-    expect(list.body.result.tools.map((t: { name: string }) => t.name)).toContain('run_select');
-  });
-
-  it('answers 405 to GET: the stateless server has no notification stream', async () => {
-    await boot({ MCP_TOKEN: 'secret' });
-    await request(app.getHttpServer())
-      .get('/api/mcp')
-      .set('Authorization', 'Bearer secret')
-      .expect(405);
+  it('answers other methods with a JSON-RPC error and an Allow header', () => {
+    const setHeader = jest.fn();
+    const body = controller().methodNotAllowed({ setHeader } as unknown as Response);
+    expect(setHeader).toHaveBeenCalledWith('Allow', 'POST');
+    expect(body).toMatchObject({ jsonrpc: '2.0', error: { code: -32000 } });
   });
 });
