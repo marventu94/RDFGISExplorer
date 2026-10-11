@@ -1019,6 +1019,32 @@ describe('SelectionService', () => {
       expect(service.getCurrentLotSnapshot()).toBe(1);
     });
 
+    it('returns to the first lot when a filter is applied, changed or removed', () => {
+      // The filtered result still has several lots: lot 3 stays valid, but the
+      // filter evaluates every retrieved row, so the user starts from lot 1.
+      const dated = ['urn:n0', 'urn:n1', 'urn:n2', 'urn:n3', 'urn:n4', 'urn:n5', 'urn:n6', 'urn:n7'];
+      const qr = makeLotResult(10);
+      qr.nodes = qr.nodes.map((n) =>
+        dated.includes(n.uri)
+          ? { ...n, temporalEvents: [{ field: 'date', isoDate: '2020-06-01T00:00:00.000Z' }] }
+          : n,
+      );
+      service.setQueryResult(qr);
+      service.setLotSize(2);
+      service.setCurrentLot(3);
+
+      service.addFilter(makeTemporalFilter());
+      expect(service.getCurrentLotSnapshot()).toBe(1);
+
+      service.setCurrentLot(3);
+      service.removeFilter(makeTemporalFilter().id);
+      expect(service.getCurrentLotSnapshot()).toBe(1);
+
+      service.setCurrentLot(3);
+      service.removeFilter('missing-filter');
+      expect(service.getCurrentLotSnapshot()).toBe(3);
+    });
+
     it('should inject the selected node into the visible lot (pinning)', () => {
       // n9 is neither referenced by batch 1 rows nor adjacent to their URIs.
       const qr = makeLotResult(10);

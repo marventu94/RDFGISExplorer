@@ -1,8 +1,13 @@
 <div class="filter-badges">
-  @for (filter of filters$ | async; track filter.id) {
+  @for (filter of filters(); track filter.id) {
     <span class="badge">
       {{ filter.label }}
       <button type="button" class="badge-remove" (click)="removeFilter(filter.id)">&times;</button>
+    </span>
+  }
+  @if (scope(); as s) {
+    <span class="filter-scope" [class.filter-scope--partial]="s.partial" [title]="s.detail" [attr.aria-label]="s.label + '. ' + s.detail">
+      {{ s.label }}
     </span>
   }
 </div>

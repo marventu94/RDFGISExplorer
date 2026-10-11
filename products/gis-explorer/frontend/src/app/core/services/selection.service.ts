@@ -226,7 +226,18 @@ export class SelectionService {
     return uri ? this.entityContext.nodes.get(uri) ?? null : null;
   }
 
+  /**
+   * Un filtro cambia el subconjunto entero (se evalúa sobre todas las filas
+   * recuperadas, no sobre el lote visible), así que se vuelve al primer lote:
+   * quedarse en el lote N del resultado filtrado mostraba filas que no tenían
+   * relación con lo que se acababa de marcar.
+   */
+  private resetLotForFilters(): void {
+    if (this._currentLot$.getValue() !== 1) this._currentLot$.next(1);
+  }
+
   addFilter(filter: Filter): void {
+    this.resetLotForFilters();
     const current = this._activeFilters$.getValue();
     const index = current.findIndex((f) => f.id === filter.id);
     if (index !== -1) {
@@ -240,10 +251,13 @@ export class SelectionService {
 
   removeFilter(id: string): void {
     const current = this._activeFilters$.getValue();
+    if (!current.some((f) => f.id === id)) return;
+    this.resetLotForFilters();
     this._activeFilters$.next(current.filter((f) => f.id !== id));
   }
 
   clearFilters(): void {
+    if (this._activeFilters$.getValue().length > 0) this.resetLotForFilters();
     this._activeFilters$.next([]);
   }
 

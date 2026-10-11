@@ -359,6 +359,11 @@ export const UI_TRANSLATIONS = [
   ['Consultas disponibles', 'Available queries'],
   ['Renombrar tablero', 'Rename dashboard'],
   ['-- Escribí tu query SPARQL acá', '-- Write your SPARQL query here'],
+  ['{matches} de {rows} filas recuperadas pasa el filtro', '{matches} of {rows} retrieved rows matches the filter'],
+  ['{matches} de {rows} filas recuperadas pasan el filtro', '{matches} of {rows} retrieved rows match the filter'],
+  ['El filtro se aplica a todas las filas recuperadas (todos los lotes), no solo al lote visible.', 'The filter applies to every retrieved row (all batches), not only the visible batch.'],
+  ['El endpoint devolvió un resultado parcial: las filas que no se recuperaron no se evalúan.', 'The endpoint returned a partial result: rows that were not retrieved are not evaluated.'],
+  [' · resultado parcial', ' · partial result'],
   ['¿Eliminar "{name}"?', 'Delete "{name}"?'],
   ['El tablero se elimina definitivamente. Esta acción no se puede deshacer.', 'The dashboard will be permanently deleted. This action cannot be undone.'],
 ] as const satisfies readonly (readonly [string, string])[];
