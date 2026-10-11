@@ -179,7 +179,7 @@ function addRequiredGeometry(
  * son la misma localidad duplicada por la taxonomía de regiones del scraper.
  *
  * Cuelga de la `?postalAddress` que se le pase: cuando el caso ya proyecta una
- * dirección (C1) se reusa esa misma, porque una rama aparte multiplicaría filas
+ * dirección (D1) se reusa esa misma, porque una rama aparte multiplicaría filas
  * por producto cartesiano sin agregar información.
  */
 function addCityFilterToAddress(
@@ -235,7 +235,7 @@ function addCityFilter(
 
 /**
  * Filtro por barrio. Es el nivel correcto cuando el caso es un barrio y no una
- * localidad entera: City Bell (C2), por ejemplo, no existe como `inm:city` en el
+ * localidad entera: City Bell (D4), por ejemplo, no existe como `inm:city` en el
  * dataset — es barrio de La Plata.
  */
 function addNeighborhoodFilter(
@@ -295,7 +295,7 @@ const CASES: EvaluationCaseDefinition[] = [
       // propio `time:hasTime`): son dos filas del mismo aviso, con la misma
       // calle escrita distinto. Sin el origen la duplicación parece un error de
       // la consulta; con él, la fila dice de qué fuente viene cada variante.
-      // Es el mismo recurso que C3 proyecta para la antigüedad.
+      // Es el mismo recurso que D2 y D3 proyectan para la antigüedad.
       const addressOrigin = varNode(graph, 'origenDireccion', 920, -60);
       connect(graph, addressFeature, `${INM}hasOrigin`, addressOrigin);
       addCityFilterToAddress(graph, postalAddress, 'berisso', 1100, 60);
@@ -320,7 +320,7 @@ const CASES: EvaluationCaseDefinition[] = [
       const realEstate = varNode(graph, 'realEstate', 420, 180);
       addListingCore(graph, listing, realEstate, `${INM}Apartment`);
       literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      // La fecha es obligatoria: C3 debe conservar dimensiones G+S+T.
+      // La fecha es obligatoria: D2 debe conservar dimensiones G+S+T.
       literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
       addCityFilter(graph, realEstate, 'berisso', 640, -20);
 
@@ -342,7 +342,7 @@ const CASES: EvaluationCaseDefinition[] = [
       const realEstate = varNode(graph, 'realEstate', 420, 180);
       addListingCore(graph, listing, realEstate, `${INM}Apartment`);
       literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      // La fecha es obligatoria: C3 debe conservar dimensiones G+S+T.
+      // La fecha es obligatoria: D3 debe conservar dimensiones G+S+T.
       literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
       addCityFilter(graph, realEstate, 'berisso', 640, -20);
 

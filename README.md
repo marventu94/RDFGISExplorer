@@ -257,6 +257,8 @@ archivo. Las rutas relativas se resuelven desde la raíz, como en `start.sh`.
 **elimina todos los tableros anteriores**, incluidos los creados manualmente.
 Conservar un respaldo si se quiere recuperar trabajo previo. No modifica el RDF.
 Los escenarios requieren el endpoint OVS y configuración/credenciales locales.
+Sin endpoint, `pnpm --dir products/shell/backend run test:scripts` construye y
+valida las consultas y prueba la seed sobre una SQLite temporal.
 
 La proyección enviada a GIS no incorpora LIMIT propio: el backend puede devolver
 un resultado parcial. D4 distingue el lote visible, las filas recuperadas y el
