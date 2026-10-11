@@ -150,6 +150,55 @@ Shell exposes `/api/dashboards` and accesses SQLite.
 The explorer runtimes expose query execution and summaries, suggestions,
 configuration, and health checks under `/api`. The Shell exposes
 CRUD operations at `/api/dashboards` and `/api/dashboards/recent?limit=N`.
+Query execution is read-only: SPARQL Update requests are rejected with
+`400 READ_ONLY`.
+
+## AI integration (MCP)
+
+The Shell backend includes an optional [Model Context Protocol](https://modelcontextprotocol.io)
+server at `/api/mcp` (Streamable HTTP, stateless). Any MCP client (Claude Code,
+Claude Desktop, Cursor, VS Code, Gemini CLI, and others) can use it to explore
+the graph, answer questions with SPARQL, and create GIS dashboards that people
+then open in the app.
+
+| Tool | What it does |
+|------|--------------|
+| `describe_endpoint` | Backend, default prefixes, and query limits |
+| `search_catalog` | Classes, properties, or resources by label or URI |
+| `explore_connections` | Incoming/outgoing properties of a class, resource, or property, with examples |
+| `find_paths` | Property paths from a class to another class or property |
+| `run_select` | Runs a self-contained `SELECT` and returns a capped set of rows |
+| `list_dashboards`, `get_dashboard` | Saved dashboards with their links and queries |
+| `create_gis_dashboard` | Saves a new four-view GIS dashboard and returns its link |
+
+The `suggest_dashboards` prompt (an optional `topic` argument) walks the graph
+looking for geometry, dates, and relationships, and proposes dashboards before
+creating any. There are no tools to modify data or to update or delete
+dashboards.
+
+The server is disabled until `MCP_TOKEN` is set:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MCP_TOKEN` | — (disabled) | Bearer token required by `/api/mcp` |
+| `MCP_EXPLORER_API_URL` | `http://localhost:3002/api` | Explorer backend the tools call (`http://gis-backend:3002/api` in Docker) |
+| `MCP_PUBLIC_APP_URL` | `http://localhost:4200` | Base URL used in dashboard links |
+| `MCP_MAX_ROWS` | `100` | Rows returned to the agent per query |
+| `MCP_EXPLORER_TIMEOUT_MS` | `120000` | Timeout for each explorer call |
+
+Browser requests must also come from an origin in `CORS_ORIGINS`. Connect a
+client with the app's URL and the token, for example:
+
+```bash
+claude mcp add --transport http rdfgis https://<host>/api/mcp \
+  --header "Authorization: Bearer <MCP_TOKEN>"
+```
+
+Clients that only support stdio servers can use the `mcp-remote` bridge:
+`npx mcp-remote https://<host>/api/mcp --header "Authorization: Bearer <MCP_TOKEN>"`.
+
+Query results reach the model provider the client uses. Check that this is
+acceptable for the data before connecting a cloud-hosted model.
 
 ## SPARQL configuration
 

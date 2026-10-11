@@ -13,7 +13,7 @@ AppShell (host, :4200)
 ├── /dashboards/:id → dashboardRedirectGuard → redirects by kind (gis/explorer)
 └── /**             → redirect to /
 
-Shell backend (:3000) → `/api/dashboards` (exclusive CRUD, SQLite)
+Shell backend (:3000) → `/api/dashboards` (exclusive CRUD, SQLite) and `/api/mcp` (optional MCP server)
 RDF backend (:3001)   → query, summary, suggestions, config, and health
 GIS backend (:3002)   → query, summary, suggestions, config, and health
 ```
@@ -304,6 +304,22 @@ closes after **the layout's views** render (`expectViews(layout.visibleSlots())`
 2.5-second margin if one does not report. Because `SelectionService` fan-out is
 synchronous, declare `expectViews` **before** `setQueryResult`.
 `DashboardPersistenceService.isHydrating` remains the data flag, not the dialog flag.
+
+## AI integration (MCP)
+
+`products/shell/backend/src/modules/mcp/` serves an MCP server at `/api/mcp`
+(Streamable HTTP, stateless: one `McpServer` + transport per POST; GET/DELETE
+answer 405). `McpGuard` returns 404 until `MCP_TOKEN` is set, then requires
+`Authorization: Bearer`, and rejects browser `Origin`s outside `CORS_ORIGINS`.
+Tools live in pure `mcp-server.ts` (`createMcpServer(deps)`, tested with the SDK
+`InMemoryTransport`): read-only discovery/`run_select` proxy the explorer backend
+through `ExplorerApiClient` (`MCP_EXPLORER_API_URL`, the GIS runtime by default);
+dashboard tools use `DashboardsService` directly. The only write is
+`create_gis_dashboard` (never update/delete). `run_select` re-checks SELECT
+locally and caps rows (`MCP_MAX_ROWS`); `describe_endpoint` omits the endpoint
+URL. The `suggest_dashboards` prompt guides dashboard proposals. Keep
+`SERVER_INSTRUCTIONS` in sync with what GIS needs (WKT, dates, self-contained
+PREFIX, no LIMIT). The SDK is pinned (`@modelcontextprotocol/sdk` 1.30.1).
 
 ## Persistence
 

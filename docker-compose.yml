@@ -5,6 +5,10 @@ services:
       dockerfile: products/shell/backend/Dockerfile
     environment:
       SHELL_BACKEND_PORT: 3000
+      # Servidor MCP (/api/mcp): deshabilitado mientras MCP_TOKEN esté vacío.
+      MCP_TOKEN: ${MCP_TOKEN:-}
+      MCP_EXPLORER_API_URL: http://gis-backend:3002/api
+      MCP_PUBLIC_APP_URL: ${MCP_PUBLIC_APP_URL:-http://localhost:4200}
     ports: ["${SHELL_BACKEND_PORT:-3000}:3000"]
     volumes:
       - shell-data:/repo/products/shell/backend/data
