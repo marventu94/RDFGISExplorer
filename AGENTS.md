@@ -235,9 +235,15 @@ raw `b0`; nodes/edges use `_:b0`). The selected node
 is **injected** into the visible batch even when no batch row references it,
 together with its object's representations and matching table rows; deselection
 removes these additions. Pinned rows are appended without changing batch counts
-or the original ordering of the base batch. New query →
-batch 1; filtering retains a still-valid batch and clamps it when
-`lotCount` shrinks. With one batch, `visibleQueryResult$` is identical to
+or the original ordering of the base batch. New query, applying, changing,
+or removing a filter → batch 1 (filters evaluate every retrieved row, then the
+filtered rows are re-batched); the lot is still clamped when `lotCount` shrinks.
+Next to the active filter badges, `filter-badges` states the scope
+(`"87 de 1000 filas recuperadas pasan el filtro"`, plus `· resultado parcial`
+when the backend truncated, since rows not retrieved are never evaluated).
+On a batch, batch-size, or result change the graph relayouts and refits the
+whole subset (shared hubs would otherwise stay locked at the previous batch's
+coordinates); adding a few pinned nodes stays incremental. With one batch, `visibleQueryResult$` is identical to
 `filteredQueryResult$` (no overhead). The navbar batch navigator
 (`"Lote X de N · T filas"`, previous/next, size selector, warning icon when the
 backend truncated, volume-warning tooltip) appears only when N > 1.
