@@ -164,7 +164,9 @@ incoming/outgoing relationships over bounded distinct-entity samples, using the
 current connected structural SELECT (without value filters) or a class/resource/property focus. Exploration paths
 are re-evaluated as joined patterns; never send returned blank-node identifiers
 back as constants. Path search validates the full chain and remains explicitly
-incomplete under its depth/time/request budgets.
+incomplete under its depth/time/request budgets (default 40 expansions, 20 s); it
+expands each class once and never through `owl:sameAs` or inferred top classes
+(`owl:Thing`) that duplicate a specific step.
 
 `graph/domain/discovery.ts` adds free variables and paths by default; observed class/datatype constraints require the explicit type action. It uses the existing domain
 model, preserves optional branch semantics, and reuses compatible branches.

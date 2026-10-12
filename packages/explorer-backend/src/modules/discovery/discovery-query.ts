@@ -9,6 +9,12 @@ import { escapeSparqlLiteral, isValidUri } from '../../adapters/sparql-text';
 
 export const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 export const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
+export const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
+/** Top classes that reasoners add to every resource: they carry no structure. */
+export const GENERIC_CLASSES: ReadonlySet<string> = new Set([
+  'http://www.w3.org/2002/07/owl#Thing',
+  `${RDFS}Resource`,
+]);
 export function iri(value: string): string {
   if (
     !isValidUri(value) ||

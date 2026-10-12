@@ -489,4 +489,64 @@ describe('DiscoveryService', () => {
     expect(response.explored).toBeLessThanOrEqual(2);
     expect(response.incomplete).toBe(true);
   });
+  it('reports a failure of the starting neighborhood instead of an empty path list', async () => {
+    execute.mockRejectedValue(new UpstreamError(0, 'socket hang up'));
+    await expect(
+      service.paths({ classUri: 'urn:House' }, 'urn:Geometry', 'class'),
+    ).rejects.toThrow();
+    await expect(
+      service.paths({ classUri: 'urn:House' }, 'urn:Other', 'class'),
+    ).rejects.toMatchObject({
+      response: { error: 'DISCOVERY_COOLDOWN' },
+    });
+  });
+  it('spends the path budget on new structure, not on owl:sameAs, inferred top classes or revisited classes', async () => {
+    const OWL = 'http://www.w3.org/2002/07/owl#';
+    const connection = (
+      predicate: string,
+      targetClass: string,
+      entities: string,
+    ) => ({
+      predicate: uri(predicate),
+      targetClass: uri(targetClass),
+      kind: lit('resource'),
+      entities: lit(entities),
+    });
+    // eslint-disable-next-line @typescript-eslint/require-await
+    execute.mockImplementation(async (query: string) => {
+      if (query.startsWith('SELECT DISTINCT (')) {
+        const site = query.includes('<urn:Site>');
+        return result([{ __d_focus: uri(site ? 'urn:site1' : 'urn:house1') }]);
+      }
+      if (!query.includes('?__d_focus ?predicate ?neighbor .'))
+        return result([]);
+      return query.includes('<urn:site1>')
+        ? result([connection('urn:hasGeometry', 'urn:Geometry', '1')])
+        : result([
+            connection(`${OWL}sameAs`, 'urn:House', '9'),
+            connection('urn:includes', `${OWL}Thing`, '9'),
+            connection('urn:self', 'urn:House', '8'),
+            connection('urn:includes', 'urn:Site', '7'),
+          ]);
+    });
+    // Budget 2: the root plus a single expansion, which must be includes→Site.
+    const response = await service.paths(
+      { classUri: 'urn:House' },
+      'urn:Geometry',
+      'class',
+    );
+    expect(response.explored).toBe(2);
+    expect(response.paths).toEqual([
+      [
+        expect.objectContaining({
+          predicate: 'urn:includes',
+          targetClass: 'urn:Site',
+        }),
+        expect.objectContaining({
+          predicate: 'urn:hasGeometry',
+          targetClass: 'urn:Geometry',
+        }),
+      ],
+    ]);
+  });
 });
