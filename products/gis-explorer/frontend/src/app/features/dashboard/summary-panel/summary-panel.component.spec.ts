@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { SummaryPanelComponent } from './summary-panel.component';
@@ -6,6 +7,7 @@ import { ApiService } from '@core/services/api.service';
 import { SelectionService } from '@core/services/selection.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
+import { AppConfigService } from '@core/services/app-config.service';
 import type { BindingValue, QueryResult, QuerySummary } from '@shared/models';
 
 const USER_QUERY = 'SELECT ?item ?price ?city WHERE { ?item ?p ?price . ?item ?c ?city }';
@@ -49,6 +51,7 @@ describe('SummaryPanelComponent', () => {
   let selectionService: SelectionService;
   let queryState: SparqlQueryStateService;
   let fetchSummaryMock: ReturnType<typeof vi.fn>;
+  const config = signal({ defaultPrefixes: { ex: 'http://x/', place: 'http://x/places/' } });
 
   beforeEach(async () => {
     fetchSummaryMock = vi.fn().mockReturnValue(of(BACKEND_SUMMARY));
@@ -59,6 +62,7 @@ describe('SummaryPanelComponent', () => {
         SelectionService,
         SparqlQueryStateService,
         { provide: ApiService, useValue: { fetchSummary: fetchSummaryMock } },
+        { provide: AppConfigService, useValue: { config } },
       ],
     }).compileComponents();
 
@@ -123,6 +127,29 @@ describe('SummaryPanelComponent', () => {
 
     const scope = fixture.nativeElement.querySelector('.summary-scope');
     expect(scope.textContent).toContain('las 5000 filas del resultado completo');
+  });
+
+  it('shows configured prefix abbreviations and retains full URI tooltips', () => {
+    fetchSummaryMock.mockReturnValue(of({
+      ...BACKEND_SUMMARY,
+      categorical: [{
+        variable: 'city',
+        values: [
+          { value: 'http://x/places/la-plata', count: 3000 },
+          { value: 'http://other.example/city', count: 20 },
+        ],
+      }],
+    }));
+    selectionService.setQueryResult(makeResult(true));
+    component['toggleCollapsed']();
+    fixture.detectChanges();
+
+    const items = fixture.nativeElement.querySelectorAll('.summary-top li');
+    expect(items[0].querySelector('.summary-top-value').textContent).toBe('place:la-plata');
+    expect(items[0].getAttribute('title')).toBe('http://x/places/la-plata');
+    expect(items[1].querySelector('.summary-top-value').textContent)
+      .toBe('http://other.example/city');
+    expect(items[1].getAttribute('title')).toBe('http://other.example/city');
   });
 
   it('marks the header as covering the full query while batches are active', () => {

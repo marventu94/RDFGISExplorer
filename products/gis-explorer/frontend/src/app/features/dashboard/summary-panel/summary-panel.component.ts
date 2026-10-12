@@ -12,6 +12,7 @@ import { DashboardLoadProgressService } from '@core/services/dashboard-load-prog
 import { classifyVariables, computeLocalSummary } from '@shared/stats/result-summary';
 import type { QueryResult, QuerySummary } from '@shared/models';
 import { I18nService } from '@core/services/i18n.service';
+import { AppConfigService } from '@core/services/app-config.service';
 
 /** De dónde salieron los números del resumen. */
 export type SummarySource = 'local' | 'backend';
@@ -46,6 +47,7 @@ export class SummaryPanelComponent {
   private readonly summaryState = inject(SummaryStateService);
   private readonly loadProgress = inject(DashboardLoadProgressService);
   private readonly i18n = inject(I18nService);
+  private readonly appConfig = inject(AppConfigService);
 
   protected readonly collapsed = signal(true);
   protected readonly loading = signal(false);
@@ -153,5 +155,13 @@ export class SummaryPanelComponent {
     if (!iso) return '—';
     const d = new Date(iso);
     return isNaN(d.getTime()) ? iso : this.i18n.formatDate(d);
+  }
+
+  protected displayValue(value: string): string {
+    const prefixes = this.appConfig.config()?.defaultPrefixes ?? {};
+    const match = Object.entries(prefixes)
+      .filter(([, namespace]) => namespace && value.startsWith(namespace) && value.length > namespace.length)
+      .sort((a, b) => b[1].length - a[1].length)[0];
+    return match ? `${match[0]}:${value.slice(match[1].length)}` : value;
   }
 }
