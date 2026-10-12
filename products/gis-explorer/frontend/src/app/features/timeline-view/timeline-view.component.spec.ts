@@ -88,6 +88,7 @@ const timelineMock = vi.hoisted(() => {
       redraw: vi.fn(),
       destroy: vi.fn(),
       setWindow: vi.fn(),
+      setOptions: vi.fn(),
       getWindow: vi.fn(() => ({
         start: new Date('2000-01-01'),
         end: new Date('2000-01-01'),
@@ -801,6 +802,16 @@ describe('TimelineViewComponent', () => {
     it('should make the mouse wheel zoom instead of panning horizontally', () => {
       expect(timelineMock.options?.['preferZoom']).toBe(true);
       expect(timelineMock.options).not.toHaveProperty('zoomKey');
+    });
+
+    it('should label months in the app language and follow language changes', () => {
+      const i18n = TestBed.inject(I18nService);
+      expect(timelineMock.options?.['locale']).toBe(i18n.language());
+
+      const other = i18n.language() === 'es' ? 'en' : 'es';
+      i18n.language.set(other);
+      TestBed.tick();
+      expect(timelineMock.instance.setOptions).toHaveBeenLastCalledWith({ locale: other });
     });
 
     it('should keep tooltips inside the quadrant', () => {
