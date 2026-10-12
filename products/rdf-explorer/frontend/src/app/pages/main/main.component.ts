@@ -1,5 +1,5 @@
 import { TranslatePipe } from '../../core/translate.pipe';
-import { Component, inject, OnInit, DestroyRef, computed, effect, signal } from '@angular/core';
+import { Component, inject, OnInit, DestroyRef, computed, effect, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { lastValueFrom } from 'rxjs';
@@ -17,6 +17,7 @@ import { AppConfigService } from '../../core/services/app-config.service';
 import { dashboardHost, isDashboardHostAvailable, registerQueryExportProvider, requestQueryExport } from '@rdfgis/platform-bridge';
 import { I18nService } from '../../core/i18n.service';
 import { closePanelFlow } from '../../core/panel-close';
+import { EndpointStatusService } from '../../core/endpoint-status.service';
 import { LanguageSelectorComponent } from '../../core/language-selector.component';
 import { ThemeToggleComponent } from '../../core/theme-toggle.component';
 import { queryExportLabel } from '../../core/query-export-label';
@@ -37,6 +38,9 @@ export class MainComponent implements OnInit {
   readonly destroyRef = inject(DestroyRef);
   readonly appConfig = inject(AppConfigService);
   readonly i18n = inject(I18nService);
+  private readonly endpointStatus = inject(EndpointStatusService);
+  private connectionDialogOpen = false;
+  private connectionDialogClosedAt = 0;
   readonly tabMenu = signal<{ panelId: string; x: number; y: number } | null>(null);
 
   readonly canHandoff = computed(() => {
@@ -77,6 +81,35 @@ export class MainComponent implements OnInit {
       void this.graph.revision();
       void this.graph.viewport();
       this.workspace.snapshotActivePanel(this.graph);
+    });
+
+    effect(() => {
+      const failure = this.endpointStatus.failure();
+      if (failure) untracked(() => this.showConnectionFailure(failure.detail, failure.at));
+    });
+  }
+
+  /**
+   * Un solo popup por ráfaga: una acción dispara varias consultas y todas
+   * fallan juntas; las que llegan hasta 3 s después de cerrarlo son la misma.
+   */
+  private showConnectionFailure(detail: string, at: number): void {
+    if (this.connectionDialogOpen || at - this.connectionDialogClosedAt < 3000) return;
+    this.connectionDialogOpen = true;
+    this.dialog.open<string>(MessageDialogComponent, {
+      width: '440px',
+      hasBackdrop: true,
+      backdropClass: 'cdk-overlay-dark-backdrop',
+      data: {
+        kind: 'error',
+        title: this.i18n.text('No se pudo conectar con el servidor'),
+        message: this.i18n.text('El endpoint SPARQL no responde. Reintentá más tarde.'),
+        detail,
+        actions: [{ label: this.i18n.text('Entendido'), value: 'ok', primary: true }],
+      } satisfies MessageDialogData,
+    }).closed.subscribe(() => {
+      this.connectionDialogOpen = false;
+      this.connectionDialogClosedAt = Date.now();
     });
   }
 

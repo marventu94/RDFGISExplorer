@@ -256,6 +256,7 @@ export const UI_TRANSLATIONS = [
   ['La query excedió el tiempo límite ({seconds} segundos). Intentá reducir el alcance.', 'The query exceeded the time limit ({seconds} seconds). Try narrowing its scope.'],
   ['Límite excedido. El máximo permitido es {limit}.', 'Limit exceeded. The maximum allowed is {limit}.'],
   ['El endpoint SPARQL no responde. Reintentá más tarde.', 'The SPARQL endpoint is not responding. Try again later.'],
+  ['No se pudo conectar con el servidor', 'Could not connect to the server'],
   ['Error del servidor ({status}).', 'Server error ({status}).'],
   ['¿Reemplazar "{name}"?', 'Replace "{name}"?'],
   ['Tenés abierto el tablero', 'You have the dashboard'],

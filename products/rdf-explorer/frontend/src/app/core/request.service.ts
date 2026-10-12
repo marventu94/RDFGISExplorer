@@ -2,12 +2,14 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { QueryResult, BindingValue } from './endpoint-adapter';
 import { createRdfBackendAdapter, type SparqlJsonResult, type SparqlBinding } from './endpoint-adapter';
+import { EndpointStatusService } from './endpoint-status.service';
 
 export type { SparqlBinding, SparqlJsonResult } from './endpoint-adapter';
 
 @Injectable({ providedIn: 'root' })
 export class RequestService {
   private readonly http = inject(HttpClient);
+  private readonly endpointStatus = inject(EndpointStatusService);
 
   readonly labelCache = signal<ReadonlyMap<string, string>>(new Map());
 
@@ -28,7 +30,10 @@ export class RequestService {
     opts?: { signal?: AbortSignal },
   ): Promise<T> {
     const adapter = createRdfBackendAdapter(this.http);
-    const result = await adapter.executeQuery(query, { signal: opts?.signal });
+    const result = await adapter.executeQuery(query, { signal: opts?.signal }).catch((err: unknown) => {
+      this.endpointStatus.report(err);
+      throw err;
+    });
     const data = toSparqlJsonResult(result);
     this.correlateLabels(data);
     return data as unknown as T;
