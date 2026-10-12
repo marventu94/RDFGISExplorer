@@ -181,8 +181,14 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   queryState: QueryState = 'no-query';
-  /** Texto del chip de cobertura; vacío cuando el grafo muestra todo sin recortes. */
-  coverageLabel = '';
+  /**
+   * Texto del chip de cobertura; vacío cuando el grafo muestra todo sin recortes. Se guarda cómo
+   * armarlo (no el texto) para que se re-traduzca al cambiar de idioma.
+   */
+  private coverage: (() => string) | null = null;
+  get coverageLabel(): string {
+    return this.coverage?.() ?? '';
+  }
   originalNodeCount = 0;
   filteredNodeCount = 0;
   activeFilterCount = 0;
@@ -396,7 +402,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
           // A collapsed motif or node cap can hide the exact entity. Pinning it
           // makes selections from the table, map, and timeline unambiguous.
           const built = this.buildElements(visible);
-          this.coverageLabel = this.buildCoverageLabel(
+          this.coverage = this.deferCoverageLabel(
             built,
             visible,
             this.lastLotState.lotCount,
@@ -911,7 +917,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.lastAppliedFiltersKey = filtersKey;
     if (filtersChanged) this.focusPins.clear();
     this.activeFilterCount = filters.length;
-    this.coverageLabel = '';
+    this.coverage = null;
     this.indexNodes(original, visible);
 
     if (!visible || visible.nodes.length === 0) {
@@ -971,7 +977,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     }
 
     const built = this.buildElements(visible);
-    this.coverageLabel = this.buildCoverageLabel(
+    this.coverage = this.deferCoverageLabel(
       built,
       visible,
       lotState.lotCount,
@@ -1068,7 +1074,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     }
     const visible = this.lastVisibleResult;
     const built = this.buildElements(visible);
-    this.coverageLabel = this.buildCoverageLabel(
+    this.coverage = this.deferCoverageLabel(
       built,
       visible,
       this.lastLotState.lotCount,
@@ -1084,6 +1090,12 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * filas, el grafo corta nodos), así que se informan juntos: antes un `else if`
    * hacía desaparecer el aviso de lote justo cuando además había truncado.
    */
+  private deferCoverageLabel(
+    ...args: Parameters<GraphViewComponent['buildCoverageLabel']>
+  ): () => string {
+    return () => this.buildCoverageLabel(...args);
+  }
+
   private buildCoverageLabel(
     built: BuiltGraph,
     visible: QueryResult,
@@ -1196,7 +1208,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
         if (this.lastVisibleResult) {
           const visible = this.lastVisibleResult;
           const built = this.buildElements(visible);
-          this.coverageLabel = this.buildCoverageLabel(
+          this.coverage = this.deferCoverageLabel(
             built,
             visible,
             this.lastLotState.lotCount,
@@ -1433,7 +1445,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       if (nextPins.size !== this.focusPins.size || [...nextPins].some((id) => !this.focusPins.has(id))) {
         this.focusPins = nextPins;
         const built = this.buildElements(visible);
-        this.coverageLabel = this.buildCoverageLabel(built, visible, this.lastLotState.lotCount, this.lastLotState.currentLot);
+        this.coverage = this.deferCoverageLabel(built, visible, this.lastLotState.lotCount, this.lastLotState.currentLot);
         this.syncGraph(built.elements);
       }
     }
@@ -1973,7 +1985,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.entitySubgraph = subgraph;
     // El chip de cobertura describe el lote del resultado; en modo entidad los
     // indicadores viven en el panel.
-    this.coverageLabel = '';
+    this.coverage = null;
     this.refreshEntityViewModel();
     this.syncGraph(buildEntityModeElements(subgraph).elements);
   }
@@ -2075,7 +2087,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const visible = this.lastVisibleResult;
     if (visible) {
       const built = this.buildElements(visible);
-      this.coverageLabel = this.buildCoverageLabel(
+      this.coverage = this.deferCoverageLabel(
         built,
         visible,
         this.lastLotState.lotCount,

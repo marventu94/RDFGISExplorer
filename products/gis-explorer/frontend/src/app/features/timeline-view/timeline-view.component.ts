@@ -9,6 +9,7 @@ import {
   HostBinding,
   NgZone,
   ChangeDetectorRef,
+  effect,
   inject,
 } from '@angular/core';
 import { SelectionService, type LotState } from '@core/services/selection.service';
@@ -74,8 +75,14 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       ? `0 de ${this.originalNodeCount} eventos en el rango activo`
       : `0 of ${this.originalNodeCount} events in the active range`;
   }
-  /** Texto del chip de cobertura; vacío cuando la timeline muestra todos los nodos. */
-  coverageLabel = '';
+  /**
+   * Texto del chip de cobertura; vacío cuando la timeline muestra todos los nodos. Se guarda cómo
+   * armarlo (no el texto) para que se re-traduzca al cambiar de idioma.
+   */
+  private coverage: (() => string) | null = null;
+  get coverageLabel(): string {
+    return this.coverage?.() ?? '';
+  }
 
   private activeView = false;
 
@@ -112,7 +119,13 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     private readonly ngZone: NgZone,
     private readonly cdr: ChangeDetectorRef,
     private readonly colorService: EntityColorService,
-  ) {}
+  ) {
+    // Meses y días del eje en el idioma de la app (vis trae moment con `es`).
+    effect(() => {
+      const locale = this.i18n.language();
+      this.timeline?.setOptions({ locale });
+    });
+  }
 
   ngOnInit(): void {
     // La timeline se crea ANTES de suscribirse: los BehaviorSubject de
@@ -147,7 +160,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     lotState: LotState,
   ): void {
     this.activeFilterCount = filters.length;
-    this.coverageLabel = '';
+    this.coverage = null;
 
     const temporalFilter = filters.find((f): f is TemporalFilter => f.kind === 'temporal');
     this.activeFilterLabel = temporalFilter?.label ?? '';
@@ -201,14 +214,14 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
       const key = stats.primaryWithoutTemporalEvents === 1
         ? 'Mostrando {shown} de {total} entidades{batch} · {missing} sin fecha'
         : 'Mostrando {shown} de {total} entidades{batch} · {missing} sin fechas';
-      this.coverageLabel = this.i18n.text(key, {
+      this.coverage = () => this.i18n.text(key, {
         shown: stats.primaryWithTemporalEvents,
         total: stats.primary,
         batch: lotState.lotCount > 1 ? this.i18n.text(' del lote') : '',
         missing: stats.primaryWithoutTemporalEvents,
       });
     } else {
-      this.coverageLabel = '';
+      this.coverage = null;
     }
     const resetViewport = original !== this.lastOriginalResult;
     this.lastOriginalResult = original;
@@ -519,6 +532,7 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
   private initTimeline(): void {
     const options: TimelineOptions = {
+      locale: this.i18n.language(),
       stack: true,
       // La timeline queda clavada al alto del cuadrante en vez de crecer con el
       // apilado: vis relee dom.root.offsetHeight después de aplicar la altura y

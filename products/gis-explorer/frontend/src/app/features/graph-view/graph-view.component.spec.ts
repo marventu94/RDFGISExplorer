@@ -714,6 +714,11 @@ describe('GraphViewComponent', () => {
     expect(component.coverageLabel).toBe('Lote 2 de 7 · 2 filas');
     const chip = (fixture.nativeElement as HTMLElement).querySelector('.coverage-chip');
     expect(chip?.textContent?.trim()).toBe('Lote 2 de 7 · 2 filas');
+
+    // El chip se re-traduce al cambiar de idioma, sin esperar otro lote.
+    TestBed.inject(I18nService).language.set('en');
+    fixture.detectChanges();
+    expect(chip?.textContent?.trim()).toBe('Batch 2 of 7 · 2 rows');
   });
 
   it('should transition back to no-query when result becomes null', () => {

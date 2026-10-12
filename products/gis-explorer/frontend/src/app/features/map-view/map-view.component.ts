@@ -67,8 +67,14 @@ export class MapViewComponent implements OnInit, OnDestroy {
   originalNodeCount = 0;
   filteredNodeCount = 0;
   activeFilterCount = 0;
-  /** Texto del chip de cobertura; vacío cuando el mapa muestra todos los nodos. */
-  coverageLabel = '';
+  /**
+   * Texto del chip de cobertura; vacío cuando el mapa muestra todos los nodos. Se guarda cómo
+   * armarlo (no el texto) para que se re-traduzca al cambiar de idioma.
+   */
+  private coverage: (() => string) | null = null;
+  get coverageLabel(): string {
+    return this.coverage?.() ?? '';
+  }
 
   private activeView = false;
 
@@ -301,7 +307,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
     lotState: LotState,
   ): void {
     this.activeFilterCount = activeFilters.length;
-    this.coverageLabel = '';
+    this.coverage = null;
 
     if (!original || original.nodes.length === 0) {
       this.queryState = 'no-query';
@@ -337,14 +343,14 @@ export class MapViewComponent implements OnInit, OnDestroy {
       const key = stats.primaryWithoutCoordinate === 1
         ? 'Mostrando {shown} de {total} entidades{batch} · {missing} sin coordenada'
         : 'Mostrando {shown} de {total} entidades{batch} · {missing} sin coordenadas';
-      this.coverageLabel = this.i18n.text(key, {
+      this.coverage = () => this.i18n.text(key, {
         shown: stats.primaryWithCoordinate,
         total: stats.primary,
         batch: lotState.lotCount > 1 ? this.i18n.text(' del lote') : '',
         missing: stats.primaryWithoutCoordinate,
       });
     } else {
-      this.coverageLabel = '';
+      this.coverage = null;
     }
     this.renderMarkers(visible);
     this.applyRequestedViewportFit(visible.nodes);
