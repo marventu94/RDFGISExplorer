@@ -371,10 +371,15 @@ Martín M. Venturino — `marventurino@gmail.com`
 
 ## Escenarios de evaluación OVS
 
-La seed de evaluación restablece la base a **cinco tableros RDF Explorer**:
-D1 casas de Berisso; D2 antigüedad/procedencia; D3 fecha/zona; D4 lotes/exportación
-City Bell; D5 construcción, transferencia y guardado. D2 y D3 parten del mismo
-patrón en workspaces independientes. El usuario abre GIS desde RDF Explorer.
+La seed de evaluación restablece la base a los **tableros iniciales de cinco
+desafíos** sobre un hilo La Plata → City Bell. Son tres workspaces RDF Explorer:
+D1 casas de La Plata publicadas del 1 al 10 de septiembre de 2023 (conjunto
+introductorio completo); D2 casas de La Plata entre septiembre y diciembre de 2023
+con barrio, dirección y precios en USD vinculados a cada aviso (incluye City Bell
+y otros barrios; el backend recupera hasta su tope); D5 solo
+el punto de partida `House` para construir la consulta de localidades. D3 y D4
+continúan el GIS abierto en D2, sin tablero propio, y los tableros GIS que se
+guardan durante el ensayo no se siembran.
 
 ```bash
 nvm use
@@ -385,7 +390,7 @@ pnpm run seed:evaluation-dashboards
 
 El comando usa `.env.evaluation.local` cuando existe; `--env ruta` selecciona otro
 archivo. Las rutas relativas se resuelven desde la raíz, como en `start.sh`.
-`--dry-run` muestra el destino y los cinco escenarios sin escribir. La seed
+`--dry-run` muestra el destino y los tableros iniciales sin escribir. La seed
 **elimina todos los tableros anteriores**, incluidos los creados manualmente.
 Conservar un respaldo si se quiere recuperar trabajo previo. No modifica el RDF.
 Los escenarios requieren el endpoint OVS y configuración/credenciales locales.

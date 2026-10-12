@@ -32,11 +32,10 @@ const REC = 'https://w3id.org/rec#';
 const GR = 'http://purl.org/goodrelations/v1#';
 const SIOC = 'http://rdfs.org/sioc/ns#';
 const GEO = 'http://www.opengis.net/ont/geosparql#';
-const TIME = 'http://www.w3.org/2006/time#';
 const DC = 'http://purl.org/dc/elements/1.1/';
 
 interface EvaluationCaseDefinition {
-  suffix: 'd1' | 'd2' | 'd3' | 'd4' | 'd5';
+  suffix: 'd1' | 'd2' | 'd5';
   title: string;
   build: (graph: PropertyGraph) => void;
 }
@@ -178,9 +177,9 @@ function addRequiredGeometry(
  * `district_Buenos_Aires_Berisso`, `district_Buenos_Aires_Interior_Berisso`):
  * son la misma localidad duplicada por la taxonomía de regiones del scraper.
  *
- * Cuelga de la `?postalAddress` que se le pase: cuando el caso ya proyecta una
- * dirección (D1) se reusa esa misma, porque una rama aparte multiplicaría filas
- * por producto cartesiano sin agregar información.
+ * Cuelga de la `?postalAddress` que se le pase: si un caso ya proyecta una
+ * dirección conviene reusar esa misma, porque una rama aparte multiplicaría
+ * filas por producto cartesiano sin agregar información.
  */
 function addCityFilterToAddress(
   graph: PropertyGraph,
@@ -221,198 +220,92 @@ function addLocationAddress(
   return address;
 }
 
-/** Filtro por partido/localidad, armando la dirección desde el inmueble. */
-function addCityFilter(
-  graph: PropertyGraph,
-  realEstate: Node,
-  value: string,
-  x: number,
-  y: number,
-): void {
-  const address = addLocationAddress(graph, realEstate, x, y);
-  addCityFilterToAddress(graph, address, value, x + 360, y);
-}
-
 /**
- * Filtro por barrio. Es el nivel correcto cuando el caso es un barrio y no una
- * localidad entera: City Bell (D4), por ejemplo, no existe como `inm:city` en el
- * dataset — es barrio de La Plata.
+ * Base compartida por D1 y D2: avisos de casas de La Plata con fecha de
+ * publicación, barrio opcional y geometría obligatoria para el mapa.
+ * D1 queda introductorio; D2 añade precio y detalle sobre este canvas.
  */
-function addNeighborhoodFilter(
+function buildLaPlataHouses(
   graph: PropertyGraph,
-  realEstate: Node,
-  value: string,
-  x: number,
-  y: number,
+  from: { date: string; granularity: 'day' | 'month' },
+  to: { date: string; granularity: 'day' | 'month' },
 ): void {
-  const address = addLocationAddress(graph, realEstate, x, y);
-  const neighborhood = varNode(graph, 'neighborhood', x + 360, y, false);
-  connect(graph, address, `${INM}neighborhood`, neighborhood);
-  const label = literalProp(graph, neighborhood, `${RDFS}label`, 'barrioLabel');
-  label.getLiteral()?.addFilter('regex', { regex: `^${value}$` }, graph);
+  const listing = varNode(graph, 'listing', 120, 180);
+  const realEstate = varNode(graph, 'realEstate', 420, 180);
+  addListingCore(graph, listing, realEstate, `${INM}House`);
+  literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
+  // El recorte es de dominio (período de publicación), no un LIMIT.
+  const publication = literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
+  publication.getLiteral()?.addFilter('datefrom', from, graph);
+  publication.getLiteral()?.addFilter('dateto', to, graph);
+
+  const address = addLocationAddress(graph, realEstate, 640, -20);
+  addCityFilterToAddress(graph, address, 'la plata', 1000, -20);
+  // City Bell es barrio (`inm:neighborhood`) de La Plata, no localidad.
+  const neighborhood = varNode(graph, 'neighborhood', 1000, 120, false);
+  connect(graph, address, `${INM}neighborhood`, neighborhood, true);
+  literalProp(graph, neighborhood, `${RDFS}label`, 'barrio', true);
+
+  addRequiredGeometry(graph, realEstate, 700, 420);
 }
 
-function addPrice(
-  graph: PropertyGraph,
-  listing: Node,
-  x: number,
-  y: number,
-): void {
-  const feature = varNode(graph, 'priceFeature', x, y, false);
-  const specification = varNode(graph, 'priceSpecification', x + 200, y, false);
+/** D2: cada precio queda vinculado al aviso, su feature y su especificación. */
+function addUsdPriceDetails(graph: PropertyGraph): void {
+  const listing = graph.nodes.find((node) => node.variable.alias === 'listing');
+  const address = graph.nodes.find((node) => node.variable.alias === 'locationValue');
+  if (!listing || !address) throw new Error('Falta la rama base de D2');
+
+  // La dirección se lee de la misma rama usada para ciudad y barrio.
+  literalProp(graph, address, `${INM}address`, 'direccion', true);
+
+  const feature = varNode(graph, 'priceFeature', 300, 520);
+  const specification = varNode(graph, 'priceSpecification', 500, 520, false);
   connect(graph, listing, `${INM}hasFeature`, feature);
-  typeIs(graph, feature, `${INM}Price`, x, y - 120);
+  typeIs(graph, feature, `${INM}Price`, 300, 680);
   connect(graph, feature, `${INM}hasValue`, specification);
-  literalProp(graph, specification, `${GR}hasCurrency`, 'moneda');
+  const currency = literalProp(graph, specification, `${GR}hasCurrency`, 'moneda');
+  currency.getLiteral()?.addFilter('equals', { value: 'USD' }, graph);
   literalProp(graph, specification, `${GR}hasCurrencyValue`, 'precio');
+
+  const origin = varNode(graph, 'origenPrecio', 340, 760);
+  connect(graph, feature, `${INM}hasOrigin`, origin, true);
+  // La feature tiene varios `time:hasTime`, pero OVS no relaciona cada instante
+  // con un `hasValue` concreto. Unir ambas ramas fabricaría pares valor-fecha.
 }
 
 const CASES: EvaluationCaseDefinition[] = [
   {
     suffix: 'd1',
-    title: 'D1 · Encontrar y verificar una casa de Berisso',
+    title: 'D1 · Casas de La Plata publicadas del 1 al 10 de septiembre de 2023',
     build(graph) {
-      const listing = varNode(graph, 'listing', 120, 180);
-      const realEstate = varNode(graph, 'realEstate', 440, 180);
-      addListingCore(graph, listing, realEstate, `${INM}House`);
-      connect(
+      buildLaPlataHouses(
         graph,
-        listing,
-        `${GR}hasBusinessFunction`,
-        constNode(graph, `${GR}Sell`, 80, 360),
+        { date: '2023-09-01', granularity: 'day' },
+        { date: '2023-09-10', granularity: 'day' },
       );
-      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-
-      const addressFeature = varNode(graph, 'addressFeature', 700, 60, false);
-      const postalAddress = varNode(graph, 'postalAddress', 900, 60, false);
-      connect(graph, realEstate, `${INM}hasFeature`, addressFeature);
-      typeIs(graph, addressFeature, `${INM}Address`, 700, -80);
-      connect(graph, addressFeature, `${INM}hasValue`, postalAddress);
-      // La dirección se proyecta como dato de la fila, no como filtro.
-      literalProp(graph, postalAddress, `${INM}address`, 'direccion');
-      // Un mismo inmueble suele traer una dirección por fuente
-      // (`feature_address_1` del Scraper y `feature_address_2` de AVE, con su
-      // propio `time:hasTime`): son dos filas del mismo aviso, con la misma
-      // calle escrita distinto. Sin el origen la duplicación parece un error de
-      // la consulta; con él, la fila dice de qué fuente viene cada variante.
-      // Es el mismo recurso que D2 y D3 proyectan para la antigüedad.
-      const addressOrigin = varNode(graph, 'origenDireccion', 920, -60);
-      connect(graph, addressFeature, `${INM}hasOrigin`, addressOrigin);
-      addCityFilterToAddress(graph, postalAddress, 'berisso', 1100, 60);
-
-      addPrice(graph, listing, 360, 420);
-      const priceTime = varNode(graph, 'priceTime', 780, 420, false);
-      connect(
-        graph,
-        graph.nodes.find((node) => node.variable.alias === 'priceFeature')!,
-        `${TIME}hasTime`,
-        priceTime,
-      );
-      literalProp(graph, priceTime, `${TIME}inXSDDateTimeStamp`, 'fechaPrecio');
-      addRequiredGeometry(graph, realEstate, 700, 260);
     },
   },
   {
     suffix: 'd2',
-    title: 'D2 · Entender la antigüedad y su procedencia en Berisso',
+    title: 'D2 · Casas de La Plata con precio USD (sep–dic 2023)',
     build(graph) {
-      const listing = varNode(graph, 'listing', 120, 180);
-      const realEstate = varNode(graph, 'realEstate', 420, 180);
-      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
-      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      // La fecha es obligatoria: D2 debe conservar dimensiones G+S+T.
-      literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
-      addCityFilter(graph, realEstate, 'berisso', 640, -20);
-
-      const ageFeature = varNode(graph, 'featureAntiguedad', 680, 220, false);
-      connect(graph, realEstate, `${INM}hasFeature`, ageFeature);
-      typeIs(graph, ageFeature, `${INM}PropertyAge`, 900, 120);
-      literalProp(graph, ageFeature, `${INM}hasValue`, 'antiguedad');
-      const origin = varNode(graph, 'origenAntiguedad', 920, 300);
-      connect(graph, ageFeature, `${INM}hasOrigin`, origin);
-
-      addRequiredGeometry(graph, realEstate, 700, 480);
-    },
-  },
-  {
-    suffix: 'd3',
-    title: 'D3 · Explorar departamentos de Berisso por fecha y zona',
-    build(graph) {
-      const listing = varNode(graph, 'listing', 120, 180);
-      const realEstate = varNode(graph, 'realEstate', 420, 180);
-      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
-      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      // La fecha es obligatoria: D3 debe conservar dimensiones G+S+T.
-      literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
-      addCityFilter(graph, realEstate, 'berisso', 640, -20);
-
-      const ageFeature = varNode(graph, 'featureAntiguedad', 680, 220, false);
-      connect(graph, realEstate, `${INM}hasFeature`, ageFeature);
-      typeIs(graph, ageFeature, `${INM}PropertyAge`, 900, 120);
-      literalProp(graph, ageFeature, `${INM}hasValue`, 'antiguedad');
-      const origin = varNode(graph, 'origenAntiguedad', 920, 300);
-      connect(graph, ageFeature, `${INM}hasOrigin`, origin);
-
-      addRequiredGeometry(graph, realEstate, 700, 480);
-    },
-  },
-  {
-    suffix: 'd4',
-    title: 'D4 · Explorar lotes y exportar departamentos de City Bell',
-    build(graph) {
-      const listing = varNode(graph, 'listing', 120, 180);
-      const realEstate = varNode(graph, 'realEstate', 420, 180);
-      addListingCore(graph, listing, realEstate, `${INM}Apartment`);
-      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      literalProp(graph, listing, `${SIOC}read_at`, 'fechaLectura');
-      addNeighborhoodFilter(graph, realEstate, 'city bell', 640, -20);
-
-      const building = varNode(graph, 'building', 680, 180, false);
-      connect(graph, realEstate, `${REC}includes`, building);
-      typeIs(graph, building, `${REC}Building`, 900, 100);
-      literalProp(graph, building, `${PRONTO}has_number_of_rooms`, 'ambientes');
-
-      const siteSurface = varNode(graph, 'siteSurface', 680, 380, false);
-      const surfaceFeature = varNode(graph, 'surfaceFeature', 880, 380, false);
-      const surfaceSpec = varNode(
+      // D3 y D4 continúan este mismo GIS: no tienen tablero propio.
+      buildLaPlataHouses(
         graph,
-        'surfaceSpecification',
-        1080,
-        380,
-        false,
+        { date: '2023-09', granularity: 'month' },
+        { date: '2023-12', granularity: 'month' },
       );
-      connect(graph, realEstate, `${REC}includes`, siteSurface);
-      typeIs(graph, siteSurface, `${REC}Site`, 680, 520);
-      connect(graph, siteSurface, `${INM}hasFeature`, surfaceFeature);
-      // Dimensions también usa gr:hasValue, pero sus valores son longitudes.
-      typeIs(graph, surfaceFeature, `${INM}Surface`, 1080, 520);
-      connect(graph, surfaceFeature, `${INM}hasValue`, surfaceSpec);
-      literalProp(graph, surfaceSpec, `${GR}hasValue`, 'superficie');
-      literalProp(
-        graph,
-        surfaceSpec,
-        `${GR}hasUnitOfMeasurement`,
-        'unidadSuperficie',
-      );
-
-      addPrice(graph, listing, 300, 480);
-      addRequiredGeometry(graph, realEstate, 900, 600);
+      addUsdPriceDetails(graph);
     },
   },
   {
     suffix: 'd5',
-    title: 'D5 · Construir y guardar una consulta de casas de Berisso',
+    title: 'D5 · Localidades asociadas a casas (punto de partida)',
     build(graph) {
-      // Punto de partida acotado. El participante agrega precio y moneda,
-      // ejecuta, guarda una copia y transfiere el resultado a GIS.
-      const listing = varNode(graph, 'listing', 120, 180);
-      const realEstate = varNode(graph, 'realEstate', 420, 180);
-      addListingCore(graph, listing, realEstate, `${INM}House`);
-      connect(graph, listing, `${GR}hasBusinessFunction`,
-        constNode(graph, `${GR}Sell`, 80, 360));
-      literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
-      addCityFilter(graph, realEstate, 'berisso', 640, -20);
-      addRequiredGeometry(graph, realEstate, 700, 480);
+      // Solo el punto de partida: el participante construye
+      // casa → hasFeature → Address → hasValue → city → label.
+      const house = varNode(graph, 'casa', 160, 200);
+      typeIs(graph, house, `${INM}House`, 160, 20);
     },
   },
 ];
@@ -503,7 +396,7 @@ export function buildEvaluationRows(): EvaluationDashboardRow[] {
   }));
 }
 
-/** Restablece la base a los cinco escenarios de evaluación.
+/** Restablece la base a los tableros iniciales de los cinco desafíos.
  * Borra también tableros manuales. Usa una transacción sobre el mismo archivo
  * para que el servidor activo vea el cambio sin reemplazar su conexión SQLite.
  */
