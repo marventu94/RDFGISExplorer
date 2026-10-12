@@ -190,7 +190,7 @@ export class DashboardStateService {
       this.viewState.tableState.set(payload.filters.table);
     }
     if (payload.filters.timeline) {
-      this.viewState.timelineState.set(payload.filters.timeline);
+      this.viewState.restoreTimelineWindow(payload.filters.timeline);
     }
     if (payload.filters.map) {
       this.viewState.mapState.set(payload.filters.map);

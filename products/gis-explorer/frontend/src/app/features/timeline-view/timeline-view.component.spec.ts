@@ -3,6 +3,7 @@ import { BehaviorSubject, of } from 'rxjs';
 import { TimelineViewComponent } from './timeline-view.component';
 import { I18nService } from '@core/services/i18n.service';
 import { SelectionService, type LotState } from '@core/services/selection.service';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
 import type {
   QueryResult,
   NormalizedNode,
@@ -358,6 +359,35 @@ describe('TimelineViewComponent', () => {
       expect(el.querySelector('.empty-state__text')?.textContent).toContain(
         '0 de 2 eventos en el rango activo',
       );
+    });
+  });
+
+  describe('stored window', () => {
+    it('shows the window of a hydrated dashboard on the first render with data, then fits new queries', () => {
+      const setWindow = timelineMock.instance.setWindow;
+      // El tablero se hidrata con la vista ya creada (el caso real al abrir un tablero).
+      TestBed.inject(DashboardViewStateService).restoreTimelineWindow({
+        rangeStart: '2024-01-01T00:00:00.000Z',
+        rangeEnd: '2024-07-01T00:00:00.000Z',
+      });
+      const result = createMockQueryResult([nodeWithDates, nodeWithOneDate]);
+      queryResultSubject.next(result);
+      filteredQueryResultSubject.next(result);
+      fixture.detectChanges();
+      expect(setWindow).toHaveBeenLastCalledWith(
+        new Date('2024-01-01T00:00:00.000Z'),
+        new Date('2024-07-01T00:00:00.000Z'),
+        { animation: false },
+      );
+      expect(TestBed.inject(DashboardViewStateService).pendingTimelineWindow()).toBeNull();
+
+      setWindow.mockClear();
+      const next = createMockQueryResult([nodeWithNumericAttrs]);
+      queryResultSubject.next(next);
+      filteredQueryResultSubject.next(next);
+      fixture.detectChanges();
+      expect(setWindow).toHaveBeenCalledTimes(1);
+      expect(setWindow.mock.calls[0][0]).not.toEqual(new Date('2024-01-01T00:00:00.000Z'));
     });
   });
 

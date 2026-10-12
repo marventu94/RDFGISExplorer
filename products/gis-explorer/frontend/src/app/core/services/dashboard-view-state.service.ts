@@ -36,6 +36,12 @@ export class DashboardViewStateService {
   readonly mapState = signal<MapViewState | null>(null);
   readonly mapViewportFit = signal(0);
   readonly timelineState = signal<TimelineViewState | null>(null);
+  /**
+   * Ventana que un tablero hidratado pidió mostrar. La línea de tiempo puede
+   * existir antes de la hidratación, así que la aplica en el primer render con
+   * datos en lugar de encuadrarlos, y la consume.
+   */
+  readonly pendingTimelineWindow = signal<TimelineViewState | null>(null);
   readonly graphState = signal<GraphViewState | null>(null);
   readonly graphLayoutReset = signal<{ revision: number; layout: string }>({
     revision: 0,
@@ -49,6 +55,11 @@ export class DashboardViewStateService {
       revision: request.revision + 1,
       layout,
     }));
+  }
+
+  restoreTimelineWindow(state: TimelineViewState): void {
+    this.timelineState.set(state);
+    this.pendingTimelineWindow.set(state.rangeStart && state.rangeEnd ? state : null);
   }
 
   requestMapViewportFit(): void {

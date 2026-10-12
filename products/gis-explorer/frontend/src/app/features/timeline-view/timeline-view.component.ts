@@ -690,7 +690,12 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     this.reapplySelection();
     this.applyFocusStyle();
 
-    if (resetViewport && this.timeline && isFinite(minMs) && isFinite(maxMs)) {
+    const pending = this.viewState.pendingTimelineWindow();
+    if (resetViewport && this.timeline && pending?.rangeStart && pending.rangeEnd) {
+      // Tablero hidratado con ventana propia: se respeta en lugar de encuadrar los datos.
+      this.viewState.pendingTimelineWindow.set(null);
+      this.timeline.setWindow(new Date(pending.rangeStart), new Date(pending.rangeEnd), { animation: false });
+    } else if (resetViewport && this.timeline && isFinite(minMs) && isFinite(maxMs)) {
       // Padding para que los items de los extremos no queden pegados al borde;
       // con todas las fechas iguales el span es 0 y el piso abre la ventana.
       const pad = Math.max((maxMs - minMs) * WINDOW_PAD_RATIO, WINDOW_PAD_MIN_MS);
