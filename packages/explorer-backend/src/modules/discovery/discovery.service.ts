@@ -28,7 +28,9 @@ import {
   connectionsQuery,
   focusPattern,
   focusSampleQuery,
+  GENERIC_CLASSES,
   iri,
+  OWL_SAME_AS,
   RDF_TYPE,
 } from './discovery-query';
 import { DiscoveryQueue, cancelled } from './discovery-queue';
@@ -510,7 +512,7 @@ export class DiscoveryService {
     const queue: DiscoveryStep[][] = [[]];
     const deadline =
       Date.now() + this.setting('DISCOVERY_PATH_TIMEOUT_MS', 20000);
-    const budget = this.setting('DISCOVERY_PATH_BUDGET', 12);
+    const budget = this.setting('DISCOVERY_PATH_BUDGET', 40);
     const depth = Math.min(
       this.setting('DISCOVERY_PATH_DEPTH', 4),
       12 - (focus.steps?.length ?? 0),
@@ -518,6 +520,9 @@ export class DiscoveryService {
     const pathLimit = this.setting('DISCOVERY_PATH_RESULT_LIMIT', 5);
     if (depth <= 0) return result;
     const seen = new Set<string>();
+    // Each class is expanded once, at its shallowest depth: reaching it again
+    // through another route re-inspects the same structure.
+    const expanded = new Set<string>(focus.classUri ? [focus.classUri] : []);
     while (
       queue.length &&
       result.explored < budget &&
@@ -534,10 +539,20 @@ export class DiscoveryService {
           Math.max(1, Math.floor((deadline - Date.now()) / 3)),
           signal,
         );
-      } catch {
+      } catch (error) {
         if (signal.aborted) throw cancelled();
+        // Without the starting neighborhood an empty answer would read as
+        // "no paths"; surface the cause (e.g. an upstream cooldown) instead.
+        if (!path.length) throw error;
         continue;
       }
+      // Inferred top classes duplicate each specific step; walking them
+      // would spend the budget without reaching new structure.
+      const specific = new Set(
+        neighborhood.connections
+          .filter((c) => c.targetClass && !GENERIC_CLASSES.has(c.targetClass))
+          .map((c) => `${c.direction} ${c.predicate}`),
+      );
       for (const c of neighborhood.connections) {
         const step: DiscoveryStep = {
           predicate: c.predicate,
@@ -560,10 +575,18 @@ export class DiscoveryService {
           next.length < depth &&
           c.kind === 'resource' &&
           c.predicate !== RDF_TYPE &&
+          c.predicate !== OWL_SAME_AS &&
+          !(
+            c.targetClass &&
+            GENERIC_CLASSES.has(c.targetClass) &&
+            specific.has(`${c.direction} ${c.predicate}`)
+          ) &&
           !path.some(
             (p) => p.predicate === c.predicate && p.direction !== c.direction,
-          )
+          ) &&
+          !(c.targetClass && expanded.has(c.targetClass))
         ) {
+          if (c.targetClass) expanded.add(c.targetClass);
           queue.push(next);
         }
       }
