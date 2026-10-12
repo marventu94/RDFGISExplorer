@@ -13,7 +13,6 @@ export function entityModeStyleRules(
   isDark: () => boolean,
   detailLevel: () => GraphDetailLevel,
 ): cytoscape.StylesheetStyle[] {
-  const accent = '#1565C0';
   const activeAccent = '#EF6C00';
   return [
     {
@@ -74,8 +73,7 @@ export function entityModeStyleRules(
       // la exploración y tiene que reconocerse de un vistazo.
       selector: 'node.entity-role-root',
       style: {
-        shape: 'round-rectangle',
-        'border-color': accent,
+        shape: 'ellipse',
         'border-width': 5,
         'border-style': 'solid',
         'font-size': '12px',
