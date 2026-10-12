@@ -164,17 +164,24 @@ then open in the app.
 | Tool | What it does |
 |------|--------------|
 | `describe_endpoint` | Backend, default prefixes, and query limits |
+| `graph_overview` | Classes by instance count and properties by usage, with exact counts (can take up to a minute on large graphs; each section degrades on its own) |
 | `search_catalog` | Classes, properties, or resources by label or URI |
-| `explore_connections` | Incoming/outgoing properties of a class, resource, or property, with examples |
+| `explore_connections` | Incoming/outgoing properties of a class, resource, or property, with examples (inferred `owl:Thing` duplicates removed) |
 | `find_paths` | Property paths from a class to another class or property |
-| `run_select` | Runs a self-contained `SELECT` and returns a capped set of rows |
+| `describe_resource` | One node's types, label, values and neighbours, with outgoing blank nodes expanded one level, plus the resources pointing to it |
+| `run_select` | Runs a self-contained `SELECT` and returns a capped set of rows and the detected type per variable |
+| `preview_dashboard` | Runs a query the way the GIS dashboard will and reports what each view will show, the real total, duplicate rows and warnings |
+| `profile_space_time` | Where and when a query's entities concentrate: bounding box, suggested map view, grid hotspots, suspicious coordinates ((0,0), swapped or equal lat/lon, far away), adaptive date histogram, peaks and gaps |
+| `scope_query` | Rewrites a query restricted to an area (bbox, or centre and radius in km) and/or a period. Reads WKT `POINT`s with plain SPARQL 1.1, so it needs no GeoSPARQL support |
 | `list_dashboards`, `get_dashboard` | Saved dashboards with their links and queries |
-| `create_gis_dashboard` | Saves a new four-view GIS dashboard and returns its link |
+| `create_gis_dashboard` | Saves a new GIS dashboard and returns its link. The map opens framed on the data (outliers excluded); optionally choose the views and their order, the map view, the timeline window, the table's primary entity and an entity selected on open |
 
 The `suggest_dashboards` prompt (an optional `topic` argument) walks the graph
-looking for geometry, dates, and relationships, and proposes dashboards before
-creating any. There are no tools to modify data or to update or delete
-dashboards.
+looking for geometry, dates, and relationships, validates candidate queries
+with `preview_dashboard`, and proposes dashboards before creating any. The
+`explore_graph` prompt (a `question` argument) answers a question by walking
+the graph and cites the URIs and the final query. There are no tools to modify
+data or to update or delete dashboards.
 
 ### Enable and connect the MCP server
 

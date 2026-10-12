@@ -323,7 +323,21 @@ through `ExplorerApiClient` (`MCP_EXPLORER_API_URL`, the GIS runtime by default)
 dashboard tools use `DashboardsService` directly. The only write is
 `create_gis_dashboard` (never update/delete). `run_select` re-checks SELECT
 locally and caps rows (`MCP_MAX_ROWS`); `describe_endpoint` omits the endpoint
-URL. The `suggest_dashboards` prompt guides dashboard proposals. Keep
+URL. Graph tools (`graph_overview`, `describe_resource`, `preview_dashboard`)
+build their SPARQL and shape results in pure `mcp-graph.ts`: IRIs pass
+`sparqlIri`, subqueries limit before label lookups (hubs), blank nodes are
+expanded inside one query and never returned as IDs, and parallel queries degrade
+per section. `preview_dashboard` executes non-raw like GIS and asks
+`/query/summary` for the real total only when truncated. Spatial/temporal logic
+lives in pure `mcp-geo.ts`: `profile_space_time` profiles the retrieved
+entities (median-based outliers, grid hotspots, adaptive histogram);
+`scope_query` wraps the query as a subquery and filters WKT `POINT`s parsed with
+`REPLACE` + `xsd:double` (no GeoSPARQL: the evaluation GraphDB lacks it, Wikidata
+uses `wikibase:around`), binding `?__scope_lng/lat` only when the projection is
+explicit so `SELECT *` gains no columns; `create_gis_dashboard` writes
+`filters.map` (`center` is `[lat, lng]`), `filters.timeline`, `primaryVariable`
+and `selection` into the existing GIS payload. Prompts:
+`suggest_dashboards` and `explore_graph`. Keep
 `SERVER_INSTRUCTIONS` in sync with what GIS needs (WKT, dates, self-contained
 PREFIX, no LIMIT). The SDK is pinned (`@modelcontextprotocol/sdk` 1.30.1).
 
