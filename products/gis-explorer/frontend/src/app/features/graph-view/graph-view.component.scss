@@ -193,11 +193,6 @@
   background: #90a4ae;
 }
 
-.legend-dot--aggregate {
-  border-radius: 2px;
-  background: #607d8b;
-}
-
 .legend-dot--motif {
   width: 13px;
   border-radius: 2px;
@@ -207,6 +202,10 @@
 .legend-line {
   width: 14px;
   border-top: 2px solid #90a4ae;
+}
+
+.legend-line--aggregate {
+  border-top-style: dashed;
 }
 
 // ---------------------------------------------------------------------------
