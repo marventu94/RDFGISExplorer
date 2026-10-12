@@ -73,11 +73,16 @@ describe('createMcpServer', () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       'create_gis_dashboard',
       'describe_endpoint',
+      'describe_resource',
       'explore_connections',
       'find_paths',
       'get_dashboard',
+      'graph_overview',
       'list_dashboards',
+      'preview_dashboard',
+      'profile_space_time',
       'run_select',
+      'scope_query',
       'search_catalog',
     ]);
     for (const tool of tools.filter((t) => t.name !== 'create_gis_dashboard')) {
@@ -129,7 +134,12 @@ describe('createMcpServer', () => {
       sparql: 'SELECT ?s WHERE { ?s ?p ?o }',
       raw: true,
     });
-    expect(out).toMatchObject({ rowsRetrieved: 5, rowsShown: 2, truncatedByBackend: true });
+    expect(out).toMatchObject({
+      rowsRetrieved: 5,
+      rowsShown: 2,
+      truncatedByBackend: true,
+      variableTypes: { s: 'uri', label: 'literal' },
+    });
     expect(out.rows).toEqual([
       { s: 'urn:s0', label: 'S0@es' },
       { s: 'urn:s1', label: 'S1@es' },
@@ -151,6 +161,207 @@ describe('createMcpServer', () => {
     const res = await client.callTool({ name: 'run_select', arguments: { sparql: 'SELECT ?s WHERE { ?s ?p ?o }' } });
     expect(res.isError).toBe(true);
     expect(text(res)).toContain('TIMEOUT');
+  });
+
+  it('summarizes classes and properties, degrading per section', async () => {
+    deps.api.post
+      .mockResolvedValueOnce({
+        ...result(0),
+        bindings: [
+          { class: { type: 'uri', value: 'urn:House' }, instances: { type: 'literal', value: '42' } },
+        ],
+      })
+      .mockRejectedValueOnce(new ExplorerApiError(408, { error: 'TIMEOUT' }));
+    const out = JSON.parse(text(await client.callTool({ name: 'graph_overview', arguments: { limit: 5 } })));
+    expect(out.classes).toEqual([{ uri: 'urn:House', instances: 42 }]);
+    expect(out.properties).toBeUndefined();
+    expect(out.failed.properties).toContain('TIMEOUT');
+    expect(deps.api.post.mock.calls[0][1].sparql).toContain('LIMIT 5');
+  });
+
+  it('describes a resource with its label language from the config', async () => {
+    deps.api.get.mockResolvedValue({ ...CONFIG, defaults: { lang: 'es' } });
+    deps.api.post.mockResolvedValue({
+      ...result(0),
+      bindings: [{ p: { type: 'uri', value: 'urn:city' }, o: { type: 'uri', value: 'urn:Rosario' } }],
+    });
+    const out = JSON.parse(
+      text(await client.callTool({ name: 'describe_resource', arguments: { uri: 'urn:listing' } })),
+    );
+    expect(deps.api.post).toHaveBeenCalledTimes(4);
+    expect(deps.api.post.mock.calls[1][1].sparql).toContain('LANGMATCHES(LANG(?l), "es")');
+    expect(out.outgoing[0]).toEqual({ predicate: 'urn:city', value: 'urn:Rosario' });
+  });
+
+  it('rejects resources that are not absolute IRIs without querying', async () => {
+    const res = await client.callTool({ name: 'describe_resource', arguments: { uri: 'x> } DROP ALL' } });
+    expect(res.isError).toBe(true);
+    expect(deps.api.post).not.toHaveBeenCalled();
+  });
+
+  it('previews a dashboard like the GIS runs it, asking the summary for the real total when truncated', async () => {
+    deps.api.post.mockImplementation((path: string) =>
+      path === '/query/summary'
+        ? Promise.resolve({ totalRows: 3589, temporal: [] })
+        : Promise.resolve(result(5, true)),
+    );
+    const out = JSON.parse(
+      text(
+        await client.callTool({
+          name: 'preview_dashboard',
+          arguments: { sparql: 'SELECT ?s ?label WHERE { ?s ?p ?label }' },
+        }),
+      ),
+    );
+    expect(deps.api.post).toHaveBeenCalledWith('/query/execute', {
+      sparql: 'SELECT ?s ?label WHERE { ?s ?p ?label }',
+    });
+    expect(out.rows).toMatchObject({ retrieved: 5, total: 3589 });
+    expect(out.sampleRows).toHaveLength(2);
+    expect(out.warnings.join(' ')).toContain('el mapa quedaría vacío');
+  });
+
+  const spatial = (truncated = false): QueryResult =>
+    ({
+      ...result(0, truncated),
+      variables: ['s', 'wkt', 'date'],
+      bindings: [
+        {
+          s: { type: 'uri', value: 'urn:a' },
+          wkt: { type: 'coordinate', value: { lat: -32.92, lng: -60.72 }, raw: 'POINT(-60.72 -32.92)' },
+          date: { type: 'date', value: '2024-03-01', raw: '2024-03-01' },
+        },
+      ],
+      nodes: [
+        {
+          uri: 'urn:a',
+          label: 'a',
+          attributes: {},
+          coordinate: { lat: -32.92, lng: -60.72 },
+          temporalEvents: [{ field: 'date', isoDate: '2024-03-01T00:00:00Z' }],
+        },
+        { uri: 'urn:b', label: 'b', attributes: {}, coordinate: { lat: -32.95, lng: -60.64 } },
+      ],
+    }) as QueryResult;
+  const SPATIAL_QUERY = 'SELECT ?s ?wkt ?date WHERE { ?s <urn:wkt> ?wkt ; <urn:date> ?date }';
+
+  it('profiles where and when the entities concentrate', async () => {
+    deps.api.post.mockResolvedValue(spatial());
+    const out = JSON.parse(
+      text(await client.callTool({ name: 'profile_space_time', arguments: { sparql: SPATIAL_QUERY } })),
+    );
+    expect(deps.api.post).toHaveBeenCalledWith('/query/execute', { sparql: SPATIAL_QUERY });
+    expect(out.space).toMatchObject({ entitiesWithCoordinate: 2, outliers: { count: 0 } });
+    expect(out.time).toMatchObject({ entitiesWithDate: 1, granularity: 'day' });
+  });
+
+  it('scopes a query, detecting the WKT and date variables when not given', async () => {
+    deps.api.post.mockResolvedValue(spatial());
+    const out = JSON.parse(
+      text(
+        await client.callTool({
+          name: 'scope_query',
+          arguments: {
+            sparql: SPATIAL_QUERY,
+            area: { center: { lat: -32.925, lng: -60.725 }, radiusKm: 2 },
+            period: { from: '2024' },
+          },
+        }),
+      ),
+    );
+    expect(out.variables).toEqual({ wkt: 'wkt', date: 'date' });
+    expect(out.sparql).toContain('FILTER(SUBSTR(STR(?date), 1, 10) >= "2024-01-01")');
+    expect(deps.api.post).toHaveBeenCalledWith('/query/execute', { sparql: SPATIAL_QUERY, raw: true });
+  });
+
+  it('asks the agent to choose when several variables carry coordinates', async () => {
+    deps.api.post.mockResolvedValue({
+      ...spatial(),
+      variables: ['a', 'b'],
+      bindings: [
+        {
+          a: { type: 'coordinate', value: { lat: 1, lng: 1 }, raw: 'POINT(1 1)' },
+          b: { type: 'coordinate', value: { lat: 2, lng: 2 }, raw: 'POINT(2 2)' },
+        },
+      ],
+    });
+    const res = await client.callTool({
+      name: 'scope_query',
+      arguments: {
+        sparql: 'SELECT ?a ?b WHERE { ?s <urn:p> ?a ; <urn:q> ?b }',
+        area: { bbox: { west: 0, south: 0, east: 3, north: 3 } },
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain('?a, ?b');
+  });
+
+  it('frames the map on the data and honours the chosen views, window, primary entity and selection', async () => {
+    deps.api.post.mockResolvedValue(spatial());
+    const out = JSON.parse(
+      text(
+        await client.callTool({
+          name: 'create_gis_dashboard',
+          arguments: {
+            name: 'Fisherton',
+            sparql: SPATIAL_QUERY,
+            views: ['map', 'timeline', 'graph'],
+            timeline: { from: '2024-01-01', to: '2024-07-01' },
+            primaryVariable: 's',
+            selectUri: 'urn:a',
+          },
+        }),
+      ),
+    );
+    const payload = deps.dashboards.create.mock.calls[0][0].payload;
+    expect(payload.layout).toEqual({
+      slotsCount: 3,
+      preset: 'triple',
+      slots: [
+        { id: 'slot-0', view: 'map' },
+        { id: 'slot-1', view: 'timeline' },
+        { id: 'slot-2', view: 'graph' },
+      ],
+    });
+    expect(payload.filters.map.center).toEqual([-32.935, -60.68]);
+    expect(payload.filters.map.zoom).toBeGreaterThanOrEqual(10);
+    expect(payload.filters.timeline).toEqual({
+      rangeStart: '2024-01-01T00:00:00.000Z',
+      rangeEnd: '2024-07-01T00:00:00.000Z',
+    });
+    expect(payload.primaryVariable).toBe('s');
+    expect(payload.selection).toEqual({ selectedIds: ['urn:a'], pinnedId: 'urn:a' });
+    expect(out.views).toEqual(['map', 'timeline', 'graph']);
+  });
+
+  it('uses an explicit map view without running the query, and skips framing without a map', async () => {
+    await client.callTool({
+      name: 'create_gis_dashboard',
+      arguments: { name: 'A', sparql: SPATIAL_QUERY, map: { lat: -34.6, lng: -58.4, zoom: 12 } },
+    });
+    await client.callTool({
+      name: 'create_gis_dashboard',
+      arguments: { name: 'B', sparql: SPATIAL_QUERY, views: ['table', 'graph'] },
+    });
+    expect(deps.api.post).not.toHaveBeenCalled();
+    expect(deps.dashboards.create.mock.calls[0][0].payload.filters.map).toEqual({
+      center: [-34.6, -58.4],
+      zoom: 12,
+    });
+    expect(deps.dashboards.create.mock.calls[1][0].payload.filters.map).toBeUndefined();
+  });
+
+  it.each([
+    ['an unprojected primary variable', { primaryVariable: 'otro' }, 'no proyecta ?otro'],
+    ['an inverted timeline window', { timeline: { from: '2024-07-01', to: '2024-01-01' } }, 'from < to'],
+  ])('rejects %s before saving', async (_case, extra, message) => {
+    const res = await client.callTool({
+      name: 'create_gis_dashboard',
+      arguments: { name: 'X', sparql: SPATIAL_QUERY, frameMap: false, ...extra },
+    });
+    expect(res.isError).toBe(true);
+    expect(text(res)).toContain(message);
+    expect(deps.dashboards.create).not.toHaveBeenCalled();
   });
 
   it('lists dashboards with links and filters by kind', async () => {
@@ -179,11 +390,23 @@ describe('createMcpServer', () => {
 
   it('offers a prompt that walks the graph and asks before creating dashboards', async () => {
     const { prompts } = await client.listPrompts();
-    expect(prompts.map((p) => p.name)).toEqual(['suggest_dashboards']);
+    expect(prompts.map((p) => p.name)).toEqual(['suggest_dashboards', 'explore_graph']);
     const prompt = await client.getPrompt({ name: 'suggest_dashboards', arguments: { topic: 'precios en Berisso' } });
     const body = (prompt.messages[0].content as { text: string }).text;
     expect(body).toContain('precios en Berisso');
     expect(body).toContain('explore_connections');
     expect(body).toContain('Preguntame cuáles crear');
+    expect(body).toContain('preview_dashboard');
+  });
+
+  it('offers a prompt to answer questions by walking the graph', async () => {
+    const prompt = await client.getPrompt({
+      name: 'explore_graph',
+      arguments: { question: '¿Qué barrios de Rosario tienen más casas?' },
+    });
+    const body = (prompt.messages[0].content as { text: string }).text;
+    expect(body).toContain('¿Qué barrios de Rosario tienen más casas?');
+    expect(body).toContain('describe_resource');
+    expect(body).toContain('no lo crees sin que te lo pida');
   });
 });
