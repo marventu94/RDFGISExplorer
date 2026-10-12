@@ -47,7 +47,7 @@
               <ul class="summary-top">
                 @for (v of c.values; track v.value) {
                   <li [title]="v.value">
-                    <span class="summary-top-value">{{ v.value }}</span>
+                    <span class="summary-top-value">{{ displayValue(v.value) }}</span>
                     <span class="summary-top-count">{{ v.count }}</span>
                   </li>
                 }

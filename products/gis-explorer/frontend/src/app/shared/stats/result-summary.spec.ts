@@ -104,13 +104,25 @@ describe('classifyVariables', () => {
     expect(classifyVariables(result).categorical).toEqual(['kind']);
   });
 
-  it('does not classify a variable with >20 distinct values as categorical', () => {
+  it('does not classify a variable beyond the categorical distinct-value cap', () => {
     const rows: ResultBinding[] = [];
     for (let i = 0; i <= MAX_CATEGORICAL_DISTINCT; i++) {
       rows.push({ label: text(`valor ${i}`) });
     }
     const result = makeResult(['label'], rows);
     expect(classifyVariables(result).categorical).toEqual([]);
+  });
+
+  it('keeps a readable neighborhood label ahead of URI categories when slots are limited', () => {
+    const rows = Array.from({ length: 26 }, (_, i): ResultBinding => ({
+      source: uri('urn:source'),
+      city: uri('urn:city'),
+      neighborhood: uri(`urn:neighborhood:${i}`),
+      currency: text('USD'),
+      barrio: text(`Barrio ${i}`),
+    }));
+    const result = makeResult(['source', 'city', 'neighborhood', 'currency', 'barrio'], rows);
+    expect(classifyVariables(result).categorical).toEqual(['barrio', 'currency', 'neighborhood']);
   });
 
   it('does not classify long free text as categorical', () => {

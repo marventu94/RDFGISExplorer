@@ -28,7 +28,7 @@ export const MAX_NUMERIC_VARS = 3;
 export const MAX_TEMPORAL_VARS = 2;
 export const MAX_CATEGORICAL_VARS = 3;
 /** Tope de valores distintos (en la muestra) para considerar una var categórica. */
-export const MAX_CATEGORICAL_DISTINCT = 20;
+export const MAX_CATEGORICAL_DISTINCT = 32;
 /** Tope de valores en el top categórico (mismo límite que el backend). */
 export const TOP_CATEGORICAL_VALUES = 12;
 /** Literales más largos que esto no son categorías legibles. */
@@ -104,7 +104,7 @@ export function numericValue(value: BindingValue | undefined): number | null {
 export function classifyVariables(result: QueryResult): VariableClassification {
   const numeric: string[] = [];
   const temporal: string[] = [];
-  const categorical: string[] = [];
+  const categoricalCandidates: Array<{ variable: string; literal: boolean; distinct: number }> = [];
 
   for (const variable of result.variables) {
     const values = result.bindings
@@ -127,16 +127,25 @@ export function classifyVariables(result: QueryResult): VariableClassification {
     }
 
     if (
-      values.every(isCategoricalValue) &&
-      categorical.length < MAX_CATEGORICAL_VARS
+      values.every(isCategoricalValue)
     ) {
       const distinct = new Set(values.map(categoricalKey));
       if (distinct.size <= MAX_CATEGORICAL_DISTINCT) {
-        categorical.push(variable);
+        categoricalCandidates.push({
+          variable,
+          literal: values.every((value) => value.type === 'literal'),
+          distinct: distinct.size,
+        });
       }
     }
   }
 
+  // Con cupo limitado, mostrar primero etiquetas literales informativas.
+  // Los URI de origen o de la entidad suelen estar disponibles en la tabla.
+  const categorical = categoricalCandidates
+    .sort((a, b) => Number(b.literal) - Number(a.literal) || b.distinct - a.distinct)
+    .slice(0, MAX_CATEGORICAL_VARS)
+    .map(({ variable }) => variable);
   return { numeric, temporal, categorical };
 }
 

@@ -81,6 +81,7 @@
   gap: 2px;
   min-width: 180px;
   max-width: 320px;
+  max-height: 200px;
   padding: 8px 12px;
   border: 1px solid var(--gis-panel-border);
   border-radius: 8px;
@@ -103,8 +104,11 @@
 
 .summary-top {
   margin: 0;
-  padding: 0;
+  padding: 0 10px 0 0;
   list-style: none;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 
   li {
     display: flex;
@@ -114,6 +118,8 @@
 }
 
 .summary-top-value {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -121,6 +127,7 @@
 }
 
 .summary-top-count {
+  flex: 0 0 auto;
   color: var(--gis-text-muted);
   font-variant-numeric: tabular-nums;
 }
