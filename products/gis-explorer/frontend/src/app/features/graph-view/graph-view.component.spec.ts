@@ -538,6 +538,10 @@ describe('GraphViewComponent', () => {
 
     expect(lastCy()._ids().filter((id: string) => id.includes('component-motif'))).toHaveLength(3);
     expect(component.coverageLabel).toBe('6 nodos representados en 1 motivo repetido');
+    expect(fixture.nativeElement.querySelector('.graph-legend')?.textContent)
+      .toContain('Patrón repetido');
+    expect(fixture.nativeElement.querySelector('.graph-legend')?.textContent)
+      .not.toContain('Relaciones agrupadas');
   });
 
   it('replaces the motif with its original entities in Exploration', () => {
@@ -563,9 +567,12 @@ describe('GraphViewComponent', () => {
     fixture.detectChanges();
 
     component.setDetailLevel('exploration');
+    fixture.detectChanges();
 
     expect(lastCy()._ids()).toContain('listing-0');
     expect(lastCy()._ids().some((id: string) => id.includes('component-motif'))).toBe(false);
+    expect(fixture.nativeElement.querySelector('.graph-legend')?.textContent)
+      .not.toContain('Patrón repetido');
     expect(lastCy()._layoutRuns[0]).toMatchObject({
       name: 'dagre',
       nodeDimensionsIncludeLabels: true,
@@ -573,6 +580,31 @@ describe('GraphViewComponent', () => {
       rankSep: 95,
       edgeSep: 24,
     });
+  });
+
+  it('shows grouped relationships only when parallel edges are collapsed', () => {
+    const result = createMockQueryResult([mockNode, mockNode2], [
+      mockEdge,
+      { ...mockEdge, id: 'edge-2', predicate: 'http://www.wikidata.org/prop/P17' },
+    ]);
+    queryResultSubject.next(result);
+    visibleQueryResultSubject.next(result);
+    fixture.detectChanges();
+
+    const legend = fixture.nativeElement.querySelector('.graph-legend');
+    expect(legend?.textContent).toContain('Relaciones agrupadas');
+    expect(legend?.querySelector('.legend-line--aggregate')).not.toBeNull();
+    expect(legend?.textContent).not.toContain('Patrón repetido');
+
+    const cy = lastCy();
+    const groupedEdgeId = cy._ids().find((id: string) => id.startsWith('super-edge:'))!;
+    cy._emit('tap', 'edge', { target: cy.getElementById(groupedEdgeId) });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.graph-legend')?.textContent)
+      .not.toContain('Relaciones agrupadas');
+    expect(fixture.nativeElement.querySelector('.graph-legend')?.textContent)
+      .toContain('Relación RDF');
   });
 
   it.each(['table', 'map', 'timeline'])(
@@ -1761,6 +1793,9 @@ describe('GraphViewComponent', () => {
 
         expect(component.isEntityMode).toBe(true);
         expect(component.entityRootUri).toBe(estate.root);
+        const legend = fixture.nativeElement.querySelector('.graph-legend');
+        expect(legend?.textContent).not.toContain('Patrón repetido');
+        expect(legend?.textContent).not.toContain('Relaciones agrupadas');
         const ids = drawnIds();
         expect(ids).toContain(estate.root);
         expect(ids).toContain(estate.estate);

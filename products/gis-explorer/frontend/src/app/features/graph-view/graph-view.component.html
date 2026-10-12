@@ -81,9 +81,15 @@
   @if (cy) {
     <div class="graph-legend">
       <span><i class="legend-dot legend-dot--node"></i>{{ 'Entidad' | translate }}</span>
-      <span><i class="legend-dot legend-dot--motif"></i>{{ 'Motivo repetido' | translate }}</span>
-      <span><i class="legend-dot legend-dot--aggregate"></i>{{ 'Super-arista' | translate }}</span>
-      <span><i class="legend-line"></i>{{ 'Relación RDF' | translate }}</span>
+      @if (legendShowsMotif) {
+        <span><i class="legend-dot legend-dot--motif"></i>{{ 'Patrón repetido' | translate }}</span>
+      }
+      @if (legendShowsGroupedRelations) {
+        <span><i class="legend-line legend-line--aggregate"></i>{{ 'Relaciones agrupadas' | translate }}</span>
+      }
+      @if (legendShowsRdfRelation) {
+        <span><i class="legend-line"></i>{{ 'Relación RDF' | translate }}</span>
+      }
     </div>
   }
 

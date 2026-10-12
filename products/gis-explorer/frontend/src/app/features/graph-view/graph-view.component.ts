@@ -208,6 +208,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   tooltipText = '';
+  legendShowsMotif = false;
+  legendShowsGroupedRelations = false;
+  legendShowsRdfRelation = false;
   tooltipVisible = false;
   tooltipX = 0;
   tooltipY = 0;
@@ -531,6 +534,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
    * cámara en cada click.
    */
   private syncGraph(elements: cytoscape.ElementDefinition[], resetLayout = false): void {
+    this.legendShowsMotif = elements.some((element) =>
+      element.data?.['aggregateKind'] === 'repeated-component');
+    this.legendShowsGroupedRelations = elements.some((element) =>
+      'source' in (element.data ?? {}) && element.data?.['aggregate'] === true &&
+      element.data?.['aggregateKind'] !== 'repeated-component-edge');
+    this.legendShowsRdfRelation = elements.some((element) =>
+      'source' in (element.data ?? {}) && element.data?.['aggregate'] !== true);
     this.indexAggregates(elements);
     const key = this.topologyKey(elements);
 
@@ -1228,6 +1238,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       this.persistGraphState();
       if (this.lastVisibleResult) {
         this.syncGraph(this.buildElements(this.lastVisibleResult).elements);
+        this.cdr.markForCheck();
       }
     });
 
