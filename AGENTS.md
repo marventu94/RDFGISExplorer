@@ -306,6 +306,10 @@ closes after **the layout's views** render (`expectViews(layout.visibleSlots())`
 2.5-second margin if one does not report. Because `SelectionService` fan-out is
 synchronous, declare `expectViews` **before** `setQueryResult`.
 `DashboardPersistenceService.isHydrating` remains the data flag, not the dialog flag.
+A saved timeline window is hydrated through
+`DashboardViewStateService.restoreTimelineWindow`: the timeline view may exist
+before hydration, so it applies `pendingTimelineWindow` on its first render with
+data instead of fitting the data, then consumes it.
 
 ## AI integration (MCP)
 
