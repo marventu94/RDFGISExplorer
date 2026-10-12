@@ -10,6 +10,7 @@ import {
   type EntitySearchResult,
 } from './sparql-endpoint.interface';
 import { escapeSparqlLiteral } from './sparql-text';
+import { connectTimeoutAgents } from './connect-timeout';
 import {
   BindingValue,
   Coordinate,
@@ -118,6 +119,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
                 'Content-Type': 'application/x-www-form-urlencoded',
               },
               auth: this.resolveAuth(),
+              ...connectTimeoutAgents(),
               signal: controller.signal,
             },
           );
@@ -233,6 +235,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         auth: this.resolveAuth(),
+        ...connectTimeoutAgents(),
       },
     );
 

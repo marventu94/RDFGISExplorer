@@ -9,6 +9,7 @@ import type {
   EntitySearchResult,
 } from './sparql-endpoint.interface';
 import { isValidUri } from './sparql-text';
+import { connectTimeoutAgents } from './connect-timeout';
 
 /**
  * Wikidata habla SPARQL como cualquier otro endpoint (de eso se encarga
@@ -301,6 +302,7 @@ export class WikidataAdapter extends GenericSparqlAdapter {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         auth: this.resolveAuth(),
+        ...connectTimeoutAgents(),
       });
 
       const matching = new Set(

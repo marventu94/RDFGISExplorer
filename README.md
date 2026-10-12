@@ -287,6 +287,7 @@ not inject them at execution time: every query must be self-contained.
 | `SPARQL_ENTITY_SEARCH_QUERY` | search by `rdfs:label` | Entity/resource search template (`$keyword`, `$limit`, optional `$offset`) |
 | `SPARQL_SERVER_TIMEOUT_PARAM` | `timeout` for GraphDB; disabled elsewhere | Server timeout form parameter, in seconds; empty disables it |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout in ms |
+| `SPARQL_CONNECT_TIMEOUT_MS` | `5000` | Max ms to open the connection to the endpoint (fails fast when it is unreachable, e.g. without VPN) |
 | `SPARQL_MAX_LIMIT` | `2000` | Maximum rows returned by a query request; also used when the request omits a response limit |
 | `SPARQL_PREFIXES_PATH` | `config/prefixes.${SPARQL_BACKEND}.json` | Prefixes |
 | `CLASS_COLORS_PATH` | `config/class-colors.${SPARQL_BACKEND}.json` | RDF colors |
