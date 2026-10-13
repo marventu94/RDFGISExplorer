@@ -1,6 +1,6 @@
 import { TranslatePipe } from '../../core/services/translate.pipe';
 import { Component, inject, signal, computed, effect, OnDestroy, HostListener } from '@angular/core';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, skip, takeUntil } from 'rxjs';
 import { AgGridAngular } from 'ag-grid-angular';
 import type {
   ColDef,
@@ -81,8 +81,6 @@ export class TableViewComponent implements OnDestroy {
   };
 
   readonly queryResult = signal<QueryResult | null>(null);
-  /** Resultado crudo (sin lotes): el banner de truncamiento habla del total. */
-  private readonly rawQueryResult = signal<QueryResult | null>(null);
   readonly pageSize = signal(50);
   /** Opciones de paginación: config-driven (limits.tablePageSizeOptions). */
   readonly pageSizeOptions = computed(() => this.limits.limits().tablePageSizeOptions);
@@ -133,16 +131,6 @@ export class TableViewComponent implements OnDestroy {
 
   readonly isReady = computed(() => this.gridApi !== null);
   readonly hasData = computed(() => this.rowData().length > 0);
-  readonly isTruncated = computed(() => this.rawQueryResult()?.meta?.truncated ?? false);
-  readonly truncatedMessage = computed(() => {
-    const qr = this.rawQueryResult();
-    if (!qr?.meta?.truncated) return '';
-    return this.i18n.text('Mostrando {shown} de {limit} resultados (truncado)', {
-      shown: qr.bindings.length,
-      limit: qr.meta.limitApplied,
-    });
-  });
-
   constructor() {
     const storedTable = this.viewState.tableState();
     if (storedTable?.pageSize) {
@@ -164,9 +152,22 @@ export class TableViewComponent implements OnDestroy {
     this.selectionService.queryResult$
       .pipe(takeUntil(this.destroy$))
       .subscribe((result) => {
-        this.rawQueryResult.set(result);
         this.originalNodes = result?.nodes ?? [];
         this.nodeByUri = new Map(this.originalNodes.map((n) => [n.uri, n]));
+      });
+
+    this.selectionService.activeFilters$
+      .pipe(skip(1), takeUntil(this.destroy$))
+      .subscribe(() => this.gridApi?.paginationGoToFirstPage());
+
+    let previousLot: { currentLot: number; lotSize: number } | null = null;
+    this.selectionService.lotState$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((lot) => {
+        if (previousLot && (lot.currentLot !== previousLot.currentLot || lot.lotSize !== previousLot.lotSize)) {
+          this.gridApi?.paginationGoToFirstPage();
+        }
+        previousLot = lot;
       });
 
     this.selectionService.visibleQueryResult$

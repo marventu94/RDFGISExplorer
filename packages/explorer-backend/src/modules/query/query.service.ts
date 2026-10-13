@@ -54,11 +54,12 @@ export class QueryService {
     sparql: string,
     limit?: number,
     raw?: boolean,
+    timeoutMs?: number,
   ): Promise<QueryResult> {
     const parser = new Parser();
     let parsed: { type?: string };
     try {
-      parsed = parser.parse(sparql) as { type?: string };
+      parsed = parser.parse(sparql);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new HttpException(
@@ -73,7 +74,8 @@ export class QueryService {
       throw new HttpException(
         {
           error: 'READ_ONLY',
-          message: 'Solo se permiten consultas de lectura; SPARQL Update está deshabilitado.',
+          message:
+            'Solo se permiten consultas de lectura; SPARQL Update está deshabilitado.',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -93,7 +95,7 @@ export class QueryService {
       );
     }
 
-    const timeout = this.intConfig('SPARQL_TIMEOUT_MS', 30000);
+    const timeout = timeoutMs ?? this.intConfig('SPARQL_TIMEOUT_MS', 30000);
     const trace = `execute-${++this.traceSequence}`;
     const startedAt = Date.now();
     this.logger.debug(

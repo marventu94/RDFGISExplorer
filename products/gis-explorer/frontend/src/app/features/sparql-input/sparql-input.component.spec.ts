@@ -6,7 +6,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SparqlInputComponent } from './sparql-input.component';
 import { ErrorDialogComponent } from './error-dialog.component';
-import { ApiService } from '@core/services/api.service';
+import { QueryPagingService } from '@core/services/query-paging.service';
 import { SelectionService } from '@core/services/selection.service';
 import { DashboardStateService } from '@core/services/dashboard-state.service';
 import { AppConfigService } from '@core/services/app-config.service';
@@ -45,7 +45,7 @@ function makeQueryResult(overrides: Partial<QueryResult> = {}): QueryResult {
 describe('SparqlInputComponent', () => {
   let component: SparqlInputComponent;
   let fixture: ComponentFixture<SparqlInputComponent>;
-  let apiServiceMock: { executeQuery: ReturnType<typeof vi.fn> };
+  let pagingMock: { loadInitial: ReturnType<typeof vi.fn>; activate: ReturnType<typeof vi.fn> };
   let selectionServiceMock: { setQueryResult: ReturnType<typeof vi.fn> };
   let persistenceMock: {
     beginLoad: ReturnType<typeof vi.fn>;
@@ -72,8 +72,9 @@ describe('SparqlInputComponent', () => {
     localStorage.clear();
     unregisterHost = registerDashboardHost(bridgeMocks);
 
-    apiServiceMock = {
-      executeQuery: vi.fn().mockReturnValue(of(makeQueryResult())),
+    pagingMock = {
+      loadInitial: vi.fn().mockReturnValue(of({ result: makeQueryResult(), totalRows: 1, size: 300 })),
+      activate: vi.fn(),
     };
     selectionServiceMock = {
       setQueryResult: vi.fn(),
@@ -96,7 +97,7 @@ describe('SparqlInputComponent', () => {
     await TestBed.configureTestingModule({
       imports: [SparqlInputComponent, NoopAnimationsModule],
       providers: [
-        { provide: ApiService, useValue: apiServiceMock },
+        { provide: QueryPagingService, useValue: pagingMock },
         { provide: SelectionService, useValue: selectionServiceMock },
         { provide: DashboardStateService, useValue: persistenceMock },
         { provide: AppConfigService, useValue: appConfigMock },
@@ -163,7 +164,7 @@ describe('SparqlInputComponent', () => {
   describe('execute', () => {
     it('should not execute when editor is empty', () => {
       asAny().execute();
-      expect(apiServiceMock.executeQuery).not.toHaveBeenCalled();
+      expect(pagingMock.loadInitial).not.toHaveBeenCalled();
       expect(realDialog.open).toHaveBeenCalledWith(
         ErrorDialogComponent,
         expect.objectContaining({
@@ -172,13 +173,11 @@ describe('SparqlInputComponent', () => {
       );
     });
 
-    it('should call apiService.executeQuery when editor has content', () => {
+    it('should count and load the first page when editor has content', () => {
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
-      expect(apiServiceMock.executeQuery).toHaveBeenCalled();
-      const callArgs = apiServiceMock.executeQuery.mock.calls[0][0];
-      expect(callArgs.sparql).toContain('SELECT');
-      expect(callArgs.limit).toBeUndefined();
+      expect(pagingMock.loadInitial).toHaveBeenCalled();
+      expect(pagingMock.loadInitial.mock.calls[0][0]).toContain('SELECT');
     });
 
     it('should set executing to false after request completes', () => {
@@ -189,7 +188,7 @@ describe('SparqlInputComponent', () => {
 
     it('should call selectionService.setQueryResult on success', () => {
       const result = makeQueryResult();
-      apiServiceMock.executeQuery.mockReturnValue(of(result));
+      pagingMock.loadInitial.mockReturnValue(of({ result, totalRows: 1, size: 300 }));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
       asAny().execute();
       expect(selectionServiceMock.setQueryResult).toHaveBeenCalledWith(result);
@@ -197,7 +196,7 @@ describe('SparqlInputComponent', () => {
 
     it('reports imported-query stages around the synchronous result fan-out', () => {
       const result = makeQueryResult();
-      apiServiceMock.executeQuery.mockReturnValue(of(result));
+      pagingMock.loadInitial.mockReturnValue(of({ result, totalRows: 1, size: 300 }));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
 
       asAny().execute({ showLoadProgress: true });
@@ -213,7 +212,7 @@ describe('SparqlInputComponent', () => {
     });
 
     it('should show snackbar with result count on success', () => {
-      apiServiceMock.executeQuery.mockReturnValue(of(makeQueryResult()));
+      pagingMock.loadInitial.mockReturnValue(of({ result: makeQueryResult(), totalRows: 1, size: 300 }));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o } LIMIT 10');
       asAny().execute();
       expect(realSnackBar.open).toHaveBeenCalledWith(
@@ -226,7 +225,7 @@ describe('SparqlInputComponent', () => {
     it('should show error popup for invalid SPARQL syntax', () => {
       asAny().setEditorContent('INVALID SPARQL');
       asAny().execute();
-      expect(apiServiceMock.executeQuery).not.toHaveBeenCalled();
+      expect(pagingMock.loadInitial).not.toHaveBeenCalled();
       expect(realDialog.open).toHaveBeenCalledWith(
         ErrorDialogComponent,
         expect.objectContaining({
@@ -240,7 +239,7 @@ describe('SparqlInputComponent', () => {
         status: 400,
         error: { error: 'INVALID_SPARQL', message: 'Parse error at line 1' },
       });
-      apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
+      pagingMock.loadInitial.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
       expect(realDialog.open).toHaveBeenCalledWith(
@@ -253,7 +252,7 @@ describe('SparqlInputComponent', () => {
 
     it('should handle HTTP 408 errors', () => {
       const error = new HttpErrorResponse({ status: 408, error: { error: 'TIMEOUT' } });
-      apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
+      pagingMock.loadInitial.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
       expect(realDialog.open).toHaveBeenCalledWith(
@@ -266,7 +265,7 @@ describe('SparqlInputComponent', () => {
 
     it('should handle HTTP 502 errors', () => {
       const error = new HttpErrorResponse({ status: 502, error: { error: 'UPSTREAM_ERROR' } });
-      apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
+      pagingMock.loadInitial.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
       expect(realDialog.open).toHaveBeenCalledWith(
@@ -279,7 +278,7 @@ describe('SparqlInputComponent', () => {
 
     it('should handle connection errors (status 0)', () => {
       const error = new HttpErrorResponse({ status: 0 });
-      apiServiceMock.executeQuery.mockReturnValue(throwError(() => error));
+      pagingMock.loadInitial.mockReturnValue(throwError(() => error));
       asAny().setEditorContent('SELECT ?x WHERE { ?x ?p ?o }');
       asAny().execute();
       expect(realDialog.open).toHaveBeenCalledWith(

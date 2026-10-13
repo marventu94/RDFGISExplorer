@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { setLanguage } from '@rdfgis/platform-bridge';
 import type { QueryResult } from '@rdfgis/contracts';
@@ -6,6 +7,7 @@ import type { QueryResult } from '@rdfgis/contracts';
 import { FilterBadgesComponent } from './filter-badges.component';
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import type { Filter } from '@shared/models/filter.model';
+import { QueryPagingService } from '@core/services/query-paging.service';
 
 describe('FilterBadgesComponent', () => {
   const range: Filter = { id: 'range', kind: 'temporal', from: '2024-01-01', to: '2024-12-31', label: '2024' };
@@ -45,7 +47,7 @@ describe('FilterBadgesComponent', () => {
           lotState$: lot$.asObservable(),
           removeFilter: vi.fn(),
         },
-      }],
+      }, { provide: QueryPagingService, useValue: { busy: signal(false), error: signal(null) } }],
     });
   });
 
@@ -74,5 +76,15 @@ describe('FilterBadgesComponent', () => {
     expect(scope.textContent?.trim()).toBe('1 of 1,000 retrieved rows matches the filter · partial result');
     expect(scope.title).toContain('rows that were not retrieved are not evaluated');
     expect(scope.classList).toContain('filter-scope--partial');
+  });
+
+  it('reports the exact filtered count against the full server count', () => {
+    filters$.next([range]);
+    result$.next(result(300, true));
+    lot$.next({ lotSize: 300, currentLot: 1, lotCount: 1, totalRows: 163, baseTotalRows: 1996, visibleNodes: 100 });
+    const scope = render().querySelector('.filter-scope') as HTMLElement;
+    expect(scope.textContent?.trim()).toBe('163 of 1,996 query rows match the filter');
+    expect(scope.title).toContain('applied at the endpoint before counting');
+    expect(scope.classList).not.toContain('filter-scope--partial');
   });
 });

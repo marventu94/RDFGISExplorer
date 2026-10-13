@@ -15,15 +15,16 @@ export class ApiService {
     limit?: number;
     /** Modo crudo (export): el backend devuelve solo bindings, sin grafo. */
     raw?: boolean;
+    timeoutMs?: number;
   }): Observable<QueryResult> {
     if (params.limit !== undefined) {
-      return this.post(params.sparql, params.limit, params.raw);
+      return this.post(params.sparql, params.limit, params.raw, params.timeoutMs);
     }
-    // Sin límite explícito: se pide el máximo que publica el backend en
-    // /api/config (maxLimit). El volumen se pagina en cliente con los lotes.
+    // Sin límite explícito se pide el máximo publicado por /api/config.
+    // La navegación GIS pasa un límite explícito por página.
     return this.appConfig
       .load()
-      .pipe(switchMap((cfg) => this.post(params.sparql, cfg.maxLimit, params.raw)));
+      .pipe(switchMap((cfg) => this.post(params.sparql, cfg.maxLimit, params.raw, params.timeoutMs)));
   }
 
   /**
@@ -35,11 +36,12 @@ export class ApiService {
     return this.http.post<QuerySummary>(`${explorerApiBase('gis')}/query/summary`, params);
   }
 
-  private post(sparql: string, limit: number, raw?: boolean): Observable<QueryResult> {
+  private post(sparql: string, limit: number, raw?: boolean, timeoutMs?: number): Observable<QueryResult> {
     return this.http.post<QueryResult>(`${explorerApiBase('gis')}/query/execute`, {
       sparql,
       limit,
       ...(raw ? { raw } : {}),
+      ...(timeoutMs ? { timeoutMs } : {}),
     });
   }
 }

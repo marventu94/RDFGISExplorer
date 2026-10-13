@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -38,6 +39,8 @@ import { AppConfigService } from '@core/services/app-config.service';
 import { buildQueryLimitNotice, type QueryLimitNotice } from '@shared/sparql/query-limit';
 import { LanguageSelectorComponent } from '@core/services/language-selector.component';
 import { ThemeToggleComponent } from '@core/services/theme-toggle.component';
+import { QueryPagingService } from '@core/services/query-paging.service';
+import { filterVariables, scopedQuery } from '@shared/query/paged-query';
 
 /**
  * Íconos propios para los presets de 3 y 4 vistas, dibujados en estilo
@@ -71,6 +74,7 @@ const LAYOUT_SVG_ICONS: Record<string, string> = {
     FormsModule,
     MatIconModule,
     MatButtonModule,
+    MatProgressSpinnerModule,
     MatMenuModule,
     MatDialogModule,
     MatSnackBarModule,
@@ -84,6 +88,7 @@ export class NavbarComponent {
   protected readonly dashboardsAvailable = isDashboardHostAvailable();
   protected readonly layout = inject(DashboardLayoutService);
   protected readonly selectionService = inject(SelectionService);
+  protected readonly paging = inject(QueryPagingService);
   protected readonly dashboardState = inject(DashboardStateService);
   private readonly saveFlow = inject(DashboardSaveFlowService);
   private readonly dialog = inject(MatDialog);
@@ -127,7 +132,7 @@ export class NavbarComponent {
     this.selectionService.lotSizeOptions$
       .pipe(takeUntilDestroyed(destroyRef))
       .subscribe((options) => this.lotSizeOptions.set(options));
-    this.selectionService.queryResult$
+    this.selectionService.baseQueryResult$
       .pipe(takeUntilDestroyed(destroyRef))
       .subscribe((r) => {
         this._truncatedLimit.set(r?.meta?.truncated ? r.meta.limitApplied : null);
@@ -198,6 +203,7 @@ export class NavbarComponent {
 
   protected queryLimitLabel(notice: QueryLimitNotice, lot: LotState | null): string {
     const params = { limit: notice.limit, maxLimit: notice.maxLimit };
+    if (lot?.baseTotalRows !== undefined) return this.i18n.text('LIMIT {limit} · resultado acotado', params);
     return notice.capped
       ? this.i18n.text('LIMIT {limit} · tope del backend {maxLimit}', params)
       : lot && lot.lotCount <= 1
@@ -206,6 +212,9 @@ export class NavbarComponent {
   }
 
   protected queryLimitDetail(notice: QueryLimitNotice, lot: LotState | null): string {
+    if (lot?.baseTotalRows !== undefined) {
+      return this.i18n.text('La consulta aplica LIMIT {limit}. El total y los lotes se calculan sobre ese resultado completo.', { limit: notice.limit });
+    }
     const params = { limit: notice.limit, maxLimit: notice.maxLimit };
     if (notice.capped) {
       return this.i18n.text('La consulta pide LIMIT {limit}, pero el backend entrega como máximo {maxLimit} filas. Los lotes solo paginan las filas recibidas.', params);
@@ -228,11 +237,20 @@ export class NavbarComponent {
   protected async exportFullXlsx(): Promise<void> {
     const result = this.selectionService.getQueryResultSnapshot();
     if (!result) return;
-    const query = this.queryState.query();
+    const filters = this.selectionService.getActiveFiltersSnapshot();
+    let query = this.queryState.query();
+    if (filters.length > 0) {
+      try {
+        query = scopedQuery(query, filters, filterVariables(result));
+      } catch (error) {
+        this.snackBar.open(error instanceof Error ? error.message : this.i18n.text('No se pudo exportar'), this.i18n.text('Cerrar'), { duration: 8000, panelClass: 'snackbar-error' });
+        return;
+      }
+    }
     const backend = result.meta.backend;
 
     // Sin truncamiento: el resultado completo ya está en el cliente.
-    if (!result.meta.truncated) {
+    if (!filters.length && !result.meta.truncated && !this.selectionService.isRemotePagingSnapshot()) {
       await this.exportService.downloadXlsx({
         rows: result.bindings,
         variables: result.variables,
@@ -250,7 +268,7 @@ export class NavbarComponent {
 
     const progress = signal<ExportProgress>({ rowsFetched: 0, page: 0, pageSize: 0 });
     // Progreso real si el summary ya calculó el COUNT del resultado completo.
-    const totalRows = this.summaryState.summary()?.totalRows ?? null;
+    const totalRows = filters.length ? this.lotState()?.totalRows ?? null : this.summaryState.summary()?.totalRows ?? null;
     const progressRef = this.dialog.open(ExportProgressDialogComponent, {
       data: { progress, totalRows } satisfies ExportProgressDialogData,
       disableClose: true,

@@ -29,6 +29,6 @@ export class SummaryQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1000)
-  @Max(120000)
+  @Max(600000)
   timeoutMs?: number;
 }

@@ -322,7 +322,7 @@ export function previewDashboard(
   }
   if (truncated) {
     warnings.push(
-      `El backend devuelve ${result.bindings.length}${total !== null ? ` de ${total}` : ''} filas: la interfaz pagina en lotes sobre lo recuperado. Si querés ver todo, filtrá la consulta.`,
+      `Esta previsualización inspeccionó ${result.bindings.length}${total !== null ? ` de ${total}` : ''} filas. El tablero contará el total y cargará los demás lotes a demanda; los detalles de mapa y grafo aquí describen solo la muestra.`,
     );
   }
   if (options.hasLimit) warnings.push('La consulta tiene LIMIT: el tablero mostrará solo esa muestra.');

@@ -7,7 +7,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { TableViewComponent } from './table-view.component';
-import { SelectionService, type FocusState, type FocusSource } from '@core/services/selection.service';
+import { SelectionService, type FocusState, type FocusSource, type LotState } from '@core/services/selection.service';
 import { DEFAULT_LIMITS, LimitsService } from '@core/services/limits.service';
 import type {
   QueryResult,
@@ -69,6 +69,7 @@ describe('TableViewComponent', () => {
     queryResult$: BehaviorSubject<QueryResult | null>;
     selectedNode$: BehaviorSubject<Selection>;
     activeFilters$: BehaviorSubject<unknown[]>;
+    lotState$: BehaviorSubject<LotState>;
     select: ReturnType<typeof vi.fn>;
     setQueryResult: ReturnType<typeof vi.fn>;
     clearSelection: ReturnType<typeof vi.fn>;
@@ -93,6 +94,7 @@ describe('TableViewComponent', () => {
         source: 'external',
       }),
       activeFilters$: new BehaviorSubject<unknown[]>([]),
+      lotState$: new BehaviorSubject<LotState>({ lotSize: 300, currentLot: 1, lotCount: 1, totalRows: 0, visibleNodes: 0 }),
       select: vi.fn(),
       setQueryResult: vi.fn(),
       clearSelection: vi.fn(),
@@ -142,6 +144,33 @@ describe('TableViewComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.empty-state')).toBeTruthy();
     expect(compiled.textContent).toContain('Ejecut');
+  });
+
+  it('does not describe a full server page as a truncated result', () => {
+    const page = { ...mockQueryResult, meta: { ...mockQueryResult.meta, truncated: true, limitApplied: 300 } };
+    selectionServiceMock.queryResult$.next(page);
+    selectionServiceMock.visibleQueryResult$.next(page);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.truncation-banner')).toBeNull();
+  });
+
+  it('returns to the first table page and refreshes rows after a space/time filter', () => {
+    const firstPage = vi.fn();
+    component.onGridReady({ api: { sizeColumnsToFit: vi.fn(), paginationGoToFirstPage: firstPage } } as never);
+    selectionServiceMock.visibleQueryResult$.next(mockQueryResult);
+    selectionServiceMock.activeFilters$.next([{ id: 'time', kind: 'temporal' }]);
+    const filtered = { ...mockQueryResult, bindings: [{ city: { type: 'uri' as const, value: 'urn:filtered' } }] };
+    selectionServiceMock.visibleQueryResult$.next(filtered);
+    fixture.detectChanges();
+    expect(firstPage).toHaveBeenCalledOnce();
+    expect(component.rowData()).toEqual(filtered.bindings);
+  });
+
+  it('starts at the first table page when the global lot changes', () => {
+    const firstPage = vi.fn();
+    component.onGridReady({ api: { sizeColumnsToFit: vi.fn(), paginationGoToFirstPage: firstPage } } as never);
+    selectionServiceMock.lotState$.next({ lotSize: 300, currentLot: 2, lotCount: 7, totalRows: 1996, visibleNodes: 500 });
+    expect(firstPage).toHaveBeenCalledOnce();
   });
 
   it('should build column defs when query result arrives', () => {

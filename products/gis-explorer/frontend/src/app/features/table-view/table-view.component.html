@@ -5,11 +5,6 @@
       <p>{{ 'Ejecutá una query para ver resultados' | translate }}</p>
     </div>
   } @else {
-    @if (isTruncated()) {
-      <div class="truncation-banner">
-        {{ truncatedMessage() }}
-      </div>
-    }
     <div class="table-toolbar">
       <div class="toolbar-search">
         <mat-icon class="search-icon">search</mat-icon>

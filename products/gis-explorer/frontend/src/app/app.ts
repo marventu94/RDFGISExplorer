@@ -12,6 +12,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoadProgressOverlayComponent } from '@features/dashboard/load-progress/load-progress-overlay.component';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import { I18nService } from '@core/services/i18n.service';
+import { QueryPagingService } from '@core/services/query-paging.service';
+import { TranslatePipe } from '@core/services/translate.pipe';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -22,6 +25,8 @@ ModuleRegistry.registerModules([AllCommunityModule]);
     LoadProgressOverlayComponent,
     DashboardComponent,
     NavbarComponent,
+    TranslatePipe,
+    MatProgressSpinnerModule,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -35,6 +40,14 @@ export class App implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly i18n = inject(I18nService);
   protected readonly editorCollapsed = this.dashboardLayout.editorCollapsed;
+  protected readonly paging = inject(QueryPagingService);
+
+  protected returnToEditor(): void {
+    this.paging.cancel();
+    this.snackBar.dismiss();
+    this.dashboardState.failLoad();
+    this.dashboardLayout.editorCollapsed.set(false);
+  }
 
   constructor() {
     // Publica en el canal compartido qué tablero/consulta hay abierto, para

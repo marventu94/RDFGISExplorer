@@ -41,8 +41,12 @@
           class="toolbar-btn toolbar-btn--primary"
           type="button"
           (click)="showStructure()"
+          [disabled]="structureLoading"
           [title]="'Ver la estructura RDF de {name}' | translate: { name: selectedEntityLabel }"
         >{{ 'Ver estructura' | translate }}</button>
+      }
+      @if (structureLoading) {
+        <span class="toolbar-label" role="status">{{ 'Recuperando estructura completa…' | translate }}</span>
       }
       @if (isEntityMode) {
         <button

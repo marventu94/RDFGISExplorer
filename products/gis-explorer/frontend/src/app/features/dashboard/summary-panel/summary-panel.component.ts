@@ -65,7 +65,7 @@ export class SummaryPanelComponent {
       this.resolved.set(null);
       this.summaryState.set(null);
     });
-    this.selectionService.queryResult$
+    this.selectionService.baseQueryResult$
       .pipe(
         takeUntilDestroyed(destroyRef),
         switchMap((result) => this.resolveSummary(result)),

@@ -32,9 +32,12 @@ describe('DiscoveryService', () => {
       new ConfigService({ DISCOVERY_SAMPLE_SIZE: 2, DISCOVERY_PATH_BUDGET: 2 }),
     );
   });
-  it('preserves combined evidence and URI fallback, caching only the same normalized search', async () => {
+  it('reuses a complete class vocabulary across normalized searches', async () => {
     execute.mockResolvedValue(
-      result([{ uri: uri('urn:House'), evidence: lit('observed,declared') }]),
+      result([
+        { uri: uri('urn:House'), evidence: lit('observed,declared') },
+        { uri: uri('urn:Address'), evidence: lit('observed') },
+      ]),
     );
     const response = await service.catalog('class', 'House');
     expect(response.items).toHaveLength(1);
@@ -44,9 +47,59 @@ describe('DiscoveryService', () => {
     });
     await service.catalog('class', ' HOUSE ');
     expect(execute).toHaveBeenCalledTimes(1);
-    await service.catalog('class', 'Address');
-    expect(execute).toHaveBeenCalledTimes(2);
-    expect(execute.mock.calls[1][0]).toContain('"address"');
+    expect((await service.catalog('class', 'Address')).items[0].label).toBe(
+      'urn:Address',
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+  it('returns unlabelled observed Apartment and House by local URI name', async () => {
+    const base =
+      'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#';
+    execute.mockResolvedValue(
+      result([
+        { uri: uri(base + 'Apartment'), evidence: lit('observed') },
+        { uri: uri(base + 'House'), evidence: lit('observed') },
+      ]),
+    );
+    const apartment = await service.catalog('class', 'Apartment');
+    const house = await service.catalog('class', 'House');
+    expect(apartment).toMatchObject({
+      sampled: false,
+      truncated: false,
+      nextOffset: undefined,
+    });
+    expect(apartment.items).toEqual([
+      {
+        uri: base + 'Apartment',
+        label: 'Apartment',
+        kind: 'class',
+        evidence: ['observed'],
+      },
+    ]);
+    expect(house.items[0]).toMatchObject({
+      uri: base + 'House',
+      label: 'House',
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).toContain(
+      'SELECT DISTINCT ?uri WHERE { ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?uri',
+    );
+    expect(execute.mock.calls[0][1].timeoutMs).toBe(45000);
+  });
+  it('matches and displays a decoded local URI name when no label exists', async () => {
+    execute.mockResolvedValue(
+      result([
+        {
+          uri: uri('https://example.org/ontology#C%C3%B3digo'),
+          evidence: lit('observed'),
+        },
+      ]),
+    );
+    const page = await service.catalog('class', 'código');
+    expect(page.items[0]).toMatchObject({
+      label: 'Código',
+      uri: 'https://example.org/ontology#C%C3%B3digo',
+    });
   });
   it('coalesces identical searches into one bounded request', async () => {
     let complete!: (data: QueryResult) => void;
@@ -69,21 +122,18 @@ describe('DiscoveryService', () => {
     expect(execute.mock.calls[0][1]).toMatchObject({
       raw: true,
       maxRetries: 0,
-      limit: 51,
+      limit: 1000,
     });
-    expect(execute.mock.calls[0][0]).toContain('"house"');
+    expect(execute.mock.calls[0][0]).not.toContain('"house"');
     expect(execute.mock.calls[0][0]).not.toContain('5001');
   });
-  it('cancels abandoned class searches without cooling down the next search', async () => {
+  it('keeps the shared class vocabulary scan alive when the first search is abandoned', async () => {
     const controller = new AbortController();
+    let complete!: (data: QueryResult) => void;
     execute.mockImplementationOnce(
-      (_query, options) =>
-        new Promise((_resolve, reject) => {
-          options.signal!.addEventListener(
-            'abort',
-            () => reject(new DOMException('cancelled', 'AbortError')),
-            { once: true },
-          );
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
         }),
     );
     const pending = service.catalog('class', 'hou', 0, controller.signal);
@@ -94,10 +144,11 @@ describe('DiscoveryService', () => {
     const signal = execute.mock.calls[0][1].signal!;
     controller.abort();
     await cancelled;
-    expect(signal.aborted).toBe(true);
-    execute.mockResolvedValue(result([]));
-    await service.catalog('class', 'house');
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(signal.aborted).toBe(false);
+    const next = service.catalog('class', 'house');
+    complete(result([{ uri: uri('urn:house'), evidence: lit('observed') }]));
+    expect((await next).items).toHaveLength(1);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
   it('backs off after an upstream failure even when the user changes category or text', async () => {
     execute.mockRejectedValue(new Error('upstream timeout'));
@@ -166,22 +217,65 @@ describe('DiscoveryService', () => {
       clock.mockRestore();
     }
   });
-  it('returns 50 terms and uses only one lookahead term to offer the next page', async () => {
+  it('paginates all distinct matching classes in URI order from one vocabulary snapshot', async () => {
     const rows = Array.from({ length: 51 }, (_, i) => ({
-      uri: uri(`urn:House${i}`),
+      uri: uri(`urn:House${String(i).padStart(3, '0')}`),
       evidence: lit('observed'),
     }));
     execute.mockResolvedValue(result(rows));
     const page = await service.catalog('class', 'House');
     expect(page.items).toHaveLength(50);
     expect(page).toMatchObject({ truncated: true, nextOffset: 50 });
-    execute.mockResolvedValue(result(rows.slice(0, 1)));
-    expect(await service.catalog('class', 'House', 50)).toMatchObject({
-      truncated: true,
-      sampled: true,
+    const second = await service.catalog('class', 'House', 50);
+    expect(second).toMatchObject({
+      truncated: false,
+      sampled: false,
       nextOffset: undefined,
     });
-    expect(execute.mock.calls[1][0]).toContain('LIMIT 51 OFFSET 50');
+    expect(second.items[0].uri).toBe('urn:House050');
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+  it('loads every vocabulary page and matches any permitted label, not just the displayed one', async () => {
+    service = new DiscoveryService(
+      { execute } as unknown as SparqlEndpoint,
+      new ConfigService({
+        DISCOVERY_CLASS_VOCABULARY_PAGE_SIZE: 2,
+        DISCOVERY_CATALOG_PAGE_SIZE: 1,
+      }),
+    );
+    execute
+      .mockResolvedValueOnce(
+        result([
+          { uri: uri('urn:A'), label: lit('First'), evidence: lit('observed') },
+          {
+            uri: uri('urn:A'),
+            label: lit('Other name'),
+            evidence: lit('observed'),
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        result([
+          { uri: uri('urn:B'), evidence: lit(',declared') },
+          {
+            uri: uri('urn:C'),
+            label: lit('Other class'),
+            evidence: lit('observed'),
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(result([]));
+    const first = await service.catalog('class', 'Other');
+    const next = await service.catalog('class', 'Other', 1);
+    expect(first.items).toEqual([
+      { uri: 'urn:A', label: 'First', kind: 'class', evidence: ['observed'] },
+    ]);
+    expect(first.nextOffset).toBe(1);
+    expect(next.items[0].uri).toBe('urn:C');
+    expect(next.nextOffset).toBeUndefined();
+    expect(
+      execute.mock.calls.map(([query]) => query.match(/OFFSET (\d+)/)?.[1]),
+    ).toEqual(['0', '2', '4']);
   });
   it('uses the configured catalogue page size independently of neighborhood limits', async () => {
     service = new DiscoveryService(
@@ -204,6 +298,7 @@ describe('DiscoveryService', () => {
     expect(page.items[1].evidence).toEqual(['declared']);
     expect(page.nextOffset).toBe(2);
     expect(execute.mock.calls[0][1].limit).toBe(3);
+    expect(execute.mock.calls[0][0]).toContain('LIMIT 1000');
   });
   it('reuses entity search for resources, preserving text, pagination and bounded cancellation', async () => {
     searchEntities.mockResolvedValue(
@@ -276,11 +371,11 @@ describe('DiscoveryService', () => {
     execute.mockResolvedValue(result([]));
     const page = await service.catalog('class', 'House');
     expect(page).toMatchObject({
-      sampled: true,
-      truncated: true,
+      sampled: false,
+      truncated: false,
       nextOffset: undefined,
     });
-    expect(execute.mock.calls[0][0]).toContain('LIMIT 123');
+    expect(execute.mock.calls[0][0]).not.toContain('LIMIT 123');
     expect(execute.mock.calls[0][0]).toContain('<urn:instanceOf>');
     expect(execute.mock.calls[0][0]).toContain('<urn:subclassOf>');
   });

@@ -25,6 +25,7 @@ import {
 } from '../../adapters/sparql-endpoint.interface';
 import {
   catalogQuery,
+  classVocabularyQuery,
   connectionsQuery,
   focusPattern,
   focusSampleQuery,
@@ -40,7 +41,17 @@ function value(row: ResultBinding, key: string): string {
   return cell?.type === 'coordinate' ? cell.raw : (cell?.value ?? '');
 }
 function local(uri: string): string {
-  return uri.split(/[/#]/).pop() || uri;
+  const name = uri.split(/[/#]/).pop() || uri;
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name;
+  }
+}
+
+interface ClassVocabularyEntry {
+  term: DiscoveryCatalog['items'][number];
+  searchLabels: string[];
 }
 
 @Injectable()
@@ -87,11 +98,12 @@ export class DiscoveryService {
     timeout?: number,
     signal?: AbortSignal,
     context = 'discovery',
+    timeoutCeilingMs?: number,
   ): Promise<ResultBinding[]> {
     const trace = `${context}/query-${++this.traceSequence}`;
     const timeoutMs = Math.min(
       timeout ?? Infinity,
-      this.setting('DISCOVERY_TIMEOUT_MS', 8000),
+      timeoutCeilingMs ?? this.setting('DISCOVERY_TIMEOUT_MS', 8000),
     );
     try {
       this.checkUpstream();
@@ -250,6 +262,76 @@ export class DiscoveryService {
     return [...terms.values()];
   }
 
+  private async classVocabulary(
+    signal: AbortSignal,
+  ): Promise<ClassVocabularyEntry[]> {
+    const pageSize = this.setting('DISCOVERY_CLASS_VOCABULARY_PAGE_SIZE', 1000);
+    const timeoutMs = this.setting(
+      'DISCOVERY_CLASS_VOCABULARY_TIMEOUT_MS',
+      45000,
+    );
+    const classPredicate =
+      this.config.get<string>('DISCOVERY_CLASS_PREDICATE') ??
+      this.endpoint.describeEndpoint?.().discovery?.classPredicate ??
+      RDF_TYPE;
+    const subclassPredicate =
+      this.config.get<string>('DISCOVERY_SUBCLASS_PREDICATE') ??
+      this.endpoint.describeEndpoint?.().discovery?.subclassPredicate;
+    const entries = new Map<string, ClassVocabularyEntry>();
+    for (let offset = 0; ; offset += pageSize) {
+      const rows = await this.run(
+        classVocabularyQuery(
+          pageSize,
+          offset,
+          classPredicate,
+          subclassPredicate,
+        ),
+        pageSize,
+        undefined,
+        signal,
+        'catalog:class:vocabulary',
+        timeoutMs,
+      );
+      for (const row of rows) {
+        const uri = value(row, 'uri');
+        if (!uri) continue;
+        const label = value(row, 'label');
+        let entry = entries.get(uri);
+        if (!entry) {
+          entry = {
+            term: {
+              uri,
+              label: label || local(uri),
+              kind: 'class',
+              evidence: [],
+            },
+            searchLabels: [],
+          };
+          entries.set(uri, entry);
+        } else if (
+          label &&
+          (!entry.searchLabels.length || label < entry.term.label)
+        ) {
+          entry.term.label = label;
+        }
+        if (label && !entry.searchLabels.includes(label))
+          entry.searchLabels.push(label);
+        for (const evidence of value(row, 'evidence').split(',')) {
+          if (
+            (evidence === 'observed' || evidence === 'declared') &&
+            !entry.term.evidence.includes(evidence)
+          ) {
+            entry.term.evidence.push(evidence);
+          }
+        }
+      }
+      if (rows.length < pageSize) break;
+    }
+    return [...entries.values()].sort((a, b) =>
+      a.term.uri < b.term.uri ? -1 : a.term.uri > b.term.uri ? 1 : 0,
+    );
+  }
+
   async catalog(
     kind: DiscoveryKind,
     q: string,
@@ -257,6 +339,32 @@ export class DiscoveryService {
     signal?: AbortSignal,
   ): Promise<DiscoveryCatalog> {
     const text = q.trim().toLowerCase();
+    if (kind === 'class' && text && !this.endpoint.searchCatalog) {
+      const vocabulary = await this.cached(
+        'catalog:class:complete-vocabulary',
+        (jobSignal) => this.classVocabulary(jobSignal),
+        () => true,
+        signal,
+        true,
+        this.setting('DISCOVERY_CATALOG_TTL_MS', 300000),
+      );
+      const matches = vocabulary.filter(
+        ({ term, searchLabels }) =>
+          term.uri.toLowerCase().includes(text) ||
+          local(term.uri).toLowerCase().includes(text) ||
+          searchLabels.some((label) => label.toLowerCase().includes(text)),
+      );
+      const items = matches
+        .slice(offset, offset + this.catalogRows)
+        .map(({ term }) => term);
+      const hasMore = matches.length > offset + this.catalogRows;
+      return {
+        items,
+        sampled: false,
+        truncated: hasMore,
+        nextOffset: hasMore ? offset + this.catalogRows : undefined,
+      };
+    }
     return this.cached(
       `catalog:${kind}:${kind === 'resource' ? q.trim() : text}:${offset}`,
       async (jobSignal) => {
@@ -319,10 +427,11 @@ export class DiscoveryService {
         );
         return {
           items: this.terms(rows.slice(0, this.catalogRows), kind),
-          // The statement sample is intentionally incomplete; another page is
-          // offered only when a lookahead term actually exists.
-          sampled: true,
-          truncated: true,
+          // Text searches for classes enumerate all observed/declarable terms.
+          // Empty browsing and property searches still use bounded samples.
+          sampled: kind !== 'class' || !text,
+          truncated:
+            kind !== 'class' || !text || rows.length > this.catalogRows,
           nextOffset:
             rows.length > this.catalogRows
               ? offset + this.catalogRows

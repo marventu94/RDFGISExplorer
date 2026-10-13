@@ -1,6 +1,7 @@
 import { Parser } from 'sparqljs';
 import {
   catalogQuery,
+  classVocabularyQuery,
   connectionsQuery,
   focusPattern,
   focusSample,
@@ -65,10 +66,13 @@ describe('discovery SPARQL', () => {
       expect(query).toContain('GROUP BY ?uri ?evidence');
     },
   );
-  it.each(['class', 'property'] as const)(
-    'bounds both %s statement scans before distinct/filter/sort',
-    (kind) => {
-      const ast = parser.parse(catalogQuery(kind, 'house', 51, 0, 123));
+  it.each([
+    ['class', ''],
+    ['property', 'house'],
+  ] as const)(
+    'bounds both %s statement scans when browsing or searching properties',
+    (kind, search) => {
+      const ast = parser.parse(catalogQuery(kind, search, 51, 0, 123));
       if (ast.type !== 'query' || ast.where![0].type !== 'group')
         throw new Error('Query required');
       const page = ast.where![0].patterns[0];
@@ -84,15 +88,50 @@ describe('discovery SPARQL', () => {
         expect(scan.limit).toBe(123);
         expect(scan.distinct).toBeUndefined();
         expect(scan.order).toBeUndefined();
-        expect(JSON.stringify(scan.where)).not.toContain('house');
+        expect(JSON.stringify(scan.where)).not.toContain('CONTAINS');
       }
     },
   );
+  it('searches all observed and declared classes before paging, including unlabelled URI matches', () => {
+    for (const name of ['Apartment', 'House']) {
+      const query = catalogQuery('class', name, 51, 50, 1000);
+      const ast = parser.parse(query);
+      if (ast.type !== 'query' || ast.where![0].type !== 'group')
+        throw new Error('Query required');
+      const page = ast.where![0].patterns[0];
+      if (page.type !== 'query' || page.where![0].type !== 'group')
+        throw new Error('Page required');
+      const union = page.where![0].patterns[0];
+      if (union.type !== 'union') throw new Error('Union required');
+      for (const branch of union.patterns) {
+        if (branch.type !== 'query')
+          throw new Error('Distinct class branch required');
+        expect(branch.distinct).toBe(true);
+        expect(branch.limit).toBeUndefined();
+      }
+      expect(query).toContain(`"${name.toLowerCase()}"`);
+      expect(query).toContain('CONTAINS(LCASE(STR(?uri))');
+      expect(query).toContain('LIMIT 51 OFFSET 50');
+      expect(query).not.toContain('LIMIT 1000');
+    }
+  });
   it('does not search labels or add an always-true text filter when browsing', () => {
     const query = catalogQuery('class', '', 51);
     expect(() => parser.parse(query)).not.toThrow();
     expect(query).not.toContain('CONTAINS');
     expect(query).not.toContain('?searchLabel');
+  });
+  it('orders a complete class vocabulary by URI and label for stable internal pages', () => {
+    const query = classVocabularyQuery(1000, 1000);
+    expect(() => parser.parse(query)).not.toThrow();
+    expect(query).toContain(
+      'SELECT DISTINCT ?uri WHERE { ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?uri',
+    );
+    expect(query).toContain(
+      'ORDER BY ?uri ?label ?evidence LIMIT 1000 OFFSET 1000',
+    );
+    expect(query).not.toContain('LIMIT 1000 }');
+    expect(query).not.toContain('CONTAINS');
   });
   it.each(['out', 'in'] as const)(
     'queries %s relationships on the same joined context, including blank nodes',

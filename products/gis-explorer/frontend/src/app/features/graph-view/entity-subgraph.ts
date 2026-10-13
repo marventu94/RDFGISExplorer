@@ -100,8 +100,8 @@ export const DEFAULT_SUBGRAPH_BUDGET: SubgraphBudget = {
 /** Resultados sobre los que se construye el subgrafo. */
 export interface EntitySubgraphSource {
   /**
-   * Resultado visible (lote actual + filtros). Es la fuente primaria: el
-   * subgrafo describe lo que el usuario está viendo.
+   * Resultado visible o estructura completa de la entidad ya recuperada.
+   * Es la fuente primaria del subgrafo.
    */
   visibleResult: QueryResult;
   /**

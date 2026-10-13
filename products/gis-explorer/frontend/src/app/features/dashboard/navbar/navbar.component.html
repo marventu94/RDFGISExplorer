@@ -21,11 +21,16 @@
         <button
           type="button"
           class="navbar-btn lot-nav-btn"
-          [disabled]="lot.currentLot <= 1"
+          [class.lot-nav-btn--loading]="paging.busy() && paging.loadingKind() === 'lot' && paging.loadingDirection() === 'previous'"
+          [disabled]="lot.currentLot <= 1 || paging.busy()"
           (click)="previousLot()"
           [attr.aria-label]="'Lote anterior' | translate"
         >
-          <mat-icon>chevron_left</mat-icon>
+          @if (paging.busy() && paging.loadingKind() === 'lot' && paging.loadingDirection() === 'previous') {
+            <mat-spinner diameter="16" />
+          } @else {
+            <mat-icon>chevron_left</mat-icon>
+          }
         </button>
         <span class="lot-label" [title]="lotNotice(lot)">
           {{ 'Lote {current} de {total} · {rows} filas' | translate: { current: lot.currentLot, total: lot.lotCount, rows: lot.totalRows } }}
@@ -33,16 +38,22 @@
         <button
           type="button"
           class="navbar-btn lot-nav-btn"
-          [disabled]="lot.currentLot >= lot.lotCount"
+          [class.lot-nav-btn--loading]="paging.busy() && paging.loadingKind() === 'lot' && paging.loadingDirection() === 'next'"
+          [disabled]="lot.currentLot >= lot.lotCount || paging.busy()"
           (click)="nextLot()"
           [attr.aria-label]="'Lote siguiente' | translate"
         >
-          <mat-icon>chevron_right</mat-icon>
+          @if (paging.busy() && paging.loadingKind() === 'lot' && paging.loadingDirection() === 'next') {
+            <mat-spinner diameter="16" />
+          } @else {
+            <mat-icon>chevron_right</mat-icon>
+          }
         </button>
         <select
           class="lot-size-select"
           [ngModel]="lot.lotSize"
           (ngModelChange)="onLotSizeChange($event)"
+          [disabled]="paging.busy()"
           [attr.title]="'Filas por lote' | translate"
           [attr.aria-label]="'Filas por lote' | translate"
         >
@@ -50,11 +61,17 @@
             <option [value]="size">{{ size }}</option>
           }
         </select>
-        @if (truncatedLimit() !== null) {
+        @if (paging.busy() && paging.loadingKind() === 'size') {
+          <mat-spinner class="lot-size-spinner" diameter="16" />
+        }
+        @if (truncatedLimit() !== null && lot.baseTotalRows === undefined) {
           <mat-icon class="lot-warning" [title]="truncatedNotice()">warning</mat-icon>
         }
       </div>
     }
+  }
+  @if (paging.error(); as error) {
+    <div class="lot-error" role="alert" [title]="error"><span>{{ error }}</span> @if (paging.canRetry()) { <button type="button" (click)="paging.retry()">{{ 'Reintentar' | translate }}</button> }</div>
   }
 
   <div class="navbar-actions">
@@ -100,9 +117,9 @@
     <button
       type="button"
       class="navbar-btn"
-      [disabled]="!hasResult()"
+      [disabled]="!hasResult() || paging.busy() || !!paging.error()"
       (click)="exportFullXlsx()"
-      [attr.title]="'Exportar TODAS las filas del resultado completo a Excel (no solo el lote visible)' | translate"
+      [attr.title]="'Exportar todas las filas del resultado filtrado a Excel (no solo el lote visible)' | translate"
     >
       <mat-icon>file_download</mat-icon>
       <span>{{ 'Exportar Excel' | translate }}</span>

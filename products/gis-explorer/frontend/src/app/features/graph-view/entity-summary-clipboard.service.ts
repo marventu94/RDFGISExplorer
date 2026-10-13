@@ -72,6 +72,7 @@ export interface EntitySummaryRequest {
   state: ExplorationState;
   /** Contexto de lote para el encabezado. */
   lot?: SummaryLotInfo | null;
+  sourceDescription?: string;
   /**
    * Subgrafo ya calculado por la vista para el alcance `view`. Si se omite se
    * recalcula con `explorationSubgraph` (mismo resultado, más trabajo).
@@ -111,6 +112,7 @@ export class EntitySummaryClipboardService {
     return buildEntitySummary(subgraph, {
       scope: 'view',
       lot: request.lot ?? null,
+      sourceDescription: request.sourceDescription,
       attributes: request.attributes,
     });
   }
@@ -132,6 +134,7 @@ export class EntitySummaryClipboardService {
     return buildEntitySummary(structure.subgraph, {
       scope: 'structure',
       lot: request.lot ?? null,
+      sourceDescription: request.sourceDescription,
       attributes: request.attributes,
       structureComplete: structure.complete,
     });
