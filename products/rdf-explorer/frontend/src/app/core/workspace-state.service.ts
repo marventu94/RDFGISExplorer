@@ -12,6 +12,7 @@ export interface PanelState {
   variables: string[];
   dirty: boolean;
   sourceWorkspaceId?: string;
+  sourceWorkspaceName?: string;
   viewport?: { zoom: number; pan: { x: number; y: number } };
   labels?: Record<string, string>;
   /** Panel vacío automático; se reemplaza al abrir el primer workspace. */
@@ -44,7 +45,7 @@ export class WorkspaceStateService {
     importPayload: (payload, context) => {
       const workspace = payload as ExplorerWorkspacePayload;
       if (context.mode === 'tabs') this.appendPayloadAsTabs(workspace, context.id, context.name);
-      else this.fromPayload(workspace);
+      else this.fromPayload(workspace, context.name);
     },
     reset: () => this.reset(),
   });
@@ -164,9 +165,9 @@ export class WorkspaceStateService {
     })));
   }
 
-  setAllPanelsSource(workspaceId: string): void {
+  setAllPanelsSource(workspaceId: string, workspaceName?: string): void {
     this.panels.update(list =>
-      list.map(p => ({ ...p, sourceWorkspaceId: workspaceId })),
+      list.map(p => ({ ...p, sourceWorkspaceId: workspaceId, sourceWorkspaceName: workspaceName ?? p.sourceWorkspaceName })),
     );
   }
 
@@ -230,11 +231,12 @@ export class WorkspaceStateService {
     };
   }
 
-  private fromPayload(payload: ExplorerWorkspacePayload): void {
+  private fromPayload(payload: ExplorerWorkspacePayload, workspaceName?: string): void {
     const mappedPanels: PanelState[] = payload.panels.map(p => {
       const state = {
         id: p.id, name: p.name, graph: p.graph, generatedQuery: p.generatedQuery,
         variables: p.variables ?? [], viewport: p.viewport, labels: p.labels,
+        sourceWorkspaceName: workspaceName,
       };
       return { ...state, dirty: false, cleanSignature: this.signature(state) };
     });
@@ -275,6 +277,7 @@ export class WorkspaceStateService {
         variables: p.variables ?? [],
         viewport: p.viewport,
         sourceWorkspaceId: id,
+        sourceWorkspaceName: name,
         labels: p.labels,
       };
       return { ...state, dirty: false, cleanSignature: this.signature(state) };

@@ -17,7 +17,8 @@ describe('ExploreInGisService', () => {
     const unregister = registerQueryExportProvider({
       listCandidates: () => [{
         id: 'panel:0',
-        label: 'Panel · Query 1',
+        panelName: 'Panel',
+        label: '?x',
         query: 'SELECT ?x WHERE { ?x ?p ?o }',
         backend: 'generic',
         source: { panelId: 'panel' },

@@ -5,6 +5,7 @@ import { TranslatePipe } from '../core/translate.pipe';
 import { DIALOG_STYLES } from './dialog.styles';
 
 export interface QuerySelectionDialogData {
+  panelName: string;
   candidates: readonly QueryExportCandidate[];
 }
 
@@ -14,7 +15,7 @@ export interface QuerySelectionDialogData {
   imports: [DialogModule, TranslatePipe],
   template: `
     <div class="dialog-container">
-      <h3>{{ 'Elegí una consulta' | translate }}</h3>
+      <h3>{{ data.panelName }}</h3>
       <p>{{ 'El panel genera varias consultas separadas. Elegí cuál querés explorar en GIS.' | translate }}</p>
 
       <div class="options" role="radiogroup" [attr.aria-label]="'Consultas disponibles' | translate">

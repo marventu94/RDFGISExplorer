@@ -70,10 +70,14 @@ describe('WorkspaceStateService dirty state', () => {
 
   it('associates every panel with the workspace that saved them together', () => {
     service.addPanel('Panel 2');
-    service.setAllPanelsSource('workspace-123');
+    service.setAllPanelsSource('workspace-123', 'Dashboard name');
     expect(service.panels().map(panel => panel.sourceWorkspaceId)).toEqual([
       'workspace-123',
       'workspace-123',
+    ]);
+    expect(service.panels().map(panel => panel.sourceWorkspaceName)).toEqual([
+      'Dashboard name',
+      'Dashboard name',
     ]);
   });
 
@@ -95,6 +99,23 @@ describe('WorkspaceStateService dirty state', () => {
     expect(service.panels()).toHaveLength(1);
     expect(service.activePanel()?.name).toBe('Dashboard name');
     expect(service.activePanel()?.sourceWorkspaceId).toBe('workspace-1');
+    expect(service.activePanel()?.sourceWorkspaceName).toBe('Dashboard name');
+  });
+
+  it('retains the dashboard name separately from tab names in a multi-panel workspace', () => {
+    const payload: ExplorerWorkspacePayload = {
+      panels: [
+        { id: 'one', name: 'First tab', graph: { nodes: [], edges: [] }, generatedQuery: '' },
+        { id: 'two', name: 'Second tab', graph: { nodes: [], edges: [] }, generatedQuery: '' },
+      ],
+      activePanelId: 'two',
+    };
+    (service as unknown as {
+      appendPayloadAsTabs(value: ExplorerWorkspacePayload, id: string, name: string): void;
+    }).appendPayloadAsTabs(payload, 'workspace-2', 'Dashboard name');
+
+    expect(service.activePanel()?.name).toBe('Second tab');
+    expect(service.activePanel()?.sourceWorkspaceName).toBe('Dashboard name');
   });
 
   it('keeps an explicitly created empty panel when a workspace is opened', () => {
