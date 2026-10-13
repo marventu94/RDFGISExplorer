@@ -25,7 +25,6 @@ import { sparql } from '@codemirror/legacy-modes/mode/sparql';
 import { Parser } from 'sparqljs';
 
 import { SelectionService } from '@core/services/selection.service';
-import { ApiService } from '@core/services/api.service';
 import { AppConfigService } from '@core/services/app-config.service';
 import { DashboardLayoutService } from '@core/services/dashboard-layout.service';
 import { SparqlQueryStateService } from '@core/services/sparql-query-state.service';
@@ -35,6 +34,7 @@ import { FieldMappingPanelComponent } from './field-mapping-panel.component';
 import type { VariableRole } from './mapping-overrides.util';
 import { ErrorDialogComponent, type ErrorDialogData } from './error-dialog.component';
 import { VariableMappingService } from '@core/services/variable-mapping.service';
+import { QueryPagingService } from '@core/services/query-paging.service';
 
 @Component({
   selector: 'app-sparql-input',
@@ -57,7 +57,6 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly editorContainer!: ElementRef<HTMLElement>;
 
   private readonly selectionService = inject(SelectionService);
-  private readonly apiService = inject(ApiService);
   private readonly appConfig = inject(AppConfigService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -65,6 +64,7 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly dashboardState = inject(DashboardStateService);
   private readonly variableMapping = inject(VariableMappingService);
+  private readonly paging = inject(QueryPagingService);
   private readonly i18n = inject(I18nService);
 
   @ViewChild(FieldMappingPanelComponent)
@@ -243,8 +243,8 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     // que antes de apretar y parece que el botón no hizo nada.
     this.snackBar.open(this.i18n.text('Ejecutando la query… puede tardar'), undefined, {});
 
-    this.apiService.executeQuery({ sparql }).subscribe({
-      next: (result) => {
+    this.paging.loadInitial(sparql).subscribe({
+      next: ({ result, totalRows, size }) => {
         this.executing.set(false);
         this.snackBar.dismiss();
         this.dashboardLayout.collapseEditor();
@@ -257,22 +257,18 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
         }
         this.variableMapping.setSourceResult(result);
         this.selectionService.setQueryResult(result);
+        this.paging.activate(sparql, result, totalRows, size);
         if (options?.showLoadProgress) {
           this.dashboardState.completeQueryProcessing();
         }
 
-        const count = result.bindings.length;
+        const count = totalRows;
         const time = result.meta.durationMs;
         const msg = count === 0
           ? this.i18n.text('Sin resultados ({duration}ms)', { duration: time })
           : this.i18n.text(count === 1 ? '{count} resultado en {duration}ms' : '{count} resultados en {duration}ms', { count, duration: time });
         this.snackBar.open(msg, this.i18n.text('Aceptar'), { duration: 4000 });
 
-        if (result.meta.truncated) {
-          this.snackBar.open(this.i18n.text('Resultado truncado a {limit} filas', { limit: result.meta.limitApplied }), this.i18n.text('Aceptar'), {
-            duration: 6000,
-          });
-        }
       },
       error: (err: HttpErrorResponse) => {
         this.executing.set(false);
@@ -281,6 +277,9 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
           this.dashboardState.failQueryLoad();
         }
         this.handleHttpError(err);
+      },
+      complete: () => {
+        this.executing.set(false);
       },
     });
   }
@@ -340,14 +339,16 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
   protected onApplyMapping(overrides: Record<string, VariableRole>): void {
     const remapped = this.variableMapping.apply(overrides);
     if (!remapped) return;
-    this.selectionService.setQueryResult(remapped);
+    if (this.selectionService.isRemotePagingSnapshot()) this.paging.remapCurrent(remapped);
+    else this.selectionService.setQueryResult(remapped);
     this.snackBar.open(this.i18n.text('Mapeo de variables aplicado'), this.i18n.text('Aceptar'), { duration: 3000 });
   }
 
   protected onRestoreAuto(): void {
     const result = this.variableMapping.restore();
     if (!result) return;
-    this.selectionService.setQueryResult(result);
+    if (this.selectionService.isRemotePagingSnapshot()) this.paging.remapCurrent(result);
+    else this.selectionService.setQueryResult(result);
     this.snackBar.open(this.i18n.text('Mapeo restaurado a detección automática'), this.i18n.text('Aceptar'), {
       duration: 3000,
     });

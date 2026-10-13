@@ -127,7 +127,7 @@ export function focusSample(
   return `{ ${focusSampleQuery(focus, limit, classPredicate)} }`;
 }
 
-/** Bound statement scans BEFORE DISTINCT, text matching or sorting. */
+/** Empty browsing stays sampled; class text search covers every observed/declarable term. */
 export function catalogQuery(
   kind: Exclude<DiscoveryKind, 'resource'>,
   q: string,
@@ -147,7 +147,11 @@ export function catalogQuery(
     kind === 'class' && subclassPredicate
       ? `{ ${declaration} } UNION { ?uri ${iri(subclassPredicate)} ?superClass . }`
       : declaration;
-  const branches = `{ SELECT ?uri WHERE { ${observed} . } LIMIT ${sample} }
+  const completeClassSearch = kind === 'class' && q.length > 0;
+  const branches = completeClassSearch
+    ? `{ SELECT DISTINCT ?uri WHERE { ${observed} . FILTER(isIRI(?uri)) } }
+        UNION { SELECT DISTINCT ?uri WHERE { ${declared} FILTER(isIRI(?uri)) } }`
+    : `{ SELECT ?uri WHERE { ${observed} . } LIMIT ${sample} }
         UNION { SELECT ?uri WHERE { ${declared} } LIMIT ${sample} }`;
   const match = q
     ? `FILTER(CONTAINS(LCASE(STR(?uri)), ${literal(q.toLowerCase())}) || EXISTS {
@@ -165,6 +169,29 @@ export function catalogQuery(
     OPTIONAL { ?uri <${RDFS}label> ?candidateLabel . FILTER(lang(?candidateLabel) IN ("", "es", "en")) }
     BIND(${evidence} AS ?evidence)
   } GROUP BY ?uri ?evidence ORDER BY ?uri LIMIT ${limit}`;
+}
+
+/** Complete, URI/label-ordered class vocabulary for a reusable search snapshot. */
+export function classVocabularyQuery(
+  limit: number,
+  offset = 0,
+  classPredicate = RDF_TYPE,
+  subclassPredicate?: string,
+): string {
+  const observed = `?s ${iri(classPredicate)} ?uri`;
+  const declaration = `?uri a ?declaration . VALUES ?declaration { <${RDFS}Class> <http://www.w3.org/2002/07/owl#Class> }`;
+  const declared = subclassPredicate
+    ? `{ ${declaration} } UNION { ?uri ${iri(subclassPredicate)} ?superClass . }`
+    : declaration;
+  return `SELECT DISTINCT ?uri ?label ?evidence WHERE {
+    { SELECT DISTINCT ?uri WHERE {
+      { SELECT DISTINCT ?uri WHERE { ${observed} . FILTER(isIRI(?uri)) } }
+      UNION { SELECT DISTINCT ?uri WHERE { ${declared} FILTER(isIRI(?uri)) } }
+    } }
+    OPTIONAL { ?uri <${RDFS}label> ?label . FILTER(lang(?label) IN ("", "es", "en")) }
+    BIND(CONCAT(IF(EXISTS { ${observed} }, "observed", ""),
+      IF(EXISTS { ${declared} }, ",declared", "")) AS ?evidence)
+  } ORDER BY ?uri ?label ?evidence LIMIT ${limit} OFFSET ${offset}`;
 }
 
 export function connectionsQuery(

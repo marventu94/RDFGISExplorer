@@ -44,6 +44,7 @@ export interface SummaryLotInfo {
 export interface EntitySummaryOptions {
   scope: SummaryScope;
   lot?: SummaryLotInfo | null;
+  sourceDescription?: string;
   /**
    * Sólo para `scope: 'structure'`: `false` marca el alcance como incompleto
    * (presupuesto agotado). Ver `buildAvailableStructure`.
@@ -335,13 +336,13 @@ export function buildEntitySummary(
   lines.push(`URI: ${subgraph.rootUri}`);
   lines.push(scopeLine(options));
   lines.push(
-    `Origen: ${
+    `Origen: ${options.sourceDescription ?? (
       subgraph.sourceScope === 'full'
         ? 'resultado completo (la raíz no está en el lote visible)'
         : subgraph.sourceScope === 'visible'
           ? 'lote visible del resultado'
           : 'sin resultado para la raíz'
-    }`,
+    )}`,
   );
   lines.push(...lotLines(options.lot));
   if (!empty && subgraph.activeUri !== subgraph.rootUri) {

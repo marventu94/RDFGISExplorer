@@ -1,5 +1,25 @@
 <main class="app-shell">
   <app-load-progress-overlay />
+  @if (paging.busy() && paging.loadingKind() === 'filter' && !paging.slow()) {
+    <div class="filter-loading-overlay" role="dialog" aria-modal="true" aria-labelledby="filter-loading-title">
+      <div class="filter-loading-card" role="status" aria-live="polite">
+        <mat-spinner diameter="32" />
+        <div>
+          <h2 id="filter-loading-title">{{ 'Aplicando filtros' | translate }}</h2>
+          <p>{{ 'Recalculando resultados y lotes…' | translate }}</p>
+        </div>
+      </div>
+    </div>
+  }
+  @if (paging.slow()) {
+    <div class="slow-query-overlay" role="alertdialog" aria-modal="true" aria-labelledby="slow-query-title">
+      <div class="slow-query-card">
+        <h2 id="slow-query-title">{{ 'La consulta lleva más de cinco minutos' | translate }}</h2>
+        <p>{{ 'Podés volver al editor y aplicar filtros para acotar los resultados.' | translate }}</p>
+        <button type="button" (click)="returnToEditor()">{{ 'Volver al editor' | translate }}</button>
+      </div>
+    </div>
+  }
   <app-navbar />
   <app-dashboard [editorCollapsed]="editorCollapsed()" />
 </main>

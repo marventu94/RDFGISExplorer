@@ -15,7 +15,7 @@ import { DashboardLayoutService, type ViewType } from './dashboard-layout.servic
 import { SelectionService } from './selection.service';
 import { SparqlQueryStateService } from './sparql-query-state.service';
 import { DashboardViewStateService } from './dashboard-view-state.service';
-import { ApiService } from './api.service';
+import { QueryPagingService } from './query-paging.service';
 import { DashboardLoadProgressService } from './dashboard-load-progress.service';
 import { VariableMappingService } from './variable-mapping.service';
 import type { LoadStageId } from '@shared/progress/load-stages';
@@ -88,7 +88,7 @@ export class DashboardStateService {
   private readonly selection = inject(SelectionService);
   private readonly queryState = inject(SparqlQueryStateService);
   private readonly viewState = inject(DashboardViewStateService);
-  private readonly apiService = inject(ApiService);
+  private readonly paging = inject(QueryPagingService);
   private readonly progress = inject(DashboardLoadProgressService);
   private readonly variableMapping = inject(VariableMappingService);
   private readonly snackBar = inject(MatSnackBar);
@@ -202,13 +202,11 @@ export class DashboardStateService {
     this.progress.complete('fetch-dashboard', this.layoutDetail());
     this.progress.start('execute-query', this.i18n.text('esperando la respuesta del endpoint SPARQL'));
 
-    return this.apiService
-      .executeQuery({
-        sparql: payload.query,
-      })
+    return this.paging
+      .loadInitial(payload.query)
       .pipe(
-        tap((result) => {
-          this.progress.complete('execute-query', describeResult(result, this.i18n));
+        tap(({ result, totalRows, size }) => {
+          this.progress.complete('execute-query', `${this.i18n.text('{count} filas', { count: totalRows })} · ${this.i18n.text('endpoint {duration} ms', { duration: result.meta.durationMs })}`);
           this.progress.start(
             'process-results',
             this.i18n.text('{count} nodos · {edges} aristas', { count: result.nodes.length, edges: result.edges.length }),
@@ -222,6 +220,7 @@ export class DashboardStateService {
             payload.variableMapping ?? {},
           );
           this.selection.setQueryResult(mappedResult, payload.primaryVariable ?? null);
+          this.paging.activate(payload.query, mappedResult!, totalRows, size, result);
           // Si ninguna vista reportó (ningún slot montado), la etapa se cierra acá.
           this.progress.complete('process-results');
         }),

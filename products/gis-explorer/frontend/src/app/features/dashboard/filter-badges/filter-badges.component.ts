@@ -4,6 +4,7 @@ import type { QueryResult } from '@rdfgis/contracts';
 import { SelectionService, type LotState } from '@core/services/selection.service';
 import { I18nService } from '@core/services/i18n.service';
 import type { Filter } from '@shared/models/filter.model';
+import { QueryPagingService } from '@core/services/query-paging.service';
 
 export interface FilterScope {
   label: string;
@@ -20,6 +21,7 @@ export interface FilterScope {
 export class FilterBadgesComponent {
   private readonly selectionService = inject(SelectionService);
   private readonly i18n = inject(I18nService);
+  private readonly paging = inject(QueryPagingService);
 
   // Suscripción explícita, como el navbar: toSignal() falla cuando el remoto
   // corre federado (NG0203, el rxjs-interop no comparte contexto de inyección).
@@ -40,19 +42,25 @@ export class FilterBadgesComponent {
       .subscribe((lot) => this.lotState.set(lot));
   }
 
-  /**
-   * Alcance del filtro: se evalúa sobre todas las filas recuperadas (todos los
-   * lotes), no sobre el lote visible. Si el endpoint truncó el resultado, las
-   * filas que no llegaron no se evalúan, y eso también se dice.
-   */
+  /** The server-paged path reports the exact full-query scope. */
   readonly scope = computed<FilterScope | null>(() => {
     const result = this.queryResult();
     const lot = this.lotState();
-    if (this.filters().length === 0 || !result || !lot) return null;
+    if (this.filters().length === 0 || !result || !lot || this.paging.busy() || this.paging.error()) return null;
     this.i18n.language();
-    const rows = result.bindings.length;
+    const rows = lot.baseTotalRows ?? result.bindings.length;
     const matches = lot.totalRows;
-    const partial = result.meta.truncated;
+    const partial = lot.baseTotalRows === undefined && result.meta.truncated;
+    if (lot.baseTotalRows !== undefined) {
+      return {
+        label: this.i18n.text(
+          matches === 1 ? '{matches} de {rows} filas de la consulta pasa el filtro' : '{matches} de {rows} filas de la consulta pasan el filtro',
+          { matches: this.i18n.formatNumber(matches), rows: this.i18n.formatNumber(rows) },
+        ),
+        detail: this.i18n.text('El filtro se aplica en el endpoint antes de contar y cargar los lotes.'),
+        partial: false,
+      };
+    }
     const label = this.i18n.text(
       matches === 1
         ? '{matches} de {rows} filas recuperadas pasa el filtro'

@@ -11,7 +11,12 @@ export class QueryController {
 
   @Post('execute')
   execute(@Body() dto: ExecuteQueryDto): Promise<QueryResult> {
-    return this.queryService.execute(dto.sparql, dto.limit, dto.raw);
+    return this.queryService.execute(
+      dto.sparql,
+      dto.limit,
+      dto.raw,
+      dto.timeoutMs,
+    );
   }
 
   @Post('summary')

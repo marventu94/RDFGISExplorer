@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsInt, IsBoolean, Min } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsBoolean,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class ExecuteQueryDto {
   @IsString()
@@ -13,4 +20,10 @@ export class ExecuteQueryDto {
   @IsOptional()
   @IsBoolean()
   raw?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(600000)
+  timeoutMs?: number;
 }

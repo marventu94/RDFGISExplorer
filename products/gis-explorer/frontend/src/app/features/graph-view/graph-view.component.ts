@@ -16,7 +16,7 @@ import { SelectionService, type LotState } from '@core/services/selection.servic
 import { DashboardLoadProgressService } from '@core/services/dashboard-load-progress.service';
 import { I18nService } from '@core/services/i18n.service';
 import { onThemeChange, type UiTextKey } from '@rdfgis/platform-bridge';
-import { combineLatest, Subject, takeUntil } from 'rxjs';
+import { combineLatest, Subject, Subscription, takeUntil } from 'rxjs';
 import { debounceTime, filter } from 'rxjs/operators';
 import cytoscape from 'cytoscape';
 import cola from 'cytoscape-cola';
@@ -113,6 +113,8 @@ import {
 } from './entity-summary-clipboard.service';
 import { EntityColorService } from '@core/services/entity-color.service';
 import { LimitsService } from '@core/services/limits.service';
+import { QueryPagingService } from '@core/services/query-paging.service';
+import { bindingGraphId } from '@shared/stats/lots';
 
 cytoscape.use(cola);
 cytoscape.use(dagre);
@@ -257,9 +259,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private lastVisibleResult: QueryResult | null = null;
   /** Resultado completo: el modo entidad lo usa cuando la raíz no está en el lote. */
   private lastOriginalResult: QueryResult | null = null;
-  private lastLotState: { lotCount: number; currentLot: number } = { lotCount: 1, currentLot: 1 };
+  private lastLotState: { lotCount: number; currentLot: number; totalRows?: number } = { lotCount: 1, currentLot: 1 };
   /** Lote dibujado (`tamaño:número`): si cambia, el subconjunto es otro y se reacomoda entero. */
   private lastLotKey: string | null = null;
+  private entityCompleteResult: QueryResult | null = null;
+  private entityRequest?: Subscription;
+  private pendingStructureRoot: string | null = null;
+  structureLoading = false;
 
   // ---------------------------------------------------------------------------
   // Modo entidad (etapa 5). Todo este estado es TRANSITORIO: no se persiste en
@@ -299,6 +305,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   private readonly limitsService = inject(LimitsService);
   private readonly loadProgress = inject(DashboardLoadProgressService);
   private readonly summaryClipboard = inject(EntitySummaryClipboardService);
+  private readonly queryPaging = inject(QueryPagingService);
   /** Entidad → id del nodo resumen que la agrupa en el lienzo actual. */
   private readonly aggregateByMember = new Map<string, string>();
   /** Nodo dibujado que representa la selección vigente (puede ser un resumen). */
@@ -360,6 +367,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.selectionService.selectedNode$
       .pipe(takeUntil(this.destroy$))
       .subscribe((sel: Selection) => {
+        if (this.structureLoading && sel.node?.uri !== this.pendingStructureRoot) {
+          this.entityRequest?.unsubscribe();
+          this.structureLoading = false;
+          this.pendingStructureRoot = null;
+        }
         this.pendingSelectionFocusUri = null;
         this.selectedUri = sel.node?.uri ?? null;
         this.selectedLabel = sel.node?.label ?? '';
@@ -370,7 +382,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
             if (next.lastRejection) {
               // Una selección explícita siempre gobierna esta vista. Si quedó
               // fuera de la estructura actual, se convierte en la nueva entidad.
-              this.enterEntity(sel.node.uri, 'user-action');
+              this.openEntity(sel.node.uri, 'user-action');
             } else {
               this.applyExploration(next);
             }
@@ -463,6 +475,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.entityRequest?.unsubscribe();
     this.stopThemeListener();
     this.destroy$.next();
     this.destroy$.complete();
@@ -926,6 +939,15 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     const filtersChanged = filtersKey !== this.lastAppliedFiltersKey;
     this.lastAppliedFiltersKey = filtersKey;
     if (filtersChanged) this.focusPins.clear();
+    if ((this.entityCompleteResult || this.structureLoading) &&
+        (filtersChanged || (!this.selectionService.isRemotePagingSnapshot() &&
+          this.lastOriginalResult && original !== this.lastOriginalResult))) {
+      this.entityRequest?.unsubscribe();
+      this.structureLoading = false;
+      this.pendingStructureRoot = null;
+      this.entityCompleteResult = null;
+      if (this.isEntityMode) this.discardEntityMode();
+    }
     this.activeFilterCount = filters.length;
     this.coverage = null;
     this.indexNodes(original, visible);
@@ -975,7 +997,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     this.queryState = visible.edges.length === 0 ? 'no-edges' : 'normal';
     this.lastVisibleResult = visible;
     this.lastOriginalResult = original;
-    this.lastLotState = { lotCount: lotState.lotCount, currentLot: lotState.currentLot };
+    this.lastLotState = { lotCount: lotState.lotCount, currentLot: lotState.currentLot, totalRows: lotState.totalRows };
 
     if (this.isEntityMode) {
       // Filtros y lotes siguen mandando sobre los datos; la exploración se
@@ -1712,7 +1734,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   showStructure(trigger: EntityModeTrigger = 'user-action'): void {
     if (!this.selectedUri) return;
     this.entityPanelVisible = true;
-    this.enterEntity(this.selectedUri, trigger);
+    this.openEntity(this.selectedUri, trigger);
   }
 
   toggleEntityPanel(): void {
@@ -1723,7 +1745,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   /** Explora la selección que llegó de otra vista como nueva raíz (acción explícita). */
   exploreSelectedAsRoot(): void {
     const candidate = this.entityRootCandidate;
-    if (candidate) this.enterEntity(candidate.uri, 'user-action');
+    if (candidate) this.openEntity(candidate.uri, 'user-action');
   }
 
   setExplorationMode(mode: string): void {
@@ -1733,6 +1755,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   /** `Volver al resultado`: restaura cámara, layout y nivel globales. */
   exitEntityMode(): void {
+    this.entityRequest?.unsubscribe();
+    this.structureLoading = false;
+    this.pendingStructureRoot = null;
     if (!this.isEntityMode) return;
     this.leaveEntityMode('');
   }
@@ -1895,7 +1920,54 @@ export class GraphViewComponent implements OnInit, OnDestroy {
 
   private explorationContext(): ExplorationContext | null {
     if (!this.lastVisibleResult) return null;
+    if (this.isEntityMode && this.entityCompleteResult) {
+      return { visibleResult: this.entityCompleteResult, fullResult: this.entityCompleteResult };
+    }
     return { visibleResult: this.lastVisibleResult, fullResult: this.lastOriginalResult };
+  }
+
+  private openEntity(rootUri: string, trigger: EntityModeTrigger): void {
+    if (!this.selectionService.isRemotePagingSnapshot()) {
+      this.enterEntity(rootUri, trigger);
+      return;
+    }
+    const selected = this.selectionService.getSelectedNodeSnapshot();
+    const targetUri = selected.node?.uri === rootUri ? selected.primaryUri ?? rootUri : rootUri;
+    const rows = this.lastVisibleResult?.bindings ?? [];
+    const row = selected.row && Object.values(selected.row).some((value) => bindingGraphId(value) === targetUri)
+      ? selected.row : rows.find((candidate) => Object.values(candidate).some((value) => bindingGraphId(value) === targetUri));
+    const preferred = this.selectionService.primaryVariable();
+    const variable = preferred && bindingGraphId(row?.[preferred]) === targetUri
+      ? preferred
+      : Object.keys(row ?? {}).find((name) => bindingGraphId(row?.[name]) === targetUri)
+        ?? selected.node?.queryVariable;
+    if (!variable) {
+      this.explorationMessage = 'No se pudo identificar la variable RDF de la entidad seleccionada.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.entityRequest?.unsubscribe();
+    this.structureLoading = true;
+    this.pendingStructureRoot = rootUri;
+    this.explorationMessage = '';
+    this.entityRequest = this.queryPaging.loadEntityStructure(variable, targetUri)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (result) => {
+          this.structureLoading = false;
+          this.pendingStructureRoot = null;
+          this.entityCompleteResult = result;
+          this.enterEntity(rootUri, trigger);
+          this.cdr.markForCheck();
+        },
+        error: (error) => {
+          this.structureLoading = false;
+          this.pendingStructureRoot = null;
+          this.explorationMessage = error instanceof Error ? error.message : 'No se pudo recuperar la estructura completa.';
+          this.cdr.markForCheck();
+        },
+      });
+    this.cdr.markForCheck();
   }
 
   private entitySummaryRequest(): EntitySummaryRequest | null {
@@ -1905,10 +1977,11 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       context,
       state: this.explorationState,
       subgraph: this.entitySubgraph,
+      sourceDescription: this.entityCompleteResult ? 'filas de la entidad recuperadas de todos los lotes filtrados' : undefined,
       lot: {
         currentLot: this.lastLotState.currentLot,
         lotCount: this.lastLotState.lotCount,
-        totalRows: this.lastOriginalResult?.bindings.length,
+        totalRows: this.lastLotState.totalRows ?? this.lastOriginalResult?.bindings.length,
         visibleRows: this.lastVisibleResult?.bindings.length,
         truncated: this.lastOriginalResult?.meta.truncated,
       },

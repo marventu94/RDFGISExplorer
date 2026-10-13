@@ -928,6 +928,32 @@ describe('SelectionService', () => {
       return makeQueryResult({ nodes, edges: [], bindings });
     }
 
+    it('uses authoritative server totals and publishes each fetched graph page intact', () => {
+      const first = makeLotResult(2);
+      const second = makeLotResult(2);
+      second.nodes[0].uri = 'urn:next-root';
+      second.bindings[0]['s'].value = 'urn:next-root';
+      second.edges = [{ id: 'next-edge', source: 'urn:next-root', target: 'urn:n1', predicate: 'urn:related' }];
+      service.setQueryResult(first);
+      service.setRemotePage(first, 7, 20, 1, 2);
+      let visible: QueryResult | null = null;
+      let state: { currentLot: number; lotCount: number; totalRows: number; baseTotalRows?: number } | null = null;
+      const requests: Array<{ lot: number; size: number }> = [];
+      const originalPages: Array<QueryResult | null> = [];
+      service.visibleQueryResult$.subscribe((result) => { visible = result; });
+      service.queryResult$.subscribe((result) => originalPages.push(result));
+      service.lotState$.subscribe((lot) => { state = lot; });
+      service.pageRequests$.subscribe((request) => requests.push(request));
+      expect(state).toMatchObject({ currentLot: 1, lotCount: 4, totalRows: 7, baseTotalRows: 20 });
+      service.nextLot();
+      expect(requests).toEqual([{ lot: 2, size: 2 }]);
+      service.setRemotePage(second, 7, 20, 2, 2);
+      expect(visible).toBe(second);
+      expect(originalPages.at(-1)).toBe(second);
+      expect(visible!.edges).toEqual(second.edges);
+      expect(state).toMatchObject({ currentLot: 2, lotCount: 4, totalRows: 7, baseTotalRows: 20 });
+    });
+
     it('should default to lotSize 300, lot 1 and equal filtered result when one lot', () => {
       const qr = makeLotResult(5);
       service.setQueryResult(qr);

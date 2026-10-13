@@ -13,6 +13,7 @@ import type { QueryResult, NormalizedNode, NormalizedEdge, Selection, Filter } f
 import { realEstateFixture } from './testing/entity-subgraph-fixtures';
 import { EntitySummaryClipboardService } from './entity-summary-clipboard.service';
 import { I18nService } from '@core/services/i18n.service';
+import { QueryPagingService } from '@core/services/query-paging.service';
 import type { BuiltGraph } from './graph-elements';
 
 const mockNode: NormalizedNode = {
@@ -380,6 +381,8 @@ describe('GraphViewComponent', () => {
       markActiveView: vi.fn(),
       getActiveView: vi.fn(() => null),
       getSelectedNodeSnapshot: vi.fn(() => selectedNodeSubject.getValue()),
+      isRemotePagingSnapshot: vi.fn(() => false),
+      primaryVariable: vi.fn(() => null),
     };
 
     await TestBed.configureTestingModule({
@@ -388,6 +391,7 @@ describe('GraphViewComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: SelectionService, useValue: mockSelectionService },
+        { provide: QueryPagingService, useValue: { loadEntityStructure: vi.fn() } },
       ],
     }).compileComponents();
 
@@ -1781,6 +1785,60 @@ describe('GraphViewComponent', () => {
       const compiled = fixture.nativeElement as HTMLElement;
       const labels = [...compiled.querySelectorAll('button')].map((b) => b.textContent?.trim());
       expect(labels).toContain('Ver estructura');
+    });
+
+    it('can open the selected entity structure after a server page changes', () => {
+      const firstPage = {
+        ...estate.result,
+        nodes: estate.result.nodes.filter((node) => node.uri !== estate.root),
+        edges: estate.result.edges.filter((edge) => edge.source !== estate.root && edge.target !== estate.root),
+      };
+      emitEstate(firstPage);
+      emitEstate(estate.result);
+      select(estate.root);
+
+      component.showStructure();
+      fixture.detectChanges();
+
+      expect(component.isEntityMode).toBe(true);
+      expect(component.entityRootUri).toBe(estate.root);
+      expect(drawnIds()).toContain(estate.root);
+      expect(drawnIds()).toContain(estate.estate);
+      expect(drawnIds()).toContain(estate.geometry);
+    });
+
+    it('uses the complete fetched structure without adding its rows to the visible lot', () => {
+      const selection = TestBed.inject(SelectionService);
+      vi.spyOn(selection, 'isRemotePagingSnapshot').mockReturnValue(true);
+      const paging = TestBed.inject(QueryPagingService);
+      const extra = { uri: 'http://example.org/price/another-lot', label: 'Otro precio', attributes: {} } as NormalizedNode;
+      const full = {
+        ...estate.result,
+        nodes: [...estate.result.nodes, extra],
+        edges: [...estate.result.edges, {
+          id: `${estate.root}|http://example.org/p/price|${extra.uri}`,
+          source: estate.root,
+          target: extra.uri,
+          predicate: 'http://example.org/p/price',
+        }],
+        bindings: [...estate.result.bindings, { listing: { type: 'uri' as const, value: estate.root }, price: { type: 'uri' as const, value: extra.uri } }],
+      };
+      vi.spyOn(paging, 'loadEntityStructure').mockReturnValue(of(full));
+      emitEstate();
+      select(estate.root);
+      component.showStructure();
+      fixture.detectChanges();
+
+      expect(paging.loadEntityStructure).toHaveBeenCalledWith('listing', estate.root);
+      expect(component.isEntityMode).toBe(true);
+      expect(drawnIds()).toContain(extra.uri);
+      expect(visibleQueryResultSubject.getValue()?.nodes).not.toContain(extra);
+      const otherLot = { ...estate.result, nodes: estate.result.nodes.filter((node) => node.uri !== estate.root) };
+      queryResultSubject.next(otherLot);
+      visibleQueryResultSubject.next(otherLot);
+      fixture.detectChanges();
+      expect(component.isEntityMode).toBe(true);
+      expect(drawnIds()).toContain(extra.uri);
     });
 
     it.each(['table', 'map', 'timeline', 'graph'] as const)(

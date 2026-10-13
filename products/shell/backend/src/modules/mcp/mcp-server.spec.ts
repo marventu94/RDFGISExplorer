@@ -94,6 +94,7 @@ describe('createMcpServer', () => {
   it('gives the agent instructions about GIS-ready queries', () => {
     expect(client.getInstructions()).toContain('geo:asWKT');
     expect(client.getInstructions()).toContain('solo lectura');
+    expect(client.getInstructions()).toContain('carga los lotes a demanda');
   });
 
   it('describes the endpoint from the explorer config', async () => {
@@ -219,6 +220,7 @@ describe('createMcpServer', () => {
     expect(out.rows).toMatchObject({ retrieved: 5, total: 3589 });
     expect(out.sampleRows).toHaveLength(2);
     expect(out.warnings.join(' ')).toContain('el mapa quedaría vacío');
+    expect(out.warnings.join(' ')).toContain('los demás lotes a demanda');
   });
 
   const spatial = (truncated = false): QueryResult =>

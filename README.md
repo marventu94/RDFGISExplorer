@@ -323,15 +323,19 @@ constrains the branch. Compatible existing branches are reused. Optionality and
 value filters remain editable in the query editor.
 
 Suggestions follow the connected graph structure and term types; canvas value
-filters apply only when executing the query. Catalogues and connections use
-bounded samples, so missing terms and counts do not describe the complete dataset
-or universal schema constraints. The endpoint's inference and dataset scope apply.
+filters apply only when executing the query. Browsing catalogues without text,
+property search, and connections use bounded samples. Text search for classes
+builds a complete, temporarily cached vocabulary of observed and declared classes,
+then filters and paginates that snapshot; its first request can take longer on a
+large endpoint. The endpoint's inference and dataset scope apply.
 
 Discovery is read-only, with caching, bounded queues and timeouts. Upstream
 failures temporarily pause new discovery requests while cached results remain
 available. Tune sampling, result limits, caching and request budgets through
 `DISCOVERY_*` environment variables; defaults are defined in
 [discovery.service.ts](packages/explorer-backend/src/modules/discovery/discovery.service.ts).
+The class vocabulary uses `DISCOVERY_CLASS_VOCABULARY_PAGE_SIZE` (default 1000)
+and `DISCOVERY_CLASS_VOCABULARY_TIMEOUT_MS` (default 45000) per upstream page.
 Resource search can be customized with `SPARQL_ENTITY_SEARCH_QUERY`.
 
 Explorer backends expose `GET /api/discovery/catalog`,
@@ -404,6 +408,8 @@ Los escenarios requieren el endpoint OVS y configuración/credenciales locales.
 Sin endpoint, `pnpm --dir products/shell/backend run test:scripts` construye y
 valida las consultas y prueba la seed sobre una SQLite temporal.
 
-La proyección enviada a GIS no incorpora LIMIT propio: el backend puede devolver
-un resultado parcial. D4 distingue el lote visible, las filas recuperadas y el
-resultado completo de la consulta. Las filas no equivalen a inmuebles distintos.
+La proyección enviada a GIS no incorpora LIMIT propio. GIS cuenta las filas del
+resultado completo y recupera los lotes a demanda; los filtros de área y tiempo
+recalculan ese total en el endpoint. Excel exporta todas las filas que pasan
+esos filtros, no solo el lote visible. D4 distingue el lote visible del resultado
+completo. Las filas no equivalen a inmuebles distintos.

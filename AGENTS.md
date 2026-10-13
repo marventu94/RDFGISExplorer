@@ -205,50 +205,46 @@ Each destination frames only compatible targets (graph readability floor, bounde
 map/time zoom-out, table rows fitting together); otherwise it keeps the camera
 and highlights matches. Empty focus and disabling coordination clear focus styling.
 Timeline renders each distinct field/date event, with clicks retaining that event.
+Area/time filter changes and global-lot changes return AG Grid's internal
+pagination to page 1; the global lot navigator reports the total, so the old
+table "truncated at 1000" banner is gone.
 
 
 **Graph entity mode:** activated only through the `Ver estructura` action on
 an explicit selection; coordinated focus never changes the mode or root. It
-operates exclusively on the retrieved `QueryResult`, without additional
-SPARQL. Pure logic lives in `features/graph-view/entity-subgraph.ts` (deterministic selection, paths,
+uses the current `QueryResult` for local results. With server paging,
+`QueryPagingService` fetches every row of the selected resource from the
+currently filtered query before entering entity mode; this does not change the
+visible lot. Queries with their own LIMIT/OFFSET cannot use this completion.
+Pure logic lives in `features/graph-view/entity-subgraph.ts` (deterministic selection, paths,
 hubs, budget) and `entity-exploration.ts` (root, active node, branches, pins,
 history). State is transient; leaving restores camera/layout/level.
 `entity-summary-text.ts` and `entity-structure.ts` generate view/structure copies with
 full URIs, opaque blank nodes, and exact multiplicities; `EntitySummaryClipboardService`
 implements clipboard plus manual fallback.
 
-**SelectionService:** central source of truth. `queryResult$`,
+**SelectionService:** central source of truth. `queryResult$` (current server page),
+`baseQueryResult$` (first page for full-query summary),
 `selectedNode$`, `activeFilters$`, `focus$`, `filteredQueryResult$`
-(applies geo + temporal filters), `visibleQueryResult$` (consumed by all four
-views: filtered result restricted to the current batch plus pinning),
+(server-filtered page, or local filters for legacy results), `visibleQueryResult$`
+(consumed by all four views),
 `lotState$`, `lotSize$`, and `currentLot$`. Batch methods:
 `setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
 
-**Global batches with pinning:** when the filtered result exceeds
-`lotSize` **rows** (default 300, config-driven through
-`limits.lotDefaultSize`/`lotSizeOptions`), all four views show **the same batch**.
-Pure logic lives in `shared/stats/lots.ts` (`sliceLot`, `restrictResultToUris`).
-The batch paginates `bindings` in **original query order**, never
-sorting them. Visible nodes are the URIs/bnodes from batch rows **plus their
-one-hop neighbors** through `edges`, recovering intermediate nodes
-removed from the SELECT by backend `pickVariables`; visible edges connect
-visible nodes. Bnodes are normalized through `bindingGraphId` (rows contain
-raw `b0`; nodes/edges use `_:b0`). The selected node
-is **injected** into the visible batch even when no batch row references it,
-together with its object's representations and matching table rows; deselection
-removes these additions. Pinned rows are appended without changing batch counts
-or the original ordering of the base batch. New query, applying, changing,
-or removing a filter → batch 1 (filters evaluate every retrieved row, then the
-filtered rows are re-batched); the lot is still clamped when `lotCount` shrinks.
-Next to the active filter badges, `filter-badges` states the scope
-(`"87 de 1000 filas recuperadas pasan el filtro"`, plus `· resultado parcial`
-when the backend truncated, since rows not retrieved are never evaluated).
-On a batch, batch-size, or result change the graph relayouts and refits the
-whole subset (shared hubs would otherwise stay locked at the previous batch's
-coordinates); adding a few pinned nodes stays incremental. With one batch, `visibleQueryResult$` is identical to
-`filteredQueryResult$` (no overhead). The navbar batch navigator
-(`"Lote X de N · T filas"`, previous/next, size selector, warning icon when the
-backend truncated, volume-warning tooltip) appears only when N > 1.
+**Global batches:** `QueryPagingService` counts the full SELECT through
+`POST /api/query/summary`, then requests only the current server page (default
+300 rows). `shared/query/paged-query.ts` adds stable `ORDER BY`/`OFFSET`/`LIMIT`
+to the original SELECT so the backend can still extract graph topology. Area
+and time filters are translated to SPARQL on the original query; each filter
+change recounts and loads page 1. Navigation loads other pages on demand and
+caches them. `lotState$` reports the exact filtered total and unfiltered base
+total. A five-minute wait reveals a return-to-editor action. The entity graph
+uses the current page's graph; `Ver estructura` separately retrieves all rows
+of the selected resource across pages and merges their graph. `shared/stats/lots.ts` remains the local fallback for
+results installed directly in `SelectionService` (including tests); it retains
+the earlier pinning behavior. The navbar shows `Lote X de N · T filas` when
+there is more than one page, and filter badges compare the filtered count to
+the full base count.
 
 **Coverage chips:** pure helper `shared/stats/coverage-stats.ts` (`computeCoverageStats`) plus
 `shared/components/coverage-chip`. Alert counts include only **main entities** (nodes with
@@ -270,7 +266,7 @@ categorical if ≤20 distinct values; caps 3/2/3. Non-truncated results are
 computed locally; truncated results call `POST /api/query/summary`, which wraps the
 query as a subquery (PREFIX at the outer level, `?__agg_*` aliases,
 per-section degradation through `failed`). It recalculates only for a
-new query (`queryResult$`), not batch or filter changes. It publishes the
+new query (`baseQueryResult$`), not batch or filter changes. It publishes the
 latest `QuerySummary` through `SummaryStateService` (export uses its COUNT for
 real progress).
 
@@ -285,8 +281,10 @@ calling `/api/query/execute` with `raw: true` (no graph or intermediate-node
 projection). Page timeout → retry at half size (2000→1000→500, minimum
 250). At 50,000 rows a dialog offers partial export marked `PARCIAL`,
 query copy, or cancel. Progress uses the summary COUNT when available. A
-non-truncated result exports directly from the client. Like summary, it does
-not export the visible batch or apply view filters. The `exceljs`
+legacy non-truncated result exports directly from the client; server-paged
+results use the full export traversal. Active area/time filters are translated
+to the same scoped query used for server paging; export includes all matching
+rows across pages, not only the visible batch. The `exceljs`
 workbook has a `Resultado` sheet (formatted header, frozen row,
 autofilter, content-adjusted widths, typed number/date cells) and a
 `Proveniencia` sheet (backend, query, ISO timestamp, rows,
@@ -296,8 +294,9 @@ autofilter, content-adjusted widths, typed number/date cells) and a
 Shell's dashboard list; GIS has no dashboards menu of its own), the
 `features/dashboard/load-progress` overlay shows the required
 stages and duration: `Recuperando el tablero` (`GET /api/dashboards/:id` plus layout/filters),
-`Ejecutando la consulta` (`POST /api/query/execute`; final detail includes rows, endpoint
-`meta.durationMs`, and truncation), `Procesando resultados`, and `Renderizando vistas`.
+`Ejecutando la consulta` (full count followed by the first page; final detail
+includes the exact row total and page duration), `Procesando resultados`, and
+`Renderizando vistas`.
 Summary is computed separately and appears later in its panel, so it is not
 part of the dialog. State lives in signal-based `DashboardLoadProgressService` over pure
 `shared/progress/load-stages.ts` (immutable reducers + `formatDuration`);
@@ -327,8 +326,9 @@ URL. Graph tools (`graph_overview`, `describe_resource`, `preview_dashboard`)
 build their SPARQL and shape results in pure `mcp-graph.ts`: IRIs pass
 `sparqlIri`, subqueries limit before label lookups (hubs), blank nodes are
 expanded inside one query and never returned as IDs, and parallel queries degrade
-per section. `preview_dashboard` executes non-raw like GIS and asks
-`/query/summary` for the real total only when truncated. Spatial/temporal logic
+per section. `preview_dashboard` executes a bounded non-raw sample and asks
+`/query/summary` for the real total only when truncated; its map/graph details
+describe that sample, while the dashboard pages the full result. Spatial/temporal logic
 lives in pure `mcp-geo.ts`: `profile_space_time` profiles the retrieved
 entities (median-based outliers, grid hotspots, adaptive histogram);
 `scope_query` wraps the query as a subquery and filters WKT `POINT`s parsed with

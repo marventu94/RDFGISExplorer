@@ -58,7 +58,12 @@ describe('QueryController', () => {
     const dto = { sparql: 'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', limit: 500 };
     const result = await controller.execute(dto);
     expect(result).toEqual(mockQueryResult);
-    expect(executeMock).toHaveBeenCalledWith(dto.sparql, dto.limit, undefined);
+    expect(executeMock).toHaveBeenCalledWith(
+      dto.sparql,
+      dto.limit,
+      undefined,
+      undefined,
+    );
   });
 
   it('should pass the raw flag through to queryService.execute', async () => {
@@ -68,7 +73,27 @@ describe('QueryController', () => {
       raw: true,
     };
     await controller.execute(dto);
-    expect(executeMock).toHaveBeenCalledWith(dto.sparql, dto.limit, true);
+    expect(executeMock).toHaveBeenCalledWith(
+      dto.sparql,
+      dto.limit,
+      true,
+      undefined,
+    );
+  });
+
+  it('passes the paging timeout through to the query service', async () => {
+    const dto = {
+      sparql: 'SELECT ?x WHERE { ?s ?p ?o }',
+      limit: 300,
+      timeoutMs: 600000,
+    };
+    await controller.execute(dto);
+    expect(executeMock).toHaveBeenCalledWith(
+      dto.sparql,
+      300,
+      undefined,
+      600000,
+    );
   });
 
   it('should call queryService.summarize with the DTO', async () => {

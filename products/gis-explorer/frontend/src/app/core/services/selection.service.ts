@@ -6,6 +6,7 @@ import {
   distinctUntilChanged,
   map,
   shareReplay,
+  Subject,
 } from 'rxjs';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import type { NormalizedNode, QueryResult, ResultBinding, Selection, Filter } from '@shared/models';
@@ -37,6 +38,8 @@ export interface LotState {
   lotCount: number;
   /** Filas del resultado filtrado (antes de cortar en lotes). */
   totalRows: number;
+  /** Total de la consulta sin filtros, cuando los lotes se cargan del endpoint. */
+  baseTotalRows?: number;
   /** Nodos del lote visible, incluidos los pineados por selección. */
   visibleNodes: number;
 }
@@ -74,6 +77,15 @@ export class SelectionService {
     this.limitsService.limits().lotSizeOptions,
   );
   private readonly _currentLot$ = new BehaviorSubject<number>(1);
+  private readonly _remotePage$ = new BehaviorSubject<{
+    result: QueryResult;
+    totalRows: number;
+    baseTotalRows: number;
+    currentLot: number;
+    lotSize: number;
+  } | null>(null);
+  private readonly _pageRequests$ = new Subject<{ lot: number; size: number }>();
+  readonly pageRequests$ = this._pageRequests$.asObservable();
   /** Índice fila ↔ entidades del resultado actual (ver shared/selection). */
   private entityContext = buildEntityContext(null);
   readonly primaryVariable = signal<string | null>(null);
@@ -90,7 +102,14 @@ export class SelectionService {
 
   readonly selectedNode$: Observable<Selection> = this._selectedNode$.asObservable();
   readonly activeFilters$: Observable<Filter[]> = this._activeFilters$.asObservable();
-  readonly queryResult$: Observable<QueryResult | null> = this._queryResult$.asObservable();
+  /** Current server page for views and entity exploration. */
+  readonly queryResult$: Observable<QueryResult | null> = combineLatest([this._queryResult$, this._remotePage$]).pipe(
+    map(([base, remote]) => remote?.result ?? base),
+    distinctUntilChanged(),
+    shareReplay({ bufferSize: 1, refCount: true }),
+  );
+  /** First page used to classify variables and calculate the full-query summary once. */
+  readonly baseQueryResult$: Observable<QueryResult | null> = this._queryResult$.asObservable();
   readonly focus$: Observable<FocusState> = this._focus$.asObservable();
   readonly activeView$: Observable<FocusSource> = this._activeView$.asObservable();
   readonly coordinatedViewEnabled$: Observable<boolean> =
@@ -107,8 +126,9 @@ export class SelectionService {
   readonly filteredQueryResult$: Observable<QueryResult | null> = combineLatest([
     this._queryResult$,
     this._activeFilters$,
+    this._remotePage$,
   ]).pipe(
-    map(([result, filters]) => this.applyFilters(result, filters)),
+    map(([result, filters, remote]) => remote ? remote.result : this.applyFilters(result, filters)),
     shareReplay({ bufferSize: 1, refCount: true }),
   );
 
@@ -132,9 +152,20 @@ export class SelectionService {
     this._lotSize$,
     this._currentLot$,
     this.pinnedUri$,
+    this._remotePage$,
   ]).pipe(
-    map(([filtered, lotSize, currentLot, pinned]) =>
-      this.computeSliceView(filtered, lotSize, currentLot, pinned),
+    map(([filtered, lotSize, currentLot, pinned, remote]) =>
+      remote ? {
+        result: remote.result,
+        state: {
+          lotSize: remote.lotSize,
+          currentLot: remote.currentLot,
+          lotCount: Math.max(1, Math.ceil(remote.totalRows / remote.lotSize)),
+          totalRows: remote.totalRows,
+          baseTotalRows: remote.baseTotalRows,
+          visibleNodes: remote.result.nodes.length,
+        },
+      } : this.computeSliceView(filtered, lotSize, currentLot, pinned),
     ),
     distinctUntilChanged(),
     shareReplay({ bufferSize: 1, refCount: true }),
@@ -159,6 +190,7 @@ export class SelectionService {
     // Si los filtros o el tamaño de lote reducen lotCount por debajo del lote
     // actual, el estado canónico se clampea (el lote se conserva si sigue válido).
     combineLatest([this.filteredQueryResult$, this._lotSize$]).subscribe(([result, lotSize]) => {
+      if (this._remotePage$.getValue()) return;
       const lotCount = computeLotCount(result, lotSize);
       if (this._currentLot$.getValue() > lotCount) {
         this._currentLot$.next(lotCount);
@@ -190,7 +222,7 @@ export class SelectionService {
   select(node: NormalizedNode | null, source: Selection['source'] = 'external', row?: ResultBinding, event?: Selection['event']): void {
     const context = node ? resolveEntityContext(this.entityContext, node.uri, row) : undefined;
     if (!row && event && context) {
-      row = this._queryResult$.getValue()?.bindings.find((candidate) =>
+      row = (this._remotePage$.getValue()?.result ?? this._queryResult$.getValue())?.bindings.find((candidate) =>
         this.entityContext.primaryByRow.get(candidate) === context.primaryUri &&
         candidate[event.field]?.type === 'date' && candidate[event.field].value === event.isoDate);
     }
@@ -214,7 +246,7 @@ export class SelectionService {
 
   setPrimaryVariable(variable: string | null): void {
     this.primaryVariable.set(variable);
-    this.entityContext = buildEntityContext(this._queryResult$.getValue(), variable);
+    this.entityContext = buildEntityContext(this._remotePage$.getValue()?.result ?? this._queryResult$.getValue(), variable);
     const selection = this._selectedNode$.getValue();
     this.pinMemo = null;
     this.select(selection.node, selection.source, selection.row, selection.event);
@@ -265,6 +297,7 @@ export class SelectionService {
     // El índice fila ↔ entidades se arma una vez por query: lo consultan todas
     // las selecciones posteriores.
     this.primaryVariable.set(primaryVariable);
+    this._remotePage$.next(null);
     this.entityContext = buildEntityContext(result, primaryVariable);
     this._queryResult$.next(result);
     this._selectedNode$.next({ node: null, source: 'external' });
@@ -274,15 +307,40 @@ export class SelectionService {
     this._currentLot$.next(1);
   }
 
+  /** Publish one server page without retriggering full-query Summary or clearing view filters. */
+  setRemotePage(result: QueryResult, totalRows: number, baseTotalRows: number, lot: number, size: number): void {
+    this.entityContext = buildEntityContext(result, this.primaryVariable());
+    this._selectedNode$.next({ node: null, source: 'external' });
+    this.clearFocus();
+    this._lotSize$.next(size);
+    this._currentLot$.next(lot);
+    this._remotePage$.next({ result, totalRows, baseTotalRows, currentLot: lot, lotSize: size });
+  }
+
+  isRemotePagingSnapshot(): boolean {
+    return this._remotePage$.getValue() !== null;
+  }
+
   setLotSize(size: number): void {
     // LOT_SIZE_OPTIONS es la oferta de la UI; el servicio acepta cualquier
     // entero positivo para no acoplar el estado a la presentación.
     if (!Number.isInteger(size) || size < 1) return;
+    if (this._remotePage$.getValue()) {
+      this._pageRequests$.next({ lot: 1, size });
+      return;
+    }
     this._lotSize$.next(size);
   }
 
   /** Lote 1-based; se clampea al rango válido del resultado actual. */
   setCurrentLot(lot: number): void {
+    const remote = this._remotePage$.getValue();
+    if (remote) {
+      const lotCount = Math.max(1, Math.ceil(remote.totalRows / remote.lotSize));
+      const target = Math.min(Math.max(1, Math.floor(lot)), lotCount);
+      if (target !== remote.currentLot) this._pageRequests$.next({ lot: target, size: remote.lotSize });
+      return;
+    }
     const lotCount = computeLotCount(
       this.applyFilters(this._queryResult$.getValue(), this._activeFilters$.getValue()),
       this._lotSize$.getValue(),
@@ -299,7 +357,7 @@ export class SelectionService {
   }
 
   getLotSizeSnapshot(): number {
-    return this._lotSize$.getValue();
+    return this._remotePage$.getValue()?.lotSize ?? this._lotSize$.getValue();
   }
 
   getCurrentLotSnapshot(): number {
