@@ -6,6 +6,7 @@ import { PropertyGraphService } from '../../graph/property-graph.service';
 import { RequestService } from '../../core/request.service';
 import { AppConfigService } from '../../core/services/app-config.service';
 import { discoveryFocus } from '../../graph/domain/discovery';
+import { Filter } from '../../graph/domain/filter';
 import type { Node } from '../../graph/domain';
 
 const first = 'http://www.wikidata.org/entity/Q397598';
@@ -85,5 +86,18 @@ describe('editing a single resource constraint', () => {
     expect(selected.uris).toEqual([first]);
     component.addValue('');
     expect(selected.uris).toEqual([first]);
+  });
+  it('renders saved month-precision date filters with visible month values', async () => {
+    selected.variable.filters.push(
+      new Filter(selected.variable, 'datefrom', { date: '2023-09', granularity: 'month' }),
+      new Filter(selected.variable, 'dateto', { date: '2023-12', granularity: 'month' }),
+    );
+    const fixture = TestBed.createComponent(EditPanelComponent);
+    fixture.componentInstance.updateExistingFilters();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const fields = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('.filter-editor:not(.new-filter) input[type="month"]')];
+    expect(fields.map(field => field.value)).toEqual(['2023-09', '2023-12']);
+    expect(selected.variable.filters.map(filter => filter.data.date)).toEqual(['2023-09', '2023-12']);
   });
 });

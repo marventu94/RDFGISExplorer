@@ -216,6 +216,13 @@ export class EditPanelComponent implements OnDestroy {
     return this.request.getLabel(uri) ?? '<' + uri + '>';
   }
 
+  filterInputType(field: FilterField, granularity: string | number | undefined): string {
+    if (field.meta.type !== 'date') return field.meta.type;
+    if (granularity === 'month') return 'month';
+    if (granularity === 'year') return 'text';
+    return 'date';
+  }
+
   private filterCatalog(): Record<string, FilterMetadata> {
     const g = this.graph as unknown as Record<string, unknown>;
     return (g['graphRef'] as unknown as Record<string, Record<string, FilterMetadata>>)?.['filterCatalog'] ?? {};
