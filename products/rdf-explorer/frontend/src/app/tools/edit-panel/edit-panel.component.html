@@ -107,7 +107,7 @@
                     @for (opt of field.meta.options ?? []; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
                   </select>
                 } @else {
-                  <input [type]="field.meta.type" autocomplete="off" [ngModel]="field.value" (ngModelChange)="updateNewFilterData(field.key, $event)" />
+                  <input [type]="filterInputType(field, newFilterData['granularity'])" autocomplete="off" [ngModel]="field.value" (ngModelChange)="updateNewFilterData(field.key, $event)" />
                 }
               </label>
             }
@@ -128,7 +128,7 @@
                       @for (opt of field.meta.options ?? []; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
                     </select>
                   } @else {
-                    <input [type]="field.meta.type" autocomplete="off" [ngModel]="field.value" (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
+                    <input [type]="filterInputType(field, ef.filter.data.granularity)" autocomplete="off" [ngModel]="field.value" (ngModelChange)="updateExistingFilterField(ef.filter, field.key, $event)" />
                   }
                 </label>
               }
