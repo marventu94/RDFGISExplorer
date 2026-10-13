@@ -44,7 +44,7 @@ export class ExploreInGisService {
       ? candidates[0]
       : await firstValueFrom(
           this.dialog.open<QueryExportCandidate>(QuerySelectionDialogComponent, {
-            data: { candidates } satisfies QuerySelectionDialogData,
+            data: { panelName: candidates[0].panelName, candidates } satisfies QuerySelectionDialogData,
           }).closed,
         );
     if (!selected) return;

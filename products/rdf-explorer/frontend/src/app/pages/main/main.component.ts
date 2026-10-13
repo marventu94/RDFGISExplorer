@@ -67,7 +67,8 @@ export class MainComponent implements OnInit {
           if (!sparql?.trim()) return [];
           return [{
             id: `${panel?.id ?? 'panel'}:${index}`,
-            label: queryExportLabel(panel?.name ?? 'Panel', index, query),
+            panelName: panel?.sourceWorkspaceName ?? panel?.name ?? 'Panel',
+            label: queryExportLabel(index, query),
             query: sparql,
             backend,
             source: { workspaceId, panelId: panel?.id },
@@ -227,7 +228,7 @@ export class MainComponent implements OnInit {
         currentId: typedResult.overwriteId,
       });
       this.workspace.markAllPanelsClean();
-      this.workspace.setAllPanelsSource(dashboard.id);
+      this.workspace.setAllPanelsSource(dashboard.id, dashboard.name);
       this.showSnackbar(`Workspace guardado: ${dashboard.name}`);
       if (!typedResult.overwriteId) {
         await this.router.navigate([], {

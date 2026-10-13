@@ -1,5 +1,6 @@
 export interface QueryExportCandidate {
   id: string;
+  panelName: string;
   label: string;
   query: string;
   backend: string;
