@@ -1864,6 +1864,20 @@ describe('GraphViewComponent', () => {
       },
     );
 
+    it('restores the active entity and branches after leaving GIS and remounting it', () => {
+      enter();
+      const expected = structuredClone(component.explorationState);
+      fixture.destroy();
+      expect(TestBed.inject(DashboardViewStateService).entitySnapshot()?.state).toEqual(expected);
+      fixture = TestBed.createComponent(GraphViewComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      expect(component.isEntityMode).toBe(true);
+      expect(component.entityRootUri).toBe(estate.root);
+      expect(component.explorationState).toEqual(expected);
+      expect(drawnIds()).toContain(estate.estate);
+    });
+
     it('uses Hierarchical and Literals as the initial entity level', () => {
       expect(component.detailLevel).toBe('summary');
 

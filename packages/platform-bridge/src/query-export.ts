@@ -1,10 +1,11 @@
+import type { QueryOrigin } from './handoff';
 export interface QueryExportCandidate {
   id: string;
   panelName: string;
   label: string;
   query: string;
   backend: string;
-  source: { workspaceId?: string; panelId?: string };
+  source: QueryOrigin;
 }
 
 export interface QueryExportProvider {

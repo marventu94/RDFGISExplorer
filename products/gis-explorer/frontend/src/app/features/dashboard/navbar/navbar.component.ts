@@ -1,3 +1,6 @@
+import { Router } from '@angular/router';
+import { DashboardViewStateService } from '@core/services/dashboard-view-state.service';
+import { requestExplorerReturn } from '@rdfgis/platform-bridge';
 import { TranslatePipe } from '../../../core/services/translate.pipe';
 import type { UiTextKey } from '@rdfgis/platform-bridge';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
@@ -35,7 +38,6 @@ import {
 import { DashboardSaveFlowService } from '../dashboard-save-flow.service';
 import { isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { I18nService } from '@core/services/i18n.service';
-import { AppConfigService } from '@core/services/app-config.service';
 import { buildQueryLimitNotice, type QueryLimitNotice } from '@shared/sparql/query-limit';
 import { LanguageSelectorComponent } from '@core/services/language-selector.component';
 import { ThemeToggleComponent } from '@core/services/theme-toggle.component';
@@ -85,6 +87,18 @@ const LAYOUT_SVG_ICONS: Record<string, string> = {
   styleUrl: './navbar.component.scss',
 })
 export class NavbarComponent {
+  private readonly router = inject(Router, { optional: true });
+  protected readonly viewState = inject(DashboardViewStateService);
+  protected readonly canReturnToRdf = computed(() => isDashboardHostAvailable() && !!this.viewState.origin()?.panelId);
+
+  returnToRdf(): void {
+    const panelId = this.viewState.origin()?.panelId;
+    if (!panelId || !this.router) return;
+    this.viewState.captureGraph?.();
+    requestExplorerReturn(panelId);
+    void this.router.navigate(['/explorer']);
+  }
+
   protected readonly dashboardsAvailable = isDashboardHostAvailable();
   protected readonly layout = inject(DashboardLayoutService);
   protected readonly selectionService = inject(SelectionService);
@@ -94,7 +108,6 @@ export class NavbarComponent {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly queryState = inject(SparqlQueryStateService);
-  private readonly appConfig = inject(AppConfigService);
   private readonly summaryState = inject(SummaryStateService);
   private readonly exportService = inject(ResultExportService);
   private readonly i18n = inject(I18nService);
@@ -113,7 +126,7 @@ export class NavbarComponent {
   protected readonly hasResult = this._hasResult.asReadonly();
   private readonly resultQuery = signal('');
   protected readonly queryLimitNotice = computed(() => this.hasResult()
-    ? buildQueryLimitNotice(this.resultQuery(), this.appConfig.config()?.maxLimit ?? null)
+    ? buildQueryLimitNotice(this.resultQuery())
     : null);
 
   constructor() {
@@ -201,27 +214,14 @@ export class NavbarComponent {
     });
   }
 
-  protected queryLimitLabel(notice: QueryLimitNotice, lot: LotState | null): string {
-    const params = { limit: notice.limit, maxLimit: notice.maxLimit };
-    if (lot?.baseTotalRows !== undefined) return this.i18n.text('LIMIT {limit} · resultado acotado', params);
-    return notice.capped
-      ? this.i18n.text('LIMIT {limit} · tope del backend {maxLimit}', params)
-      : lot && lot.lotCount <= 1
-        ? this.i18n.text('LIMIT {limit} · sin más lotes', params)
-        : this.i18n.text('LIMIT {limit} · resultado acotado', params);
+  protected queryLimitLabel(notice: QueryLimitNotice): string {
+    const clauses = [notice.limit !== null ? `LIMIT ${notice.limit}` : '',
+      notice.offset !== null ? `OFFSET ${notice.offset}` : ''].filter(Boolean).join(' · ');
+    return this.i18n.text('{clauses} · límite manual', { clauses });
   }
 
-  protected queryLimitDetail(notice: QueryLimitNotice, lot: LotState | null): string {
-    if (lot?.baseTotalRows !== undefined) {
-      return this.i18n.text('La consulta aplica LIMIT {limit}. El total y los lotes se calculan sobre ese resultado completo.', { limit: notice.limit });
-    }
-    const params = { limit: notice.limit, maxLimit: notice.maxLimit };
-    if (notice.capped) {
-      return this.i18n.text('La consulta pide LIMIT {limit}, pero el backend entrega como máximo {maxLimit} filas. Los lotes solo paginan las filas recibidas.', params);
-    }
-    return lot && lot.lotCount <= 1
-      ? this.i18n.text('La consulta aplica LIMIT {limit} antes de llegar al tablero. Con las filas recibidas no hay más lotes; el resumen y la exportación las consideran el resultado completo.', params)
-      : this.i18n.text('La consulta aplica LIMIT {limit} antes de llegar al tablero. Los lotes solo paginan esas filas; el resumen y la exportación las consideran el resultado completo.', params);
+  protected queryLimitDetail(): string {
+    return this.i18n.text('La consulta contiene LIMIT/OFFSET manual. Los lotes, el detalle y la exportación respetan ese recorte; pueden faltar entidades o datos relacionados. Para explorar todo, quitá esas cláusulas de la consulta.');
   }
 
   protected openSaveDialog(): void {

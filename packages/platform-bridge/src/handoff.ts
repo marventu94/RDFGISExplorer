@@ -13,10 +13,15 @@
  * este contrato y la lógica de lectura/escritura.
  */
 
+export interface QueryOrigin {
+  workspaceId?: string;
+  panelId?: string;
+}
+
 export interface HandoffPayload {
   query: string;
   backend: string;
-  source: { workspaceId?: string; panelId?: string };
+  source: QueryOrigin;
   /**
    * El Explorer ya avisó que la importación reemplaza el tablero abierto en el
    * GIS y el usuario aceptó: el GIS no vuelve a preguntar.
@@ -28,7 +33,7 @@ export interface HandoffPayload {
 export interface HandoffPayloadInput {
   query: string;
   backend: string;
-  source: { workspaceId?: string; panelId?: string };
+  source: QueryOrigin;
   overwriteConfirmed?: boolean;
 }
 

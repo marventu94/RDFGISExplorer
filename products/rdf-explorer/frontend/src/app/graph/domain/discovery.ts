@@ -12,6 +12,8 @@ export function nodeClasses(graph: PropertyGraph, node: Node): string[] {
     && e.source.getUri() === (graph.endpointAdapter.classPredicate ?? TYPE_URI) && !e.target.isVariable()).flatMap(e => e.target.uris);
 }
 export function discoveryFocus(node: Node): DiscoveryFocus | null {
+  const fixed = node.variable.filters.find(f => f.type === 'resourceEquals')?.data.value;
+  if (fixed) return { uri: fixed };
   if (!node.isVariable()) return node.getUri() ? { uri: node.getUri()! } : null;
   const query = node.createQuery()?.toSparql({ structural: true });
   return query ? { query, variable: node.variable.getName() } : null;

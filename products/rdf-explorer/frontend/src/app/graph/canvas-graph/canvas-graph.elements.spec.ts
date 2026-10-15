@@ -1,3 +1,4 @@
+import { Filter } from '../domain/filter';
 import { describe, it, expect } from 'vitest';
 import type cytoscape from 'cytoscape';
 
@@ -31,6 +32,38 @@ function positionOf(
 }
 
 describe('buildCanvasElements', () => {
+  it('keeps legacy class labels and renders fixed text in blue without extra value rows', () => {
+    const graph = createGraph();
+    const city = graph.addNode(); city.variable.setAlias('ciudad', graph);
+    city.addUri('urn:LaPlata'); city.mkConst();
+    const label = city.newProp(); label.addUri('http://www.w3.org/2000/01/rdf-schema#label'); label.mkConst();
+    const text = label.mkLiteral()!; text.variable.setAlias('ciudadLabel', graph);
+    text.variable.filters.push(new Filter(text.variable, 'equals', { value: 'La Plata', language: 'es' }));
+    const elements = buildCanvasElements(graph.nodes, graph.edges);
+    expect(elements.find(el => el.data.id === `n${city.id}`)?.data['label']).toBe('LaPlata');
+    expect(elements.find(el => el.data.id === `l${label.id}`)?.data['label']).toBe('La Plata');
+    const rows = elements.filter(el => el.data['kind'] === 'filter');
+    expect(rows).toHaveLength(0);
+    expect(elements.find(el => el.data.id === `n${city.id}`)?.data['color']).toBe('#1f77b4');
+    expect(elements.find(el => el.data.id === `l${label.id}`)?.data['color']).toBe('#1f77b4');
+    expect(city.isVariable()).toBe(false);
+  });
+
+  it('switches from variable name/green to fixed resource name/blue and back, preserving other filters', () => {
+    const graph = createGraph();
+    const city = graph.addNode(); city.variable.setAlias('ciudad', graph);
+    const render = () => buildCanvasElements(graph.nodes, graph.edges);
+    const title = () => render().find(el => el.data.id === `n${city.id}`)!.data;
+    expect(title()).toMatchObject({ label: '?ciudad', color: '#2ca02c' });
+    city.variable.filters.push(new Filter(city.variable, 'regex', { regex: 'Plata' }));
+    city.variable.filters.push(new Filter(city.variable, 'resourceEquals', { value: 'urn:LaPlata' }));
+    expect(title()).toMatchObject({ label: 'LaPlata', color: '#1f77b4' });
+    expect(render().filter(el => el.data['kind'] === 'filter')).toHaveLength(1);
+    city.variable.filters = city.variable.filters.filter(filter => filter.type !== 'resourceEquals');
+    expect(title()).toMatchObject({ label: '?ciudad', color: '#2ca02c' });
+    expect(render().filter(el => el.data['kind'] === 'filter')).toHaveLength(1);
+  });
+
   it('detects reused Cytoscape IDs that belong to another restored panel', () => {
     const firstGraph = createGraph();
     const secondGraph = createGraph();

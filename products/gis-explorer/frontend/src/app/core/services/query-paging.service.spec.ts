@@ -23,6 +23,54 @@ function page(uri: string): QueryResult {
 }
 
 describe('QueryPagingService', () => {
+  it('uses the configured batch size on first load and when reopening older saved batches', () => {
+    const cfg = { maxLimit: 500, limits: { lotDefaultSize: 500, lotSizeOptions: [500] } };
+    const api = {
+      fetchSummary: vi.fn(() => of({ totalRows: 1500 })),
+      executeQuery: vi.fn((_request: { sparql: string }) => of(page('urn:first'))),
+    };
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiService, useValue: api },
+      { provide: AppConfigService, useValue: { load: () => of(cfg), config: signal(cfg) } },
+    ] });
+    const selection = TestBed.inject(SelectionService);
+    const paging = TestBed.inject(QueryPagingService);
+    selection.setLotSize(300);
+    paging.loadInitial(query).subscribe(({ result, totalRows, size }) => {
+      expect(size).toBe(500);
+      expect(totalRows).toBe(1500);
+      paging.activate(query, result, totalRows, size);
+    });
+    expect(api.executeQuery.mock.calls[0][0].sparql).toContain('LIMIT 500');
+    paging.restoreView([], 2, 100).subscribe();
+    expect(selection.getLotSizeSnapshot()).toBe(500);
+    expect(api.executeQuery.mock.calls[1][0].sparql).toContain('OFFSET 500');
+    expect(api.executeQuery.mock.calls[1][0].sparql).toContain('LIMIT 500');
+  });
+
+  it('restores saved filters and clamps the saved lot after recounting, with no duplicate requests', () => {
+    const first = page('urn:first');
+    const api = { fetchSummary: vi.fn(() => of({ totalRows: 2 })), executeQuery: vi.fn((_request: { sparql: string }) => of(first)) };
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiService, useValue: api },
+      { provide: AppConfigService, useValue: { load: () => of({ maxLimit: 1000 }), config: signal({ maxLimit: 1000 }) } },
+    ] });
+    const selection = TestBed.inject(SelectionService);
+    const paging = TestBed.inject(QueryPagingService);
+    selection.setQueryResult(first);
+    paging.activate(query, first, 20, 1);
+    const filter = { id: 'time', kind: 'temporal' as const, label: 'Octubre', from: '2023-10-01', to: '2023-10-31' };
+    let completed = false;
+    paging.restoreView([filter], 10, 1).subscribe(() => completed = true);
+    expect(completed).toBe(true);
+    expect(selection.getActiveFiltersSnapshot()).toEqual([filter]);
+    expect(selection.getCurrentLotSnapshot()).toBe(2);
+    expect(api.fetchSummary).toHaveBeenCalledTimes(1);
+    expect(api.executeQuery).toHaveBeenCalledTimes(1);
+    expect(api.executeQuery.mock.calls[0][0].sparql).toContain('OFFSET 1');
+    expect(api.executeQuery.mock.calls[0][0].sparql).toContain('2023-10-01');
+  });
+
   it('distinguishes batch navigation from filter recounts while loading', () => {
     const nextPage$ = new Subject<QueryResult>();
     const api = { fetchSummary: vi.fn(() => NEVER), executeQuery: vi.fn(() => nextPage$) };
@@ -83,6 +131,41 @@ describe('QueryPagingService', () => {
     expect(selection.getCurrentLotSnapshot()).toBe(1);
     paging.loadEntityStructure('listing', 'urn:first').subscribe();
     expect(api.executeQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('retrieves all price nodes across pages for the selected entity', () => {
+    const priceQuery = 'SELECT ?listing ?price WHERE { ?listing <urn:price> ?price }';
+    const pricePage = (price: string): QueryResult => ({
+      ...page('urn:house'), variables: ['listing', 'price'],
+      bindings: [{ listing: { type: 'uri', value: 'urn:house' }, price: { type: 'uri', value: price } }],
+      nodes: [
+        { uri: 'urn:house', label: 'House', queryVariable: 'listing', attributes: {} },
+        { uri: price, label: price, queryVariable: 'price', attributes: {} },
+      ],
+      edges: [{ id: price, source: 'urn:house', target: price, predicate: 'urn:price' }],
+    });
+    const first = pricePage('urn:price1');
+    const api = {
+      fetchSummary: vi.fn().mockReturnValue(of({ totalRows: 3 })),
+      executeQuery: vi.fn().mockReturnValueOnce(of(first))
+        .mockReturnValueOnce(of(pricePage('urn:price2')))
+        .mockReturnValueOnce(of(pricePage('urn:price3'))),
+    };
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiService, useValue: api },
+      { provide: AppConfigService, useValue: { config: signal({ maxLimit: 1000 }) } },
+    ] });
+    const selection = TestBed.inject(SelectionService);
+    const paging = TestBed.inject(QueryPagingService);
+    selection.setLotSize(1);
+    selection.setQueryResult(first);
+    paging.activate(priceQuery, first, 3, 1);
+    let result: QueryResult | undefined;
+    paging.loadEntityStructure('listing', 'urn:house').subscribe(value => result = value);
+    expect(result?.nodes.map(node => node.uri)).toEqual(['urn:house', 'urn:price1', 'urn:price2', 'urn:price3']);
+    expect(result?.edges).toHaveLength(3);
+    expect(result?.bindings).toHaveLength(3);
+    expect(selection.getQueryResultSnapshot()?.bindings).toHaveLength(1);
   });
 
   it('counts the full query, loads pages on demand, then recounts the filtered query', () => {

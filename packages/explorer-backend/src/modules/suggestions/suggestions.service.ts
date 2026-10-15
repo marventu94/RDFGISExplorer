@@ -15,7 +15,7 @@ import { isValidUri } from '../../adapters/sparql-text';
 
 export type { EntitySearchResult };
 
-const DEFAULT_MAX_LIMIT = 2000;
+const DEFAULT_MAX_LIMIT = 300;
 
 /**
  * Capa HTTP de las sugerencias: valida la entrada y delega en el adapter.

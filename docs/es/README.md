@@ -130,14 +130,12 @@ inyecta al ejecutar: cada consulta debe ser autocontenida.
 | `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Basic Auth opcional |
 | `SPARQL_ENTITY_SEARCH_QUERY` | búsqueda por `rdfs:label` | Búsqueda personalizable |
 | `SPARQL_TIMEOUT_MS` | `30000` | Timeout en ms |
-| `SPARQL_MAX_LIMIT` | `2000` | Máximo de filas devueltas por una consulta; también se usa si la petición omite un límite de respuesta |
+| `SPARQL_MAX_LIMIT` | `300` | Filas por lote de GIS y máximo por petición; no limita el total de resultados |
 | `SPARQL_PREFIXES_PATH` | `config/prefixes.${SPARQL_BACKEND}.json` | Prefixes |
 | `CLASS_COLORS_PATH` | `config/class-colors.${SPARQL_BACKEND}.json` | Colores RDF |
 | `DASHBOARDS_SQLITE_PATH` | `data/${SPARQL_BACKEND}.sqlite` | SQLite del Shell |
 | `SPARQL_PROTECTED_BACKENDS` | `wikidata` | Bases preservadas por la limpieza |
 | `GIS_GRAPH_MAX_NODES` | `300` | Tope de nodos del grafo |
-| `GIS_LOT_DEFAULT_SIZE` | `300` | Tamaño de lote inicial |
-| `GIS_LOT_SIZE_OPTIONS` | `100,300,500` | Tamaños disponibles |
 | `GIS_TABLE_PAGE_SIZE_OPTIONS` | `50,100,200` | Paginación de tabla |
 | `EXPORT_MAX_ROWS` | `50000` | Tope del export completo |
 | `EXPORT_MIN_PAGE_SIZE` | `250` | Página mínima al reintentar |

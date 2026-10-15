@@ -26,6 +26,7 @@ describe('editing a single resource constraint', () => {
     const property = selected.newProp(); property.addUri('urn:relation'); property.mkConst();
     graph.addEdge(property, related);
     vi.spyOn(selected, 'loadPreview').mockImplementation(() => {});
+    vi.spyOn(related, 'loadPreview').mockImplementation(() => {});
     graph.setSelected(selected);
     component = TestBed.runInInjectionContext(() => new EditPanelComponent());
     TestBed.tick();
@@ -63,9 +64,10 @@ describe('editing a single resource constraint', () => {
     component.addValue(first);
     component.mkVariable();
     component.addValue(second);
-    expect(selected.uris).toEqual([second]);
-    expect(selected.getUri()).toBe(second);
-    expect(selected.isVariable()).toBe(false);
+    expect(selected.uris).toEqual([]);
+    expect(selected.variable.filters.find(f => f.type === 'resourceEquals')?.data.value).toBe(second);
+    expect(selected.getUri()).toBeNull();
+    expect(selected.isVariable()).toBe(true);
     expect(component.isVariable).toBe(false);
     expect(discoveryFocus(selected)).toEqual({ uri: second });
     const query = related.createQuery()!.toSparqlFullProjection();
@@ -77,16 +79,61 @@ describe('editing a single resource constraint', () => {
     selected.addUri(first); selected.addUri(second); selected.mkConst();
     component.newValue = 'urn:new-resource';
     component.addValue();
-    expect(selected.uris).toEqual(['urn:new-resource']);
-    expect(selected.getUri()).toBe('urn:new-resource');
+    expect(selected.uris).toEqual([]);
+    expect(selected.variable.filters.find(f => f.type === 'resourceEquals')?.data.value).toBe('urn:new-resource');
+    expect(selected.isVariable()).toBe(true);
     expect(component.newValue).toBe('');
   });
   it('keeps one value when selecting it again and leaves existing values intact on empty input', () => {
     component.addValue(first); component.addValue(first);
-    expect(selected.uris).toEqual([first]);
+    expect(selected.variable.filters.filter(f => f.type === 'resourceEquals').map(f => f.data.value)).toEqual([first]);
     component.addValue('');
-    expect(selected.uris).toEqual([first]);
+    expect(selected.variable.filters.filter(f => f.type === 'resourceEquals').map(f => f.data.value)).toEqual([first]);
   });
+  it('clears only the fixed value when switching back to Variable', () => {
+    selected.variable.filters.push(new Filter(selected.variable, 'regex', { regex: 'Plata' }));
+    component.addValue(first);
+    component.mkVariable();
+    expect(selected.variable.filters.map(f => f.type)).toEqual(['regex']);
+    expect(component.isVariable).toBe(true);
+  });
+
+  it('keeps a literal variable with its language and existing filters when fixing or editing text', () => {
+    const label = selected.newProp(); label.addUri('http://www.w3.org/2000/01/rdf-schema#label'); label.mkConst();
+    const literal = label.mkLiteral()!;
+    literal.variable.filters.push(new Filter(literal.variable, 'regex', { regex: 'Plata' }));
+    vi.spyOn(literal, 'loadPreview').mockImplementation(() => {});
+    graph.setSelected(literal); TestBed.tick();
+    component.onAliasChange('ciudadLabel');
+    component.addValue('La Plata', { type: 'literal', value: 'La Plata', 'xml:lang': 'es' });
+    expect(literal.isVariable()).toBe(true);
+    expect(literal.variable.toString()).toBe('?ciudadLabel');
+    expect(component.isConst).toBe(true);
+    expect(component.existingFilters.map(f => f.filter.type)).toEqual(['regex']);
+    expect(component.constraintValues()).toEqual([expect.objectContaining({ value: 'La Plata', language: 'es' })]);
+    const query = selected.createQuery()!.toSparqlFullProjection()!;
+    expect(query).toContain('STR(?ciudadLabel) = "La Plata"');
+    expect(query).toContain('LANG(?ciudadLabel) = "es"');
+    component.editValue('La Plata'); component.newValue = 'Berisso'; component.addValue();
+    expect(component.constraintValues()).toEqual([expect.objectContaining({ value: 'Berisso', language: 'es' })]);
+    component.rmValue('Berisso');
+    expect(component.isVariable).toBe(true);
+    expect(literal.variable.filters.map(f => f.type)).toEqual(['regex']);
+  });
+
+  it('keeps Constraint active when reselecting a fixed resource and shows its value outside Filters', async () => {
+    component.addValue(first);
+    graph.setSelected(related); TestBed.tick();
+    graph.setSelected(selected); TestBed.tick();
+    expect(component.isConst).toBe(true);
+    const fixture = TestBed.createComponent(EditPanelComponent);
+    fixture.detectChanges(); await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('.mode-switch button')[1].getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelector('.value-text')?.getAttribute('title')).toBe(first);
+    expect(el.querySelectorAll('.filter-editor:not(.new-filter)')).toHaveLength(0);
+  });
+
   it('renders saved month-precision date filters with visible month values', async () => {
     selected.variable.filters.push(
       new Filter(selected.variable, 'datefrom', { date: '2023-09', granularity: 'month' }),

@@ -38,9 +38,9 @@ export interface SettingsDefaults {
 export interface LimitsConfig {
   /** Cap de nodos de la vista de grafo del GIS (GIS_GRAPH_MAX_NODES). */
   graphMaxNodes: number;
-  /** Tamaño de lote por defecto de las vistas coordinadas (GIS_LOT_DEFAULT_SIZE). */
+  /** Tamaño de lote de las vistas coordinadas, derivado de SPARQL_MAX_LIMIT. */
   lotDefaultSize: number;
-  /** Opciones del selector de tamaño de lote (GIS_LOT_SIZE_OPTIONS, CSV en la env). */
+  /** Tamaños de lote publicados; contiene únicamente SPARQL_MAX_LIMIT. */
   lotSizeOptions: number[];
   /** Opciones de paginación de la tabla (GIS_TABLE_PAGE_SIZE_OPTIONS, CSV en la env). */
   tablePageSizeOptions: number[];

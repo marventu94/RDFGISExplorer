@@ -54,14 +54,11 @@ export class AppConfigService {
    * Límites de queries y visualización unificados: los frontends los consumen
    * vía /api/config (con defaults equivalentes hasta que la config llega).
    */
-  private buildLimits(): LimitsConfig {
+  private buildLimits(maxLimit: number): LimitsConfig {
     return {
       graphMaxNodes: this.intFromEnv('GIS_GRAPH_MAX_NODES', 300),
-      lotDefaultSize: this.intFromEnv('GIS_LOT_DEFAULT_SIZE', 300),
-      lotSizeOptions: this.csvIntsFromEnv(
-        'GIS_LOT_SIZE_OPTIONS',
-        [100, 300, 500],
-      ),
+      lotDefaultSize: maxLimit,
+      lotSizeOptions: [maxLimit],
       tablePageSizeOptions: this.csvIntsFromEnv(
         'GIS_TABLE_PAGE_SIZE_OPTIONS',
         [50, 100, 200],
@@ -88,10 +85,7 @@ export class AppConfigService {
     const username = this.config.get<string>('SPARQL_USERNAME');
     const password = this.config.get<string>('SPARQL_PASSWORD');
 
-    const maxLimit = parseInt(
-      this.config.get<string>('SPARQL_MAX_LIMIT') ?? '2000',
-      10,
-    );
+    const maxLimit = this.intFromEnv('SPARQL_MAX_LIMIT', 300);
     const labelUri = 'http://www.w3.org/2000/01/rdf-schema#label';
 
     return {
@@ -114,7 +108,7 @@ export class AppConfigService {
       defaultPrefixes: this.buildPrefixes(),
       search: { ...descriptor.search, labelProperty: labelUri },
       labelUri,
-      limits: this.buildLimits(),
+      limits: this.buildLimits(maxLimit),
       describe: descriptor.describe,
     };
   }

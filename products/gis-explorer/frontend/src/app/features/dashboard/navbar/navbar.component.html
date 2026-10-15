@@ -2,16 +2,22 @@
   <span class="navbar-brand" [title]="dashboardState.currentDashboardName() ?? (dashboardsAvailable ? ('Tablero sin guardar' | translate) : 'GIS Explorer')">
     {{ dashboardState.currentDashboardName() || (dashboardsAvailable ? ('Tablero sin guardar' | translate) : 'GIS Explorer') }}
   </span>
+  @if (canReturnToRdf()) {
+    <button class="navbar-btn" type="button" (click)="returnToRdf()">
+      <mat-icon>arrow_back</mat-icon>
+      {{ 'Volver a RDF Explorer' | translate }}
+    </button>
+  }
   <app-filter-badges />
 
   @if (queryLimitNotice(); as notice) {
     <span
       class="query-limit-indicator"
-      [title]="queryLimitDetail(notice, lotState())"
-      [attr.aria-label]="queryLimitDetail(notice, lotState())"
+      [title]="queryLimitDetail()"
+      [attr.aria-label]="queryLimitDetail()"
     >
       <mat-icon>warning</mat-icon>
-      {{ queryLimitLabel(notice, lotState()) }}
+      {{ queryLimitLabel(notice) }}
     </span>
   }
 
@@ -49,6 +55,7 @@
             <mat-icon>chevron_right</mat-icon>
           }
         </button>
+        @if (lotSizeOptions().length > 1) {
         <select
           class="lot-size-select"
           [ngModel]="lot.lotSize"
@@ -61,6 +68,9 @@
             <option [value]="size">{{ size }}</option>
           }
         </select>
+        } @else {
+          <span [title]="'Filas por lote' | translate">{{ lot.lotSize }} {{ 'Filas por lote' | translate }}</span>
+        }
         @if (paging.busy() && paging.loadingKind() === 'size') {
           <mat-spinner class="lot-size-spinner" diameter="16" />
         }

@@ -322,8 +322,7 @@ export class TableViewComponent implements OnDestroy {
   }
 
   private buildColumnDefs(result: QueryResult): void {
-    const defs: ColDef[] = result.variables.map((variable, index) => {
-      const isPrimaryUriColumn = index === 0;
+    const defs: ColDef[] = result.variables.map((variable) => {
 
       const colDef: ColDef = {
         field: variable,
@@ -342,10 +341,10 @@ export class TableViewComponent implements OnDestroy {
         // que muestran una versión abreviada, como las URI y las coordenadas.
         tooltipValueGetter: (params: ITooltipParams) => this.fullTextOrNull(params),
         cellRendererSelector: (params: ICellRendererParams) => {
-          if (isPrimaryUriColumn) {
+          const rawBinding = (params.data as Record<string, BindingValue> | undefined)?.[variable];
+          if (rawBinding?.type === 'uri') {
             return { component: UriCellRendererComponent };
           }
-          const rawBinding = (params.data as Record<string, BindingValue> | undefined)?.[variable];
           if (rawBinding?.type === 'coordinate') {
             return { component: CoordCellRendererComponent };
           }

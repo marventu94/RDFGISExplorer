@@ -1,4 +1,15 @@
 import { Injectable, signal } from '@angular/core';
+import type { ExplorationState } from '../../features/graph-view/entity-exploration';
+import type { HandoffPayload } from '@rdfgis/platform-bridge';
+
+export interface EntityViewSnapshot {
+  state: ExplorationState;
+  layout: string;
+  pan?: { x: number; y: number };
+  zoom?: number;
+  panelVisible: boolean;
+}
+
 
 export interface MapViewState {
   center: [number, number];
@@ -33,6 +44,11 @@ export interface TableViewState {
 
 @Injectable({ providedIn: 'root' })
 export class DashboardViewStateService {
+  captureGraph?: () => void;
+  cachedEntityResult: import('@shared/models').QueryResult | null = null;
+  readonly origin = signal<HandoffPayload['source'] | null>(null);
+  readonly entitySnapshot = signal<EntityViewSnapshot | null>(null);
+  readonly pendingEntitySnapshot = signal<EntityViewSnapshot | null>(null);
   readonly mapState = signal<MapViewState | null>(null);
   readonly mapViewportFit = signal(0);
   readonly timelineState = signal<TimelineViewState | null>(null);

@@ -105,6 +105,9 @@
         <span class="entity-panel__uri" [title]="entityRootUri">{{ entityRootShortUri }}</span>
       </header>
 
+      @if (canReturnToRdf) {
+        <p class="entity-panel__hint">{{ 'Si falta un dato, volvé a RDF Explorer y agregá más nodos a la consulta.' | translate }}</p>
+      }
       <div class="entity-panel__active">
         <span class="entity-panel__label">{{ 'Nodo activo' | translate }}</span>
         <span class="entity-panel__value" [title]="entityActiveUri">

@@ -17,7 +17,7 @@ const mockQueryResult: QueryResult = {
   meta: {
     durationMs: 100,
     truncated: false,
-    limitApplied: 500,
+    limitApplied: 300,
     backend: 'wikidata',
   },
 };
@@ -56,12 +56,12 @@ describe('QueryService', () => {
   it('should execute valid SPARQL and return QueryResult', async () => {
     const result = await service.execute(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      500,
+      300,
     );
     expect(result).toEqual(mockQueryResult);
     expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      expect.objectContaining({ limit: 500, timeoutMs: 30000 }),
+      expect.objectContaining({ limit: 300, timeoutMs: 30000 }),
     );
   });
 
@@ -69,15 +69,15 @@ describe('QueryService', () => {
     await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10');
     expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      expect.objectContaining({ limit: 2000 }),
+      expect.objectContaining({ limit: 300 }),
     );
   });
 
   it('should propagate the raw flag to the endpoint', async () => {
-    await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 500, true);
+    await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 300, true);
     expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      expect.objectContaining({ limit: 500, raw: true }),
+      expect.objectContaining({ limit: 300, raw: true }),
     );
   });
 
@@ -106,7 +106,7 @@ describe('QueryService', () => {
     expect(mockSparqlEndpoint.execute).not.toHaveBeenCalled();
   });
 
-  it('should throw 413 LIMIT_EXCEEDED when limit > 2000', async () => {
+  it('should throw 413 LIMIT_EXCEEDED when limit > 300', async () => {
     try {
       await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 3000);
       fail('Expected HttpException');
@@ -122,7 +122,7 @@ describe('QueryService', () => {
   it('should throw 408 TIMEOUT on TimeoutError', async () => {
     mockSparqlEndpoint.execute.mockRejectedValueOnce(new TimeoutError(10000));
     try {
-      await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 500);
+      await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 300);
       fail('Expected HttpException');
     } catch (e) {
       expect(e).toBeInstanceOf(HttpException);
@@ -138,7 +138,7 @@ describe('QueryService', () => {
       new UpstreamError(503, 'Service unavailable'),
     );
     try {
-      await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 500);
+      await service.execute('SELECT ?x WHERE { ?s ?p ?o } LIMIT 10', 300);
       fail('Expected HttpException');
     } catch (e) {
       expect(e).toBeInstanceOf(HttpException);

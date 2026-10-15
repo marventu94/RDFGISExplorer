@@ -72,7 +72,7 @@ export class App implements OnInit {
     const dashboardId = params.get('dashboardId');
     const handoff = params.get('handoff') === '1';
 
-    if (dashboardId && isDashboardHostAvailable()) {
+    if (dashboardId && isDashboardHostAvailable() && dashboardId !== this.dashboardState.currentDashboardId()) {
       this.dashboardState.beginLoad();
       this.dashboardState.isHydrating.set(true);
       dashboardHost().load(dashboardId).then(

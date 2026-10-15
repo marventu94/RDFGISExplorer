@@ -14,6 +14,9 @@ export type LayoutPreset =
 
 interface PersistedState {
   preset: LayoutPreset;
+  colLeft?: number;
+  rowTop?: number;
+  editorCollapsed?: boolean;
   slots: ViewType[];
 }
 
@@ -35,6 +38,8 @@ export class DashboardLayoutService {
   readonly preset = signal<LayoutPreset>('quad');
   readonly slots = signal<ViewType[]>([...DEFAULT_SLOTS]);
   readonly editorCollapsed = signal(false);
+  readonly colLeft = signal(50);
+  readonly rowTop = signal(50);
 
   collapseEditor(): void {
     this.editorCollapsed.set(true);
@@ -53,6 +58,9 @@ export class DashboardLayoutService {
       const state: PersistedState = {
         preset: this.preset(),
         slots: this.slots(),
+        colLeft: this.colLeft(),
+        rowTop: this.rowTop(),
+        editorCollapsed: this.editorCollapsed(),
       };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -127,11 +135,19 @@ export class DashboardLayoutService {
     return this.editorCollapsed();
   }
 
+  restoreDividers(colLeft = 50, rowTop = 50): void {
+    const bounded = (value: number) => Number.isFinite(value) ? Math.max(20, Math.min(80, value)) : 50;
+    this.colLeft.set(bounded(colLeft));
+    this.rowTop.set(bounded(rowTop));
+  }
+
   private hydrate(): void {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<PersistedState>;
+      this.restoreDividers(parsed.colLeft, parsed.rowTop);
+      this.editorCollapsed.set(parsed.editorCollapsed === true);
       if (parsed.preset && SLOT_COUNT[parsed.preset] !== undefined) {
         this.preset.set(parsed.preset);
       }

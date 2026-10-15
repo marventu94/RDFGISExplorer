@@ -117,6 +117,7 @@ vi.mock('leaflet', () => {
     map: vi.fn(function () { return { ...mockMapObj }; }),
     tileLayer: vi.fn(function () { return mockTileLayer; }),
     markerClusterGroup: vi.fn(function () { return mockClusterGroup; }),
+    geoJSON: vi.fn(() => ({ eachLayer: (cb: (layer: object) => void) => cb({}) })),
     featureGroup: vi.fn(function () { return mockFeatureGroup; }),
     circleMarker: vi.fn(function () { return mockCircleMarker; }),
     marker: vi.fn(function () { return {}; }),
@@ -224,6 +225,23 @@ describe('MapViewComponent', () => {
     beforeEach(async () => {
       createSubjects();
       await setUpModule();
+    });
+
+    it('restores the camera after remount without repeating the previous handoff fit', () => {
+      const state = TestBed.inject(DashboardViewStateService);
+      state.requestMapViewportFit();
+      fixture.destroy();
+      state.mapState.set({ center: [-35, -59], zoom: 11 });
+      fixture = TestBed.createComponent(MapViewComponent);
+      fixture.detectChanges();
+      const result = createMockQueryResult([mockNode, mockNode2]);
+      queryResultSubject.next(result);
+      filteredSubject.next(result);
+      fixture.componentInstance['initMap']();
+      const map = fixture.componentInstance['map'] as unknown as { setView: ReturnType<typeof vi.fn>; fitBounds: ReturnType<typeof vi.fn> };
+      expect(map.setView).toHaveBeenCalledWith([-35, -59], 11);
+      expect(map.fitBounds).not.toHaveBeenCalled();
+      expect(state.mapState()).toEqual({ center: [-35, -59], zoom: 11 });
     });
 
     it('should create the component', () => {
