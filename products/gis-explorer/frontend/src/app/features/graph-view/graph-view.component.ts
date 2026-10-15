@@ -1,3 +1,4 @@
+import { isDashboardHostAvailable } from '@rdfgis/platform-bridge';
 import { TranslatePipe } from '../../core/services/translate.pipe';
 import {
   Component,
@@ -318,6 +319,9 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
   ) {
     effect(() => {
+      if (this.viewState.pendingEntitySnapshot()) queueMicrotask(() => this.restoreSavedEntity());
+    });
+    effect(() => {
       const request = this.viewState.graphLayoutReset();
       if (request.revision === 0 || !this.cy || !(request.layout in LAYOUT_CONFIGS)) return;
       this.setLayout(request.layout as GraphLayout);
@@ -340,7 +344,37 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     });
   }
 
+  get canReturnToRdf(): boolean { return isDashboardHostAvailable() && !!this.viewState.origin()?.panelId; }
+
+  private restoringEntity: import('@core/services/dashboard-view-state.service').EntityViewSnapshot | null = null;
+
+  private captureSession = (): void => {
+    this.persistGraphState();
+    this.viewState.cachedEntityResult = this.entityCompleteResult;
+    this.viewState.entitySnapshot.set(this.isEntityMode ? {
+      state: structuredClone(this.explorationState), layout: this.currentLayout,
+      pan: this.cy ? { ...this.cy.pan() } : undefined, zoom: this.cy?.zoom(),
+      panelVisible: this.entityPanelVisible,
+    } : null);
+  };
+
+  private restoreSavedEntity(): void {
+    const saved = this.viewState.pendingEntitySnapshot();
+    if (!saved?.state.rootUri || !this.lastVisibleResult || this.structureLoading) return;
+    this.viewState.pendingEntitySnapshot.set(null);
+    this.restoringEntity = saved;
+    this.entityPanelVisible = saved.panelVisible;
+    if (this.viewState.cachedEntityResult) {
+      this.entityCompleteResult = this.viewState.cachedEntityResult;
+      this.enterEntity(saved.state.rootUri, 'user-action');
+    } else this.openEntity(saved.state.rootUri, 'user-action');
+  }
+
   ngOnInit(): void {
+    this.viewState.captureGraph = this.captureSession;
+    if (this.viewState.entitySnapshot() && !this.viewState.pendingEntitySnapshot()) {
+      this.viewState.pendingEntitySnapshot.set(this.viewState.entitySnapshot());
+    }
     const storedGraphState = this.viewState.graphState();
     this.detailLevel = storedGraphState?.detailLevel ?? 'summary';
     this.expandedSuperEdgeIds = new Set(storedGraphState?.expandedSuperEdgeIds ?? []);
@@ -357,6 +391,7 @@ export class GraphViewComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(([original, visible, filters, lotState]) => {
         this.applyResult(original, visible, filters, lotState);
+        this.restoreSavedEntity();
         // Cartel de carga: los elementos ya están en Cytoscape (el layout puede
         // seguir acomodándolos, pero el grafo ya se ve).
         if (visible) this.loadProgress.reportViewRendered('graph');
@@ -475,6 +510,8 @@ export class GraphViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.captureSession();
+    if (this.viewState.captureGraph === this.captureSession) this.viewState.captureGraph = undefined;
     this.entityRequest?.unsubscribe();
     this.stopThemeListener();
     this.destroy$.next();
@@ -2046,6 +2083,13 @@ export class GraphViewComponent implements OnInit, OnDestroy {
     // El modo entidad arranca mostrando la propiedad directa de cada literal.
     this.currentLayout = 'dagre';
     this.detailLevel = 'literals';
+    if (this.restoringEntity) {
+      const saved = this.restoringEntity;
+      this.explorationState = structuredClone(saved.state);
+      if (saved.layout in LAYOUT_CONFIGS) this.currentLayout = saved.layout as GraphLayout;
+      this.restoreCamera = saved.pan && saved.zoom ? { pan: saved.pan, zoom: saved.zoom } : undefined;
+      this.restoringEntity = null;
+    }
     this.manualPositions.clear();
     this.destroyGraph();
     this.syncEntityMode();

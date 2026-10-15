@@ -1,9 +1,11 @@
+import { Literal } from '../../graph/domain';
 import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, computed, inject, effect, signal, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PropertyGraphService } from '../../graph/property-graph.service';
 import { RequestService } from '../../core/request.service';
 import type { RDFResource, FilterType, FilterMetadata } from '../../graph/domain';
+import type { SparqlBinding } from '../../graph/domain/variable';
 import type { Filter, FilterFieldMeta } from '../../graph/domain';
 
 interface FilterField {
@@ -40,6 +42,8 @@ export class EditPanelComponent implements OnDestroy {
   newValueType = 'url';
   newValuePlaceholder = 'add a new URI';
   newValue = '';
+  newValueLanguage = '';
+  newValueDatatype = '';
 
   resultFilterValue = '';
   // Signals: la app es zoneless, así que todo estado mutado desde callbacks
@@ -66,6 +70,7 @@ export class EditPanelComponent implements OnDestroy {
   newFilterFields: FilterField[] = [];
   existingFilters: ExistingFilter[] = [];
 
+  readonly constraintError = signal<string | null>(null);
   private lastSelected: RDFResource | null = null;
 
   constructor() {
@@ -80,8 +85,10 @@ export class EditPanelComponent implements OnDestroy {
       if (sel !== this.lastSelected) {
         this.lastSelected = sel;
         this.editResource(sel);
-      } else if (sel.isVariable()) {
-        this.loadPreview();
+      } else {
+        if (this.constraintFilters(sel).length || !sel.isVariable()) { this.isVariable = false; this.isConst = true; }
+        this.updateExistingFilters();
+        if (this.isVariable) this.loadPreview();
       }
     });
   }
@@ -90,12 +97,16 @@ export class EditPanelComponent implements OnDestroy {
     if (this.resultFilterValue) {
       this.resultFilterValue = '';
     }
+    this.newValue = '';
+    this.newValueLanguage = '';
+    this.newValueDatatype = '';
     this.resultOffset = 0;
     this.hasMoreResults.set(false);
     this.loadError.set(null);
-    this.isVariable = resource.isVariable();
+    this.constraintError.set(null);
+    this.isVariable = resource.isVariable() && this.constraintFilters(resource).length === 0;
     this.isConst = !this.isVariable;
-    this.isLiteral = !!(resource as unknown as Record<string, unknown>)['parent'];
+    this.isLiteral = resource instanceof Literal;
     if (this.isLiteral) {
       this.newValueType = 'text';
       this.newValuePlaceholder = 'add a new literal';
@@ -111,6 +122,7 @@ export class EditPanelComponent implements OnDestroy {
   mkVariable(): void {
     const sel = this.selected();
     if (!sel) return;
+    sel.variable.filters = sel.variable.filters.filter(f => !this.isValueConstraint(f));
     sel.mkVariable();
     this.isVariable = true;
     this.isConst = false;
@@ -123,17 +135,23 @@ export class EditPanelComponent implements OnDestroy {
   mkConst(): void {
     const sel = this.selected();
     if (!sel) return;
-    sel.mkConst();
+    // Opening the value editor does not change the query before a value is entered.
     this.isVariable = false;
     this.isConst = true;
-    this.graph.refresh();
   }
 
-  addValue(newV?: string): void {
+  addValue(newV?: string, binding?: SparqlBinding): void {
     const sel = this.selected();
     if (!sel) return;
     const val = newV ?? this.newValue;
-    if (!val) return;
+    if (val === '' && !this.isLiteral) return;
+    this.constraintError.set(null);
+    try {
+      this.graph.replaceConstraintValue(sel, val, binding ? { language: binding['xml:lang'], datatype: binding.datatype } : this.isLiteral ? { language: this.newValueLanguage || undefined, datatype: this.newValueDatatype || undefined } : {});
+    } catch (error) {
+      this.constraintError.set(error instanceof Error ? error.message : String(error));
+      return;
+    }
     this.newValue = '';
     this.previewAbort?.abort();
     this.previewAbort = null;
@@ -141,14 +159,38 @@ export class EditPanelComponent implements OnDestroy {
     this.hasMoreResults.set(false);
     this.isVariable = false;
     this.isConst = true;
-    this.graph.replaceConstraintValue(sel, val);
+    this.updateExistingFilters();
   }
 
   rmValue(value: string): void {
     const sel = this.selected();
     if (!sel) return;
     sel.removeUri(value);
-    this.graph.refresh();
+    sel.variable.filters = sel.variable.filters.filter(f => !(this.isValueConstraint(f) && f.data.value === value));
+    if (!this.constraintValues().length) this.mkVariable();
+    else this.graph.refresh();
+  }
+
+  private isValueConstraint(filter: Filter): boolean {
+    return filter.type === 'resourceEquals' || filter.type === 'equals';
+  }
+
+  private constraintFilters(resource: RDFResource): Filter[] {
+    return resource.variable.filters.filter(f => this.isValueConstraint(f));
+  }
+
+  constraintValues(): Array<{ value: string; language?: string; datatype?: string }> {
+    const sel = this.selected();
+    if (!sel) return [];
+    const filters = this.constraintFilters(sel).map(f => ({ ...f.data, value: f.data.value ?? '' }));
+    return filters.length ? filters : sel.isVariable() ? [] : sel.uris.map(value => ({ value }));
+  }
+
+  editValue(value: string): void {
+    const constraint = this.constraintValues().find(c => c.value === value);
+    this.newValue = value;
+    this.newValueLanguage = constraint?.language ?? '';
+    this.newValueDatatype = constraint?.datatype ?? '';
   }
 
   onNewFilterTypeChange(type: FilterType | ''): void {
@@ -230,7 +272,7 @@ export class EditPanelComponent implements OnDestroy {
 
   getFilterTypeOptions(): Array<{ key: string; metadata: FilterMetadata }> {
     const cat = this.filterCatalog();
-    return Object.entries(cat).map(([key, meta]) => ({ key, metadata: meta }));
+    return Object.entries(cat).filter(([key]) => key !== 'resourceEquals' && key !== 'equals').map(([key, meta]) => ({ key, metadata: meta }));
   }
 
   updateFilterFields(): void {
@@ -256,7 +298,7 @@ export class EditPanelComponent implements OnDestroy {
       this.existingFilters = [];
       return;
     }
-    this.existingFilters = sel.variable.filters.map(f => ({
+    this.existingFilters = sel.variable.filters.filter(f => !this.isValueConstraint(f)).map(f => ({
       filter: f,
       typeName: this.getFilterMeta(f.type)?.name ?? f.type,
       fields: Object.entries(this.getFilterMeta(f.type)?.data ?? {}).map(([k, v]) => ({
@@ -315,7 +357,7 @@ export class EditPanelComponent implements OnDestroy {
 
   private loadPreview(isLoadMore = false): void {
     const sel = this.selected();
-    if (!sel || !sel.isVariable()) return;
+    if (!sel || !sel.isVariable() || !this.isVariable) return;
 
     if (!isLoadMore) {
       this.resultOffset = 0;

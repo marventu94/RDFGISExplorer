@@ -235,6 +235,16 @@ describe('TimelineViewComponent', () => {
     fixture.detectChanges();
   });
 
+  it('keeps the saved window pending for the first result after remount', () => {
+    fixture.destroy();
+    const state = TestBed.inject(DashboardViewStateService);
+    const saved = { rangeStart: '2020-01-01T00:00:00.000Z', rangeEnd: '2025-01-01T00:00:00.000Z' };
+    state.timelineState.set(saved);
+    fixture = TestBed.createComponent(TimelineViewComponent);
+    fixture.detectChanges();
+    expect(state.pendingTimelineWindow()).toEqual(saved);
+  });
+
   it('should create the component', () => {
     expect(component).toBeTruthy();
   });

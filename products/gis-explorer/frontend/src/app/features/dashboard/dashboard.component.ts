@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, computed, inject, input, signal, AfterViewInit } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, input, AfterViewInit } from '@angular/core';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { SparqlInputComponent } from '@features/sparql-input/sparql-input.component';
@@ -28,10 +28,9 @@ export class DashboardComponent implements AfterViewInit {
 
   private readonly gisHandoff = inject(GisHandoffService);
 
-  protected readonly colLeft = signal(50);
-  protected readonly rowTop = signal(50);
-
   protected readonly layout = inject(DashboardLayoutService);
+  protected readonly colLeft = this.layout.colLeft;
+  protected readonly rowTop = this.layout.rowTop;
   protected readonly preset = this.layout.preset;
   protected readonly slotIndices = computed(() =>
     Array.from({ length: this.layout.slotCount() }, (_, i) => i),

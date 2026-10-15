@@ -1,3 +1,5 @@
+import { UriCellRendererComponent } from './cell-renderers/uri-cell-renderer.component';
+import type { ICellRendererParams } from 'ag-grid-community';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -85,6 +87,21 @@ describe('TableViewComponent', () => {
     setFocus: ReturnType<typeof vi.fn>;
     setPrimaryVariable: ReturnType<typeof vi.fn>;
   };
+  it('abbreviates URI cells in every column, leaving literal cells alone', () => {
+    const result: QueryResult = {
+      ...mockQueryResult, variables: ['cityLabel', 'city', 'otherCity'],
+      bindings: [{ cityLabel: mockBindingValueLiteral, city: mockBindingValueUri, otherCity: mockBindingValueUri }],
+    };
+    selectionServiceMock.queryResult$.next(result);
+    selectionServiceMock.visibleQueryResult$.next(result);
+    fixture.detectChanges();
+    const defs = component.columnDefs();
+    const params = { data: result.bindings[0] } as ICellRendererParams;
+    expect(defs[0].cellRendererSelector?.(params)).toBeUndefined();
+    expect(defs[1].cellRendererSelector?.(params)?.component).toBe(UriCellRendererComponent);
+    expect(defs[2].cellRendererSelector?.(params)?.component).toBe(UriCellRendererComponent);
+  });
+
   beforeEach(async () => {
     selectionServiceMock = {
       visibleQueryResult$: new BehaviorSubject<QueryResult | null>(null),

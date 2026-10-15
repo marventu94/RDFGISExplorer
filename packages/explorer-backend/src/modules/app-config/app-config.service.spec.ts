@@ -240,7 +240,7 @@ describe('AppConfigService', () => {
       expect(service.getConfig().limits).toEqual({
         graphMaxNodes: 300,
         lotDefaultSize: 300,
-        lotSizeOptions: [100, 300, 500],
+        lotSizeOptions: [300],
         tablePageSizeOptions: [50, 100, 200],
         exportMaxRows: 50_000,
         exportMinPageSize: 250,
@@ -248,11 +248,22 @@ describe('AppConfigService', () => {
       });
     });
 
+    it('uses one variable for batch size and response cap, ignoring legacy lot settings', () => {
+      const service = new AppConfigService(
+        createConfigMock({ SPARQL_MAX_LIMIT: '500', GIS_LOT_DEFAULT_SIZE: '300', GIS_LOT_SIZE_OPTIONS: '100,300' }) as unknown as ConfigService,
+        endpointFor('generic'),
+      );
+      const config = service.getConfig();
+      expect(config.maxLimit).toBe(500);
+      expect(config.limits.lotDefaultSize).toBe(config.maxLimit);
+      expect(config.limits.lotSizeOptions).toEqual([config.maxLimit]);
+    });
+
     it('reads integer limits from env', () => {
       const service = new AppConfigService(
         createConfigMock({
           GIS_GRAPH_MAX_NODES: '150',
-          GIS_LOT_DEFAULT_SIZE: '100',
+          SPARQL_MAX_LIMIT: '100',
           EXPORT_MAX_ROWS: '10000',
           EXPORT_MIN_PAGE_SIZE: '125',
           SUMMARY_TOP_CATEGORICAL_LIMIT: '7',
@@ -270,13 +281,13 @@ describe('AppConfigService', () => {
     it('parses CSV list options from env', () => {
       const service = new AppConfigService(
         createConfigMock({
-          GIS_LOT_SIZE_OPTIONS: '200, 400 ,800',
+          SPARQL_MAX_LIMIT: '800',
           GIS_TABLE_PAGE_SIZE_OPTIONS: '25,75',
         }) as unknown as ConfigService,
         endpointFor('generic'),
       );
       const limits = service.getConfig().limits;
-      expect(limits.lotSizeOptions).toEqual([200, 400, 800]);
+      expect(limits.lotSizeOptions).toEqual([800]);
       expect(limits.tablePageSizeOptions).toEqual([25, 75]);
     });
 
@@ -284,14 +295,14 @@ describe('AppConfigService', () => {
       const service = new AppConfigService(
         createConfigMock({
           GIS_GRAPH_MAX_NODES: 'abc',
-          GIS_LOT_SIZE_OPTIONS: 'x,,y',
+          SPARQL_MAX_LIMIT: 'invalid',
           EXPORT_MAX_ROWS: '-5',
         }) as unknown as ConfigService,
         endpointFor('generic'),
       );
       const limits = service.getConfig().limits;
       expect(limits.graphMaxNodes).toBe(300);
-      expect(limits.lotSizeOptions).toEqual([100, 300, 500]);
+      expect(limits.lotSizeOptions).toEqual([300]);
       expect(limits.exportMaxRows).toBe(50_000);
     });
   });

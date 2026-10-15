@@ -288,6 +288,10 @@ export class SelectionService {
     this._activeFilters$.next(current.filter((f) => f.id !== id));
   }
 
+  restoreFilters(filters: Filter[]): void {
+    this._activeFilters$.next(structuredClone(filters));
+  }
+
   clearFilters(): void {
     if (this._activeFilters$.getValue().length > 0) this.resetLotForFilters();
     this._activeFilters$.next([]);

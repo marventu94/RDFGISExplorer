@@ -6,6 +6,7 @@ import type { Prefix } from '../core/services/app-config.service';
 import {
   PropertyGraph,
   Node,
+  Literal,
   Edge,
   Query,
   RDFResource,
@@ -15,6 +16,7 @@ import {
 import type { DropPayload } from './domain';
 import type { QueryRetriever } from './domain';
 import { serializeGraph, deserializeGraph, type ExplorerSerializedGraph } from './domain/graph-serializer';
+import { Filter } from './domain/filter';
 import { addClassNode, addDiscoveryPath, nodeClasses } from './domain/discovery';
 import type { DiscoveryExample, DiscoveryStep } from '@rdfgis/contracts';
 
@@ -37,7 +39,8 @@ export class PropertyGraphService {
     return token;
   }
 
-  replaceConstraintValue(resource: RDFResource, value: string): void {
+  replaceConstraintValue(resource: RDFResource, value: string, metadata: { language?: string; datatype?: string } = {}): void {
+    if (resource instanceof Node && !/^[a-z][a-z0-9+.-]*:[^\s<>"\\{}|^`]*$/i.test(value)) throw new Error('Invalid resource IRI');
     for (const previous of [...resource.uris]) {
       if (resource instanceof Node && this.graphRef.uriToNode.get(previous) === resource) {
         this.graphRef.unregisterUriNode(previous);
@@ -45,8 +48,16 @@ export class PropertyGraphService {
       resource.removeUri(previous);
     }
     resource.cur = -1;
-    resource.addUri(value);
-    resource.mkConst();
+    if (resource instanceof Node || resource instanceof Literal) {
+      // Keep the variable and its connections; replace only its exact-value constraint.
+      resource.mkVariable();
+      const type = resource instanceof Node ? 'resourceEquals' : 'equals';
+      resource.variable.filters = resource.variable.filters.filter(f => f.type !== type);
+      resource.variable.filters.push(new Filter(resource.variable, type, { value, ...metadata }));
+    } else {
+      resource.addUri(value);
+      resource.mkConst();
+    }
     this.refresh();
   }
 

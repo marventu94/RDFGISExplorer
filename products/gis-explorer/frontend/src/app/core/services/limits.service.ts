@@ -3,9 +3,9 @@ import type { LimitsConfig } from '@rdfgis/contracts';
 import { DEFAULT_LOT_SIZE, LOT_SIZE_OPTIONS } from '@shared/stats/lots';
 
 /**
- * Defaults equivalentes a los del backend: valen hasta que llega la config
+ * Valores provisionales: valen hasta que llega la config
  * (que carga async, y en el remote puede no llegar nunca si el backend está
- * caído). Mantener alineados con AppConfigService.buildLimits().
+ * caído). El tamaño real del lote llega de SPARQL_MAX_LIMIT vía /api/config.
  */
 export const DEFAULT_LIMITS: LimitsConfig = {
   graphMaxNodes: 300,

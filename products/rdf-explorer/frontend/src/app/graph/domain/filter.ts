@@ -1,7 +1,7 @@
 import type { Variable } from './variable';
 import type { DomainEndpointAdapter } from './endpoint/adapter';
 
-export type FilterType = 'text' | 'lang' | 'regex' | 'leq' | 'geq' | 'isuri' | 'isliteral' | 'datefrom' | 'dateto' | 'equals' | 'datatype' | 'isresource';
+export type FilterType = 'resourceEquals' | 'text' | 'lang' | 'regex' | 'leq' | 'geq' | 'isuri' | 'isliteral' | 'datefrom' | 'dateto' | 'equals' | 'datatype' | 'isresource';
 
 export type DateGranularity = 'year' | 'month' | 'day';
 
@@ -72,6 +72,11 @@ export class Filter {
   serialize(adapter: DomainEndpointAdapter): string {
     const v = this.variable.toString();
     switch (this.type) {
+      case 'resourceEquals': {
+        const uri = this.data.value ?? '';
+        if (!/^[a-z][a-z0-9+.-]*:[^\s<>"\\{}|^`]*$/i.test(uri)) throw new Error('Invalid resource IRI');
+        return `FILTER (sameTerm(${v}, <${uri}>))\n`;
+      }
       case 'equals': {
         const quote = (s: string) => '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"';
         const checks = [`isLiteral(${v})`, `STR(${v}) = ${quote(this.data.value ?? '')}`];

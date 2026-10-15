@@ -135,6 +135,10 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.drawnItems = L.featureGroup();
     this.map!.addLayer(this.drawnItems);
 
+    // Snapshot before synchronous result subscriptions can request an initial fit.
+    const storedMapState = this.viewState.mapState();
+    if (storedMapState) this.appliedViewportFitRevision = this.viewState.mapViewportFit();
+
     // Los event listeners y setupSubscriptions DEBEN registrarse siempre.
     // setupDrawControl/setupGeocoder pueden fallar si leaflet-draw/geocoder no augmentaron
     // la instancia correcta de L en native federation — se envuelven en try-catch para
@@ -174,7 +178,6 @@ export class MapViewComponent implements OnInit, OnDestroy {
     this.initResizeObserver();
 
     // Restore stored view state
-    const storedMapState = this.viewState.mapState();
     if (storedMapState) {
       this.map.setView(storedMapState.center, storedMapState.zoom);
     }
@@ -199,6 +202,10 @@ export class MapViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.map) {
+      const center = this.map.getCenter();
+      this.viewState.mapState.set({ center: [center.lat, center.lng], zoom: this.map.getZoom() });
+    }
     this.destroy$.next();
     this.destroy$.complete();
     this.resizeObserver?.disconnect();
@@ -241,7 +248,7 @@ export class MapViewComponent implements OnInit, OnDestroy {
       position: 'topright',
       draw: {
         rectangle: false,
-        polygon: { shapeOptions: {} },
+        polygon: { shapeOptions: { fillOpacity: 0.08 } },
         marker: false,
         circle: false,
         polyline: false,
@@ -559,6 +566,19 @@ export class MapViewComponent implements OnInit, OnDestroy {
     const geoFilterIds = new Set(
       filters.filter((f): f is GeoFilter => f.kind === 'geo').map((f) => f.id),
     );
+    const existing = new Set<string>();
+    this.drawnItems.eachLayer(layer => {
+      const id = (layer as unknown as Record<string, unknown>)['_filterId'];
+      if (typeof id === 'string') existing.add(id);
+    });
+    for (const filter of filters) {
+      if (filter.kind !== 'geo' || existing.has(filter.id)) continue;
+      L.geoJSON(filter.polygon, { style: { fillOpacity: 0.08 } }).eachLayer(layer => {
+        (layer as unknown as Record<string, unknown>)['_filterId'] = filter.id;
+        this.drawnItems!.addLayer(layer);
+      });
+    }
+
 
     this.drawnItems.eachLayer((layer) => {
       const layerFilterId = (layer as unknown as Record<string, unknown>)['_filterId'] as

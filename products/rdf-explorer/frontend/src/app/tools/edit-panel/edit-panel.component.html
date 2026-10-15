@@ -10,7 +10,7 @@
   </div>
   @if (!isVariable) {
     <section class="edit-card">
-      <h4>{{ 'Restricciones' | translate }}</h4>
+      <h4>{{ (isLiteral ? 'Texto fijo' : 'Recurso fijo') | translate }}</h4>
       <form novalidate class="value-entry" (submit)="addValue(); $event.preventDefault()">
         <input [type]="newValueType" name="newValue" [placeholder]="newValuePlaceholder" [(ngModel)]="newValue"
           [attr.aria-label]="'Agregar valor' | translate" />
@@ -19,14 +19,27 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         </button>
       </form>
-      @if (!sel.hasUris()) {
+      @if (isLiteral) {
+        <label class="filter-field"><span>{{ 'Idioma del texto' | translate }}</span>
+          <input type="text" [(ngModel)]="newValueLanguage" placeholder="es" />
+        </label>
+        <label class="filter-field"><span>{{ 'Tipo de dato (URI)' | translate }}</span>
+          <input type="url" [(ngModel)]="newValueDatatype" placeholder="http://www.w3.org/2001/XMLSchema#string" />
+        </label>
+      }
+      @if (constraintError(); as error) { <p class="notice error" role="alert">{{ error }}</p> }
+      @if (constraintValues().length === 0) {
         <p class="notice warning">{{ 'Para usar este recurso como restricción necesitás agregar al menos un valor' | translate }}</p>
       }
       <div class="value-list">
-        @for (value of sel.uris; track value) {
+        @for (constraint of constraintValues(); track constraint.value) {
           <div class="value-row">
-            <span class="value-text" [title]="value">{{ isLiteral ? value : getLabel(value) }}</span>
-            <button class="icon-button" type="button" (click)="rmValue(value)"
+            <span class="value-text" [title]="constraint.value">{{ isLiteral ? '“' + constraint.value + '”' : getLabel(constraint.value) }}
+              @if (constraint.language) { <small> @{{ constraint.language }}</small> }
+              @if (constraint.datatype) { <small [title]="constraint.datatype"> ^^{{ getLabel(constraint.datatype) }}</small> }
+            </span>
+            <button class="icon-button" type="button" (click)="editValue(constraint.value)" [attr.aria-label]="'Editar' | translate">✎</button>
+            <button class="icon-button" type="button" (click)="rmValue(constraint.value)"
               [attr.title]="'Quitar valor' | translate" [attr.aria-label]="'Quitar valor' | translate">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" /></svg>
             </button>
@@ -69,8 +82,8 @@
       <div class="value-list">
         @for (elem of results(); track elem.value) {
           <div class="value-row">
-            <span class="value-text" [title]="elem.value">{{ getLabel(elem.value) }}</span>
-            <button class="icon-button" type="button" (click)="addValue(elem.value)"
+            <span class="value-text" [title]="elem.value">{{ isLiteral ? elem.value : getLabel(elem.value) }}</span>
+            <button class="icon-button" type="button" (click)="addValue(elem.value, elem)"
               [attr.title]="'Agregar valor' | translate" [attr.aria-label]="'Agregar valor' | translate">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
             </button>
@@ -86,12 +99,14 @@
         }
       </div>
     </section>
+  }
+  @if (sel.isVariable()) {
     <section class="edit-card filters-card">
       <button class="section-toggle" type="button" (click)="showFilters = !showFilters"
         [attr.aria-expanded]="showFilters" aria-controls="edit-filters">
         <svg class="chevron" [class.expanded]="showFilters" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
         <strong>{{ 'Filtros' | translate }}</strong>
-        @if (sel.variable.filters.length > 0) { <span class="count-badge">{{ sel.variable.filters.length }}</span> }
+        @if (existingFilters.length > 0) { <span class="count-badge">{{ existingFilters.length }}</span> }
       </button>
       @if (showFilters) {
         <div id="edit-filters" class="filter-content">

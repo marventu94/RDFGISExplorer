@@ -10,6 +10,9 @@ type SelectAst = {
   order?: unknown[];
   limit?: number;
   offset?: number;
+  prefixes?: Record<string, string>;
+  base?: string;
+  from?: unknown;
 };
 
 const parser = new Parser();
@@ -111,10 +114,20 @@ export function entityScopedQuery(query: string, variable: string, uri: string):
     throw new Error('La entidad seleccionada no tiene una URI válida para recuperar su estructura.');
   }
   const ast = select(query);
-  if (ast.limit !== undefined || ast.offset !== undefined) {
-    throw new Error('La estructura completa no está disponible para consultas con LIMIT u OFFSET.');
-  }
   const values = select(`SELECT * WHERE { VALUES ?${variable} { <${uri}> } }`).where;
+  if (ast.limit !== undefined || ast.offset !== undefined) {
+    // Select the entity AFTER the user's slice, never move LIMIT/OFFSET onto
+    // the entity filter: that would silently retrieve a different result.
+    const outer = select('SELECT * WHERE {}');
+    outer.prefixes = ast.prefixes;
+    outer.base = ast.base;
+    outer.from = ast.from;
+    delete ast.prefixes;
+    delete ast.base;
+    delete ast.from;
+    outer.where = [{ type: 'group', patterns: [ast] }, ...(values ?? [])];
+    return generator.stringify(outer as never);
+  }
   ast.where = [...(ast.where ?? []), ...(values ?? [])];
   return generator.stringify(ast as never);
 }

@@ -1,3 +1,4 @@
+import { consumeExplorerReturn } from '@rdfgis/platform-bridge';
 import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, inject, OnInit, DestroyRef, computed, effect, signal, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -115,6 +116,10 @@ export class MainComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    const panelId = consumeExplorerReturn();
+    if (panelId && this.workspace.panels().some(panel => panel.id === panelId)) {
+      this.switchPanel(panelId);
+    }
     this.route.queryParamMap
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(params => {

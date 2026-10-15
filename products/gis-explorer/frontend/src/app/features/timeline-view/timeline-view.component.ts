@@ -132,6 +132,10 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
     // SelectionService emiten sincrónicamente al suscribirse, así que con un
     // queryResult ya presente (dashboard hidratado / handoff) renderItems()
     // correría con this.timeline undefined y se perdería el encuadre inicial.
+    const savedWindow = this.viewState.timelineState();
+    if (savedWindow && !this.viewState.pendingTimelineWindow()) {
+      this.viewState.restoreTimelineWindow(savedWindow);
+    }
     this.initTimeline();
     this.initResizeObserver();
 
@@ -440,6 +444,10 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.timeline) {
+      const window = this.timeline.getWindow();
+      this.viewState.timelineState.set({ rangeStart: window.start.toISOString(), rangeEnd: window.end.toISOString() });
+    }
     this.destroy$.next();
     this.destroy$.complete();
     this.resizeObserver?.disconnect();

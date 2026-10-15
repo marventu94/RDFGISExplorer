@@ -11,6 +11,25 @@ SELECT DISTINCT ?listing ?price ?wkt ?date WHERE {
 }`;
 
 describe('server-side GIS paging', () => {
+  it('keeps manual LIMIT/OFFSET inside the result before filtering an entity', () => {
+    const parser = new Parser();
+    const input = 'PREFIX ex: <http://example.org/> SELECT ?listing ?price FROM <http://example.org/data> WHERE { ?listing ex:price ?price } ORDER BY ?price LIMIT 500 OFFSET 10';
+    const scoped = entityScopedQuery(input, 'listing', 'http://example.org/listing/1');
+    const ast = parser.parse(scoped) as unknown as { from: { default: { value: string }[] }; limit?: number; offset?: number; where: [{ patterns: { limit?: number; offset?: number }[] }, { type: string }] };
+    expect(ast.from.default[0].value).toBe('http://example.org/data');
+    expect(ast.limit).toBeUndefined();
+    expect(ast.offset).toBeUndefined();
+    const inner = ast.where[0].patterns[0];
+    expect(inner.limit).toBe(500);
+    expect(inner.offset).toBe(10);
+    expect(ast.where[1].type).toBe('values');
+    const page = parser.parse(pagedQuery(scoped, 2, 100)) as unknown as typeof ast;
+    expect(page.limit).toBe(100);
+    expect(page.offset).toBe(100);
+    expect(page.where[0].patterns[0].limit).toBe(500);
+    expect(page.where[0].patterns[0].offset).toBe(10);
+  });
+
   it('keeps the graph patterns and pages all projected rows in a stable order', () => {
     const first = pagedQuery(query, 1, 300);
     const second = pagedQuery(query, 2, 300);

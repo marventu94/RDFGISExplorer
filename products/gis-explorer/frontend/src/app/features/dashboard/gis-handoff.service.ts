@@ -107,6 +107,12 @@ export class GisHandoffService {
     // La vista importada es una vista NUEVA: si siguiera apuntando al tablero
     // que estaba abierto, "Guardar" lo sobrescribiría con la query importada.
     this.dashboardState.clearCurrent();
+    this.viewState.origin.set(payload.source);
+    this.viewState.cachedEntityResult = null;
+    this.viewState.timelineState.set(null);
+    this.viewState.pendingTimelineWindow.set(null);
+    this.viewState.entitySnapshot.set(null);
+    this.viewState.pendingEntitySnapshot.set(null);
 
     // A handoff starts a new GIS view: discard the previous graph camera and
     // use the dedicated graph-right / map-and-timeline-left arrangement.

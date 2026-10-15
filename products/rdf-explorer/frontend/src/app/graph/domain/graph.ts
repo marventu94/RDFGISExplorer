@@ -22,6 +22,7 @@ export const CHILD_HEIGHT = 20;
 export const PADDING = 10;
 
 export interface FilterCatalog {
+  resourceEquals: FilterMetadata;
   datatype: FilterMetadata;
   equals: FilterMetadata;
   text: FilterMetadata;
@@ -50,6 +51,7 @@ export class PropertyGraph implements GraphContext, VariableContext, LabelProvid
   readonly uriToNode = new Map<string, Node>();
 
   readonly filterCatalog: FilterCatalog = {
+    resourceEquals: { name: 'valor del recurso', inputs: 1, data: { value: { type: 'text' } } },
     datatype: { name: 'datatype', inputs: 1, data: { datatype: { type: 'text' } } },
     equals: { name: 'exact value', inputs: 3, data: { value: { type: 'text' }, datatype: { type: 'text' }, language: { type: 'text' } } },
     text: { name: 'contains', inputs: 1, data: { keyword: { type: 'text' } } },

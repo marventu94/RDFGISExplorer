@@ -33,6 +33,7 @@ export class QueryPagingService {
   private slowTimer?: ReturnType<typeof setTimeout>;
   private generation = 0;
   private session: Session | null = null;
+  private restoring = false;
   private readonly entityCache = new Map<string, QueryResult>();
   private requestedScoped: string | null = null;
   private retryRequest: { lot: number; size: number; recount: boolean; scoped: string; kind: LoadKind } | null = null;
@@ -46,7 +47,7 @@ export class QueryPagingService {
   constructor() {
     this.selection.pageRequests$.subscribe(({ lot, size }) => this.loadRequestedPage(lot, size));
     this.selection.activeFilters$.subscribe((filters) => {
-      if (this.session) this.applyFilters(filters);
+      if (this.session && !this.restoring) this.applyFilters(filters);
     });
   }
 
@@ -62,7 +63,7 @@ export class QueryPagingService {
       this.startWait('initial');
       return this.config.load().pipe(
         switchMap((cfg) => {
-          const size = Math.min(this.selection.getLotSizeSnapshot(), cfg.maxLimit);
+          const size = cfg.limits?.lotDefaultSize ?? Math.min(this.selection.getLotSizeSnapshot(), cfg.maxLimit);
           return this.count(query).pipe(
             switchMap((totalRows) => this.page(query, 1, size).pipe(
               map((result) => ({ result, totalRows, size })),
@@ -138,6 +139,32 @@ export class QueryPagingService {
             }),
           )
           : throwError(() => new Error('La entidad ya no aparece en la consulta filtrada.'))),
+      );
+    });
+  }
+
+  restoreView(filters: Filter[], requestedLot = 1, requestedSize = this.selection.getLotSizeSnapshot()): Observable<void> {
+    return defer(() => {
+      const session = this.session;
+      if (!session) return of(undefined);
+      const cfg = this.config.config();
+      const size = cfg?.limits?.lotDefaultSize ?? Math.max(1, Math.min(requestedSize, cfg?.maxLimit ?? requestedSize));
+      const scoped = scopedQuery(session.query, filters, session.fields);
+      return (scoped === session.query ? of(session.baseTotalRows) : this.count(scoped)).pipe(
+        switchMap(total => {
+          const lot = Math.max(1, Math.min(requestedLot, Math.max(1, Math.ceil(total / size))));
+          return this.page(scoped, lot, size).pipe(map(result => {
+            session.scoped = scoped;
+            session.totalRows = total;
+            session.cache.clear();
+            session.cache.set(`${lot}:${size}`, result);
+            this.restoring = true;
+            try { this.selection.restoreFilters(filters); } finally { this.restoring = false; }
+            const mapped = this.mapping.setSourceResult(result, this.mapping.overrides())!;
+            this.selection.setRemotePage(this.completePage(mapped), total, session.baseTotalRows, lot, size);
+          }));
+        }),
+        takeUntil(this.cancel$),
       );
     });
   }

@@ -43,10 +43,10 @@ import { ThemeToggleComponent } from '../core/theme-toggle.component';
       display: flex;
       align-items: center;
       gap: 1rem;
-      padding: 0.5rem 1.5rem;
+      padding: 0.25rem 1rem;
       background: var(--top-bar-bg);
       border-bottom: 1px solid var(--top-bar-border);
-      height: 56px;
+      height: 44px;
       box-sizing: border-box;
     }
 
@@ -63,7 +63,7 @@ import { ThemeToggleComponent } from '../core/theme-toggle.component';
 
     .top-bar__title {
       font-weight: 600;
-      font-size: 1.1rem;
+      font-size: 1rem;
       white-space: nowrap;
       color: var(--top-bar-title);
     }

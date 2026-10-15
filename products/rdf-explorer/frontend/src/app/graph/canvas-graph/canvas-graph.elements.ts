@@ -20,8 +20,10 @@ function compactFilterValue(value: unknown): string {
 /** Human-readable, compact representation of the actual SPARQL constraint. */
 export function filterLabel(filter: Filter): string {
   switch (filter.type) {
+    case 'resourceEquals':
+      return `Recurso = ${compactFilterValue(filter.variable.parent?.labelOf(filter.data.value ?? '') ?? filter.data.value)}`;
     case 'equals':
-      return `⌕ = “${compactFilterValue(filter.data.value)}”`;
+      return `Texto = “${compactFilterValue(filter.data.value)}”${filter.data.language ? ` @${filter.data.language}` : filter.data.datatype ? ` ^^${compactFilterValue(filter.variable.parent?.labelOf(filter.data.datatype) ?? filter.data.datatype)}` : ''}`;
     case 'datatype':
       return `⌕ datatype · ${compactFilterValue(filter.data.datatype)}`;
     case 'isresource':
@@ -47,6 +49,19 @@ export function filterLabel(filter: Filter): string {
   }
 }
 
+/** Fixed values are represented by the resource's label and blue border, not filter rows. */
+function fixedValue(resource: RDFResource): Filter | undefined {
+  return resource.variable.filters.find(filter => filter.type === 'resourceEquals' || filter.type === 'equals');
+}
+
+function isRestricted(resource: RDFResource): boolean {
+  return !resource.isVariable() || !!fixedValue(resource);
+}
+
+function visualFilters(resource: RDFResource): Filter[] {
+  return resource.variable.filters.filter(filter => filter.type !== 'resourceEquals' && filter.type !== 'equals');
+}
+
 /**
  * Traduccion dominio -> elementos de cytoscape.
  *
@@ -69,12 +84,12 @@ export function buildCanvasElements(
 
   for (const node of nodes) {
     const rowHeights: number[] = [
-      ...node.variable.filters.map(() => FILTER_HEIGHT),
+      ...visualFilters(node).map(() => FILTER_HEIGHT),
       ...node.properties.flatMap((prop) => [
         CHILD_HEIGHT,
-        ...prop.variable.filters.map(() => FILTER_HEIGHT),
+        ...visualFilters(prop).map(() => FILTER_HEIGHT),
         ...(prop.literal
-          ? [CHILD_HEIGHT, ...prop.literal.variable.filters.map(() => FILTER_HEIGHT)]
+          ? [CHILD_HEIGHT, ...visualFilters(prop.literal).map(() => FILTER_HEIGHT)]
           : []),
       ]),
     ];
@@ -91,7 +106,7 @@ export function buildCanvasElements(
     let rowTop = node.y - compoundHeight / 2 + NODE_TITLE_HEIGHT;
 
     const addFilterRows = (resource: RDFResource, ownerId: string): void => {
-      resource.variable.filters.forEach((filter, index) => {
+      visualFilters(resource).forEach((filter, index) => {
         elements.push({
           group: 'nodes',
           data: {
@@ -114,7 +129,7 @@ export function buildCanvasElements(
       data: {
         id: `n${node.id}`,
         kind: 'node',
-        color: node.isVariable() ? '#2ca02c' : '#1f77b4',
+        color: isRestricted(node) ? '#1f77b4' : '#2ca02c',
         label: nodeLabel(node),
         domain: node,
       },
@@ -166,7 +181,7 @@ export function buildCanvasElements(
             id: `l${prop.id}`,
             parent: `n${node.id}`,
             kind: 'literal',
-            color: '#9467bd',
+            color: isRestricted(prop.literal) ? '#1f77b4' : '#9467bd',
             label: resourceLabel(prop.literal),
             domain: prop.literal,
           },
@@ -220,10 +235,14 @@ export function canvasGraphInstanceChanged(
 }
 
 export function nodeLabel(node: Node): string {
-  return node.getRepr() ?? 'No values set!';
+  return resourceLabel(node);
 }
 
 export function resourceLabel(r: RDFResource): string {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (r as any).getRepr?.() ?? 'No values set!';
+  const fixed = fixedValue(r);
+  if (fixed) {
+    const value = fixed.data.value ?? '';
+    return fixed.type === 'resourceEquals' ? r.labelOf(value) : value;
+  }
+  return r.getRepr() ?? 'No values set!';
 }

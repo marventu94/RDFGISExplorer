@@ -8,7 +8,7 @@
         type="text"
         [ngModel]="name()"
         (ngModelChange)="onNameChange($event)"
-        [attr.placeholder]="'Ej: Mis ciudades argentinas' | translate"
+        [attr.placeholder]="'Ej: Mi exploración' | translate"
         [class.input-error]="hasConflict() && mode() === 'copy'"
       />
       @if (checking()) {

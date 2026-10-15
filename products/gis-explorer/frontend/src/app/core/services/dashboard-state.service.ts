@@ -19,14 +19,21 @@ import { QueryPagingService } from './query-paging.service';
 import { DashboardLoadProgressService } from './dashboard-load-progress.service';
 import { VariableMappingService } from './variable-mapping.service';
 import type { LoadStageId } from '@shared/progress/load-stages';
+import type { Filter } from '@shared/models/filter.model';
 import type { NormalizedNode, QueryResult } from '@shared/models';
 import { registerDashboardStateAdapter } from '@rdfgis/platform-bridge';
 import { I18nService } from './i18n.service';
 
 export interface GisDashboardPayload {
+  activeFilters?: Filter[];
+  paging?: { lot: number; size: number };
+  entityView?: import('./dashboard-view-state.service').EntityViewSnapshot;
   query: string;
   backend: string;
   layout: {
+    colLeft?: number;
+    rowTop?: number;
+    editorCollapsed?: boolean;
     slotsCount: 1 | 2 | 3 | 4;
     preset?: 'single' | 'split-h' | 'split-v' | 'triple' | 'triple-inv' | 'triple-v' | 'triple-v-inv' | 'quad';
     slots: Array<{ id: string; view: 'map' | 'timeline' | 'graph' | 'table' }>;
@@ -116,6 +123,7 @@ export class DashboardStateService {
   readonly isDirty = signal(false);
 
   serialize(): Readonly<GisDashboardPayload> {
+    this.viewState.captureGraph?.();
     const slotCount = this.layout.slotCount();
     const slots = this.layout.getSlotsSnapshot();
 
@@ -142,10 +150,16 @@ export class DashboardStateService {
     const tableState = this.viewState.tableState();
 
     const payload: GisDashboardPayload = {
+      activeFilters: structuredClone(this.selection.getActiveFiltersSnapshot()),
+      paging: { lot: this.selection.getCurrentLotSnapshot(), size: this.selection.getLotSizeSnapshot() },
+      entityView: this.viewState.entitySnapshot() ?? undefined,
       query: this.queryState.query(),
       ...(this.selection.primaryVariable() ? { primaryVariable: this.selection.primaryVariable()! } : {}),
       backend: this.queryState.backend(),
       layout: {
+        colLeft: this.layout.colLeft(),
+        rowTop: this.layout.rowTop(),
+        editorCollapsed: this.layout.editorCollapsed(),
         slotsCount: slotCount as 1 | 2 | 3 | 4,
         preset: this.layout.preset(),
         slots: visibleSlots,
@@ -175,9 +189,19 @@ export class DashboardStateService {
   deserialize(payload: GisDashboardPayload): Observable<void> {
     this.isHydrating.set(true);
 
+    this.viewState.cachedEntityResult = null;
+    this.viewState.entitySnapshot.set(null);
+    this.viewState.pendingEntitySnapshot.set(null);
+    this.viewState.origin.set(null);
+    this.viewState.mapState.set(null);
+    this.viewState.timelineState.set(null);
+    this.viewState.graphState.set(null);
+    this.viewState.tableState.set(null);
     this.queryState.query.set(payload.query);
     this.queryState.backend.set(payload.backend);
 
+    this.layout.restoreDividers(payload.layout.colLeft, payload.layout.rowTop);
+    this.layout.editorCollapsed.set(payload.layout.editorCollapsed ?? false);
     const slotsCount = payload.layout.slotsCount;
     const preset = payload.layout.preset ?? SLOT_COUNT_TO_PRESET[slotsCount];
     if (preset) {
@@ -224,7 +248,11 @@ export class DashboardStateService {
           // Si ninguna vista reportó (ningún slot montado), la etapa se cierra acá.
           this.progress.complete('process-results');
         }),
+        switchMap(() => payload.activeFilters?.length || payload.paging
+          ? this.paging.restoreView(payload.activeFilters ?? [], payload.paging?.lot, payload.paging?.size)
+          : of(undefined)),
         switchMap(() => {
+          this.viewState.pendingEntitySnapshot.set(payload.entityView ?? null);
           if (payload.selection) {
             const { selectedIds, pinnedId } = payload.selection;
             if (pinnedId) {
@@ -303,6 +331,7 @@ export class DashboardStateService {
   }
 
   clearCurrent(): void {
+    this.viewState.origin.set(null);
     this.currentDashboardId.set(null);
     this.currentDashboardName.set(null);
     this.isDirty.set(false);

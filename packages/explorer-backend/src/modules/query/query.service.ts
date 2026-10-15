@@ -81,7 +81,7 @@ export class QueryService {
       );
     }
 
-    const maxLimit = this.intConfig('SPARQL_MAX_LIMIT', 2000);
+    const maxLimit = this.intConfig('SPARQL_MAX_LIMIT', 300);
     const resolvedLimit = limit ?? maxLimit;
 
     if (resolvedLimit > maxLimit) {

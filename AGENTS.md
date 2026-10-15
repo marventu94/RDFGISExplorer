@@ -82,6 +82,7 @@ cd products/<product>/frontend && pnpm test
 ### Shell ↔ remote communication
 
 - **QueryHandoffService** is deliberately duplicated in `rdf_explorer` and `rdf_gis_explorer`; application services cannot be shared through federation. It uses `sessionStorage` + `CustomEvent('query-handoff')` + the `storage` event, a 5-minute TTL, and one-time `consume()` semantics.
+- **Return to RDF Explorer:** a live RDF → GIS handoff keeps the originating panel ID in GIS memory. The GIS navbar offers a return to that panel through `explorer-return.ts`; no result subgraph is transferred and no dashboard linkage is persisted. Opening a saved GIS dashboard or starting a new one clears this origin.
 - **Dashboards:** only the Shell exposes `/api/dashboards` and registers `DashboardHost` in `@rdfgis/platform-bridge`. Integrated remotes use that mediation; standalone mode hides persistence.
 - **Dialogs:** Shell, GIS, and Explorer dialogs share one visual design (bordered container, `h3`, labelled fields, 4px buttons; `.btn-danger` for destructive actions). The Shell's copy lives in `shell/dialog.styles.ts`. Do not use `window.prompt`/`window.confirm`.
 - **Explorer APIs:** standalone mode uses `/api`; the Shell configures `/rdf-api` and `/gis-api`, always as relative URLs.
@@ -189,6 +190,7 @@ Four views are synchronized through `SelectionService` (BehaviorSubject):
 **Coordinated View:** map, graph, and timeline emit `setFocus(uris)` when panning/zooming.
 The others adjust their viewport. A global navbar toggle controls this
 behavior.
+URI cells in every table column use `defaultPrefixes` (most specific match), with local-name fallback and full values retained for tooltips, search and export.
 The table is auxiliary: it receives focus and highlights matching rows, but its
 scrolling, pagination, sorting, and quick filter never emit coordinated focus or
 activate the green view border. User navigation in the table releases the previous
@@ -215,7 +217,7 @@ an explicit selection; coordinated focus never changes the mode or root. It
 uses the current `QueryResult` for local results. With server paging,
 `QueryPagingService` fetches every row of the selected resource from the
 currently filtered query before entering entity mode; this does not change the
-visible lot. Queries with their own LIMIT/OFFSET cannot use this completion.
+visible lot. Manual LIMIT/OFFSET remain inside a subquery before filtering the selected entity, so structure completion respects the user-selected slice. The navbar warns that this manual boundary can omit entities or related data; the per-request backend cap does not limit the total traversed across lots.
 Pure logic lives in `features/graph-view/entity-subgraph.ts` (deterministic selection, paths,
 hubs, budget) and `entity-exploration.ts` (root, active node, branches, pins,
 history). State is transient; leaving restores camera/layout/level.
@@ -232,8 +234,7 @@ implements clipboard plus manual fallback.
 `setLotSize()`, `setCurrentLot()`, `nextLot()`, `previousLot()`.
 
 **Global batches:** `QueryPagingService` counts the full SELECT through
-`POST /api/query/summary`, then requests only the current server page (default
-300 rows). `shared/query/paged-query.ts` adds stable `ORDER BY`/`OFFSET`/`LIMIT`
+`POST /api/query/summary`, then requests only the current server page (size from `SPARQL_MAX_LIMIT`). `shared/query/paged-query.ts` adds stable `ORDER BY`/`OFFSET`/`LIMIT`
 to the original SELECT so the backend can still extract graph topology. Area
 and time filters are translated to SPARQL on the original query; each filter
 change recounts and loads page 1. Navigation loads other pages on demand and

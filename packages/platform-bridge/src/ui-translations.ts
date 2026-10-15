@@ -8,6 +8,12 @@ export type UiTranslation = Readonly<{ es: string; en: string }>;
  * through this catalog.
  */
 export const UI_TRANSLATIONS = [
+  ['Idioma del texto', 'Text language'], ['Tipo de dato (URI)', 'Datatype (URI)'],
+  ['Texto fijo', 'Fixed text'], ['Recurso fijo', 'Fixed resource'],
+  ['{clauses} · límite manual', '{clauses} · manual limit'],
+  ['La consulta contiene LIMIT/OFFSET manual. Los lotes, el detalle y la exportación respetan ese recorte; pueden faltar entidades o datos relacionados. Para explorar todo, quitá esas cláusulas de la consulta.', 'The query contains manual LIMIT/OFFSET clauses. Batches, details and export respect that slice; entities or related data may be missing. To explore everything, remove those clauses from the query.'],
+  ['Volver a RDF Explorer', 'Back to RDF Explorer'],
+  ['Si falta un dato, volvé a RDF Explorer y agregá más nodos a la consulta.', 'If a field is missing, go back to RDF Explorer and add more nodes to the query.'],
   ['Recuperando estructura completa…', 'Retrieving complete structure…'],
   ['Aplicando filtros', 'Applying filters'],
   ['Recalculando resultados y lotes…', 'Recalculating results and batches…'],
@@ -166,7 +172,7 @@ export const UI_TRANSLATIONS = [
   ['Editor', 'Editor'], ['Layout', 'Layout'], ['Coordinada', 'Coordinated'], ['Exportar Excel', 'Export Excel'],
   ['Exportar TODAS las filas del resultado completo a Excel (no solo el lote visible)', 'Export ALL rows from the full result to Excel (not only the visible batch)'],
   ['Exportar todas las filas del resultado filtrado a Excel (no solo el lote visible)', 'Export all rows in the filtered result to Excel (not only the visible batch)'],
-  ['Guardar tablero', 'Save dashboard'], ['Nombre del tablero', 'Dashboard name'], ['Ej: Mis ciudades argentinas', 'E.g. My Argentine cities'],
+  ['Guardar tablero', 'Save dashboard'], ['Nombre del tablero', 'Dashboard name'], ['Ej: Mi exploración', 'E.g. My exploration'],
   ['Resumen del resultado', 'Result summary'], ['Calculando…', 'Calculating…'], ['Promedio', 'Average'],
   ['Total de la consulta · no del lote', 'Full query result · not this batch'],
   ['Mínimo', 'Minimum'], ['Máximo', 'Maximum'], ['Valores más frecuentes', 'Most frequent values'],
