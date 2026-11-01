@@ -327,6 +327,11 @@ describe('QueryService.summarize', () => {
     expect(sent).toContain('(AVG(?ok_var) AS ?__agg_avg_ok_var)');
   });
 
+  it('preserves a timeout for paging COUNT requests, which cannot degrade to an unknown total', async () => {
+    executeMock.mockRejectedValueOnce(new TimeoutError(180000));
+    await expect(service.summarize({ query: USER_QUERY, numericVars: [], temporalVars: [], categoricalVars: [] })).rejects.toBeInstanceOf(TimeoutError);
+  });
+
   it('honors the requested timeoutMs', async () => {
     executeMock.mockResolvedValue(
       aggRowResult([{ __agg_total: { type: 'literal', value: '1' } }]),

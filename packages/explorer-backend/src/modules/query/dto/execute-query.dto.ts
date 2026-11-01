@@ -1,3 +1,4 @@
+import { QUERY_TIMEOUT_MS } from '../../../common/query-timeout';
 import {
   IsString,
   IsOptional,
@@ -24,6 +25,6 @@ export class ExecuteQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1000)
-  @Max(600000)
+  @Max(QUERY_TIMEOUT_MS)
   timeoutMs?: number;
 }

@@ -1,3 +1,4 @@
+import { queryTimeout } from '../../common/query-timeout';
 import {
   Injectable,
   Inject,
@@ -95,7 +96,7 @@ export class QueryService {
       );
     }
 
-    const timeout = timeoutMs ?? this.intConfig('SPARQL_TIMEOUT_MS', 30000);
+    const timeout = queryTimeout(this.config.get<string>('SPARQL_TIMEOUT_MS'), timeoutMs);
     const trace = `execute-${++this.traceSequence}`;
     const startedAt = Date.now();
     this.logger.debug(
@@ -152,7 +153,7 @@ export class QueryService {
     const categoricalVars = this.sanitizeVars(request.categoricalVars);
 
     const timeoutMs =
-      request.timeoutMs ?? this.intConfig('SPARQL_TIMEOUT_MS', 30000);
+      queryTimeout(this.config.get<string>('SPARQL_TIMEOUT_MS'), request.timeoutMs);
 
     const summary: QuerySummary = {
       totalRows: null,
@@ -170,7 +171,10 @@ export class QueryService {
       numericVars,
       temporalVars,
     );
-    const mainRow = await this.runSummarySection(mainQuery, timeoutMs, () => {
+    const mainRow = await this.runSummarySection(mainQuery, timeoutMs, (error) => {
+      // Paging COUNT has no partial sections to show: preserve HTTP 408 so the
+      // editor/dashboard can offer recovery rather than an unknown row total.
+      if (error instanceof TimeoutError && !numericVars.length && !temporalVars.length && !categoricalVars.length) throw error;
       summary.failed.total = true;
       summary.failed.numeric.push(...numericVars);
       summary.failed.temporal.push(...temporalVars);
@@ -332,18 +336,18 @@ export class QueryService {
   private async runSummarySection(
     query: string,
     timeoutMs: number,
-    onFail: () => void,
+    onFail: (error: unknown) => void,
   ): Promise<QueryResult['bindings'][number] | null>;
   private async runSummarySection(
     query: string,
     timeoutMs: number,
-    onFail: () => void,
+    onFail: (error: unknown) => void,
     singleRow: false,
   ): Promise<QueryResult['bindings'] | null>;
   private async runSummarySection(
     query: string,
     timeoutMs: number,
-    onFail: () => void,
+    onFail: (error: unknown) => void,
     singleRow = true,
   ): Promise<QueryResult['bindings'] | QueryResult['bindings'][number] | null> {
     try {
@@ -360,7 +364,7 @@ export class QueryService {
       this.logger.warn(
         `Summary section failed (${e instanceof Error ? e.message : String(e)}): ${preview}`,
       );
-      onFail();
+      onFail(e);
       return null;
     }
   }

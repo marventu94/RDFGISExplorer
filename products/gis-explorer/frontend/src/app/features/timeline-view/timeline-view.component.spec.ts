@@ -677,6 +677,20 @@ describe('TimelineViewComponent', () => {
   });
 
   describe('temporal filter', () => {
+    it('validates editable bounds and submits inclusive calendar dates', () => {
+      const add = vi.spyOn(TestBed.inject(SelectionService), 'addFilter');
+      component.dateFrom = '2023-11-30';
+      component.dateTo = '2023-10-01';
+      component.applyDates();
+      expect(component.dateRangeError).toContain('Desde');
+      expect(add).not.toHaveBeenCalled();
+      component.editDate('from', '2023-10-01');
+      component.editDate('to', '2023-11-30');
+      component.applyDates();
+      expect(add).toHaveBeenCalledWith(expect.objectContaining({ from: '2023-10-01', to: '2023-11-30', label: '01/10/2023 – 30/11/2023' }));
+      expect(component.dateRangeError).toBe('');
+    });
+
     it('should emit temporal filter when applyRange is called', () => {
       const result = createMockQueryResult([nodeWithDates]);
       queryResultSubject.next(result);

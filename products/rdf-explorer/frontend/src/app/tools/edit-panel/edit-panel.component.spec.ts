@@ -60,6 +60,19 @@ describe('editing a single resource constraint', () => {
     (latest['callback'] as () => void)();
     expect(component.resultFilterLoading()).toBe(false);
   });
+  it('explains a timeout and allows another result search', () => {
+    vi.useFakeTimers();
+    const preview = vi.mocked(selected.loadPreview);
+    const request = preview.mock.calls.at(-1)![0];
+    (request['onError'] as (error: unknown) => void)({ status: 408 });
+    expect(component.loadError()).toContain('agregá filtros');
+    expect(component.resultFilterLoading()).toBe(false);
+    component.resultFilterValue = 'Casa'; component.onFilterValueChange();
+    vi.advanceTimersByTime(400);
+    expect(component.loadError()).toBeNull();
+    expect(component.resultFilterLoading()).toBe(true);
+  });
+
   it('replaces the previous result and keeps the query and Explorer on the same resource', () => {
     component.addValue(first);
     component.mkVariable();

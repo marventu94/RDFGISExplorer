@@ -1,3 +1,4 @@
+import { isCalendarDay, validTemporalRange, instantMillis } from './temporal-range';
 import { Generator, Parser } from 'sparqljs';
 import type { Polygon } from 'geojson';
 import type { Filter, QueryResult } from '@shared/models';
@@ -84,13 +85,24 @@ function filterExpressions(filters: readonly Filter[], fields: ReturnType<typeof
       return fields.coordinates.map((variable) => `(BOUND(?${variable}) && ${polygonExpression(filter.polygon, variable)})`).join(' || ');
     }
     if (!fields.dates.length) throw new Error('La consulta no proyecta una fecha para filtrar el período.');
-    if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z?)?$/.test(filter.from) ||
-        !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z?)?$/.test(filter.to)) {
+    if (!validTemporalRange(filter.from, filter.to)) {
       throw new Error('El rango temporal no tiene fechas válidas.');
     }
-    return fields.dates.map((variable) =>
-      `(BOUND(?${variable}) && STR(?${variable}) >= "${filter.from}" && STR(?${variable}) <= "${filter.to}")`,
-    ).join(' || ');
+    if (isCalendarDay(filter.from) && isCalendarDay(filter.to)) {
+      // Calendar days include every time/fraction, retaining the date's own zone.
+      return fields.dates.map((variable) =>
+        `(BOUND(?${variable}) && SUBSTR(STR(?${variable}), 1, 10) >= "${filter.from}" && SUBSTR(STR(?${variable}), 1, 10) <= "${filter.to}")`,
+      ).join(' || ');
+    }
+    const from = new Date(instantMillis(filter.from)).toISOString();
+    const to = new Date(instantMillis(filter.to)).toISOString();
+    return fields.dates.map((variable) => {
+      const value = `STR(?${variable})`;
+      const datetime = `IF(DATATYPE(?${variable}) = <http://www.w3.org/2001/XMLSchema#date>, CONCAT(SUBSTR(${value}, 1, 10), "T00:00:00", SUBSTR(${value}, 11)), ${value})`;
+      const zoned = `IF(REGEX(${datetime}, "(Z|[+-][0-9]{2}:[0-9]{2})$"), ${datetime}, CONCAT(${datetime}, "Z"))`;
+      const instant = `<http://www.w3.org/2001/XMLSchema#dateTime>(${zoned})`;
+      return `(BOUND(?${variable}) && ${instant} >= "${from}"^^<http://www.w3.org/2001/XMLSchema#dateTime> && ${instant} <= "${to}"^^<http://www.w3.org/2001/XMLSchema#dateTime>)`;
+    }).join(' || ');
   });
 }
 

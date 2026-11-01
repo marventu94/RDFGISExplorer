@@ -79,6 +79,16 @@ describe('server-side GIS paging', () => {
     expect(exportPage).toContain('2023-11-30');
   });
 
+  it('uses inclusive calendar days for every RDF temporal datatype and preserves them in export', () => {
+    const scoped = scopedQuery(query, [{ id: 'time', kind: 'temporal', label: 'Oct–Nov', from: '2023-10-01', to: '2023-11-30' }], { coordinates: [], dates: ['date'] });
+    expect(scoped).toMatch(/SUBSTR\(STR\(\?date\), 1\s*, 10\s*\)/);
+    expect(scoped).toContain('<= "2023-11-30"');
+    expect(buildPagedQuery(wrapUserQuery(scoped), 0, 300)).toContain('<= "2023-11-30"');
+    for (const [from, to] of [['2023-02-29', '2023-11-30'], ['2023-11-30', '2023-10-01']]) {
+      expect(() => scopedQuery(query, [{ id: 'time', kind: 'temporal', label: 'invalid', from, to }], { coordinates: [], dates: ['date'] })).toThrow('fechas válidas');
+    }
+  });
+
   it('rejects malformed temporal values instead of interpolating them into SPARQL', () => {
     expect(() => scopedQuery(query, [{ id: 'time', kind: 'temporal', label: 'Time', from: '2023-01-01" )', to: '2023-12-31' }], { coordinates: [], dates: ['date'] })).toThrow('fechas válidas');
   });

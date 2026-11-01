@@ -240,3 +240,23 @@ code {
 :host ::ng-deep .vis-item.coordinated-muted:not(.vis-selected) {
   opacity: 0.3;
 }
+
+.date-range {
+  position: relative;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 5px 6px;
+  font-size: 12px;
+  background: var(--gis-panel-bg);
+  border-bottom: 1px solid var(--gis-panel-border);
+  color: var(--gis-text);
+
+  label { display: flex; align-items: center; gap: 4px; }
+  input { min-width: 0; width: 126px; padding: 3px; border: 1px solid var(--gis-panel-border); border-radius: 4px; background: var(--gis-panel-bg); color: var(--gis-text); }
+  &__hint { color: var(--gis-text-muted); }
+  &__error { flex-basis: 100%; color: var(--gis-danger, #c62828); }
+}

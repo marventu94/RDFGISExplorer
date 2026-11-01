@@ -8,6 +8,12 @@ export type UiTranslation = Readonly<{ es: string; en: string }>;
  * through this catalog.
  */
 export const UI_TRANSLATIONS = [
+  ['Desde', 'From'], ['Hasta', 'To'], ['Aplicar fechas', 'Apply dates'],
+  ['Días completos, según la fecha del dato.', 'Whole days, using the date in the data.'],
+  ['Ingresá fechas válidas en Desde y Hasta.', 'Enter valid dates in From and To.'],
+  ['Desde debe ser anterior o igual a Hasta.', 'From must be earlier than or equal to To.'],
+  ['La consulta excedió el tiempo límite. Reducí el alcance o agregá filtros y reintentá.', 'The query exceeded the time limit. Narrow its scope or add filters and retry.'],
+  ['No se pudo cargar el lote.', 'Could not load the batch.'],
   ['Idioma del texto', 'Text language'], ['Tipo de dato (URI)', 'Datatype (URI)'],
   ['Texto fijo', 'Fixed text'], ['Recurso fijo', 'Fixed resource'],
   ['{clauses} · límite manual', '{clauses} · manual limit'],
@@ -166,7 +172,7 @@ export const UI_TRANSLATIONS = [
   ['Fecha', 'Date'], ['Numérico', 'Numeric'], ['Ignorar', 'Ignore'], ['Restaurar auto', 'Restore auto'], ['Aplicar', 'Apply'],
   ['Lote anterior', 'Previous batch'], ['Lote siguiente', 'Next batch'], ['Filas por lote', 'Rows per batch'],
   ['Cargando lote…', 'Loading batch…'], ['Reintentar', 'Retry'],
-  ['La consulta lleva más de cinco minutos', 'The query has taken more than five minutes'],
+  ['La consulta lleva más de tres minutos', 'The query has taken more than three minutes'],
   ['Podés volver al editor y aplicar filtros para acotar los resultados.', 'You can return to the editor and add filters to narrow the results.'],
   ['Volver al editor', 'Return to editor'],
   ['Editor', 'Editor'], ['Layout', 'Layout'], ['Coordinada', 'Coordinated'], ['Exportar Excel', 'Export Excel'],
@@ -268,7 +274,7 @@ export const UI_TRANSLATIONS = [
   ['Sin resultados ({duration}ms)', 'No results ({duration}ms)'],
   ['{count} resultado en {duration}ms', '{count} result in {duration}ms'],
   ['{count} resultados en {duration}ms', '{count} results in {duration}ms'],
-  ['La query excedió el tiempo límite ({seconds} segundos). Intentá reducir el alcance.', 'The query exceeded the time limit ({seconds} seconds). Try narrowing its scope.'],
+  ['La query excedió el tiempo límite ({seconds} segundos). Reducí el alcance o agregá filtros y reintentá.', 'The query exceeded the time limit ({seconds} seconds). Narrow its scope or add filters and retry.'],
   ['Límite excedido. El máximo permitido es {limit}.', 'Limit exceeded. The maximum allowed is {limit}.'],
   ['El endpoint SPARQL no responde. Reintentá más tarde.', 'The SPARQL endpoint is not responding. Try again later.'],
   ['No se pudo conectar con el servidor', 'Could not connect to the server'],

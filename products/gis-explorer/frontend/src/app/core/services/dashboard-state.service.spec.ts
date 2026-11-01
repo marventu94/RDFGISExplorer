@@ -1,9 +1,10 @@
+import { QueryPagingService } from './query-paging.service';
 import { DashboardLayoutService } from './dashboard-layout.service';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { signal } from '@angular/core';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { DashboardStateService } from './dashboard-state.service';
 import { DashboardViewStateService } from './dashboard-view-state.service';
 import { SelectionService } from './selection.service';
@@ -30,7 +31,7 @@ it('round-trips active GIS filters and view state through a JSON dashboard', asy
   const view = TestBed.inject(DashboardViewStateService);
   TestBed.inject(SparqlQueryStateService).query.set('SELECT ?listing ?date WHERE { ?listing <urn:date> ?date }');
   selection.setQueryResult(result);
-  const filter = { id: 'time', kind: 'temporal' as const, from: '2023-10-01', to: '2023-10-31', label: 'Octubre' };
+  const filter = { id: 'time', kind: 'temporal' as const, from: '2023-10-01', to: '2023-11-30', label: 'Octubre–Noviembre' };
   selection.addFilter(filter);
   view.mapState.set({ center: [-34, -58], zoom: 12 });
   const saved = JSON.parse(JSON.stringify(state.serialize()));
@@ -45,4 +46,20 @@ it('round-trips active GIS filters and view state through a JSON dashboard', asy
   expect(layout.rowTop()).toBe(35);
   expect(layout.editorCollapsed()).toBe(true);
   expect(state.isHydrating()).toBe(false);
+});
+
+it('opens the editor and releases hydration after a dashboard query timeout', async () => {
+  const open = vi.fn();
+  TestBed.configureTestingModule({ providers: [provideHttpClient(),
+    { provide: MatSnackBar, useValue: { open } },
+    { provide: QueryPagingService, useValue: { loadInitial: () => throwError(() => ({ status: 408 })) } },
+  ] });
+  const layout = TestBed.inject(DashboardLayoutService);
+  const state = TestBed.inject(DashboardStateService);
+  const saved = { ...state.serialize(), query: 'SELECT ?s WHERE { ?s ?p ?o }' };
+  layout.editorCollapsed.set(true);
+  await expect(firstValueFrom(state.deserialize(saved))).rejects.toMatchObject({ status: 408 });
+  expect(state.isHydrating()).toBe(false);
+  expect(layout.editorCollapsed()).toBe(false);
+  expect(open).toHaveBeenCalledWith(expect.stringContaining('agregá filtros'), expect.any(String), expect.any(Object));
 });

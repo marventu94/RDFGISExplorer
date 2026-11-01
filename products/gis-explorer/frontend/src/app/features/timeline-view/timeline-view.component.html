@@ -61,6 +61,20 @@
     </div>
   }
 
+  @if (queryState === 'normal' || activeFilterLabel || queryState === 'no-dates-lot') {
+    <form class="date-range" (submit)="$event.preventDefault(); applyDates()" novalidate>
+      <label>{{ 'Desde' | translate }}
+        <input type="date" [attr.aria-label]="'Desde' | translate" [value]="dateFrom" (input)="editDate('from', $any($event.target).value)" [attr.aria-invalid]="dateRangeError ? true : null" />
+      </label>
+      <label>{{ 'Hasta' | translate }}
+        <input type="date" [attr.aria-label]="'Hasta' | translate" [value]="dateTo" (input)="editDate('to', $any($event.target).value)" [attr.aria-invalid]="dateRangeError ? true : null" />
+      </label>
+      <button class="toolbar-btn toolbar-btn--apply" type="submit">{{ 'Aplicar fechas' | translate }}</button>
+      <span class="date-range__hint">{{ 'Días completos, según la fecha del dato.' | translate }}</span>
+      @if (dateRangeError) { <span class="date-range__error" role="alert">{{ dateRangeError }}</span> }
+    </form>
+  }
+
   <div
     #tlContainer
     class="tl-container"

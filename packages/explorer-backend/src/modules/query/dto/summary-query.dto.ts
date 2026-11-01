@@ -1,3 +1,4 @@
+import { QUERY_TIMEOUT_MS } from '../../../common/query-timeout';
 import {
   IsArray,
   IsInt,
@@ -29,6 +30,6 @@ export class SummaryQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1000)
-  @Max(600000)
+  @Max(QUERY_TIMEOUT_MS)
   timeoutMs?: number;
 }

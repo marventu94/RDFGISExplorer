@@ -61,7 +61,14 @@ describe('QueryService', () => {
     expect(result).toEqual(mockQueryResult);
     expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
       'SELECT ?x WHERE { ?s ?p ?o } LIMIT 10',
-      expect.objectContaining({ limit: 300, timeoutMs: 30000 }),
+      expect.objectContaining({ limit: 300, timeoutMs: 180000 }),
+    );
+  });
+
+  it('caps explicit query overrides at three minutes', async () => {
+    await service.execute('SELECT ?x WHERE { ?s ?p ?o }', 300, false, 600000);
+    expect(mockSparqlEndpoint.execute).toHaveBeenCalledWith(
+      expect.any(String), expect.objectContaining({ timeoutMs: 180000 }),
     );
   });
 

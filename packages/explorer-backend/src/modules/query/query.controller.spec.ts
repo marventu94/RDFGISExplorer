@@ -85,14 +85,14 @@ describe('QueryController', () => {
     const dto = {
       sparql: 'SELECT ?x WHERE { ?s ?p ?o }',
       limit: 300,
-      timeoutMs: 600000,
+      timeoutMs: 180000,
     };
     await controller.execute(dto);
     expect(executeMock).toHaveBeenCalledWith(
       dto.sparql,
       300,
       undefined,
-      600000,
+      180000,
     );
   });
 
