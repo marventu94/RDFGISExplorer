@@ -1,6 +1,6 @@
 {
   "name": "@rdfgis/shell-backend",
-  "version": "0.0.0",
+  "version": "1.0.0-beta1",
   "private": true,
   "scripts": {
     "build": "nest build",
