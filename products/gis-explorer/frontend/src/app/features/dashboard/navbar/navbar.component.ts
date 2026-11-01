@@ -45,12 +45,10 @@ import { QueryPagingService } from '@core/services/query-paging.service';
 import { filterVariables, scopedQuery } from '@shared/query/paged-query';
 
 /**
- * Íconos propios para los presets de 3 y 4 vistas, dibujados en estilo
- * "línea" (marco + divisores) para que el menú sea visualmente uniforme:
- * la fuente Material Icons no tiene glifos de "3 paneles" con la geometría
- * real de los layouts (1 ancho arriba + 2 abajo, y su inversa), y el glifo
- * de 4 paneles (`grid_view`) es relleno, distinto de `crop_square` y
- * `splitscreen`. Se registran como svgIcon.
+ * Custom outline icons keep three- and four-view presets visually consistent.
+ * Material Icons lacks glyphs matching the three-panel layouts, and its filled
+ * grid_view glyph differs from crop_square and splitscreen. Register these as
+ * svgIcon entries instead.
  */
 const LAYOUT_SVG_ICONS: Record<string, string> = {
   'layout-split-v':
@@ -118,10 +116,10 @@ export class NavbarComponent {
   protected readonly lotSizeOptions = signal<readonly number[]>([]);
   private readonly _lotState = signal<LotState | null>(null);
   protected readonly lotState = this._lotState.asReadonly();
-  /** Límite aplicado por el backend cuando truncó el resultado; null si no truncó. */
+  /** Backend row cap for a truncated result; null for a complete result. */
   private readonly _truncatedLimit = signal<number | null>(null);
   protected readonly truncatedLimit = this._truncatedLimit.asReadonly();
-  /** Hay un resultado ejecutado (habilita el export completo). */
+  /** Whether an executed result is available for full export. */
   private readonly _hasResult = signal(false);
   protected readonly hasResult = this._hasResult.asReadonly();
   private readonly resultQuery = signal('');
@@ -199,7 +197,7 @@ export class NavbarComponent {
     this.selectionService.setLotSize(Number(size));
   }
 
-  /** Aviso de volumen: tooltip del navegador de lotes. */
+  /** Result volume notice shown in the batch navigation tooltip. */
   protected lotNotice(lot: LotState): string {
     return this.i18n.text('La query devolvió {rows} filas — mostrando en {lots} lotes de {size}. Considerá acotar la query o el LIMIT.', {
       rows: lot.totalRows,
@@ -229,10 +227,10 @@ export class NavbarComponent {
   }
 
   /**
-   * Export completo del resultado a XLSX: TODAS las filas de la query, no el
-   * lote visible (eso ya lo hace el botón de la tabla). Si el resultado no
-   * está truncado ya está todo en el cliente; si está truncado se pagina del
-   * lado del endpoint (ver ResultExportService).
+   * Export every query row matching the active spatial and temporal filters,
+   * traversing all batches. Table quick search and viewports do not change the
+   * export scope. Complete local results without filters are exported directly;
+   * other results are fetched through ResultExportService.
    */
   protected async exportFullXlsx(): Promise<void> {
     const result = this.selectionService.getQueryResultSnapshot();
@@ -249,7 +247,7 @@ export class NavbarComponent {
     }
     const backend = result.meta.backend;
 
-    // Sin truncamiento: el resultado completo ya está en el cliente.
+    // A complete local result without active filters needs no server traversal.
     if (!filters.length && !result.meta.truncated && !this.selectionService.isRemotePagingSnapshot()) {
       await this.exportService.downloadXlsx({
         rows: result.bindings,
@@ -267,7 +265,7 @@ export class NavbarComponent {
     }
 
     const progress = signal<ExportProgress>({ rowsFetched: 0, page: 0, pageSize: 0 });
-    // Progreso real si el summary ya calculó el COUNT del resultado completo.
+    // Use the filtered total or full-query summary COUNT for export progress.
     const totalRows = filters.length ? this.lotState()?.totalRows ?? null : this.summaryState.summary()?.totalRows ?? null;
     const progressRef = this.dialog.open(ExportProgressDialogComponent, {
       data: { progress, totalRows } satisfies ExportProgressDialogData,

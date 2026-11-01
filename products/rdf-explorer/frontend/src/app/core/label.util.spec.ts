@@ -13,6 +13,13 @@ const cache = new Map<string, string>([
 ]);
 
 describe('toCurie', () => {
+  it('abbreviates the OVS hash namespace while retaining other URI identities', () => {
+    const base = 'http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology';
+    const ovs = [{ prefix: 'inm', uri: `${base}#` }];
+    expect(toCurie(`${base}#House`, ovs)[0]).toBe('inm:House');
+    expect(toCurie(`${base}/House`, ovs)[0]).toBe(`<${base}/House>`);
+    expect(toCurie(base, ovs)[0]).toBe(`<${base}>`);
+  });
   it('returns curie and prefix object when a prefix matches', () => {
     const [curie, prefix] = toCurie('http://www.wikidata.org/entity/Q146', prefixes);
     expect(curie).toBe('wd:Q146');

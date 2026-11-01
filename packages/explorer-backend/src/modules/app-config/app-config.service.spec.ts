@@ -23,6 +23,16 @@ function createConfigMock(values: Record<string, string | undefined>) {
 }
 
 describe('AppConfigService', () => {
+  it('publishes the OVS hash namespace through the selected prefix configuration', () => {
+    const service = new AppConfigService(createConfigMock({
+      SPARQL_BACKEND: 'graphdb', SPARQL_PREFIXES_PATH: 'config/prefixes.ovs.json',
+    }) as unknown as ConfigService, endpointFor('graphdb'));
+    const prefixes = service.getConfig().defaultPrefixes;
+    expect(prefixes.inm).toBe('http://www.semanticweb.org/luciana/ontologies/2024/8/inmontology#');
+    expect(prefixes.rec).toBe('https://w3id.org/rec#');
+    expect(prefixes.geo).toBe('http://www.opengis.net/ont/geosparql#');
+  });
+
   describe('wikidata backend', () => {
     let service: AppConfigService;
 

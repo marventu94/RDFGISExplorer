@@ -78,6 +78,14 @@ graph.
 
 ![Coordinated result exploration in GIS Explorer](docs/assets/03-gis-explorer.png)
 
+GIS supports **From / To** calendar-day filters alongside the visual timeline
+range. Both boundary days are included in full, using the date written in the
+RDF value without converting it to the browser's time zone. This covers
+`xsd:date`, `xsd:dateTime`, unzoned values, offsets, and fractional seconds.
+Visual ranges retain instant precision; unzoned RDF timestamps use UTC.
+Saved filters are restored when a dashboard opens and apply to row counts,
+batches, and exports.
+
 ## Technology stack
 
 | Area | Technologies | Role |
@@ -373,13 +381,6 @@ If you use the RDF Explorer approach in academic work, please cite:
 > 2019*, LNCS 11778, pp. 647–663. Springer, 2019.
 > [doi:10.1007/978-3-030-30793-6_37](https://doi.org/10.1007/978-3-030-30793-6_37)
 
-GIS permite filtrar la línea de tiempo con **Desde / Hasta** además del rango
-visual. Ambos días se incluyen completos (por ejemplo, 01/10/2023–30/11/2023),
-conservando el día escrito en el valor RDF, sin convertirlo a la zona horaria del
-navegador. Esto incluye `xsd:date`, `xsd:dateTime`, valores sin zona, offsets y
-fracciones de segundo. El filtro visual conserva precisión de instantes; para
-valores RDF sin zona se usa UTC. Los filtros guardados se restauran al abrir el
-tablero y se aplican también al recuento, los lotes y la exportación.
 
 ## Contact
 
@@ -393,12 +394,16 @@ La seed de evaluación crea cinco tableros sobre OVS:
 - **D1 · Exploración inicial**: workspace RDF con casas de La Plata publicadas
   del 1 al 10 de septiembre de 2023.
 - **D2 · Casas de La Plata con precio USD (sep–dic 2023)**: tablero GIS con
-  cuatro vistas, precios vinculados a cada aviso y `listing` como entidad principal.
+  mapa, grafo y tiempo inicialmente (la tabla se agrega desde Layout), precios
+  vinculados a cada aviso y `listing` como entidad principal.
 - **D5 · Ciudades asociadas a casas**: workspace RDF con el punto de partida `House`.
 - **T1 / T2**: la misma consulta de departamentos de Berisso de octubre a
   diciembre de 2023, como workspace RDF y tablero GIS respectivamente.
 
-D3 y D4 continúan el GIS de D2, sin tablero propio.
+D3 y D4 continúan el GIS de D2, sin tablero propio. Para conservar un recorte
+se usa **Guardar como copia**, con otro nombre, manteniendo D2 intacto.
+El entorno de evaluación usa `config/prefixes.ovs.json`: el namespace de
+Inmontology termina en `#` y se abrevia como `inm:`.
 
 ```bash
 nvm use

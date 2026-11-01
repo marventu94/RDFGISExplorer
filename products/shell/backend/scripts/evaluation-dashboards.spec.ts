@@ -69,7 +69,10 @@ describe('evaluation scenario seed', () => {
     const handoff = d2.payload.query as string;
     const panel = { generatedQuery: handoff };
     expect(d2.payload.primaryVariable).toBe('listing');
-    expect(d2.payload.layout).toMatchObject({ slotsCount: 4, preset: 'quad' });
+    expect(d2.payload.layout).toEqual({ slotsCount: 3, preset: 'triple-v-inv', editorCollapsed: true,
+      slots: ['graph', 'map', 'timeline'].map((view, i) => ({ id: `slot-${i}`, view })),
+    });
+    expect(buildEvaluationRows()[4].payload.layout).toMatchObject({ slotsCount: 4, preset: 'quad' });
     expect(d2.name).toContain('precio USD');
     expect(panel.generatedQuery).toContain('?precio');
     expect(panel.generatedQuery).toContain('?direccion');

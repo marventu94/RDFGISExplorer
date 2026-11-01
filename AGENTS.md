@@ -54,6 +54,9 @@ cd products/<product>/frontend && pnpm test
 
 ## Code conventions
 
+- Write general code comments and project documentation in English. Spanish is
+  allowed for material specific to this branch's evaluation seed.
+
 ### Backend (NestJS)
 
 - **Pattern:** Hexagonal (Ports & Adapters). `SparqlEndpoint` is the port; `GenericSparqlAdapter` serves configurable SPARQL endpoints, and `WikidataAdapter` adds its public integrations. The factory passes `SPARQL_BACKEND` as `backendName`, reported by `/api/health` and `QueryResult.meta.backend`.

@@ -407,6 +407,9 @@ function dashboardId(item: CaseArtifacts): string {
 }
 
 function gisPayload(item: CaseArtifacts): Record<string, unknown> {
+  // D2 starts with the three coordinated views; participants add the table via Layout.
+  const isD2 = item.definition.suffix === 'd2';
+  const views = isD2 ? ['graph', 'map', 'timeline'] : ['map', 'timeline', 'table', 'graph'];
   return {
     query: item.gisQuery,
     backend: 'graphdb',
@@ -414,8 +417,8 @@ function gisPayload(item: CaseArtifacts): Record<string, unknown> {
     activeFilters: [],
     paging: { lot: 1, size: 300 },
     layout: {
-      slotsCount: 4, preset: 'quad', editorCollapsed: true,
-      slots: ['map', 'timeline', 'table', 'graph'].map((view, i) => ({ id: `slot-${i}`, view })),
+      slotsCount: views.length, preset: isD2 ? 'triple-v-inv' : 'quad', editorCollapsed: true,
+      slots: views.map((view, i) => ({ id: `slot-${i}`, view })),
     },
     filters: { graph: { layout: 'dagre' } },
   };

@@ -67,6 +67,12 @@ describe('DashboardHostService', () => {
     });
   });
 
+  it('saves a copy of an open seeded D2 without updating the original', async () => {
+    await dashboardHost().save({ kind: 'gis', name: 'D3 · Mi recorte', mode: 'copy', currentId: 'eval-gis-d2' });
+    expect(api.create).toHaveBeenCalledWith({ kind: 'gis', name: 'D3 · Mi recorte', payload: { query: 'ASK {}' } });
+    expect(api.update).not.toHaveBeenCalled();
+  });
+
   it('captures remote state but decides create/update in the Shell', async () => {
     await dashboardHost().save({ kind: 'gis', name: 'Nuevo', mode: 'copy' });
     expect(api.create).toHaveBeenCalledWith({
