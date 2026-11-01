@@ -1,6 +1,6 @@
 {
   "name": "@rdfgis/platform-bridge",
-  "version": "0.0.0",
+  "version": "1.0.0-beta1",
   "private": true,
   "description": "Contrato compartido entre los remotes para el handoff Explorer<->GIS",
   "type": "module",

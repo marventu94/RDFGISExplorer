@@ -1,6 +1,6 @@
 {
   "name": "@rdfgis/gis-explorer-frontend",
-  "version": "0.0.0",
+  "version": "1.0.0-beta1",
   "scripts": {
     "ng": "ng",
     "start": "node -e \"require('node:fs').rmSync('node_modules/.cache/native-federation/rdf_gis_explorer', { recursive: true, force: true })\" && ng serve",

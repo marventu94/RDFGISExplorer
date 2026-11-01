@@ -1,6 +1,6 @@
 {
   "name": "@rdfgis/contracts",
-  "version": "0.0.0",
+  "version": "1.0.0-beta1",
   "private": true,
   "description": "Contratos compartidos backend<->frontends (solo tipos TypeScript)",
   "main": "dist/index.js",

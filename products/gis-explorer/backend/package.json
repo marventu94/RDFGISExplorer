@@ -1,6 +1,6 @@
 {
   "name": "@rdfgis/gis-explorer-backend",
-  "version": "0.0.0",
+  "version": "1.0.0-beta1",
   "private": true,
   "scripts": {
     "build": "pnpm --filter @rdfgis/explorer-backend build",
