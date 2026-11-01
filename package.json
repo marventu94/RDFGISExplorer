@@ -21,6 +21,7 @@
     "build": "pnpm -r --if-present build",
     "test": "node scripts/check-node.cjs && pnpm -r --if-present test",
     "test:ci": "node scripts/run-ci-tests.cjs",
+    "seed:evaluation-dashboards": "node scripts/check-node.cjs && pnpm --dir products/shell/backend seed:evaluation-dashboards",
     "lint": "pnpm -r --if-present lint"
   },
   "devDependencies": {

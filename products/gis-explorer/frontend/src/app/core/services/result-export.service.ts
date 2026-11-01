@@ -12,11 +12,10 @@ import type { ResultBinding } from '@shared/models';
 import { I18nService } from './i18n.service';
 
 /**
- * Export completo del resultado a XLSX: recorre TODAS las filas de la query
- * paginando del lado del endpoint (ver shared/export/result-exporter) y las
- * descarga como workbook Excel (hoja "Resultado" con formato + hoja
- * "Proveniencia"). Es la semántica del summary (resultado completo), no la
- * de los lotes ni la de los filtros de las vistas.
+ * Export the complete query result as an XLSX workbook with result and provenance
+ * sheets, fetching every page through shared/export/result-exporter.
+ * The navbar adds active spatial and temporal filters to the query before export;
+ * the traversal includes all matching rows across batches.
  */
 @Injectable({ providedIn: 'root' })
 export class ResultExportService {
@@ -24,7 +23,7 @@ export class ResultExportService {
   private readonly appConfig = inject(AppConfigService);
   private readonly i18n = inject(I18nService);
 
-  /** Recorre el resultado completo página a página (solo para resultados truncados). */
+  /** Fetch every page of a server-paged or filtered query result. */
   exportAll(params: {
     query: string;
     onProgress?: (p: ExportProgress) => void;
@@ -44,7 +43,7 @@ export class ResultExportService {
     );
   }
 
-  /** Genera el XLSX (con hoja de proveniencia) y dispara la descarga del archivo. */
+  /** Build the XLSX workbook with provenance and trigger its download. */
   async downloadXlsx(params: {
     rows: ResultBinding[];
     variables: string[];
