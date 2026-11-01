@@ -19,7 +19,8 @@ const rows = buildEvaluationRows();
 if (args.includes('--dry-run')) {
   process.stdout.write(JSON.stringify({ target, dashboards: rows.map(({id, kind, name}) => ({id, kind, name})) }, null, 2) + '\n');
 } else {
-  seedEvaluationDatabase(target);
-  process.stdout.write(`Base de evaluación restablecida: ${target}\n`);
-  process.stdout.write(`${rows.length} tableros RDF Explorer; los tableros anteriores fueron eliminados.\n`);
+  const result = seedEvaluationDatabase(target);
+  process.stdout.write(`Seed de evaluación actualizada: ${target}\n`);
+  process.stdout.write(`${result.count} tableros RDF/GIS; guardados ajenos preservados.\n`);
+  if (result.backupPath) process.stdout.write(`Respaldo SQLite: ${result.backupPath}\n`);
 }

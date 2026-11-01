@@ -23,12 +23,13 @@ describe('evaluation scenario seed', () => {
     return { graph, panel };
   };
 
-  it('seeds only the RDF Explorer starters D1, D2 and D5; D3/D4 continue the D2 GIS session', () => {
+  it('seeds D1/D5 RDF, direct D2 GIS and the separate T1/T2 tutorial', () => {
     const rows = buildEvaluationRows();
-    expect(rows.map(row => row.id)).toEqual(['eval-explorer-d1', 'eval-explorer-d2', 'eval-explorer-d5']);
-    expect(rows.every(row => row.kind === 'explorer')).toBe(true);
-    expect(rows.map(row => row.name.slice(0, 4))).toEqual(['D1 ·', 'D2 ·', 'D5 ·']);
-    rows.forEach(row => {
+    expect(rows.map(row => row.id)).toEqual(['eval-explorer-d1', 'eval-gis-d2', 'eval-explorer-d5', 'eval-explorer-t1', 'eval-gis-t2']);
+    expect(rows.map(row => row.kind)).toEqual(['explorer', 'gis', 'explorer', 'explorer', 'gis']);
+    expect(rows[0].name).toBe('D1 · Exploración inicial');
+    expect(rows.map(row => row.name.slice(0, 4))).toEqual(['D1 ·', 'D2 ·', 'D5 ·', 'T1 ·', 'T2 ·']);
+    rows.filter(row => row.kind === 'explorer').forEach(row => {
       const panels = row.payload.panels as Array<{ name: string }>;
       expect(panels).toHaveLength(1);
       expect(panels[0].name).toBe(row.name);
@@ -37,6 +38,7 @@ describe('evaluation scenario seed', () => {
 
   it('audits the exact full projection produced by handoff after loading each graph', () => {
     buildEvaluationRows().forEach((row, i) => {
+      if (row.kind === 'gis') { expect(row.payload.query).toBe(queries()[i]); return; }
       const { graph, panel } = loadGraph(row);
       const built = graph.getQueriesForGraph().queries;
       expect(built).toHaveLength(1);
@@ -64,8 +66,10 @@ describe('evaluation scenario seed', () => {
 
   it('keeps every D2 USD price observation identifiable and the detail editable in the canvas', () => {
     const d2 = buildEvaluationRows()[1];
-    const { graph, panel } = loadGraph(d2);
-    const handoff = graph.getQueriesForGraph().queries[0].toSparqlFullProjection()!;
+    const handoff = d2.payload.query as string;
+    const panel = { generatedQuery: handoff };
+    expect(d2.payload.primaryVariable).toBe('listing');
+    expect(d2.payload.layout).toMatchObject({ slotsCount: 4, preset: 'quad' });
     expect(d2.name).toContain('precio USD');
     expect(panel.generatedQuery).toContain('?precio');
     expect(panel.generatedQuery).toContain('?direccion');
@@ -123,22 +127,38 @@ describe('evaluation scenario seed', () => {
     expect(solution).toContain(`?valor <${inm}city> ?ciudad`);
   });
 
-  it('resets legacy and manual dashboards atomically to the starters on the live connection', () => {
+  it('uses identical tutorial queries, a different property type and a different city', () => {
+    const q = queries();
+    expect(q[3]).toBe(q[4]);
+    expect(q[3]).toContain(`${inm}Apartment`);
+    expect(q[3]).toContain('^berisso$');
+    expect(q[3]).toContain('2023-10-01T00:00:00');
+    expect(q[3]).toContain('?precio');
+    expect(q[3]).toContain('?wkt');
+  });
+
+  it('backs up the live database, replaces retired D2 and preserves unrelated dashboards', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdfgis-scenarios-'));
     const dbPath = path.join(dir, 'evaluation.sqlite');
     try {
-      seedEvaluationDatabase(dbPath);
+      expect(seedEvaluationDatabase(dbPath).backupPath).toBeNull();
       const live = new Database(dbPath);
       try {
-        live.prepare('INSERT INTO dashboards VALUES (?, ?, ?, ?, ?, ?)').run('personal', 'gis', 'Mi tablero', '{}', 'old', 'old');
-        for (const id of ['eval-c1', 'eval-explorer-d3', 'eval-explorer-d4', 'draft-explorer-c3'])
-          live.prepare('INSERT INTO dashboards VALUES (?, ?, ?, ?, ?, ?)').run(id, 'gis', 'Legacy', '{}', 'old', 'old');
-        seedEvaluationDatabase(dbPath);
-        seedEvaluationDatabase(dbPath);
-        const rows = live.prepare('SELECT id, kind, json_valid(payload) AS valid FROM dashboards ORDER BY id').all() as Array<{id: string; kind: string; valid: number}>;
-        expect(rows.map(row => row.id)).toEqual(['eval-explorer-d1', 'eval-explorer-d2', 'eval-explorer-d5']);
-        expect(rows.every(row => row.kind === 'explorer' && row.valid === 1)).toBe(true);
+        live.pragma('journal_mode = WAL');
+        live.prepare('INSERT INTO dashboards VALUES (?, ?, ?, ?, ?, ?)').run('personal', 'gis', 'Mi tablero', '{"kept":true}', 'old', 'old');
+        live.prepare('INSERT INTO dashboards VALUES (?, ?, ?, ?, ?, ?)').run('eval-explorer-d2', 'explorer', 'Legacy D2', '{}', 'old', 'old');
+        const result = seedEvaluationDatabase(dbPath);
+        expect(result.backupPath).toBeTruthy();
+        const backup = new Database(result.backupPath!, { readonly: true });
+        try {
+          expect(backup.prepare('SELECT name FROM dashboards WHERE id = ?').get('eval-explorer-d2')).toEqual({name:'Legacy D2'});
+          expect(backup.prepare('SELECT payload FROM dashboards WHERE id = ?').get('personal')).toEqual({payload:'{"kept":true}'});
+        } finally { backup.close(); }
+        expect(live.prepare('SELECT * FROM dashboards WHERE id = ?').get('eval-explorer-d2')).toBeUndefined();
+        expect(live.prepare('SELECT payload, updated_at FROM dashboards WHERE id = ?').get('personal')).toEqual({payload:'{"kept":true}', updated_at:'old'});
+        expect(live.prepare('SELECT COUNT(*) AS n FROM dashboards').get()).toEqual({n:6});
+        expect(live.prepare('SELECT kind FROM dashboards WHERE id = ?').get('eval-gis-d2')).toEqual({kind:'gis'});
       } finally { live.close(); }
-    } finally { fs.rmSync(dir, {recursive: true, force: true}); }
+    } finally { fs.rmSync(dir, {recursive:true, force:true}); }
   });
 });

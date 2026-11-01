@@ -35,7 +35,7 @@ const GEO = 'http://www.opengis.net/ont/geosparql#';
 const DC = 'http://purl.org/dc/elements/1.1/';
 
 interface EvaluationCaseDefinition {
-  suffix: 'd1' | 'd2' | 'd5';
+  suffix: 'd1' | 'd2' | 'd5' | 't1' | 't2';
   title: string;
   build: (graph: PropertyGraph) => void;
 }
@@ -229,10 +229,12 @@ function buildLaPlataHouses(
   graph: PropertyGraph,
   from: { date: string; granularity: 'day' | 'month' },
   to: { date: string; granularity: 'day' | 'month' },
+  realEstateClass = `${INM}House`,
+  city = 'la plata',
 ): void {
   const listing = varNode(graph, 'listing', 120, 180);
   const realEstate = varNode(graph, 'realEstate', 420, 180);
-  addListingCore(graph, listing, realEstate, `${INM}House`);
+  addListingCore(graph, listing, realEstate, realEstateClass);
   literalProp(graph, listing, `${RDFS}label`, 'realEstateLabel');
   // El recorte es de dominio (período de publicación), no un LIMIT.
   const publication = literalProp(graph, listing, `${DC}date`, 'fechaPublicacion');
@@ -240,7 +242,7 @@ function buildLaPlataHouses(
   publication.getLiteral()?.addFilter('dateto', to, graph);
 
   const address = addLocationAddress(graph, realEstate, 640, -20);
-  addCityFilterToAddress(graph, address, 'la plata', 1000, -20);
+  addCityFilterToAddress(graph, address, city, 1000, -20);
   // City Bell es barrio (`inm:neighborhood`) de La Plata, no localidad.
   const neighborhood = varNode(graph, 'neighborhood', 1000, 120, false);
   connect(graph, address, `${INM}neighborhood`, neighborhood, true);
@@ -276,7 +278,7 @@ function addUsdPriceDetails(graph: PropertyGraph): void {
 const CASES: EvaluationCaseDefinition[] = [
   {
     suffix: 'd1',
-    title: 'D1 · Casas de La Plata publicadas del 1 al 10 de septiembre de 2023',
+    title: 'D1 · Exploración inicial',
     build(graph) {
       buildLaPlataHouses(
         graph,
@@ -300,12 +302,32 @@ const CASES: EvaluationCaseDefinition[] = [
   },
   {
     suffix: 'd5',
-    title: 'D5 · Localidades asociadas a casas (punto de partida)',
+    title: 'D5 · Ciudades asociadas a casas',
     build(graph) {
       // Solo el punto de partida: el participante construye
-      // casa → hasFeature → Address → hasValue → city → label.
+      // House → hasFeature → [rdf:type Address] → hasValue → city → label.
       const house = varNode(graph, 'casa', 160, 200);
       typeIs(graph, house, `${INM}House`, 160, 20);
+    },
+  },
+  {
+    suffix: 't1',
+    title: 'T1 · Tutorial RDF · Departamentos de Berisso (oct–dic 2023)',
+    build(graph) {
+      buildLaPlataHouses(graph,
+        { date: '2023-10', granularity: 'month' },
+        { date: '2023-12', granularity: 'month' }, `${INM}Apartment`, 'berisso');
+      addUsdPriceDetails(graph);
+    },
+  },
+  {
+    suffix: 't2',
+    title: 'T2 · Tutorial GIS · Departamentos de Berisso (oct–dic 2023)',
+    build(graph) {
+      buildLaPlataHouses(graph,
+        { date: '2023-10', granularity: 'month' },
+        { date: '2023-12', granularity: 'month' }, `${INM}Apartment`, 'berisso');
+      addUsdPriceDetails(graph);
     },
   },
 ];
@@ -379,62 +401,80 @@ function explorerPayload(artifacts: CaseArtifacts): Record<string, unknown> {
   };
 }
 
-/** Consultas de auditoría derivadas de los mismos grafos que carga la interfaz. */
-export function buildEvaluationQueries(): Array<{ id: string; query: string }> {
-  return CASES.map(buildCaseArtifacts).map((item) => ({
-    id: `eval-explorer-${item.definition.suffix}`,
+function dashboardId(item: CaseArtifacts): string {
+  const suffix = item.definition.suffix;
+  return `eval-${suffix === 'd2' || suffix === 't2' ? 'gis' : 'explorer'}-${suffix}`;
+}
+
+function gisPayload(item: CaseArtifacts): Record<string, unknown> {
+  return {
     query: item.gisQuery,
-  }));
+    backend: 'graphdb',
+    primaryVariable: 'listing',
+    activeFilters: [],
+    paging: { lot: 1, size: 300 },
+    layout: {
+      slotsCount: 4, preset: 'quad', editorCollapsed: true,
+      slots: ['map', 'timeline', 'table', 'graph'].map((view, i) => ({ id: `slot-${i}`, view })),
+    },
+    filters: { graph: { layout: 'dagre' } },
+  };
+}
+
+/** Exact full projections used by GIS and real RDF→GIS handoff. */
+export function buildEvaluationQueries(): Array<{ id: string; query: string }> {
+  return CASES.map(buildCaseArtifacts).map(item => ({ id: dashboardId(item), query: item.gisQuery }));
 }
 
 export function buildEvaluationRows(): EvaluationDashboardRow[] {
-  return CASES.map(buildCaseArtifacts).map((item) => ({
-    id: `eval-explorer-${item.definition.suffix}`,
-    kind: 'explorer',
-    name: item.definition.title,
-    payload: explorerPayload(item),
-  }));
+  return CASES.map(buildCaseArtifacts).map(item => {
+    const kind = item.definition.suffix === 'd2' || item.definition.suffix === 't2' ? 'gis' : 'explorer';
+    return { id: dashboardId(item), kind, name: item.definition.title,
+      payload: kind === 'gis' ? gisPayload(item) : explorerPayload(item) };
+  });
 }
 
-/** Restablece la base a los tableros iniciales de los cinco desafíos.
- * Borra también tableros manuales. Usa una transacción sobre el mismo archivo
- * para que el servidor activo vea el cambio sin reemplazar su conexión SQLite.
+/** Consistent SQLite backup first, then update only IDs owned by this seed.
+ * The former RDF D2 is retired in favor of the direct GIS entry.
+ * Unrelated and manually saved dashboards are preserved on the live connection.
  */
-export function seedEvaluationDatabase(targetPath: string): void {
+export function seedEvaluationDatabase(targetPath: string): { backupPath: string | null; count: number } {
   const rows = buildEvaluationRows();
   const resolved = path.resolve(targetPath);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  const existed = fs.existsSync(resolved);
   const db = new Database(resolved);
+  let backupPath: string | null = null;
   try {
     db.pragma('busy_timeout = 5000');
+    if (existed) {
+      const backupDir = path.join(path.dirname(resolved), 'evaluation-backups');
+      fs.mkdirSync(backupDir, { recursive: true });
+      backupPath = path.join(backupDir, `${path.basename(resolved)}.${new Date().toISOString().replace(/[:.]/g, '-')}.${process.pid}.sqlite`);
+      db.prepare('VACUUM INTO ?').run(backupPath);
+    }
     db.exec(`
       CREATE TABLE IF NOT EXISTS dashboards (
-        id TEXT PRIMARY KEY,
-        kind TEXT NOT NULL CHECK (kind IN ('gis','explorer')),
-        name TEXT NOT NULL,
-        payload TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('gis','explorer')),
+        name TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_dashboards_updated ON dashboards(updated_at DESC);
     `);
-    const remove = db.prepare('DELETE FROM dashboards');
+    const removeRetired = db.prepare('DELETE FROM dashboards WHERE id = ?');
     const upsert = db.prepare(`
       INSERT INTO dashboards (id, kind, name, payload, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        kind = excluded.kind, name = excluded.name, payload = excluded.payload,
-        updated_at = excluded.updated_at
+      ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name,
+        payload = excluded.payload, updated_at = excluded.updated_at
     `);
     db.transaction(() => {
-      remove.run();
+      removeRetired.run('eval-explorer-d2');
       const baseTime = Date.now();
       rows.forEach((row, index) => {
         const timestamp = new Date(baseTime - index * 1000).toISOString();
         upsert.run(row.id, row.kind, row.name, JSON.stringify(row.payload), timestamp, timestamp);
       });
     })();
-  } finally {
-    db.close();
-  }
+    return { backupPath, count: rows.length };
+  } finally { db.close(); }
 }
