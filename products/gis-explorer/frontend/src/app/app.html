@@ -14,7 +14,7 @@
   @if (paging.slow()) {
     <div class="slow-query-overlay" role="alertdialog" aria-modal="true" aria-labelledby="slow-query-title">
       <div class="slow-query-card">
-        <h2 id="slow-query-title">{{ 'La consulta lleva más de cinco minutos' | translate }}</h2>
+        <h2 id="slow-query-title">{{ 'La consulta lleva más de tres minutos' | translate }}</h2>
         <p>{{ 'Podés volver al editor y aplicar filtros para acotar los resultados.' | translate }}</p>
         <button type="button" (click)="returnToEditor()">{{ 'Volver al editor' | translate }}</button>
       </div>

@@ -256,7 +256,7 @@ set in the environment of the Shell backend.
 | `MCP_PUBLIC_APP_URL` | `http://localhost:4200` | Base URL used in dashboard links |
 | `MCP_EXPLORER_API_URL` | `http://localhost:3002/api` | Explorer backend the tools call (`http://gis-backend:3002/api` in Docker) |
 | `MCP_MAX_ROWS` | `100` | Rows returned to the agent per query |
-| `MCP_EXPLORER_TIMEOUT_MS` | `120000` | Timeout for each explorer call |
+| `MCP_EXPLORER_TIMEOUT_MS` | `185000` | HTTP timeout for each explorer call (query budget plus response margin) |
 
 Requests sent from a browser must also come from an origin listed in
 `CORS_ORIGINS`; command-line and desktop clients send no origin. Keep the token
@@ -293,7 +293,7 @@ not inject them at execution time: every query must be self-contained.
 | `SPARQL_USERNAME` / `SPARQL_PASSWORD` | — | Optional Basic Auth |
 | `SPARQL_ENTITY_SEARCH_QUERY` | search by `rdfs:label` | Entity/resource search template (`$keyword`, `$limit`, optional `$offset`) |
 | `SPARQL_SERVER_TIMEOUT_PARAM` | `timeout` for GraphDB; disabled elsewhere | Server timeout form parameter, in seconds; empty disables it |
-| `SPARQL_TIMEOUT_MS` | `30000` | Timeout in ms |
+| `SPARQL_TIMEOUT_MS` | `180000` | Query timeout in ms (maximum 3 minutes; shorter requests are allowed) |
 | `SPARQL_CONNECT_TIMEOUT_MS` | `5000` | Max ms to open the connection to the endpoint (fails fast when it is unreachable, e.g. without VPN) |
 | `SPARQL_MAX_LIMIT` | `300` | Rows per GIS batch and maximum rows per query request; does not cap the total result |
 | `SPARQL_PREFIXES_PATH` | `config/prefixes.${SPARQL_BACKEND}.json` | Prefixes |
@@ -372,6 +372,14 @@ If you use the RDF Explorer approach in academic work, please cite:
 > *RDF Explorer: A Visual SPARQL Query Builder.* In *The Semantic Web – ISWC
 > 2019*, LNCS 11778, pp. 647–663. Springer, 2019.
 > [doi:10.1007/978-3-030-30793-6_37](https://doi.org/10.1007/978-3-030-30793-6_37)
+
+GIS permite filtrar la línea de tiempo con **Desde / Hasta** además del rango
+visual. Ambos días se incluyen completos (por ejemplo, 01/10/2023–30/11/2023),
+conservando el día escrito en el valor RDF, sin convertirlo a la zona horaria del
+navegador. Esto incluye `xsd:date`, `xsd:dateTime`, valores sin zona, offsets y
+fracciones de segundo. El filtro visual conserva precisión de instantes; para
+valores RDF sin zona se usa UTC. Los filtros guardados se restauran al abrir el
+tablero y se aplican también al recuento, los lotes y la exportación.
 
 ## Contact
 

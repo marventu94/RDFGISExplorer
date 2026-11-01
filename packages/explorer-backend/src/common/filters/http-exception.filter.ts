@@ -43,7 +43,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           : { ...(res as Record<string, unknown>) };
     } else if (exception instanceof TimeoutError) {
       status = HttpStatus.REQUEST_TIMEOUT;
-      body = { error: 'TIMEOUT', message: exception.message };
+      body = { error: 'TIMEOUT', message: exception.message, timeoutMs: exception.timeoutMs };
     } else if (exception instanceof UpstreamError) {
       status = HttpStatus.BAD_GATEWAY;
       body = { error: 'UPSTREAM_ERROR', message: exception.message };

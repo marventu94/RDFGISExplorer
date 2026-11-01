@@ -44,6 +44,11 @@ describe('GenericSparqlAdapter', () => {
   });
 
   describe('execute', () => {
+    it.each([408, 504, 500])('classifies an upstream execution timeout (%s) as TimeoutError', async (status) => {
+      nock(WIKIDATA_BASE).post(WIKIDATA_PATH).reply(status, 'org.eclipse.rdf4j.query.QueryInterruptedException: Query evaluation took too long');
+      await expect(adapter.execute('SELECT * WHERE { ?s ?p ?o }', defaultOpts)).rejects.toBeInstanceOf(TimeoutError);
+    });
+
     it('returns >0 bindings for a valid query', async () => {
       mockWikidata(FIXTURE);
       const result = await adapter.execute(

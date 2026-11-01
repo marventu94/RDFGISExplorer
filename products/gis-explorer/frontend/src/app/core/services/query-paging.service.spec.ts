@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { NEVER, Subject, of } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import type { QueryResult } from '@rdfgis/contracts';
 import { ApiService } from './api.service';
 import { AppConfigService } from './app-config.service';
@@ -210,7 +210,35 @@ describe('QueryPagingService', () => {
     expect(visible.at(-1)?.nodes[0]?.uri).toBe('urn:filtered');
   });
 
-  it('offers a return to the editor after five minutes and clears it on cancellation', () => {
+  it('recovers from a filter COUNT timeout and resets to lot one after correcting the calendar bounds', () => {
+    const api = {
+      fetchSummary: vi.fn().mockReturnValueOnce(throwError(() => ({ status: 408 }))).mockReturnValue(of({ totalRows: 400 })),
+      executeQuery: vi.fn((_request: { sparql: string; timeoutMs?: number }) => of(page('urn:filtered'))),
+    };
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiService, useValue: api },
+      { provide: AppConfigService, useValue: { load: () => of({ maxLimit: 300 }), config: signal({ maxLimit: 300 }) } },
+    ] });
+    const selection = TestBed.inject(SelectionService);
+    const paging = TestBed.inject(QueryPagingService);
+    const first = page('urn:first');
+    selection.setQueryResult(first);
+    paging.activate(query, first, 650, 300);
+    selection.nextLot();
+    expect(selection.getCurrentLotSnapshot()).toBe(2);
+    selection.addFilter({ id: 'timeline-range', kind: 'temporal', label: 'Oct–Nov', from: '2023-10-01', to: '2023-11-30' });
+    expect(paging.error()).toContain('agregá filtros');
+    expect(paging.busy()).toBe(false);
+    expect(paging.canRetry()).toBe(true);
+    paging.retry();
+    expect(paging.error()).toBeNull();
+    expect(selection.getCurrentLotSnapshot()).toBe(1);
+    expect(api.fetchSummary.mock.calls[1][0]).not.toHaveProperty('timeoutMs');
+    expect(api.fetchSummary.mock.calls[1][0].query).toContain('SUBSTR');
+    expect(api.executeQuery.mock.calls.at(-1)?.[0]).not.toHaveProperty('timeoutMs');
+  });
+
+  it('offers a return to the editor after three minutes and clears it on cancellation', () => {
     vi.useFakeTimers();
     try {
       TestBed.configureTestingModule({ providers: [
@@ -219,7 +247,7 @@ describe('QueryPagingService', () => {
       ] });
       const paging = TestBed.inject(QueryPagingService);
       paging.loadInitial(query).subscribe();
-      vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+      vi.advanceTimersByTime(3 * 60 * 1000 + 1);
       expect(paging.slow()).toBe(true);
       paging.cancel();
       expect(paging.slow()).toBe(false);

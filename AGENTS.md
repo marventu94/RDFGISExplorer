@@ -239,7 +239,7 @@ to the original SELECT so the backend can still extract graph topology. Area
 and time filters are translated to SPARQL on the original query; each filter
 change recounts and loads page 1. Navigation loads other pages on demand and
 caches them. `lotState$` reports the exact filtered total and unfiltered base
-total. A five-minute wait reveals a return-to-editor action. The entity graph
+total. A three-minute wait reveals a return-to-editor action. The entity graph
 uses the current page's graph; `Ver estructura` separately retrieves all rows
 of the selected resource across pages and merges their graph. `shared/stats/lots.ts` remains the local fallback for
 results installed directly in `SelectionService` (including tests); it retains

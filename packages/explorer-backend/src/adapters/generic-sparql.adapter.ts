@@ -10,6 +10,7 @@ import {
   type EntitySearchResult,
 } from './sparql-endpoint.interface';
 import { escapeSparqlLiteral } from './sparql-text';
+import { queryTimeout } from '../common/query-timeout';
 import { connectTimeoutAgents } from './connect-timeout';
 import {
   BindingValue,
@@ -23,7 +24,6 @@ import {
 import { extractQueryTopology, type QueryTopology } from './query-topology';
 
 const DEFAULT_SPARQL_URL = 'https://query.wikidata.org/sparql';
-const DEFAULT_TIMEOUT_MS = 10_000;
 export const DEFAULT_USER_AGENT =
   'rdf-gis-explorer/0.1 (https://github.com/marventu94/RDFGISExplorer; mailto:mar_venturino@hotmail.com)';
 const RETRY_DELAYS_MS = [500, 1500, 4500];
@@ -50,7 +50,7 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
 
   async execute(query: string, opts: ExecuteOptions): Promise<QueryResult> {
     const t0 = Date.now();
-    const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
+    const timeoutMs = queryTimeout(process.env['SPARQL_TIMEOUT_MS'], opts.timeoutMs);
     const userAgent = this.resolveUserAgent();
     const serverTimeoutParam =
       process.env['SPARQL_SERVER_TIMEOUT_PARAM'] ??
@@ -184,6 +184,11 @@ export class GenericSparqlAdapter implements SparqlEndpoint {
             continue;
           }
           const upstreamBody = JSON.stringify(err.response?.data ?? {});
+          // RDF4J can stop the query just before our HTTP deadline and answer
+          // 500 with QueryInterruptedException; that is still a query timeout.
+          if (status === 408 || status === 504 || (status >= 500 && /QueryInterruptedException|Query evaluation (?:has run|took) too long|(?:query|execution) timed out|TimeoutException/i.test(upstreamBody))) {
+            throw new TimeoutError(timeoutMs);
+          }
           if (status === 429) {
             throw new UpstreamError(
               429,

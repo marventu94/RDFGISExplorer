@@ -1,3 +1,4 @@
+import { isCalendarDay } from '@shared/query/temporal-range';
 import { TranslatePipe } from '../../core/services/translate.pipe';
 import {
   Component,
@@ -65,6 +66,31 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
   queryState: QueryState = 'no-query';
   activeFilterLabel = '';
+  dateFrom = '';
+  dateTo = '';
+  dateRangeError = '';
+  private appliedTemporalKey = '';
+
+  editDate(bound: 'from' | 'to', value: string): void {
+    if (bound === 'from') this.dateFrom = value; else this.dateTo = value;
+    this.dateRangeError = '';
+  }
+
+  applyDates(): void {
+    if (!isCalendarDay(this.dateFrom) || !isCalendarDay(this.dateTo)) {
+      this.dateRangeError = this.i18n.text('Ingresá fechas válidas en Desde y Hasta.');
+      return;
+    }
+    if (this.dateFrom > this.dateTo) {
+      this.dateRangeError = this.i18n.text('Desde debe ser anterior o igual a Hasta.');
+      return;
+    }
+    const label = (day: string) => day.split('-').reverse().join('/');
+    this.selectionService.addFilter({ id: 'timeline-range', kind: 'temporal', from: this.dateFrom, to: this.dateTo, label: `${label(this.dateFrom)} – ${label(this.dateTo)}` });
+    this.dateRangeError = '';
+    this.pendingRange = undefined;
+    this.canApplyRange = false;
+  }
   originalNodeCount = 0;
   filteredNodeCount = 0;
   canApplyRange = false;
@@ -168,6 +194,13 @@ export class TimelineViewComponent implements OnInit, OnDestroy {
 
     const temporalFilter = filters.find((f): f is TemporalFilter => f.kind === 'temporal');
     this.activeFilterLabel = temporalFilter?.label ?? '';
+    const key = temporalFilter ? `${temporalFilter.from}/${temporalFilter.to}` : '';
+    if (key !== this.appliedTemporalKey) {
+      this.appliedTemporalKey = key;
+      this.dateFrom = temporalFilter?.from.slice(0, 10) ?? '';
+      this.dateTo = temporalFilter?.to.slice(0, 10) ?? '';
+      this.dateRangeError = '';
+    }
 
     if (!visible || visible.nodes.length === 0) {
       if (!original || original.nodes.length === 0) {

@@ -1,3 +1,4 @@
+import { temporalRangeContains } from '@shared/query/temporal-range';
 import { Injectable, effect, inject, signal } from '@angular/core';
 import {
   BehaviorSubject,
@@ -575,7 +576,7 @@ export class SelectionService {
     }
     if (filter.kind === 'temporal') {
       if (!node.temporalEvents?.length) return false;
-      return node.temporalEvents.some((ev) => ev.isoDate >= filter.from && ev.isoDate <= filter.to);
+      return node.temporalEvents.some((ev) => temporalRangeContains(ev.isoDate, filter.from, filter.to));
     }
     return true;
   }

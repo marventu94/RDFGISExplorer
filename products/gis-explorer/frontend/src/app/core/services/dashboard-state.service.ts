@@ -271,9 +271,13 @@ export class DashboardStateService {
         }),
         catchError((err) => {
           this.isHydrating.set(false);
-          this.progress.failActive(this.i18n.text('query inválida o backend no disponible'));
+          const message = err?.status === 408
+            ? this.i18n.text('La consulta excedió el tiempo límite. Reducí el alcance o agregá filtros y reintentá.')
+            : this.i18n.text('Error al hidratar el dashboard. Query inválida o backend no disponible.');
+          if (err?.status === 408) this.layout.editorCollapsed.set(false);
+          this.progress.failActive(message);
           this.snackBar.open(
-            this.i18n.text('Error al hidratar el dashboard. Query inválida o backend no disponible.'),
+            message,
             this.i18n.text('Cerrar'),
             {
               duration: 8000,

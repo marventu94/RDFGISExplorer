@@ -1,3 +1,4 @@
+import { translateUiText, getLanguage } from '@rdfgis/platform-bridge';
 import { Literal } from '../../graph/domain';
 import { TranslatePipe } from '../../core/translate.pipe';
 import { Component, computed, inject, effect, signal, OnDestroy } from '@angular/core';
@@ -411,7 +412,9 @@ export class EditPanelComponent implements OnDestroy {
         const msg = typeof body?.['message'] === 'string' ? body['message']
           : err instanceof Error ? err.message
           : String(err ?? '');
-        this.loadError.set(msg || 'Error al ejecutar la query.');
+        this.loadError.set((err as { status?: number })?.status === 408
+          ? translateUiText('La consulta excedió el tiempo límite. Reducí el alcance o agregá filtros y reintentá.', getLanguage())
+          : msg || 'Error al ejecutar la query.');
       },
     };
 

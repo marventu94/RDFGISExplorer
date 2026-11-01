@@ -6,10 +6,10 @@ import { SelectionService } from './selection.service';
 import { VariableMappingService } from './variable-mapping.service';
 import { entityScopedQuery, filterVariables, pagedQuery, scopedQuery } from '@shared/query/paged-query';
 import { mergePages } from '@shared/query/merge-pages';
+import { I18nService } from './i18n.service';
 import { AppConfigService } from './app-config.service';
 
-const LONG_QUERY_MS = 5 * 60 * 1000;
-const ENDPOINT_TIMEOUT_MS = 10 * 60 * 1000;
+const LONG_QUERY_MS = 3 * 60 * 1000;
 type LoadKind = 'initial' | 'lot' | 'size' | 'filter';
 type LotDirection = 'previous' | 'next' | null;
 
@@ -25,6 +25,7 @@ interface Session {
 @Injectable({ providedIn: 'root' })
 export class QueryPagingService {
   private readonly api = inject(ApiService);
+  private readonly i18n = inject(I18nService);
   private readonly selection = inject(SelectionService);
   private readonly mapping = inject(VariableMappingService);
   private readonly config = inject(AppConfigService);
@@ -170,15 +171,15 @@ export class QueryPagingService {
   }
 
   private count(query: string): Observable<number> {
-    return this.api.fetchSummary({ query, numericVars: [], temporalVars: [], categoricalVars: [], timeoutMs: ENDPOINT_TIMEOUT_MS }).pipe(
+    return this.api.fetchSummary({ query, numericVars: [], temporalVars: [], categoricalVars: [] }).pipe(
       switchMap((summary) => summary.totalRows === null
-        ? throwError(() => new Error('No se pudo calcular el total de filas de la consulta.'))
+        ? throwError(() => new Error('No se pudo calcular el total de filas. Reducí el alcance o agregá filtros y reintentá.'))
         : of(summary.totalRows)),
     );
   }
 
   private page(query: string, lot: number, size: number): Observable<QueryResult> {
-    return this.api.executeQuery({ sparql: pagedQuery(query, lot, size), limit: size, timeoutMs: ENDPOINT_TIMEOUT_MS });
+    return this.api.executeQuery({ sparql: pagedQuery(query, lot, size), limit: size });
   }
 
   private applyFilters(filters: Filter[]): void {
@@ -243,7 +244,9 @@ export class QueryPagingService {
       },
       error: (error) => {
         if (generation !== this.generation) return;
-        this.error.set(error instanceof Error ? error.message : 'No se pudo cargar el lote.');
+        this.error.set(error?.status === 408
+          ? this.i18n.text('La consulta excedió el tiempo límite. Reducí el alcance o agregá filtros y reintentá.')
+          : error instanceof Error ? error.message : this.i18n.text('No se pudo cargar el lote.'));
       },
     });
   }

@@ -26,7 +26,7 @@ export class ExplorerApiClient {
       config.get<string>('MCP_EXPLORER_API_URL') ?? 'http://localhost:3002/api'
     ).replace(/\/+$/, '');
     const timeout = parseInt(config.get<string>('MCP_EXPLORER_TIMEOUT_MS') ?? '', 10);
-    this.timeoutMs = Number.isInteger(timeout) && timeout > 0 ? timeout : 120_000;
+    this.timeoutMs = Number.isInteger(timeout) && timeout > 0 ? timeout : 185_000;
   }
 
   get<T>(path: string, query: Record<string, string | number | undefined> = {}): Promise<T> {

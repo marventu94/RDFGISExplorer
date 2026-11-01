@@ -1,3 +1,4 @@
+import { queryTimeout } from '../../common/query-timeout';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync, existsSync } from 'fs';
@@ -93,10 +94,7 @@ export class AppConfigService {
       endpointUrl,
       hasBasicAuth: Boolean(username && password),
       userAgent,
-      timeoutMs: parseInt(
-        this.config.get<string>('SPARQL_TIMEOUT_MS') ?? '30000',
-        10,
-      ),
+      timeoutMs: queryTimeout(this.config.get<string>('SPARQL_TIMEOUT_MS')),
       maxLimit,
       capabilities: [
         'sparql11',

@@ -315,8 +315,8 @@ export class SparqlInputComponent implements OnInit, OnDestroy {
     }
 
     if (err.status === 408) {
-      const secs = body?.timeoutMs ? Math.round(body.timeoutMs / 1000) : 30;
-      return this.i18n.text('La query excedió el tiempo límite ({seconds} segundos). Intentá reducir el alcance.', { seconds: secs });
+      const secs = body?.timeoutMs ? Math.round(body.timeoutMs / 1000) : 180;
+      return this.i18n.text('La query excedió el tiempo límite ({seconds} segundos). Reducí el alcance o agregá filtros y reintentá.', { seconds: secs });
     }
 
     if (err.status === 413) {
